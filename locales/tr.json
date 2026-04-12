@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "GüneşHesap",
+    "subtitle": "Türkiye Güneş Paneli Hesaplayıcı",
+    "tagline": "Profesyonel GES Mühendislik Aracı"
+  },
+  "nav": {
+    "step1": "Konum",
+    "step2": "Çatı",
+    "step3": "Seçenekler",
+    "step4": "Hesaplama",
+    "step5": "Sonuçlar"
+  },
+  "step1": {
+    "title": "Konumunuzu Seçin",
+    "subtitle": "Haritaya tıklayın veya şehir adı arayın",
+    "search": "İl adı arayın...",
+    "geoBtn": "Konumumu Kullan",
+    "next": "Çatı Bilgilerine Geç"
+  },
+  "step2": {
+    "title": "Çatı Konfigürasyonu",
+    "roofArea": "Çatı Alanı (m²)",
+    "tilt": "Eğim Açısı",
+    "direction": "Çatı Yönü",
+    "shading": "Gölgelenme",
+    "next": "Panel Seçimine Geç"
+  },
+  "step3": {
+    "title": "Panel & Gelişmiş Seçenekler",
+    "panelType": "Panel Tipi",
+    "inverter": "İnverter Tipi",
+    "consumption": "Günlük Tüketim",
+    "battery": "Batarya (BESS)",
+    "netMetering": "Net Sayaç / YEKDEM",
+    "cableLoss": "Kablo Kayıp Hesabı",
+    "billAnalysis": "Fatura Analizi",
+    "ev": "EV Şarj",
+    "heatPump": "Isı Pompası",
+    "tax": "Vergi Avantajı",
+    "calculate": "Hesaplamayı Başlat"
+  },
+  "step4": {
+    "title": "Hesaplanıyor",
+    "subtitle": "PVGIS verisi ve enerji üretimi hesaplanıyor..."
+  },
+  "step5": {
+    "title": "Hesaplama Sonuçları",
+    "annualEnergy": "Yıllık Enerji",
+    "annualSavings": "Yıllık Tasarruf",
+    "systemPower": "Sistem Gücü",
+    "co2": "CO₂ Tasarrufu",
+    "totalCost": "Toplam Maliyet",
+    "payback": "Geri Ödeme",
+    "npv": "NPV (25 Yıl)",
+    "roi": "ROI",
+    "irr": "IRR",
+    "lcoe": "LCOE",
+    "downloadPDF": "PDF İndir",
+    "share": "Paylaş",
+    "save": "Hesabı Kaydet",
+    "engReport": "Mühendis Hesap Raporu"
+  },
+  "results": {
+    "monthlyChart": "Aylık Üretim Grafiği",
+    "hourlyProfile": "Saatlik Üretim Profili",
+    "sunPath": "Güneş Yolu Diyagramı",
+    "heatmap": "Türkiye Üretim Haritası",
+    "scenarios": "Senaryo Analizi",
+    "comparison": "Teklif Karşılaştır",
+    "prGauge": "Performans Oranı (PR)"
+  },
+  "common": {
+    "yes": "Evet",
+    "no": "Hayır",
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "close": "Kapat",
+    "loading": "Yükleniyor...",
+    "error": "Hata",
+    "success": "Başarılı"
+  }
+}

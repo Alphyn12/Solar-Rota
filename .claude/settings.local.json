@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -c \"C:\\\\Users\\\\Monster\\\\Desktop\\\\GüneşHesap\\\\index.html\")",
+      "Bash(ls:*)",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(npx --yes http-server -p 8080 -c-1 --cors)",
+      "Bash(start:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(python -m http.server 8080)",
+      "Bash(curl -s \"http://127.0.0.1:8080/\")",
+      "Bash(node:*)",
+      "Bash(grep -v \"//.*getElementById\")",
+      "Bash(python3 -c \" import re with open\\('index.html'\\) as f: content = f.read\\(\\) opens = len\\(re.findall\\(r'<div[^>]*>', content\\)\\) closes = len\\(re.findall\\(r'</div>', content\\)\\) print\\(f'Open divs: {opens}, Close divs: {closes}, Diff: {opens - closes}'\\) \")",
+      "Bash(npm start:*)"
+    ]
+  }
+}

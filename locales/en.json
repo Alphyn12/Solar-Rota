@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "GüneşHesap",
+    "subtitle": "Turkey Solar Panel Calculator",
+    "tagline": "Professional Solar Engineering Tool"
+  },
+  "nav": {
+    "step1": "Location",
+    "step2": "Roof",
+    "step3": "Options",
+    "step4": "Calculating",
+    "step5": "Results"
+  },
+  "step1": {
+    "title": "Select Your Location",
+    "subtitle": "Click on the map or search by city name",
+    "search": "Search for a city...",
+    "geoBtn": "Use My Location",
+    "next": "Continue to Roof Configuration"
+  },
+  "step2": {
+    "title": "Roof Configuration",
+    "roofArea": "Roof Area (m²)",
+    "tilt": "Tilt Angle",
+    "direction": "Roof Direction",
+    "shading": "Shading",
+    "next": "Continue to Panel Selection"
+  },
+  "step3": {
+    "title": "Panel & Advanced Options",
+    "panelType": "Panel Type",
+    "inverter": "Inverter Type",
+    "consumption": "Daily Consumption",
+    "battery": "Battery (BESS)",
+    "netMetering": "Net Metering / YEKDEM",
+    "cableLoss": "Cable Loss Calculator",
+    "billAnalysis": "Bill Analysis",
+    "ev": "EV Charging",
+    "heatPump": "Heat Pump",
+    "tax": "Tax Advantage",
+    "calculate": "Start Calculation"
+  },
+  "step4": {
+    "title": "Calculating",
+    "subtitle": "Fetching PVGIS data and computing energy production..."
+  },
+  "step5": {
+    "title": "Calculation Results",
+    "annualEnergy": "Annual Energy",
+    "annualSavings": "Annual Savings",
+    "systemPower": "System Power",
+    "co2": "CO₂ Savings",
+    "totalCost": "Total Cost",
+    "payback": "Payback Period",
+    "npv": "NPV (25 Years)",
+    "roi": "ROI",
+    "irr": "IRR",
+    "lcoe": "LCOE",
+    "downloadPDF": "Download PDF",
+    "share": "Share",
+    "save": "Save Calculation",
+    "engReport": "Engineering Report"
+  },
+  "results": {
+    "monthlyChart": "Monthly Production Chart",
+    "hourlyProfile": "Hourly Production Profile",
+    "sunPath": "Sun Path Diagram",
+    "heatmap": "Turkey Production Heatmap",
+    "scenarios": "Scenario Analysis",
+    "comparison": "Compare Offers",
+    "prGauge": "Performance Ratio (PR)"
+  },
+  "common": {
+    "yes": "Yes",
+    "no": "No",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
+  }
+}

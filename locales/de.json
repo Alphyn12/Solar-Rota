@@ -1,0 +1,83 @@
+{
+  "app": {
+    "title": "GüneşHesap",
+    "subtitle": "Türkei Solarrechner",
+    "tagline": "Professionelles Solar-Engineering-Tool"
+  },
+  "nav": {
+    "step1": "Standort",
+    "step2": "Dach",
+    "step3": "Optionen",
+    "step4": "Berechnung",
+    "step5": "Ergebnisse"
+  },
+  "step1": {
+    "title": "Standort auswählen",
+    "subtitle": "Klicken Sie auf die Karte oder suchen Sie nach einer Stadt",
+    "search": "Stadt suchen...",
+    "geoBtn": "Meinen Standort verwenden",
+    "next": "Zur Dachkonfiguration"
+  },
+  "step2": {
+    "title": "Dachkonfiguration",
+    "roofArea": "Dachfläche (m²)",
+    "tilt": "Neigungswinkel",
+    "direction": "Dachrichtung",
+    "shading": "Verschattung",
+    "next": "Zur Panelauswahl"
+  },
+  "step3": {
+    "title": "Panel & Erweiterte Optionen",
+    "panelType": "Paneltyp",
+    "inverter": "Wechselrichtertyp",
+    "consumption": "Tagesverbrauch",
+    "battery": "Batterie (BESS)",
+    "netMetering": "Netzeinspeisung / YEKDEM",
+    "cableLoss": "Kabelverlustrechner",
+    "billAnalysis": "Stromkostenanalyse",
+    "ev": "E-Auto Laden",
+    "heatPump": "Wärmepumpe",
+    "tax": "Steuervorteile",
+    "calculate": "Berechnung starten"
+  },
+  "step4": {
+    "title": "Berechnung läuft",
+    "subtitle": "PVGIS-Daten werden abgerufen und Energieerzeugung berechnet..."
+  },
+  "step5": {
+    "title": "Berechnungsergebnisse",
+    "annualEnergy": "Jahresenergie",
+    "annualSavings": "Jahresersparnis",
+    "systemPower": "Systemleistung",
+    "co2": "CO₂-Einsparung",
+    "totalCost": "Gesamtkosten",
+    "payback": "Amortisationszeit",
+    "npv": "NPV (25 Jahre)",
+    "roi": "ROI",
+    "irr": "IRR",
+    "lcoe": "LCOE",
+    "downloadPDF": "PDF herunterladen",
+    "share": "Teilen",
+    "save": "Berechnung speichern",
+    "engReport": "Ingenieurbericht"
+  },
+  "results": {
+    "monthlyChart": "Monatliches Produktionsdiagramm",
+    "hourlyProfile": "Stündliches Produktionsprofil",
+    "sunPath": "Sonnenbahndiagramm",
+    "heatmap": "Türkei Produktionskarte",
+    "scenarios": "Szenarioanalyse",
+    "comparison": "Angebote vergleichen",
+    "prGauge": "Performance Ratio (PR)"
+  },
+  "common": {
+    "yes": "Ja",
+    "no": "Nein",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "loading": "Lädt...",
+    "error": "Fehler",
+    "success": "Erfolg"
+  }
+}

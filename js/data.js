@@ -1,0 +1,288 @@
+// ═══════════════════════════════════════════════════════════
+// DATA — Tüm sabitler ve referans verileri
+// GüneşHesap v2.0
+// ═══════════════════════════════════════════════════════════
+
+export const TURKISH_CITIES = [
+  { name: "İstanbul", lat: 41.0082, lon: 28.9784, ghi: 1550 },
+  { name: "Ankara", lat: 39.9334, lon: 32.8597, ghi: 1620 },
+  { name: "İzmir", lat: 38.4192, lon: 27.1287, ghi: 1720 },
+  { name: "Antalya", lat: 36.8969, lon: 30.7133, ghi: 1800 },
+  { name: "Bursa", lat: 40.1885, lon: 29.0610, ghi: 1580 },
+  { name: "Adana", lat: 37.0000, lon: 35.3213, ghi: 1780 },
+  { name: "Konya", lat: 37.8715, lon: 32.4846, ghi: 1680 },
+  { name: "Gaziantep", lat: 37.0662, lon: 37.3833, ghi: 1820 },
+  { name: "Şanlıurfa", lat: 37.1591, lon: 38.7969, ghi: 1880 },
+  { name: "Mersin", lat: 36.8000, lon: 34.6333, ghi: 1790 },
+  { name: "Diyarbakır", lat: 37.9144, lon: 40.2306, ghi: 1750 },
+  { name: "Edirne", lat: 41.6818, lon: 26.5623, ghi: 1490 },
+  { name: "Trabzon", lat: 41.0015, lon: 39.7178, ghi: 1320 },
+  { name: "Erzurum", lat: 39.9055, lon: 41.2658, ghi: 1580 },
+  { name: "Malatya", lat: 38.3552, lon: 38.3095, ghi: 1720 },
+  { name: "Kayseri", lat: 38.7312, lon: 35.4787, ghi: 1650 },
+  { name: "Eskişehir", lat: 39.7767, lon: 30.5206, ghi: 1580 },
+  { name: "Samsun", lat: 41.2867, lon: 36.3300, ghi: 1380 },
+  { name: "Denizli", lat: 37.7765, lon: 29.0864, ghi: 1720 },
+  { name: "Sakarya", lat: 40.7731, lon: 30.3949, ghi: 1500 },
+  { name: "Tekirdağ", lat: 40.9781, lon: 27.5115, ghi: 1490 },
+  { name: "Balıkesir", lat: 39.6484, lon: 27.8826, ghi: 1580 },
+  { name: "Kahramanmaraş", lat: 37.5753, lon: 36.9228, ghi: 1780 },
+  { name: "Van", lat: 38.4938, lon: 43.3800, ghi: 1700 },
+  { name: "Aydın", lat: 37.8444, lon: 27.8458, ghi: 1760 },
+  { name: "Manisa", lat: 38.6191, lon: 27.4289, ghi: 1680 },
+  { name: "Muğla", lat: 37.2153, lon: 28.3636, ghi: 1780 },
+  { name: "Hatay", lat: 36.4018, lon: 36.3498, ghi: 1800 },
+  { name: "Kocaeli", lat: 40.8533, lon: 29.8815, ghi: 1480 },
+  { name: "Ordu", lat: 40.9862, lon: 37.8797, ghi: 1340 },
+  { name: "Afyonkarahisar", lat: 38.7507, lon: 30.5567, ghi: 1620 },
+  { name: "Çorum", lat: 40.5506, lon: 34.9556, ghi: 1580 },
+  { name: "Sivas", lat: 39.7477, lon: 37.0179, ghi: 1600 },
+  { name: "Elazığ", lat: 38.6810, lon: 39.2264, ghi: 1720 },
+  { name: "Tokat", lat: 40.3167, lon: 36.5544, ghi: 1500 },
+  { name: "Osmaniye", lat: 37.0742, lon: 36.2464, ghi: 1760 },
+  { name: "Düzce", lat: 40.8438, lon: 31.1565, ghi: 1420 },
+  { name: "Muş", lat: 38.7432, lon: 41.5064, ghi: 1620 },
+  { name: "Nevşehir", lat: 38.6939, lon: 34.6857, ghi: 1650 },
+  { name: "Isparta", lat: 37.7648, lon: 30.5566, ghi: 1700 },
+  { name: "Aksaray", lat: 38.3687, lon: 34.0370, ghi: 1640 },
+  { name: "Niğde", lat: 37.9667, lon: 34.6833, ghi: 1650 },
+  { name: "Karaman", lat: 37.1759, lon: 33.2287, ghi: 1700 },
+  { name: "Rize", lat: 41.0201, lon: 40.5234, ghi: 1260 },
+  { name: "Giresun", lat: 40.9128, lon: 38.3895, ghi: 1320 },
+  { name: "Artvin", lat: 41.1828, lon: 41.8183, ghi: 1280 },
+  { name: "Sinop", lat: 42.0231, lon: 35.1531, ghi: 1380 },
+  { name: "Kastamonu", lat: 41.3887, lon: 33.7827, ghi: 1450 },
+  { name: "Zonguldak", lat: 41.4564, lon: 31.7987, ghi: 1380 },
+  { name: "Bolu", lat: 40.7360, lon: 31.6061, ghi: 1460 },
+  { name: "Bartın", lat: 41.6344, lon: 32.3375, ghi: 1390 },
+  { name: "Karabük", lat: 41.2061, lon: 32.6204, ghi: 1440 },
+  { name: "Kırıkkale", lat: 39.8468, lon: 33.5153, ghi: 1600 },
+  { name: "Kırklareli", lat: 41.7333, lon: 27.2167, ghi: 1470 },
+  { name: "Kırşehir", lat: 39.1425, lon: 34.1709, ghi: 1620 },
+  { name: "Çankırı", lat: 40.6013, lon: 33.6134, ghi: 1540 },
+  { name: "Yozgat", lat: 39.8181, lon: 34.8147, ghi: 1580 },
+  { name: "Amasya", lat: 40.6499, lon: 35.8353, ghi: 1520 },
+  { name: "Çanakkale", lat: 40.1553, lon: 26.4142, ghi: 1560 },
+  { name: "Bilecik", lat: 40.1506, lon: 29.9792, ghi: 1510 },
+  { name: "Kütahya", lat: 39.4167, lon: 29.9833, ghi: 1590 },
+  { name: "Uşak", lat: 38.6823, lon: 29.4082, ghi: 1660 },
+  { name: "Burdur", lat: 37.7260, lon: 30.2900, ghi: 1720 },
+  { name: "Mardin", lat: 37.3212, lon: 40.7245, ghi: 1840 },
+  { name: "Batman", lat: 37.8812, lon: 41.1351, ghi: 1760 },
+  { name: "Şırnak", lat: 37.5164, lon: 42.4611, ghi: 1760 },
+  { name: "Siirt", lat: 37.9333, lon: 41.9500, ghi: 1760 },
+  { name: "Bitlis", lat: 38.3938, lon: 42.1232, ghi: 1640 },
+  { name: "Ağrı", lat: 39.7191, lon: 43.0503, ghi: 1620 },
+  { name: "Iğdır", lat: 39.9167, lon: 44.0453, ghi: 1680 },
+  { name: "Kars", lat: 40.6013, lon: 43.0975, ghi: 1550 },
+  { name: "Ardahan", lat: 41.1105, lon: 42.7022, ghi: 1480 },
+  { name: "Hakkari", lat: 37.5744, lon: 43.7408, ghi: 1700 },
+  { name: "Adıyaman", lat: 37.7648, lon: 38.2786, ghi: 1800 },
+  { name: "Bingöl", lat: 38.8854, lon: 40.4982, ghi: 1680 },
+  { name: "Tunceli", lat: 39.1079, lon: 39.5478, ghi: 1660 },
+  { name: "Gümüşhane", lat: 40.4386, lon: 39.5086, ghi: 1500 },
+  { name: "Bayburt", lat: 40.2552, lon: 40.2249, ghi: 1520 },
+  { name: "Erzincan", lat: 39.7500, lon: 39.5000, ghi: 1640 }
+];
+
+export const PANEL_TYPES = {
+  mono: {
+    name: "Monokristal (PERC)",
+    efficiency: 0.215,
+    wattPeak: 430,
+    width: 1.134, height: 1.762,
+    tempCoeff: -0.0034,
+    degradation: 0.0045,
+    firstYearDeg: 0.02,
+    pricePerWatt: 20.0,
+    warranty: 25,
+    standard: "IEC 61215 / IEC 61730",
+    bifacialGain: 0
+  },
+  poly: {
+    name: "Polikristal (BSF)",
+    efficiency: 0.178,
+    wattPeak: 370,
+    width: 1.134, height: 1.762,
+    tempCoeff: -0.0040,
+    degradation: 0.006,
+    firstYearDeg: 0.025,
+    pricePerWatt: 15.5,
+    warranty: 25,
+    standard: "IEC 61215",
+    bifacialGain: 0
+  },
+  bifacial: {
+    name: "Bifacial TOPCon (N-Type)",
+    efficiency: 0.232,
+    wattPeak: 470,
+    width: 1.134, height: 1.762,
+    tempCoeff: -0.0028,
+    degradation: 0.0035,
+    firstYearDeg: 0.01,
+    pricePerWatt: 25.0,
+    warranty: 30,
+    standard: "IEC 61215 / IEC TS 60904-1-2",
+    bifacialGain: 0.10
+  }
+};
+
+export const BATTERY_MODELS = {
+  pylontech: { name: 'Pylontech US5000', capacity: 9.6,  dod: 0.90, efficiency: 0.92, spec: '48V / 9.6 kWh LFP' },
+  powerwall:  { name: 'Tesla Powerwall 2', capacity: 13.5, dod: 0.90, efficiency: 0.90, spec: '50V / 13.5 kWh NMC' },
+  huawei:     { name: 'Huawei LUNA2000', capacity: 10.0, dod: 0.90, efficiency: 0.95, spec: '48V / 10 kWh LFP' },
+  custom:     { name: 'Özel Batarya',     capacity: 5.0,  dod: 0.80, efficiency: 0.90, spec: 'Manuel giriş' }
+};
+
+export const COMPASS_DIRS = [
+  { name: "Kuzey",      azimuth: 0,   coeff: 0.55, angle: 270 },
+  { name: "Kuzeydoğu", azimuth: 45,  coeff: 0.70, angle: 315 },
+  { name: "Doğu",       azimuth: 90,  coeff: 0.85, angle: 0   },
+  { name: "Güneydoğu", azimuth: 135, coeff: 0.97, angle: 45  },
+  { name: "Güney",      azimuth: 180, coeff: 1.00, angle: 90  },
+  { name: "Güneybatı", azimuth: 225, coeff: 0.97, angle: 135 },
+  { name: "Batı",       azimuth: 270, coeff: 0.85, angle: 180 },
+  { name: "Kuzeybatı", azimuth: 315, coeff: 0.70, angle: 225 }
+];
+
+export const PSH_FALLBACK = {
+  "İstanbul":4.24,"Ankara":4.44,"İzmir":4.71,"Antalya":4.93,"Bursa":4.32,
+  "Adana":4.87,"Konya":4.60,"Gaziantep":4.99,"Şanlıurfa":5.15,"Mersin":4.90,
+  "Diyarbakır":4.79,"Trabzon":3.62,"default":4.50
+};
+
+export const CITY_SUMMER_TEMPS = {
+  'Rize':23,'Trabzon':24,'Giresun':24,'Artvin':25,'Ordu':25,
+  'Sinop':24,'Samsun':26,'Zonguldak':25,'Bartın':25,
+  'Erzurum':21,'Kars':20,'Ardahan':19,'Ağrı':22,'Iğdır':28,
+  'Hakkari':28,'Bitlis':25,'Muş':27,'Bingöl':28,'Tunceli':27,
+  'Van':26,'Bayburt':22,'Gümüşhane':24,'Erzincan':27,
+  'İstanbul':28,'Edirne':29,'Kırklareli':28,'Tekirdağ':27,
+  'Bursa':29,'Balıkesir':30,'Çanakkale':28,'Bilecik':28,
+  'Eskişehir':28,'Kütahya':27,'Afyonkarahisar':28,
+  'İzmir':32,'Aydın':33,'Muğla':32,'Denizli':31,'Uşak':30,
+  'Antalya':35,'Mersin':34,'Adana':36,'Hatay':34,'Osmaniye':35,
+  'Şanlıurfa':38,'Gaziantep':36,'Mardin':37,'Diyarbakır':38,
+  'Batman':37,'Şırnak':37,'Siirt':36,'Adıyaman':36,
+  'Kahramanmaraş':35,'Elazığ':33,'Malatya':33,
+  'Konya':31,'Kayseri':28,'Sivas':27,'Yozgat':26,
+  'Ankara':29,'Kırıkkale':28,'Kırşehir':28,
+  'Nevşehir':28,'Aksaray':29,'Niğde':27,'Karaman':30,
+  'Isparta':30,'Burdur':30,
+  'default':32
+};
+
+export const MONTHS = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+export const MONTH_WEIGHTS = [0.055,0.062,0.085,0.095,0.105,0.115,0.112,0.108,0.090,0.075,0.055,0.043];
+
+export const DEFAULT_TARIFFS = {
+  residential: 7.16,
+  commercial: 8.44,
+  industrial: 6.80
+};
+
+export const TARIFF_META = {
+  residential: {
+    label: 'Konut',
+    sourceLabel: 'EPDK/SKTT 2026 bilgilendirme, kullanıcı manuel TL/kWh girişi',
+    sourceDate: '2026-04-12',
+    skttLimitKwh: 4000
+  },
+  commercial: {
+    label: 'Ticari',
+    sourceLabel: 'EPDK/SKTT 2026 bilgilendirme, kullanıcı manuel TL/kWh girişi',
+    sourceDate: '2026-04-12',
+    skttLimitKwh: 15000
+  },
+  industrial: {
+    label: 'Sanayi',
+    sourceLabel: 'EPDK/SKTT 2026 bilgilendirme, kullanıcı manuel TL/kWh girişi',
+    sourceDate: '2026-04-12',
+    skttLimitKwh: 15000
+  },
+  custom: {
+    label: 'Özel',
+    sourceLabel: 'Kullanıcı tanımlı tarife',
+    sourceDate: '2026-04-12',
+    skttLimitKwh: null
+  }
+};
+
+// ─── Faz B: İnverter Tipleri ────────────────────────────────────────────────
+export const INVERTER_TYPES = {
+  string: {
+    name: 'String İnverter',
+    efficiency: 0.97,
+    pricePerKWp: { lt10: 7500, lt50: 6500, gt50: 5500 },
+    shadeTolerance: 0.65,
+    lifetime: 12,
+    advantages: ['Düşük maliyet', 'Kolay bakım', 'Yüksek güçte verimli'],
+    disadvantages: ['Gölgede tüm string etkilenir', 'Tek arıza noktası']
+  },
+  micro: {
+    name: 'Mikro İnverter',
+    efficiency: 0.965,
+    pricePerKWp: { lt10: 12000, lt50: 11000, gt50: 10000 },
+    shadeTolerance: 0.90,
+    lifetime: 20,
+    advantages: ['Panel bazlı optimizasyon', 'Gölgeye dayanıklı', 'Uzun ömür'],
+    disadvantages: ['Yüksek maliyet', 'Çatıda bakım zorluğu']
+  },
+  optimizer: {
+    name: 'DC Optimizör + String',
+    efficiency: 0.985,
+    pricePerKWp: { lt10: 9500, lt50: 8500, gt50: 7500 },
+    shadeTolerance: 0.85,
+    lifetime: 15,
+    advantages: ['İyi gölge toleransı', 'Panel izleme', 'Orta maliyet'],
+    disadvantages: ['String inverter hâlâ gerekli', 'Ek kablolama']
+  }
+};
+
+// ─── Faz B: Saatlik Üretim Profili ──────────────────────────────────────────
+export const HOURLY_SOLAR_PROFILE = {
+  summer: [0,0,0,0,0,0.02,0.08,0.18,0.35,0.55,0.75,0.90,0.95,1.00,0.95,0.88,0.72,0.50,0.28,0.10,0.02,0,0,0],
+  winter: [0,0,0,0,0,0,0,0.05,0.15,0.32,0.52,0.70,0.78,0.75,0.65,0.45,0.22,0.05,0,0,0,0,0,0],
+  spring: [0,0,0,0,0,0.01,0.05,0.14,0.28,0.48,0.68,0.82,0.90,0.92,0.85,0.70,0.50,0.30,0.12,0.03,0,0,0,0]
+};
+
+export const RESIDENTIAL_LOAD = [0.02,0.02,0.02,0.02,0.02,0.03,0.05,0.06,0.04,0.03,0.03,0.03,
+                                   0.04,0.04,0.04,0.04,0.05,0.07,0.08,0.08,0.07,0.06,0.04,0.03];
+
+export const COMMERCIAL_LOAD = [0.01,0.01,0.01,0.01,0.01,0.02,0.03,0.05,0.07,0.08,0.08,0.08,
+                                  0.08,0.08,0.08,0.08,0.07,0.06,0.04,0.03,0.02,0.02,0.01,0.01];
+
+export const INDUSTRIAL_LOAD = [0.035,0.035,0.035,0.035,0.035,0.04,0.045,0.045,0.045,0.045,0.045,0.045,
+                                0.045,0.045,0.045,0.045,0.045,0.045,0.04,0.04,0.04,0.04,0.035,0.035];
+
+// ─── Faz C: Yapısal Yük Verileri ────────────────────────────────────────────
+export const SNOW_ZONES = {
+  'İstanbul': { zone: 2, sk: 0.75 }, 'Ankara': { zone: 3, sk: 1.00 },
+  'İzmir': { zone: 1, sk: 0.40 }, 'Antalya': { zone: 1, sk: 0.35 },
+  'Bursa': { zone: 2, sk: 0.75 }, 'Adana': { zone: 1, sk: 0.40 },
+  'Konya': { zone: 3, sk: 1.00 }, 'Gaziantep': { zone: 2, sk: 0.75 },
+  'Şanlıurfa': { zone: 1, sk: 0.40 }, 'Mersin': { zone: 1, sk: 0.40 },
+  'Diyarbakır': { zone: 2, sk: 0.75 }, 'Trabzon': { zone: 3, sk: 1.50 },
+  'Erzurum': { zone: 5, sk: 2.50 }, 'Malatya': { zone: 3, sk: 1.00 },
+  'Kayseri': { zone: 3, sk: 1.00 }, 'Eskişehir': { zone: 2, sk: 0.75 },
+  'Samsun': { zone: 3, sk: 1.00 }, 'Van': { zone: 4, sk: 1.75 },
+  'Edirne': { zone: 2, sk: 0.75 }, 'Kars': { zone: 5, sk: 2.50 },
+  'default': { zone: 2, sk: 0.75 }
+};
+
+export const WIND_ZONES = {
+  'İstanbul': { zone: 2, vb: 33.5 }, 'Ankara': { zone: 2, vb: 30.0 },
+  'İzmir': { zone: 2, vb: 32.0 }, 'Antalya': { zone: 2, vb: 30.0 },
+  'Edirne': { zone: 3, vb: 38.0 }, 'Trabzon': { zone: 3, vb: 36.0 },
+  'Erzurum': { zone: 2, vb: 28.0 }, 'Şanlıurfa': { zone: 1, vb: 26.0 },
+  'default': { zone: 2, vb: 30.0 }
+};
+
+// ─── Faz C: Isı Pompası Verileri ────────────────────────────────────────────
+export const HEAT_PUMP_DATA = {
+  cop_heating: { good: 4.0, avg: 3.5, poor: 3.0 },
+  cop_cooling: { all: 5.5 },
+  heat_load: { good: 50, avg: 80, poor: 120 },
+  gas_price: 7.50,
+  gas_kwh_per_m3: 10.64
+};

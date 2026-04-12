@@ -1,0 +1,485 @@
+/* ═══════════════════════════════════════════════════════════
+   COMPONENTS.CSS — GüneşHesap v2.0 Modüler Bileşenler
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── DİL SEÇİCİ ──────────────────────────────────────────── */
+.lang-switcher {
+  display: flex;
+  gap: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.lang-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+.lang-btn:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+}
+
+.lang-btn.active {
+  background: var(--primary);
+  color: #000;
+}
+
+/* ── İNVERTER KARTLARI ──────────────────────────────────── */
+.inverter-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .inverter-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inverter-card {
+  background: var(--surface-glass);
+  backdrop-filter: blur(8px);
+  border: 2px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 18px;
+  cursor: pointer;
+  transition: all var(--transition-bounce);
+  position: relative;
+  overflow: hidden;
+}
+
+.inverter-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+}
+
+.inverter-card:hover {
+  border-color: rgba(6,182,212,0.4);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-glow-accent);
+}
+
+.inverter-card.selected {
+  border-color: var(--accent);
+  background: rgba(6,182,212,0.05);
+  box-shadow: var(--shadow-glow-accent);
+}
+
+.inverter-check {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  width: 22px; height: 22px;
+  display: none;
+  align-items: center; justify-content: center;
+  font-size: 12px; color: #fff;
+  box-shadow: 0 0 10px rgba(6,182,212,0.5);
+}
+
+.inverter-card.selected .inverter-check {
+  display: flex;
+}
+
+.inverter-card-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.inverter-card-eff {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin-bottom: 10px;
+}
+
+.inverter-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.inverter-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+}
+
+.inverter-stat-label { color: var(--text-muted); }
+.inverter-stat-val { font-weight: 600; color: var(--text); }
+
+.inverter-card-pros,
+.inverter-card-cons {
+  font-size: 0.72rem;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.inverter-card-pros { color: var(--success); }
+.inverter-card-cons { color: var(--text-muted); }
+
+/* ── FATURA ANALİZİ ────────────────────────────────────── */
+.bill-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .bill-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .bill-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.bill-month-input label {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+  text-align: center;
+}
+
+.bill-month-input input {
+  text-align: center;
+}
+
+/* ── KABLO KAYIP ────────────────────────────────────────── */
+.cable-loss-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.cable-loss-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cable-loss-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.cable-loss-val {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── YAPISAN ANALİZ ─────────────────────────────────────── */
+.structural-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.structural-check-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+
+.structural-check-row > *:first-child {
+  flex: 1;
+  color: var(--text-muted);
+}
+
+.structural-check-row > *:nth-child(2) {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.status-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+/* ── MEVSİM BUTONLARI ────────────────────────────────────── */
+.season-btn {
+  background: var(--surface-glass);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 6px 14px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-family: var(--font-body);
+  transition: all var(--transition);
+}
+
+.season-btn:hover {
+  background: rgba(255,255,255,0.07);
+  color: var(--text);
+}
+
+.season-btn.active {
+  background: rgba(245,158,11,0.12);
+  border-color: rgba(245,158,11,0.4);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* ── SAATLIK İSTATİSTİKLER ─────────────────────────────── */
+.hourly-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  background: var(--surface-glass);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+
+/* ── SENARYO KARŞILAŞTIRMA TABLOSU ──────────────────────── */
+.scenario-compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.scenario-compare-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.scenario-compare-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(71,85,105,0.2);
+}
+
+.scenario-compare-table tr {
+  transition: background var(--transition);
+}
+
+.scenario-compare-table tr:hover td {
+  background: rgba(255,255,255,0.02);
+}
+
+.scenario-compare-table td:first-child {
+  font-weight: 600;
+}
+
+.scenario-compare-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── KARŞILAŞTIRMA MODAL TABLOSU ────────────────────────── */
+.comp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.comp-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+}
+
+.comp-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(71,85,105,0.2);
+}
+
+.comp-table tr:nth-child(even) td {
+  background: rgba(51,65,85,0.15);
+}
+
+.comparison-scenario {
+  background: var(--surface-glass);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+/* ── DASHBOARD ───────────────────────────────────────────── */
+.dashboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dashboard-card {
+  background: var(--surface-glass);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: border-color var(--transition);
+}
+
+.dashboard-card:hover {
+  border-color: rgba(245,158,11,0.3);
+}
+
+.dashboard-card-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.dashboard-card-metrics span {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+/* ── SONUÇ KART BİLEŞENLERİ ─────────────────────────────── */
+.result-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+
+.result-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .result-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.result-metric {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+
+.result-metric-val {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.result-metric-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+/* ── GÜNEŞ YOLU DİYAGRAMI ────────────────────────────────── */
+#sun-path-svg text {
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+}
+
+/* ── HEATMAP TOOLTIP ─────────────────────────────────────── */
+.heatmap-tooltip {
+  background: rgba(15,23,42,0.95) !important;
+  border: 1px solid rgba(71,85,105,0.5) !important;
+  border-radius: 8px !important;
+  color: #F1F5F9 !important;
+  font-size: 0.78rem !important;
+  padding: 8px 12px !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important;
+}
+
+/* ── LEAFLET Z-INDEX DÜZELTMESİ ─────────────────��───────── */
+#heatmap-container .leaflet-pane {
+  z-index: 1;
+}
+
+#heatmap-container .leaflet-top,
+#heatmap-container .leaflet-bottom {
+  z-index: 2;
+}
+
+/* ── TOUCH HEDEF DÜZELTMESİ ─────────────────────────────── */
+/* Apple HIG / Material Design: min 44px dokunmatik yüzey */
+@media (pointer: coarse) {
+  .feature-toggle-header {
+    min-height: 44px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+/* ── MOBİL UYUMLULUK ─────────────────────────────────────── */
+@media (max-width: 600px) {
+  .inverter-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .bill-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cable-loss-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .result-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
