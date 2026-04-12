@@ -32,7 +32,7 @@
     "inverter": "Inverter Type",
     "consumption": "Daily Consumption",
     "battery": "Battery (BESS)",
-    "netMetering": "Net Metering / YEKDEM",
+    "netMetering": "Hourly Settlement",
     "cableLoss": "Cable Loss Calculator",
     "billAnalysis": "Bill Analysis",
     "ev": "EV Charging",

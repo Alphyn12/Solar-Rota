@@ -32,7 +32,7 @@
     "inverter": "İnverter Tipi",
     "consumption": "Günlük Tüketim",
     "battery": "Batarya (BESS)",
-    "netMetering": "Net Sayaç / YEKDEM",
+    "netMetering": "Saatlik Mahsuplaşma",
     "cableLoss": "Kablo Kayıp Hesabı",
     "billAnalysis": "Fatura Analizi",
     "ev": "EV Şarj",

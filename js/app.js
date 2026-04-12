@@ -47,14 +47,18 @@ window.state = {
   dailyConsumption: 20,
   batteryEnabled: false,
   battery: { model: 'pylontech', capacity: 9.6, dod: 0.90, efficiency: 0.92 },
-  // Net metering
+  // Saatlik mahsuplaşma / şebeke ihracatı
   netMeteringEnabled: false,
   usdToTry: 38.5,
   displayCurrency: 'TRY',
   // Tarife
   tariff: 7.16,
   tariffType: 'residential',
-  tariffMode: 'manual',
+  tariffMode: 'auto',
+  tariffRegime: 'auto',
+  contractedPowerKw: 10,
+  contractedTariff: 7.16,
+  skttTariff: 7.16,
   exportTariff: 7.16,
   annualPriceIncrease: 0.12,
   discountRate: 0.18,
@@ -315,16 +319,22 @@ function updateSoiling(val) {
 
 function updateTariffType(type) {
   window.state.tariffType = type;
-  window.state.tariffMode = type === 'custom' ? 'custom' : 'manual';
+  window.state.tariffMode = type === 'custom' ? 'custom' : 'auto';
   const descs = {
-    residential: 'EPDK/SKTT 2026: mesken yıllık limit 4.000 kWh. Birim fiyatı faturanızdan doğrulayın.',
-    commercial: 'EPDK/SKTT 2026: mesken dışı yıllık limit 15.000 kWh. Birim fiyatı faturanızdan doğrulayın.',
-    industrial: 'EPDK/SKTT 2026: mesken dışı yıllık limit 15.000 kWh. Birim fiyatı faturanızdan doğrulayın.',
+    residential: '2026 tarife seçimi: yıllık tüketim 4.000 kWh üstündeyse SKTT seçilebilir. Birim fiyatları faturanızdan doğrulayın.',
+    commercial: '2026 tarife seçimi: mesken dışı yıllık tüketim 15.000 kWh üstündeyse SKTT seçilebilir. Sözleşmeli tarife varsa girin.',
+    industrial: '2026 tarife seçimi: mesken dışı yıllık tüketim 15.000 kWh üstündeyse SKTT seçilebilir. Sözleşmeli tarife varsa girin.',
     custom: 'Kullanıcı tanımlı tarife'
   };
   if (type !== 'custom') {
     window.state.tariff = DEFAULT_TARIFFS[type] || 7.16;
     document.getElementById('tariff-input').value = window.state.tariff;
+    window.state.skttTariff = window.state.tariff;
+    window.state.contractedTariff = window.state.tariff;
+    const skttEl = document.getElementById('sktt-tariff-input');
+    const contractEl = document.getElementById('contracted-tariff-input');
+    if (skttEl) skttEl.value = window.state.skttTariff;
+    if (contractEl) contractEl.value = window.state.contractedTariff;
     window.state.exportTariff = window.state.tariff;
     const exportEl = document.getElementById('export-tariff-input');
     if (exportEl) exportEl.value = window.state.exportTariff;
@@ -336,6 +346,11 @@ function updateTariffAssumptions() {
   const s = window.state;
   s.tariff = parseFloat(document.getElementById('tariff-input')?.value) || s.tariff || 7.16;
   s.exportTariff = parseFloat(document.getElementById('export-tariff-input')?.value) || s.tariff;
+  s.tariffRegime = document.getElementById('tariff-regime')?.value || s.tariffRegime || 'auto';
+  s.tariffMode = s.tariffRegime;
+  s.contractedPowerKw = parseFloat(document.getElementById('contracted-power-input')?.value) || s.contractedPowerKw || 0;
+  s.contractedTariff = parseFloat(document.getElementById('contracted-tariff-input')?.value) || s.tariff;
+  s.skttTariff = parseFloat(document.getElementById('sktt-tariff-input')?.value) || s.tariff;
   s.usdToTry = parseFloat(document.getElementById('usd-try-input')?.value) || s.usdToTry || 38.5;
   s.displayCurrency = document.getElementById('display-currency')?.value || s.displayCurrency || 'TRY';
   s.annualPriceIncrease = (parseFloat(document.getElementById('price-increase-input')?.value) || 0) / 100;

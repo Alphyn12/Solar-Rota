@@ -44,7 +44,9 @@ export function renderResults() {
   document.querySelector('#step-5 .kpi-card:nth-child(2) .kpi-unit').textContent =
     (state.displayCurrency === 'USD' ? 'USD / yıl' : 'TL / yıl');
   document.getElementById('fin-cost').textContent = money(r.totalCost);
-  document.getElementById('fin-payback').textContent = r.paybackYear ? r.paybackYear + ' yıl' : '>25 yıl';
+  document.getElementById('fin-payback').textContent = r.simplePaybackYear ? r.simplePaybackYear + ' yıl' : '>25 yıl';
+  const discountedPaybackEl = document.getElementById('fin-discounted-payback');
+  if (discountedPaybackEl) discountedPaybackEl.textContent = r.discountedPaybackYear ? r.discountedPaybackYear + ' yıl' : '>25 yıl';
   document.getElementById('fin-total').textContent = money(r.npvTotal);
   document.getElementById('fin-roi').textContent = r.roi + '%';
   document.getElementById('fin-irr').textContent = r.irr === 'N/A' ? 'N/A' : r.irr + '%';
@@ -59,7 +61,7 @@ export function renderResults() {
     if (omRow) omRow.style.display = 'none';
     if (invRow) invRow.style.display = 'none';
   }
-  const paybackPct = Math.min((r.paybackYear / 15) * 100, 100);
+  const paybackPct = Math.min(((r.simplePaybackYear || 25) / 15) * 100, 100);
   document.getElementById('payback-bar').style.width = paybackPct + '%';
 
   document.getElementById('eng-report-body').innerHTML = '';
@@ -86,7 +88,9 @@ export function renderResults() {
     ['CO₂ Tasarrufu', r.co2Savings + ' ton/yıl'],
     ['Hesap Metodu', `${r.calculationMode || '—'} / ${r.methodologyVersion || '—'}`],
     ['PVGIS loss parametresi', `${r.pvgisLossParam ?? 0}%`],
+    ['PVGIS POA', `${r.pvgisPoa || '—'} kWh/m²/yıl`],
     ['Tarife', moneyRate(r.tariff, 'kWh')],
+    ['Tarife Rejimi', `${r.tariffModel?.effectiveRegime || '—'} / Sözleşme gücü: ${r.tariffModel?.contractedPowerKw || 0} kW`],
     ['Para Birimi', `${state.displayCurrency || 'TRY'} (USD/TRY: ${Number(state.usdToTry || 38.5).toFixed(2)})`],
     ['Tarife Kaynak Tarihi', r.tariffModel?.sourceDate || '—'],
     ['Yıllık Fiyat Artışı', ((r.annualPriceIncrease || 0) * 100).toFixed(1) + '%'],
@@ -182,7 +186,7 @@ function renderNMResults(nm, enabled) {
   if (!nm) { section.style.display = 'none'; return; }
   section.style.display = 'block';
   document.getElementById('nm-license-badge').textContent = enabled ? nm.systemType : 'Satış kapalı';
-  document.getElementById('nm-export-kwh').textContent = nm.annualGridExport.toLocaleString('tr-TR');
+  document.getElementById('nm-export-kwh').textContent = `${nm.paidGridExport.toLocaleString('tr-TR')} / ${nm.annualGridExport.toLocaleString('tr-TR')}`;
   document.getElementById('nm-export-revenue').textContent = money(nm.annualExportRevenue);
   document.getElementById('nm-self-consumption').textContent = `${nm.selfConsumptionPct}%`;
 }
@@ -213,9 +217,9 @@ function renderWarningsAndAudit(state, r) {
     <table class="tech-table">
       <tbody>
         <tr><td>Konum</td><td>${state.cityName || '—'} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
-        <tr><td>Tarife</td><td>${r.tariffModel?.type || state.tariffType} | ${moneyRate(r.tariff, 'kWh')} | Kaynak: ${r.tariffModel?.sourceDate || '—'}</td></tr>
+        <tr><td>Tarife</td><td>${r.tariffModel?.type || state.tariffType} | ${r.tariffModel?.effectiveRegime || '—'} | ${moneyRate(r.tariff, 'kWh')} | Kaynak: ${r.tariffModel?.sourceDate || '—'}</td></tr>
         <tr><td>Tüketim</td><td>${Math.round(r.hourlySummary?.annualLoad || state.dailyConsumption * 365).toLocaleString('tr-TR')} kWh/yıl</td></tr>
-        <tr><td>Öz tüketim / İhracat</td><td>${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString('tr-TR')} kWh / ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString('tr-TR')} kWh</td></tr>
+        <tr><td>Öz tüketim / İhracat</td><td>${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString('tr-TR')} kWh / ücretli ${Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString('tr-TR')} kWh / toplam ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString('tr-TR')} kWh</td></tr>
         <tr><td>Üretim güven aralığı</td><td>Kötü yıl: ${Math.round(r.annualEnergy * 0.90).toLocaleString('tr-TR')} kWh | Baz: ${r.annualEnergy.toLocaleString('tr-TR')} kWh | İyi yıl: ${Math.round(r.annualEnergy * 1.10).toLocaleString('tr-TR')} kWh</td></tr>
         <tr><td>Güven seviyesi</td><td>${r.confidenceLevel} (${r.calculationMode})</td></tr>
         <tr><td>Veri gizliliği</td><td>Kayıtlı hesaplar sadece bu tarayıcıdaki localStorage alanında tutulur.</td></tr>
@@ -496,7 +500,8 @@ export function downloadPDF() {
     [normalizeTR('Yıllık Tasarruf'), money(r.annualSavings)],
     [normalizeTR('Sistem Gücü'), r.systemPower.toFixed(2) + ' kWp'],
     [normalizeTR('Toplam Maliyet'), money(r.totalCost)],
-    [normalizeTR('Geri Ödeme'), (r.paybackYear || '>25') + ' yıl'],
+    [normalizeTR('Basit Geri Ödeme'), (r.simplePaybackYear || '>25') + ' yıl'],
+    [normalizeTR('İskontolu Geri Ödeme'), (r.discountedPaybackYear || '>25') + ' yıl'],
     [normalizeTR('NPV (25 yıl)'), money(r.npvTotal)],
     ['IRR', r.irr + '%'],
     ['LCOE', moneyRate(r.lcoe, 'kWh')],
@@ -671,6 +676,10 @@ export function loadFromHash() {
       if (params.state.soilingFactor !== undefined) { document.getElementById('soiling-slider').value = params.state.soilingFactor; window.updateSoiling(params.state.soilingFactor); }
       if (params.state.tariff !== undefined) document.getElementById('tariff-input').value = params.state.tariff;
       if (params.state.exportTariff !== undefined && document.getElementById('export-tariff-input')) document.getElementById('export-tariff-input').value = params.state.exportTariff;
+      if (params.state.tariffRegime !== undefined && document.getElementById('tariff-regime')) document.getElementById('tariff-regime').value = params.state.tariffRegime;
+      if (params.state.skttTariff !== undefined && document.getElementById('sktt-tariff-input')) document.getElementById('sktt-tariff-input').value = params.state.skttTariff;
+      if (params.state.contractedTariff !== undefined && document.getElementById('contracted-tariff-input')) document.getElementById('contracted-tariff-input').value = params.state.contractedTariff;
+      if (params.state.contractedPowerKw !== undefined && document.getElementById('contracted-power-input')) document.getElementById('contracted-power-input').value = params.state.contractedPowerKw;
       if (params.state.usdToTry !== undefined && document.getElementById('usd-try-input')) document.getElementById('usd-try-input').value = params.state.usdToTry;
       if (params.state.displayCurrency && document.getElementById('display-currency')) document.getElementById('display-currency').value = params.state.displayCurrency;
       if (params.state.annualPriceIncrease !== undefined && document.getElementById('price-increase-input')) document.getElementById('price-increase-input').value = (params.state.annualPriceIncrease * 100).toFixed(0);

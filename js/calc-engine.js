@@ -9,8 +9,9 @@ import {
 import {
   METHODOLOGY_VERSION, PVGIS_LOSS_PARAM, buildTariffModel, calcIRR,
   calculateEVLoad, calculateHeatPumpLoad, calculateSystemLayout,
-  computeFinancialTable, detectCalculationWarnings, getMonthlyLoadKwh,
-  simulateBatteryOnHourlySummary, simulateHourlyEnergy
+  combineHourlyLoads, computeFinancialTable, detectCalculationWarnings,
+  getMonthlyLoadKwh, buildBaseHourlyLoad8760, simulateBatteryOnHourlySummary,
+  simulateHourlyEnergy, sumMonthlyArrays
 } from './calc-core.js';
 
 const LOADING_MSGS = [
@@ -84,22 +85,22 @@ export function calculateNMMetrics(annualEnergy, systemPower, dailyConsumption, 
   const selfConsumedEnergy = batterySummary?.totalSelfConsumption ?? hourlySummary?.selfConsumption ?? Math.min(annualConsumption, annualEnergy);
   const selfConsumptionRatio = annualEnergy > 0 ? Math.min(selfConsumedEnergy / annualEnergy, 1.0) : 0;
   const annualGridExport = Math.round(batterySummary?.remainingExport ?? hourlySummary?.gridExport ?? annualEnergy * (1 - selfConsumptionRatio));
-  const isLicenseFree        = systemPower <= 10;
-  const yekdemTariffTL       = 0.133 * usdToTry;
+  const paidGridExport = Math.round(batterySummary?.paidGridExport ?? hourlySummary?.paidGridExport ?? annualGridExport);
+  const unpaidGridExport = Math.round(batterySummary?.unpaidGridExport ?? hourlySummary?.unpaidGridExport ?? Math.max(0, annualGridExport - paidGridExport));
 
-  const annualExportRevenue  = isLicenseFree
-    ? Math.round(annualGridExport * tariff)
-    : Math.round(annualGridExport * yekdemTariffTL);
+  const annualExportRevenue = Math.round(paidGridExport * Math.max(0, tariff));
 
   return {
     annualGridExport,
+    paidGridExport,
+    unpaidGridExport,
     annualExportRevenue,
     selfConsumptionRatio,
     annualConsumption: Math.round(annualConsumption),
     selfConsumedEnergy: Math.round(selfConsumedEnergy),
     selfConsumptionPct: (selfConsumptionRatio * 100).toFixed(1),
-    isLicenseFree,
-    systemType: isLicenseFree ? 'Lisanssız Üretim (≤10 kWe) — Saatlik Mahsuplaşma' : 'YEKDEM (>10 kWe) — Devlet Alım Garantisi',
+    isLicenseFree: true,
+    systemType: 'Lisanssız Üretim — Saatlik mahsuplaşma ve ihracat sınırı',
     settlementMode: hourlySummary ? 'Saatlik profil tabanlı' : 'Yıllık fallback oranı'
   };
 }
@@ -170,7 +171,7 @@ export async function runCalculation() {
     const secPower = secPC * panel.wattPeak / 1000;
     if (secPower <= 0) return null;
 
-    let rawEnergy = null, rawMonthly = null, usedFallback = false;
+    let rawEnergy = null, rawMonthly = null, rawPoa = null, usedFallback = false;
 
     async function fetchPVGIS(retries = 2) {
       const pvgisAzimut = sec.azimuth - 180;
@@ -186,6 +187,7 @@ export async function runCalculation() {
             const ey = data.outputs?.totals?.fixed?.E_y;
             if (ey && ey > 0) {
               rawEnergy = ey;
+              rawPoa = data.outputs?.totals?.fixed?.['H(i)_y'] || data.outputs?.totals?.fixed?.H_i_y || null;
               if (data.outputs?.monthly?.fixed) rawMonthly = data.outputs.monthly.fixed.map(m => m.E_m);
               return;
             }
@@ -200,6 +202,7 @@ export async function runCalculation() {
       usedFallback = true;
       const psh = PSH_FALLBACK[state.cityName] || PSH_FALLBACK['default'];
       rawEnergy = secPower * psh * 365 * 0.80;
+      rawPoa = psh * 365;
     }
 
     // Kayıp sıralaması (doğru fiziksel sıra):
@@ -230,7 +233,7 @@ export async function runCalculation() {
     return {
       panelCount: secPC, systemPower: secPower,
       annualEnergy: adjustedE, monthlyData: monthly,
-      pvgisRawEnergy: rawEnergy, usedFallback,
+      pvgisRawEnergy: rawEnergy, pvgisPoa: rawPoa, usedFallback,
       shadingLoss:    rawEnergy * (sec.shadingFactor / 100),
       tempLossEnergy: usedFallback ? rawEnergy * Math.abs(Math.min(tempLoss, 0)) : 0,
       azimuthLossEnergy: usedFallback ? rawEnergy * (1 - sec.azimuthCoeff) : 0,
@@ -254,6 +257,8 @@ export async function runCalculation() {
   const monthlyData   = validSections.reduce((agg, r) => agg.map((v,i) => v + r.monthlyData[i]), new Array(12).fill(0));
   const usedFallback  = validSections.some(r => r.usedFallback);
   const pvgisRawEnergy= validSections.reduce((s, r) => s + r.pvgisRawEnergy, 0);
+  const pvgisPoaWeighted = validSections.reduce((s, r) => s + (Number(r.pvgisPoa) || 0) * r.systemPower, 0);
+  const pvgisPoa = systemPower > 0 ? pvgisPoaWeighted / systemPower : 0;
   const shadingLoss   = validSections.reduce((s, r) => s + r.shadingLoss, 0);
   const tempLossEnergy= validSections.reduce((s, r) => s + r.tempLossEnergy, 0);
   const azimuthLossEnergy   = validSections.reduce((s, r) => s + r.azimuthLossEnergy, 0);
@@ -293,37 +298,51 @@ export async function runCalculation() {
   const kdv         = subtotal * kdvRate;
   let solarCost     = subtotal + kdv;
 
-  const tariffModel = buildTariffModel(state);
-  const tariff = tariffModel.importRate || 7.16;
-  const annualPriceIncrease = tariffModel.annualPriceIncrease;
-  const discountRate = tariffModel.discountRate;
+  let tariffModel = buildTariffModel(state);
+  let tariff = tariffModel.importRate || 7.16;
 
   // ── EV / Isı pompası ek yükleri ana tüketim profiline bağlanır ──────────────
   let evMetrics = null;
   const evLoad = state.evEnabled && state.ev ? calculateEVLoad(state.ev) : { annualKwh: 0, dailyKwh: 0 };
-  if (state.evEnabled && state.ev) {
-    evMetrics = calculateEVMetrics(adjustedEnergy, state.dailyConsumption, state.ev, tariff);
-  }
 
   let heatPumpMetrics = null;
   const heatPumpLoad = state.heatPumpEnabled && state.heatPump
     ? calculateHeatPumpLoad(state.heatPump, HEAT_PUMP_DATA)
     : { annualKwh: 0, heatDemand: 0, cop: 0 };
+
+  const extraMonthlyLoad = sumMonthlyArrays(evLoad.monthlyKwh, heatPumpLoad.monthlyKwh);
+  const monthlyLoad = getMonthlyLoadKwh(state, extraMonthlyLoad);
+  const baseMonthlyLoad = getMonthlyLoadKwh(state, 0);
+  const baseHourlyLoad = Array.isArray(state.hourlyConsumption8760) && state.hourlyConsumption8760.length >= 8760
+    ? state.hourlyConsumption8760.slice(0, 8760).map(v => Math.max(0, Number(v) || 0))
+    : buildBaseHourlyLoad8760(baseMonthlyLoad, state.tariffType);
+  const hourlyLoad8760 = combineHourlyLoads(baseHourlyLoad, evLoad.hourly8760, heatPumpLoad.hourly8760);
+
+  tariffModel = buildTariffModel({
+    ...state,
+    annualConsumptionKwh: monthlyLoad.reduce((a, b) => a + b, 0)
+  });
+  tariff = tariffModel.importRate || tariffModel.pstRate || 7.16;
+  const annualPriceIncrease = tariffModel.annualPriceIncrease;
+  const discountRate = tariffModel.discountRate;
+
+  if (state.evEnabled && state.ev) {
+    evMetrics = calculateEVMetrics(adjustedEnergy, state.dailyConsumption, state.ev, tariff);
+  }
   if (state.heatPumpEnabled && state.heatPump) {
     heatPumpMetrics = calculateHeatPumpMetrics(state.heatPump, tariff);
   }
 
-  const monthlyLoad = getMonthlyLoadKwh(state, evLoad.annualKwh + heatPumpLoad.annualKwh);
   const hourlySummaryRaw = simulateHourlyEnergy(monthlyData, monthlyLoad, {
     tariffType: state.tariffType,
-    hourlyLoad8760: state.hourlyConsumption8760
+    hourlyLoad8760
   });
 
   let bessMetrics = null;
   let batterySummary = null;
   let batteryCostVal = 0;
   if (state.batteryEnabled) {
-    batterySummary = simulateBatteryOnHourlySummary(hourlySummaryRaw, state.battery);
+    batterySummary = simulateBatteryOnHourlySummary(hourlySummaryRaw, state.battery, { paidBatteryExportAllowed: false });
     bessMetrics = calculateBatteryMetrics(adjustedEnergy, hourlySummaryRaw.annualLoad / 365, state.battery);
     if (batterySummary) {
       bessMetrics.gridIndependence = (batterySummary.gridIndependence * 100).toFixed(1);
@@ -337,7 +356,7 @@ export async function runCalculation() {
 
   let nmMetrics = calculateNMMetrics(
     adjustedEnergy, systemPower, hourlySummaryRaw.annualLoad / 365,
-    tariff, annualPriceIncrease, state.usdToTry, hourlySummaryRaw, batterySummary
+    tariffModel.exportRate, annualPriceIncrease, state.usdToTry, hourlySummaryRaw, batterySummary
   );
   if (!state.netMeteringEnabled) {
     nmMetrics = { ...nmMetrics, annualExportRevenue: 0, systemType: 'Şebeke satışı kapalı — fazla üretim geliri 0 TL' };
@@ -345,9 +364,9 @@ export async function runCalculation() {
 
   const selfConsumptionRatio = nmMetrics.selfConsumptionRatio;
   const exportRate = state.netMeteringEnabled
-    ? (nmMetrics.isLicenseFree ? tariffModel.exportRate : (0.133 * state.usdToTry))
+    ? tariffModel.exportRate
     : 0;
-  const annualSavings = nmMetrics.selfConsumedEnergy * tariff + (state.netMeteringEnabled ? nmMetrics.annualGridExport * exportRate : 0);
+  const annualSavings = nmMetrics.selfConsumedEnergy * tariff + (state.netMeteringEnabled ? nmMetrics.paidGridExport * exportRate : 0);
   const co2Savings = adjustedEnergy * 0.442 / 1000;
   const trees = Math.round(co2Savings * 1000 / 21);
 
@@ -373,6 +392,7 @@ export async function runCalculation() {
   });
   const yearlyTable = financial.rows;
   const paybackYear = financial.paybackYear;
+  const discountedPaybackYear = financial.discountedPaybackYear;
   const totalExpenses25y = financial.totalExpenses25y;
   const npvTotal = financial.projectNPV;
   const roi = financial.roi;
@@ -391,7 +411,7 @@ export async function runCalculation() {
   const cf   = systemPower > 0 ? ((adjustedEnergy / (systemPower * 8760)) * 100).toFixed(1) : 0;
   const psh  = systemPower > 0 ? adjustedEnergy / (systemPower * 365) : 0;
   const pr = (systemPower > 0 && state.ghi > 0)
-    ? (adjustedEnergy / (systemPower * state.ghi))
+    ? (adjustedEnergy / (systemPower * (pvgisPoa || state.ghi)))
     : (adjustedEnergy / (pvgisRawEnergy || 1));
 
   // ── Yapısal Kontrol ──────────────────────────────────────────────────────────
@@ -412,13 +432,13 @@ export async function runCalculation() {
   const results = {
     panelCount, systemPower, annualEnergy: Math.round(adjustedEnergy),
     annualSavings: Math.round(annualSavings), totalCost: Math.round(totalCost),
-    paybackYear,
+    paybackYear, simplePaybackYear: financial.simplePaybackYear, discountedPaybackYear,
     npvTotal: Math.round(npvTotal), discountedCashFlow: Math.round(financial.discountedCashFlow), roi: roi.toFixed(1),
     co2Savings: co2Savings.toFixed(2), trees, monthlyData,
     tempLoss: (tempLoss * 100).toFixed(2), pr: (pr * 100).toFixed(1),
     psh: psh.toFixed(2), avgSummerTemp: avgSummerTemp.toFixed(1),
     usedFallback,
-    pvgisRawEnergy: Math.round(pvgisRawEnergy),
+    pvgisRawEnergy: Math.round(pvgisRawEnergy), pvgisPoa: Math.round(pvgisPoa),
     shadingLoss: Math.round(shadingLoss),
     tempLossEnergy: Math.round(tempLossEnergy),
     azimuthLossEnergy: Math.round(azimuthLossEnergy),

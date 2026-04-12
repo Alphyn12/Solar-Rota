@@ -32,7 +32,7 @@
     "inverter": "Wechselrichtertyp",
     "consumption": "Tagesverbrauch",
     "battery": "Batterie (BESS)",
-    "netMetering": "Netzeinspeisung / YEKDEM",
+    "netMetering": "Stündliche Verrechnung",
     "cableLoss": "Kabelverlustrechner",
     "billAnalysis": "Stromkostenanalyse",
     "ev": "E-Auto Laden",

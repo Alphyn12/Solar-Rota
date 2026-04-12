@@ -3,6 +3,8 @@
 // GüneşHesap v2.0
 // ═══════════════════════════════════════════════════════════
 
+import { buildTariffModel, calcIRR, computeFinancialTable } from './calc-core.js';
+
 let scenarioChart = null;
 let fxChart = null;
 
@@ -110,56 +112,40 @@ function renderSensitivityTable(r) {
 }
 
 function computeScenario(r, inflationRate, state) {
-  const tariff = r.tariff;
   const totalCost = r.totalCost;
-  const discountRate = r.discountRate;
   const panel = window._appData?.PANEL_TYPES?.[state.panelType] ||
     { degradation: 0.0045, firstYearDeg: 0.02 };
-
-  const omCost = r.annualOMCost;
-  const insurance = r.annualInsurance;
-  const invReplace = r.inverterReplaceCost;
-
-  let cumulative = 0;
-  let paybackYear = 0;
-  const cashFlows = [-totalCost];
-  let totalExpenses = 0;
-
-  for (let year = 1; year <= 25; year++) {
-    const degradedEnergy = r.annualEnergy * (1 - panel.firstYearDeg) * Math.pow(1 - panel.degradation, year - 1);
-    const elPrice = tariff * Math.pow(1 + inflationRate, year - 1);
-    const savings = degradedEnergy * elPrice;
-    const expenses = omCost + insurance + (year === (r.inverterLifetime || 12) ? invReplace : 0);
-    totalExpenses += expenses;
-    const net = savings - expenses;
-    cumulative += net;
-    if (cumulative >= totalCost && paybackYear === 0) paybackYear = year;
-    cashFlows.push(net);
-  }
-
-  const npvArr = cashFlows.map((cf, t) => cf / Math.pow(1 + discountRate, t));
-  const npv = Math.round(npvArr.reduce((a, b) => a + b, 0));
-
-  // IRR
-  let irr = 0.15;
-  for (let i = 0; i < 100; i++) {
-    const f  = cashFlows.reduce((s, c, t) => s + c / Math.pow(1 + irr, t), 0);
-    const df = cashFlows.reduce((s, c, t) => s - t * c / Math.pow(1 + irr, t + 1), 0);
-    if (Math.abs(df) < 1e-10) break;
-    const nr = irr - f / df;
-    if (!isFinite(nr) || isNaN(nr)) { irr = NaN; break; }
-    if (Math.abs(nr - irr) < 0.00001) { irr = nr; break; }
-    irr = nr;
-  }
-
-  const totalNetCashFlow = cashFlows.slice(1).reduce((a, b) => a + b, 0);
-  const roi = ((totalNetCashFlow - totalCost) / totalCost * 100).toFixed(1);
+  const tariffModel = buildTariffModel({
+    ...state,
+    annualConsumptionKwh: r.hourlySummary?.annualLoad || r.tariffModel?.annualConsumptionKwh,
+    tariff: r.tariffModel?.pstRate ?? r.tariff,
+    skttTariff: r.tariffModel?.skttRate ?? r.tariff,
+    contractedTariff: r.tariffModel?.contractedRate ?? r.tariff,
+    exportTariff: r.tariffModel?.exportRate ?? r.tariff,
+    annualPriceIncrease: inflationRate,
+    discountRate: r.discountRate
+  });
+  const financial = computeFinancialTable({
+    annualEnergy: r.annualEnergy,
+    hourlySummary: r.hourlySummary,
+    batterySummary: r.batterySummary,
+    totalCost,
+    tariffModel,
+    panel,
+    annualOMCost: r.annualOMCost,
+    annualInsurance: r.annualInsurance,
+    inverterLifetime: r.inverterLifetime || 12,
+    inverterReplaceCost: r.inverterReplaceCost,
+    netMeteringEnabled: state.netMeteringEnabled,
+    exportRateOverride: state.netMeteringEnabled ? tariffModel.exportRate : 0
+  });
+  const cashFlows = [-totalCost, ...financial.rows.map(row => row.netCashFlow)];
 
   return {
-    paybackYear,
-    npv,
-    irr: isFinite(irr) ? (irr * 100).toFixed(1) : 'N/A',
-    roi,
+    paybackYear: financial.simplePaybackYear,
+    npv: Math.round(financial.projectNPV),
+    irr: calcIRR(cashFlows),
+    roi: financial.roi.toFixed(1),
     cashFlows
   };
 }

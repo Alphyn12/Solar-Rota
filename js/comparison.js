@@ -119,6 +119,7 @@ export function runComparison() {
     });
     const tariffModel = buildTariffModel({
       ...state,
+      annualConsumptionKwh: monthlyLoad.reduce((a, b) => a + b, 0),
       annualPriceIncrease: r.annualPriceIncrease,
       discountRate: r.discountRate,
       tariff: r.tariff,
@@ -128,7 +129,7 @@ export function runComparison() {
     const annualInsurance = state.omEnabled ? Math.round(totalCost * ((Number(state.insuranceRate) || 0) / 100)) : 0;
     const inverterReplaceCost = state.omEnabled ? Math.round((systemPower * invUnit) * 1.1) : 0;
     const exportRate = state.netMeteringEnabled
-      ? (systemPower <= 10 ? tariffModel.exportRate : (0.133 * (state.usdToTry || 38.5)))
+      ? tariffModel.exportRate
       : 0;
     const financial = computeFinancialTable({
       annualEnergy,

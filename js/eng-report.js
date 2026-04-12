@@ -176,11 +176,11 @@ GHI: ${state.ghi} kWh/m²/yıl${r.usedFallback ? '\n⚠ API erişilemedi — PSH
   </div>
   <div class="formula-card">
     <div class="formula-title">PR — Performans Oranı (IEC 61724)</div>
-    <div class="formula-body">PR = E_net ÷ (P_stc × GHI)
-= ${fmt(netEnergy)} kWh ÷ (${r.systemPower.toFixed(2)} kWp × ${state.ghi || 'N/A'} kWh/m²) = ${r.pr}%
+    <div class="formula-body">PR = E_net ÷ (P_stc × POA)
+= ${fmt(netEnergy)} kWh ÷ (${r.systemPower.toFixed(2)} kWp × ${r.pvgisPoa || state.ghi || 'N/A'} kWh/m²) = ${r.pr}%
 
-P_stc birim: kWp, GHI birim: kWh/m²/yıl → Sonuç boyutsuz oran</div>
-    <div class="formula-note">PR ≥ 75% endüstri standardı için "iyi" kabul edilir. Türkiye'de tipik PR: %75–85.</div>
+P_stc birim: kWp, POA birim: kWh/m²/yıl → Sonuç boyutsuz oran</div>
+    <div class="formula-note">POA değeri PVGIS eğimli düzlem ışınımından alınır; fallback modunda PSH tabanlı yaklaşık değer kullanılır.</div>
   </div>
   <div class="formula-card">
     <div class="formula-title">LCOE — İskonto Edilmiş Normalleştirilmiş Enerji Maliyeti</div>
@@ -287,15 +287,14 @@ Batarya kurulu maliyet (~${moneyRate(8000, 'kWh')}): ${money(bm.batteryCost)}</d
   </div>`;
   }
 
-  // ── 9. Net Metering ────────────────────────────────────────────────────────
+  // ── 9. Saatlik mahsuplaşma ─────────────────────────────────────────────────
   if (r.nmMetrics) {
     const nm = r.nmMetrics;
     const sectionNum = r.bessMetrics ? 9 : 8;
-    const yekdemTL = (0.133 * state.usdToTry).toFixed(2);
     html += `
   <div class="eng-section-header">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/></svg>
-    ${sectionNum}. Şebeke Satışı / Net Metering
+    ${sectionNum}. Şebeke İhracatı / Saatlik Mahsuplaşma
   </div>
   <div class="formula-card">
     <div class="formula-title">${nm.systemType}</div>
@@ -303,13 +302,11 @@ Batarya kurulu maliyet (~${moneyRate(8000, 'kWh')}): ${money(bm.batteryCost)}</d
 Yıllık tüketim: ${fmt(r.hourlySummary?.annualLoad || state.dailyConsumption * 365)} kWh
 Öz tüketim oranı = ${nm.selfConsumptionPct}%
 Yıllık ihracat = ${fmt(nm.annualGridExport)} kWh
+Ödeme hesabına alınan ihracat = ${fmt(nm.paidGridExport || 0)} kWh
+Sınır dışında kalan ihracat = ${fmt(nm.unpaidGridExport || 0)} kWh
 
-${nm.isLicenseFree
-  ? `Net sayaç mahsuplaşma (≤10 kWe):
-İhracat geliri ≈ ${money(nm.annualExportRevenue)}/yıl`
-  : `YEKDEM ($0.133/kWh × ${state.usdToTry} TL/USD = ${yekdemTL} TL/kWh):
-İhracat geliri = ${money(nm.annualExportRevenue)}/yıl`
-}</div>
+Saatlik mahsuplaşma:
+İhracat geliri = ${money(nm.annualExportRevenue)}/yıl</div>
     <div class="formula-result">✓ ${money(nm.annualExportRevenue)}/yıl ek şebeke geliri</div>
   </div>`;
   }

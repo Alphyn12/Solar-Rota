@@ -686,7 +686,7 @@ input[type=range]::-moz-range-thumb{
 .nm-result-title{font-family:var(--font-display);font-weight:700;font-size:0.95rem;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .nm-badge{font-size:0.72rem;padding:3px 9px;border-radius:12px;font-weight:600}
 .nm-badge.license-free{background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)}
-.nm-badge.yekdem{background:rgba(6,182,212,0.15);color:#06B6D4;border:1px solid rgba(6,182,212,0.3)}
+.nm-badge.settlement{background:rgba(6,182,212,0.15);color:#06B6D4;border:1px solid rgba(6,182,212,0.3)}
 
 /* ── ROOF SECTION FORM ── */
 .roof-section-form{background:rgba(30,41,59,0.6);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:16px;margin-bottom:12px;position:relative}
@@ -1027,9 +1027,38 @@ input[type=range]::-moz-range-thumb{
           </select>
         </div>
         <div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Birim Fiyat (TL/kWh)</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Tarife Rejimi</div>
+          <select id="tariff-regime" onchange="updateTariffAssumptions()"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;min-width:145px">
+            <option value="auto" selected>Otomatik PST/SKTT</option>
+            <option value="pst">PST / Ulusal Tarife</option>
+            <option value="sktt">SKTT</option>
+            <option value="contract">İkili Anlaşma</option>
+            <option value="custom">Özel</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">PST / Baz Fiyat (TL/kWh)</div>
           <input type="number" id="tariff-input" value="7.16" min="0.5" step="0.01"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:120px;font-size:0.9rem"
+            oninput="updateTariffAssumptions()"/>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">SKTT Fiyatı (TL/kWh)</div>
+          <input type="number" id="sktt-tariff-input" value="7.16" min="0" step="0.01"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:130px;font-size:0.9rem"
+            oninput="updateTariffAssumptions()"/>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Sözleşmeli Fiyat (TL/kWh)</div>
+          <input type="number" id="contracted-tariff-input" value="7.16" min="0" step="0.01"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:150px;font-size:0.9rem"
+            oninput="updateTariffAssumptions()"/>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Sözleşme Gücü (kW)</div>
+          <input type="number" id="contracted-power-input" value="10" min="0" step="0.1"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:130px;font-size:0.9rem"
             oninput="updateTariffAssumptions()"/>
         </div>
         <div>
@@ -1074,7 +1103,7 @@ input[type=range]::-moz-range-thumb{
       <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-muted);margin-top:8px;cursor:pointer">
         <input type="checkbox" id="tariff-tax-included" checked onchange="updateTariffAssumptions()"> Birim fiyat vergi/dağıtım dahil kabul edilsin
       </label>
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px" id="tariff-desc">EPDK/SKTT 2026: mesken yıllık limit 4.000 kWh. Birim fiyatı faturanızdan doğrulayın.</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px" id="tariff-desc">2026 tarife seçimi: mesken yıllık 4.000 kWh, mesken dışı 15.000 kWh SKTT eşiğiyle değerlendirilir. Birim fiyatları faturanızdan doğrulayın.</div>
     </div>
 
     <!-- Günlük tüketim -->
@@ -1136,12 +1165,12 @@ input[type=range]::-moz-range-thumb{
       </div>
     </div>
 
-    <!-- Net Metering / YEKDEM -->
+    <!-- Saatlik mahsuplaşma -->
     <div class="advanced-feature-block" id="nm-block">
       <div class="feature-toggle-header" onclick="toggleNMBlock()">
         <div class="feature-toggle-title">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-          Şebekeye Satış / Net Metering
+          Şebeke İhracatı / Saatlik Mahsuplaşma
           <span class="feature-badge">YENİ</span>
         </div>
         <label class="toggle-switch" onclick="event.stopPropagation()">
@@ -1151,12 +1180,12 @@ input[type=range]::-moz-range-thumb{
       </div>
       <div class="feature-toggle-body" id="nm-inputs" style="display:none">
         <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:0.8rem">
-          <strong style="color:#10B981">EPDK Lisanssız Üretim:</strong> ≤10 kWe sistemler lisans gerektirmez — üretim fazlası <strong>net sayaç mahsuplaşması</strong> ile şebekeye verilir, tüketim tarifesiyle alacak oluşur.<br>
-          <strong style="color:#06B6D4;margin-top:6px;display:block">YEKDEM:</strong> &gt;10 kWe sistemler devlet alım garantisi — <strong>$0.133/kWh</strong> 10 yıl sabit garanti (sonrası spot fiyat).
+          <strong style="color:#10B981">2026 Lisanssız Üretim:</strong> Fazla üretim saatlik mahsuplaşma ve tüketim bazlı ihracat sınırıyla değerlendirilir. Ücretlendirilemeyen fazla üretim gelir hesabına alınmaz.<br>
+          <strong style="color:#06B6D4;margin-top:6px;display:block">Not:</strong> Sözleşme, bağlantı görüşü, tüketim limiti ve depolama kuralları proje bazında doğrulanmalıdır.
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label style="font-size:0.8rem">USD/TRY Kuru
-            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">YEKDEM tarifesi USD bazlıdır. Güncel kuru girin.</span></span>
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Para birimi dönüşümü için kullanılır. İhracat geliri TL/kWh alanından hesaplanır.</span></span>
           </label>
           <input type="number" id="usd-try-input-nm" value="38.5" min="1" step="0.5"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:140px;font-size:0.9rem"
@@ -1573,11 +1602,15 @@ input[type=range]::-moz-range-thumb{
       <span class="fin-val highlight" id="fin-cost">-</span>
     </div>
     <div class="fin-row" style="flex-wrap:wrap;gap:8px">
-      <span class="fin-label">Geri Ödeme Süresi</span>
+      <span class="fin-label">Basit Geri Ödeme Süresi</span>
       <div style="display:flex;align-items:center;flex:1;min-width:200px">
         <div class="payback-bar-wrap"><div class="payback-bar-fill" id="payback-bar" style="width:0%"></div></div>
         <span class="fin-val" id="fin-payback" style="white-space:nowrap">-</span>
       </div>
+    </div>
+    <div class="fin-row">
+      <span class="fin-label">İskontolu Geri Ödeme Süresi</span>
+      <span class="fin-val" id="fin-discounted-payback">-</span>
     </div>
     <div class="fin-row">
       <span class="fin-label">Proje NPV (iskontolu net bugünkü değer)</span>
@@ -1629,17 +1662,17 @@ input[type=range]::-moz-range-thumb{
   <div class="nm-result-wrap" id="nm-result-section" style="display:none">
     <div class="nm-result-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/></svg>
-      Şebeke Satışı / Net Metering
+      Şebeke İhracatı / Saatlik Mahsuplaşma
       <span class="nm-badge" id="nm-license-badge">-</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
       <div style="text-align:center;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:14px">
         <div style="font-family:var(--font-display);font-size:1.6rem;font-weight:800;color:#10B981" id="nm-export-kwh">-</div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px">kWh / yıl ihracat</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px">ücretli / toplam kWh yıl ihracat</div>
       </div>
       <div style="text-align:center;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:14px">
         <div style="font-family:var(--font-display);font-size:1.6rem;font-weight:800;color:#10B981" id="nm-export-revenue">-</div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px">TL / yıl şebeke geliri</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px">TL / yıl sınır sonrası gelir</div>
       </div>
       <div style="text-align:center;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:14px">
         <div style="font-family:var(--font-display);font-size:1.6rem;font-weight:800;color:#10B981" id="nm-self-consumption">--%</div>
