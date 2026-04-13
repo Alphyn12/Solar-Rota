@@ -36,9 +36,11 @@ export function calculateStructural(cityName, tiltDeg, systemPowerKWp, totalPane
   const Iv = 1 / (co * Math.log(Math.max(z, zmin) / z0));
   const qp = (1 + 7 * Iv) * 0.5 * rho * vm * vm / 1000; // kN/m²
 
-  // Panel üzerindeki net rüzgar kuvveti
-  const Cp = 0.7; // Net basınç katsayısı (eğimli panel)
-  const windPressure = qp * Cp * Math.abs(Math.sin((alpha * Math.PI) / 180)); // kN/m²
+  // Panel üzerindeki net rüzgar kuvveti. Düşük eğimli çatılarda emme/uplift
+  // riski sıfırlanmaz; bu yüzden minimum aerodinamik katsayı korunur.
+  const Cp = 0.7; // Ön fizibilite net basınç katsayısı
+  const tiltFactor = Math.max(0.35, Math.abs(Math.sin((alpha * Math.PI) / 180)));
+  const windPressure = qp * Cp * tiltFactor; // kN/m²
 
   // ─── Montaj sistemi gereksinimi ───────────────────────────────────────────
   const maxLoad = Math.max(snowLoad, windPressure);
@@ -46,10 +48,10 @@ export function calculateStructural(cityName, tiltDeg, systemPowerKWp, totalPane
   let status;
   if (maxLoad <= 0.3) {
     status = 'ok';
-    recommendation = 'Standart montaj sistemi yeterli (≥0.5 kN/m² kapasiteli). Normal vidalar kullanılabilir.';
+    recommendation = 'Ön fizibiliteye göre standart montaj sistemi yeterli olabilir; kesin teklif öncesi taşıyıcı sistem, bağlantı elemanı ve kenar bölge kontrolleri yapılmalıdır.';
   } else if (maxLoad <= 0.6) {
     status = 'warn';
-    recommendation = 'Güçlendirilmiş montaj rayları önerilir (≥1.0 kN/m² kapasiteli). Ek ankraj noktaları dikkate alınmalı.';
+    recommendation = 'Güçlendirilmiş montaj rayları ve ek ankraj noktaları mühendis tarafından kontrol edilmelidir.';
   } else {
     status = 'danger';
     recommendation = 'Yüksek yük bölgesi — profesyonel yapısal hesap zorunlu. Özel montaj sistemi ve statik hesap gerektirir.';
@@ -66,6 +68,7 @@ export function calculateStructural(cityName, tiltDeg, systemPowerKWp, totalPane
     status,
     recommendation,
     maxLoad: parseFloat(maxLoad.toFixed(3))
+    , disclaimer: 'Ön fizibilite kontrolüdür; statik proje veya mühendis onayı yerine geçmez.'
   };
 }
 

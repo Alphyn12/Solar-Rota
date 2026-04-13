@@ -3,6 +3,7 @@
 // GüneşHesap v2.0
 // ═══════════════════════════════════════════════════════════
 import { PANEL_TYPES } from './data.js';
+import { escapeHtml } from './security.js';
 
 export function toggleEngReport() {
   const body    = document.getElementById('eng-report-body');
@@ -21,6 +22,7 @@ export function renderEngReport() {
   if (!r) return;
   const p   = PANEL_TYPES[state.panelType];
   const body = document.getElementById('eng-report-body');
+  const lcoeValue = Number.parseFloat(r.lcoe);
   const fmt  = v => Math.round(v).toLocaleString('tr-TR');
   const money = v => {
     const currency = state.displayCurrency || 'TRY';
@@ -65,7 +67,7 @@ Kullanılabilir çatı alanı = Toplam alan × 0.75
 Panel sayısı = floor(Kullanılabilir alan ÷ Panel alanı)
 = floor(${usableArea.toFixed(1)} ÷ ${panelArea.toFixed(4)}) = ${r.panelCount} adet</div>
     <div class="formula-result">✓ ${r.panelCount} adet ${p.name} panel</div>
-    <div class="formula-note">%75 katsayısı: IEC 62548 montaj standardına göre panel arası min. mesafe ve kenar payı. Gerçek yerleşim için on-site survey gereklidir.</div>
+    <div class="formula-note">%75 katsayısı GüneşHesap ön fizibilite varsayımıdır. IEC 62548 uyumlu kesin yerleşim için saha keşfi, yangın kaçış yolları, bakım koridorları ve üretici montaj talimatları ayrıca doğrulanmalıdır.</div>
   </div>
   <div class="formula-card">
     <div class="formula-title">Kurulu Güç (DC — STC)</div>
@@ -85,7 +87,7 @@ Panel sayısı = floor(Kullanılabilir alan ÷ Panel alanı)
     <div class="formula-body">İnverter AC çıkış verimi = %${r.inverterEfficiency || '97'}
 E_AC = E_DC × η_inv = ${fmt(r.annualEnergy / (r.inverterEfficiency/100 || 0.97) * (r.inverterEfficiency/100 || 0.97))} kWh × ${r.inverterEfficiency || '97'}% = ${fmt(r.annualEnergy)} kWh/yıl${r.cableLossPct > 0 ? `\n\nKablo kaybı: %${cablePct}
 E_net = E_AC × (1 − %${cablePct}) = ${fmt(r.annualEnergy)} kWh/yıl` : ''}</div>
-    <div class="formula-note">İnverter verimliliği IEC 61683 standardına göre CEC (California Energy Commission) verim ağırlıklı ortalama değeridir.</div>
+    <div class="formula-note">İnverter verimliliği katalog varsayımıdır. CEC/IEC 61683 eğrileri ve string çalışma noktaları bu ön fizibilite hesabında ayrı doğrulanmamıştır.</div>
   </div>
 
   <!-- 3. PVGIS -->
@@ -119,7 +121,7 @@ GHI: ${state.ghi} kWh/m²/yıl${r.usedFallback ? '\n⚠ API erişilemedi — PSH
         <div class="loss-val neutral">${fmt(r.pvgisRawEnergy)} kWh</div>
       </div>
       <div class="loss-row">
-        <div class="loss-label">− Gölgelenme (%${state.shadingFactor})</div>
+    <div class="loss-label">− Gölgelenme (%${r.effectiveShadingFactor ?? state.shadingFactor})</div>
         <div class="loss-bar-wrap"><div class="loss-bar-fill negative" style="width:${shadingPct}%"></div></div>
         <div class="loss-val negative">−${fmt(r.shadingLoss)} kWh</div>
       </div>
@@ -172,7 +174,7 @@ GHI: ${state.ghi} kWh/m²/yıl${r.usedFallback ? '\n⚠ API erişilemedi — PSH
     <div class="perf-badge"><div class="perf-badge-val">${r.ysp}</div><div class="perf-badge-label">Spesifik Verim (kWh/kWp)</div></div>
     <div class="perf-badge"><div class="perf-badge-val">${r.cf}%</div><div class="perf-badge-label">Kapasite Faktörü (CF)</div></div>
     <div class="perf-badge"><div class="perf-badge-val">${r.irr}%</div><div class="perf-badge-label">IRR</div></div>
-    <div class="perf-badge"><div class="perf-badge-val">${r.lcoe}</div><div class="perf-badge-label">LCOE (TL/kWh)</div></div>
+    <div class="perf-badge"><div class="perf-badge-val">${Number.isFinite(lcoeValue) ? lcoeValue.toFixed(2) : '—'}</div><div class="perf-badge-label">LCOE (TL/kWh)</div></div>
   </div>
   <div class="formula-card">
     <div class="formula-title">PR — Performans Oranı (IEC 61724)</div>
@@ -191,10 +193,10 @@ Toplam maliyet (yıl 0): ${money(r.totalCost)}
 İskonto oranı: %${(r.discountRate*100).toFixed(0)}
 
 LCOE = ${moneyRate(r.lcoe, 'kWh')}</div>
-    <div class="formula-note">Kullanıcı tarifesi: ${moneyRate(r.tariff, 'kWh')} (${state.tariffType}). LCOE &lt; tarife ise yatırım kârlıdır (fark: ${moneyRate(r.tariff - parseFloat(r.lcoe), 'kWh')} avantaj).</div>
+    <div class="formula-note">Kullanıcı tarifesi: ${moneyRate(r.tariff, 'kWh')} (${escapeHtml(state.tariffType)}). LCOE karşılaştırması sadece ön fizibilite göstergesidir; resmi teklif, finansman ve vergi koşulları ayrıca doğrulanmalıdır.${Number.isFinite(lcoeValue) ? ` Fark: ${moneyRate(r.tariff - lcoeValue, 'kWh')}.` : ''}</div>
   </div>
   <div class="formula-card">
-    <div class="formula-title">IRR — İç Getiri Oranı (Newton-Raphson)</div>
+    <div class="formula-title">IRR — İç Getiri Oranı (Bisection kök arama)</div>
     <div class="formula-body">NPV(r) = −C₀ + Σₜ [NCFₜ ÷ (1+r)ᵗ] = 0  çözülür
 C₀ = ${money(r.totalCost)}   (ilk yatırım)
 NCFₜ = Tasarrufₜ − Giderₜ
@@ -240,7 +242,7 @@ IRR = ${r.irr === 'N/A' ? 'Hesaplanamadı' : r.irr + '%'}</div>
     <div class="formula-title">Yıllık Hesap Formülleri</div>
     <div class="formula-body">Eₜ = E₁ × (1−LID) × (1−δ)ⁿ⁻¹    LID=${r.lidFactor}% (ilk yıl), δ=${(p.degradation*100).toFixed(2)}%/yıl
 Pₜ = P₀ × (1 + g)ᵗ⁻¹   g=${(r.annualPriceIncrease*100).toFixed(0)}%/yıl tarife artışı, P₀=${r.tariff} TL/kWh
-Gelirₜ = Eₜ × Pₜ
+Gelirₜ = Öz tüketimₜ × ithalat tarifesiₜ + ücretli ihracatₜ × ihracat tarifesiₜ
 Giderₜ = O&M + Sigorta
 NCFₜ = Gelirₜ − Giderₜ
 NPVₜ = NCFₜ ÷ (1+d)ᵗ    d=${(r.discountRate*100).toFixed(0)}%
@@ -282,7 +284,7 @@ Kullanılabilir kapasite = ${state.battery.capacity} kWh × ${(state.battery.dod
 
 Şebeke Bağımsızlığı = ${bm.gridIndependence}%
 Gece Kapsamı = ${bm.nightCoverage}%
-Batarya kurulu maliyet (~${moneyRate(8000, 'kWh')}): ${money(bm.batteryCost)}</div>
+Batarya kurulu maliyet (seçili model varsayımı): ${money(bm.batteryCost)}</div>
     <div class="formula-result">✓ Şebeke bağımsızlığı: %${bm.gridIndependence} | Gece kapsamı: %${bm.nightCoverage}</div>
   </div>`;
   }
@@ -314,6 +316,87 @@ Saatlik mahsuplaşma:
   body.innerHTML = html;
 }
 
+// ─── Bilimsel gösterim formatı ───────────────────────────────────────────────
+function formatSci(n, digits = 3) {
+  if (!Number.isFinite(n) || n === 0) return '0';
+  const exp = Math.floor(Math.log10(Math.abs(n)));
+  const coeff = (n / Math.pow(10, exp)).toFixed(digits);
+  return `${coeff} × 10<sup>${exp}</sup>`;
+}
+
+// ─── Step-4 Özet Hesap Paneli ────────────────────────────────────────────────
+export function renderEngCalcPanel() {
+  const state = window.state;
+  const r = state?.results;
+  const panel = document.getElementById('eng-calc-panel');
+  if (!panel || !r) return;
+
+  const p = PANEL_TYPES[state.panelType];
+  if (!p) return;
+
+  const currency = state.displayCurrency || 'TRY';
+  const usdToTry = Math.max(0.0001, Number(state.usdToTry) || 38.5);
+  const moneyFmt = v => {
+    const converted = currency === 'USD' ? (Number(v) || 0) / usdToTry : (Number(v) || 0);
+    return converted.toLocaleString(currency === 'USD' ? 'en-US' : 'tr-TR', { maximumFractionDigits: 0 }) + ' ' + currency;
+  };
+  const lcoeValue = Number.parseFloat(r.lcoe);
+  const co2Value = Number.parseFloat(r.co2Savings);
+  const paybackValue = Number(r.simplePaybackYear || r.paybackYear || 0);
+
+  panel.style.display = 'block';
+  panel.innerHTML = `
+    <div style="background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.2);border-radius:10px;padding:16px;margin-top:16px">
+      <div style="font-family:var(--font-display);font-weight:700;font-size:0.9rem;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+        Temel Fizik Hesapları
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;font-size:0.8rem">
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
+          <div style="color:var(--text-muted);margin-bottom:4px">Kurulu güç (P<sub>dc</sub>)</div>
+          <div style="font-family:monospace;font-size:0.85rem">${r.panelCount} × ${p.wattPeak} Wp = <strong style="color:var(--accent)">${(r.systemPower * 1000).toFixed(0)} W<sub>p</sub></strong></div>
+          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${formatSci(r.systemPower * 1000, 3)} W</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
+          <div style="color:var(--text-muted);margin-bottom:4px">Yıllık enerji üretimi (E<sub>yıl</sub>)</div>
+          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--primary)">${r.annualEnergy.toLocaleString('tr-TR')} kWh/yıl</strong></div>
+          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${formatSci(r.annualEnergy * 3.6e6, 3)} J/yıl</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
+          <div style="color:var(--text-muted);margin-bottom:4px">25 yıllık kümülatif enerji</div>
+          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--primary)">${r.yearlyTable.reduce((s,y)=>s+y.energy,0).toLocaleString('tr-TR')} kWh</strong></div>
+          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${formatSci(r.yearlyTable.reduce((s,y)=>s+y.energy,0) * 3.6e6, 3)} J</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
+          <div style="color:var(--text-muted);margin-bottom:4px">Toplam yatırım</div>
+          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--text)">${moneyFmt(r.totalCost)}</strong></div>
+          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${formatSci(r.totalCost, 3)} TL</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
+          <div style="color:var(--text-muted);margin-bottom:4px">LCOE (Eşleşik Enerji Maliyeti)</div>
+          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--accent)">${Number.isFinite(lcoeValue) ? lcoeValue.toFixed(2) : '—'} TL/kWh</strong></div>
+          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">Tüm ömür giderler ÷ toplam enerji</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
+          <div style="color:var(--text-muted);margin-bottom:4px">Performans Oranı (PR)</div>
+          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--success)">${r.pr}%</strong></div>
+          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">IEC 61724-1 metriği</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
+          <div style="color:var(--text-muted);margin-bottom:4px">CO₂ tasarrufu (yıllık)</div>
+          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--success)">${Number.isFinite(co2Value) ? co2Value.toFixed(1) : '—'} t CO₂</strong></div>
+          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${formatSci((Number.isFinite(co2Value) ? co2Value : 0) * 1000, 3)} kg CO₂/yıl</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
+          <div style="color:var(--text-muted);margin-bottom:4px">Geri ödeme süresi</div>
+          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--text)">${paybackValue ? paybackValue.toFixed(1) : '>25'} yıl</strong></div>
+          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">Basit geri ödeme (vergi öncesi)</div>
+        </div>
+      </div>
+    </div>`;
+}
+
 // window'a expose et
 window.toggleEngReport = toggleEngReport;
 window.renderEngReport = renderEngReport;
+window.renderEngCalcPanel = renderEngCalcPanel;

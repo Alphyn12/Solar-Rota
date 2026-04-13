@@ -67,11 +67,18 @@ export function calculateHeatPumpLoad(hp, heatPumpData) {
   if (!hp) return { annualKwh: 0, heatDemand: 0, cop: 0, monthlyKwh: new Array(12).fill(0), hourly8760: new Array(8760).fill(0) };
   const insulation = hp.insulation === 'low' ? 'poor' : hp.insulation;
   const heatLoad = heatPumpData?.heat_load?.[insulation] || 80;
-  const cop = heatPumpData?.cop_heating?.[insulation] || 3.5;
-  const coolingCop = heatPumpData?.cop_cooling?.all || 5.5;
-  const heatDemand = Math.max(0, Number(hp.area) || 0) * heatLoad;
-  const heatingKwh = hp.heatingType === 'cooling' ? 0 : heatDemand / cop;
-  const coolingKwh = hp.heatingType === 'heating' ? 0 : (Math.max(0, Number(hp.area) || 0) * 25 / coolingCop);
+  const cop = heatPumpData?.spf_heating?.[insulation] || heatPumpData?.cop_heating?.[insulation] || 3.5;
+  const coolingCop = heatPumpData?.spf_cooling?.[insulation] || heatPumpData?.cop_cooling?.[insulation] || 4.0;
+  const area = Math.max(0, Number(hp.area) || 0);
+  const heatingMonths = Math.max(1, Number(heatPumpData?.heating_season_months) || 5);
+  const coolingMonths = Math.max(1, Number(heatPumpData?.cooling_season_months) || 4);
+  const heatDemand = area * heatLoad * 8 * heatingMonths * 30 / 1000;
+  const coolDemand = area * heatLoad * 0.7 * 8 * coolingMonths * 30 / 1000;
+  const mode = hp.heatingType || 'both';
+  const doHeating = mode === 'heat' || mode === 'heating' || mode === 'both';
+  const doCooling = mode === 'cool' || mode === 'cooling' || mode === 'both';
+  const heatingKwh = doHeating ? heatDemand / cop : 0;
+  const coolingKwh = doCooling ? coolDemand / coolingCop : 0;
   const annualKwh = heatingKwh + coolingKwh;
   const monthlyKwh = HEAT_PUMP_HEATING_WEIGHTS.map((w, i) =>
     heatingKwh * w + coolingKwh * (HEAT_PUMP_COOLING_WEIGHTS[i] || 0)

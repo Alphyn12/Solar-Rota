@@ -13,14 +13,18 @@
   },
   "step1": {
     "title": "Standort auswählen",
-    "subtitle": "Klicken Sie auf die Karte oder suchen Sie nach einer Stadt",
+    "subtitle": "Markieren Sie Ihre Stadt oder wählen Sie einen Punkt auf der Karte, um das Solarpotenzial in der Türkei zu schätzen.",
     "search": "Stadt suchen...",
     "geoBtn": "Meinen Standort verwenden",
+    "locationCard": "Standort Auswählen",
     "next": "Zur Dachkonfiguration"
   },
   "step2": {
     "title": "Dachkonfiguration",
+    "subtitle": "Neigung und Ausrichtung beeinflussen den Solarertrag. Geben Sie realistische Dachwerte ein.",
+    "roofInfo": "Dachinformationen",
     "roofArea": "Dachfläche (m²)",
+    "roofOrientation": "Dachausrichtung und Verschattung",
     "tilt": "Neigungswinkel",
     "direction": "Dachrichtung",
     "shading": "Verschattung",
@@ -45,7 +49,8 @@
     "subtitle": "PVGIS-Daten werden abgerufen und Energieerzeugung berechnet..."
   },
   "step5": {
-    "title": "Berechnungsergebnisse",
+    "title": "Ihre Ergebnisse Sind Fertig",
+    "subtitle": "Eine 25-jährige Energie- und Finanzprojektion wird unten mit transparenten Annahmen angezeigt.",
     "annualEnergy": "Jahresenergie",
     "annualSavings": "Jahresersparnis",
     "systemPower": "Systemleistung",
@@ -62,7 +67,7 @@
     "engReport": "Ingenieurbericht"
   },
   "results": {
-    "monthlyChart": "Monatliches Produktionsdiagramm",
+    "monthlyChart": "Monatliche Energieproduktion (kWh)",
     "hourlyProfile": "Stündliches Produktionsprofil",
     "sunPath": "Sonnenbahndiagramm",
     "heatmap": "Türkei Produktionskarte",
@@ -70,14 +75,43 @@
     "comparison": "Angebote vergleichen",
     "prGauge": "Performance Ratio (PR)"
   },
+  "charts": {
+    "monthlyProduction": "Monatliche Produktion",
+    "estimatedConsumption": "Geschätzter Verbrauch"
+  },
+  "finance": {
+    "analysis": "Finanzanalyse",
+    "tariffDesc": "Die Tarifauswahl 2026 bewertet PST-, SKTT- und Vertragsleistungsoptionen nach Projektbedingungen. Prüfen Sie die Einheitspreise anhand Ihrer Rechnung.",
+    "exchangeLoading": "USD/TRY-Kurs wird geladen...",
+    "settlementBadge": "Stündliche Verrechnung",
+    "simplePayback": "Einfache Amortisationszeit",
+    "discountedPayback": "Diskontierte Amortisationszeit",
+    "npv": "Projekt-NPV (diskontierter Kapitalwert)",
+    "roi": "Kapitalrendite (ROI)",
+    "irr": "Interner Zinsfuß (IRR)",
+    "lcoe": "Stromgestehungskosten (LCOE)",
+    "om": "Jährliche Wartung + Versicherung",
+    "inverterReplace": "Wechselrichtertausch (Jahr 12)"
+  },
+  "units": {
+    "year": "Jahr",
+    "kwhPerYear": "kWh / Jahr",
+    "kwpInstalled": "kWp installierte Leistung",
+    "tonsCo2PerYear": "Tonnen CO₂ / Jahr"
+  },
+  "dashboard": {
+    "saved": "Gespeicherte Berechnungen"
+  },
   "common": {
     "yes": "Ja",
     "no": "Nein",
+    "back": "← Zurück",
     "save": "Speichern",
     "cancel": "Abbrechen",
     "close": "Schließen",
     "loading": "Lädt...",
     "error": "Fehler",
-    "success": "Erfolg"
+    "success": "Erfolg",
+    "pending": "-"
   }
 }

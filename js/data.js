@@ -128,10 +128,41 @@ export const PANEL_TYPES = {
 };
 
 export const BATTERY_MODELS = {
-  pylontech: { name: 'Pylontech US5000', capacity: 9.6,  dod: 0.90, efficiency: 0.92, spec: '48V / 9.6 kWh LFP' },
-  powerwall:  { name: 'Tesla Powerwall 2', capacity: 13.5, dod: 0.90, efficiency: 0.90, spec: '50V / 13.5 kWh NMC' },
-  huawei:     { name: 'Huawei LUNA2000', capacity: 10.0, dod: 0.90, efficiency: 0.95, spec: '48V / 10 kWh LFP' },
-  custom:     { name: 'Özel Batarya',     capacity: 5.0,  dod: 0.80, efficiency: 0.90, spec: 'Manuel giriş' }
+  pylontech_us5000c: {
+    name: 'Pylontech US5000C', capacity: 9.6, dod: 0.90, efficiency: 0.94,
+    spec: '48V / 9.6 kWh LFP', chemistry: 'LFP', warranty: 10, cycles: 6000,
+    price_try: 120000, brand: 'Pylontech'
+  },
+  huawei_luna15: {
+    name: 'Huawei LUNA2000-15-S0', capacity: 15.0, dod: 0.90, efficiency: 0.95,
+    spec: '100V / 15 kWh LFP', chemistry: 'LFP', warranty: 10, cycles: 6000,
+    price_try: 180000, brand: 'Huawei'
+  },
+  byd_lvs16: {
+    name: 'BYD Battery-Box LVS 16.0', capacity: 16.0, dod: 0.90, efficiency: 0.96,
+    spec: '48V / 16 kWh LFP', chemistry: 'LFP', warranty: 10, cycles: 6000,
+    price_try: 200000, brand: 'BYD'
+  },
+  solarmax_sh10: {
+    name: 'SolarMax SHB 10.0', capacity: 10.0, dod: 0.90, efficiency: 0.94,
+    spec: '48V / 10 kWh LFP', chemistry: 'LFP', warranty: 10, cycles: 5000,
+    price_try: 130000, brand: 'SolarMax'
+  },
+  tesla_pw3: {
+    name: 'Tesla Powerwall 3', capacity: 13.5, dod: 0.97, efficiency: 0.97,
+    spec: '50V / 13.5 kWh LFP', chemistry: 'LFP', warranty: 10, cycles: 3650,
+    price_try: 220000, brand: 'Tesla'
+  },
+  fox_ess_h3: {
+    name: 'Fox ESS ECS4000-H3', capacity: 10.1, dod: 0.90, efficiency: 0.95,
+    spec: '48V / 10.1 kWh LFP', chemistry: 'LFP', warranty: 10, cycles: 6000,
+    price_try: 125000, brand: 'Fox ESS'
+  },
+  custom: {
+    name: 'Özel Batarya', capacity: 5.0, dod: 0.80, efficiency: 0.90,
+    spec: 'Manuel giriş', chemistry: 'LFP', warranty: 5, cycles: 3000,
+    price_try: 0, brand: 'Özel'
+  }
 };
 
 export const COMPASS_DIRS = [
@@ -243,7 +274,8 @@ export const INVERTER_TYPES = {
 export const HOURLY_SOLAR_PROFILE = {
   summer: [0,0,0,0,0,0.02,0.08,0.18,0.35,0.55,0.75,0.90,0.95,1.00,0.95,0.88,0.72,0.50,0.28,0.10,0.02,0,0,0],
   winter: [0,0,0,0,0,0,0,0.05,0.15,0.32,0.52,0.70,0.78,0.75,0.65,0.45,0.22,0.05,0,0,0,0,0,0],
-  spring: [0,0,0,0,0,0.01,0.05,0.14,0.28,0.48,0.68,0.82,0.90,0.92,0.85,0.70,0.50,0.30,0.12,0.03,0,0,0,0]
+  spring: [0,0,0,0,0,0.01,0.05,0.14,0.28,0.48,0.68,0.82,0.90,0.92,0.85,0.70,0.50,0.30,0.12,0.03,0,0,0,0],
+  autumn: [0,0,0,0,0,0,0.02,0.10,0.22,0.40,0.58,0.72,0.77,0.74,0.63,0.46,0.26,0.08,0.01,0,0,0,0,0]
 };
 
 export const RESIDENTIAL_LOAD = [0.02,0.02,0.02,0.02,0.02,0.03,0.05,0.06,0.04,0.03,0.03,0.03,
@@ -280,9 +312,31 @@ export const WIND_ZONES = {
 
 // ─── Faz C: Isı Pompası Verileri ────────────────────────────────────────────
 export const HEAT_PUMP_DATA = {
-  cop_heating: { good: 4.0, avg: 3.5, poor: 3.0 },
-  cop_cooling: { all: 5.5 },
-  heat_load: { good: 50, avg: 80, poor: 120 },
-  gas_price: 7.50,
-  gas_kwh_per_m3: 10.64
+  cop_heating: { good: 4.5, avg: 3.8, poor: 3.2 },
+  cop_cooling: { good: 5.5, avg: 4.5, poor: 3.5 },
+  heat_load: { good: 40, avg: 70, poor: 110 },
+  gas_price: 8.50,
+  gas_kwh_per_m3: 10.64,
+  electric_price: 7.16,
+  fuel_oil_price: 35.0,
+  fuel_oil_kwh_per_liter: 9.5,
+  heating_season_months: 5,
+  cooling_season_months: 4,
+  spf_heating: { good: 3.8, avg: 3.2, poor: 2.6 },
+  spf_cooling: { good: 4.2, avg: 3.5, poor: 2.8 }
+};
+
+// ─── EV Araç Modelleri ───────────────────────────────────────────────────────
+export const EV_MODELS = {
+  togg_t10f:   { name: 'Togg T10F', brand: 'Togg', kwh100: 18.0, batteryKwh: 88.5, chargeKw: 7.4, range: 500 },
+  tesla_m3sr:  { name: 'Tesla Model 3 SR', brand: 'Tesla', kwh100: 14.5, batteryKwh: 60.0, chargeKw: 11.0, range: 491 },
+  tesla_m3lr:  { name: 'Tesla Model 3 LR', brand: 'Tesla', kwh100: 15.5, batteryKwh: 82.0, chargeKw: 11.0, range: 629 },
+  bmw_i4:      { name: 'BMW i4 eDrive40', brand: 'BMW', kwh100: 18.0, batteryKwh: 83.9, chargeKw: 11.0, range: 590 },
+  vw_id4:      { name: 'VW ID.4 Pro', brand: 'VW', kwh100: 17.5, batteryKwh: 77.0, chargeKw: 11.0, range: 529 },
+  hyundai_i5:  { name: 'Hyundai Ioniq 5 LR', brand: 'Hyundai', kwh100: 17.0, batteryKwh: 77.4, chargeKw: 11.0, range: 507 },
+  kia_ev6:     { name: 'Kia EV6 AWD', brand: 'Kia', kwh100: 18.0, batteryKwh: 77.4, chargeKw: 11.0, range: 506 },
+  renault_meg: { name: 'Renault Megane E-Tech', brand: 'Renault', kwh100: 16.0, batteryKwh: 60.0, chargeKw: 7.4, range: 450 },
+  fiat_500e:   { name: 'Fiat 500e', brand: 'Fiat', kwh100: 14.0, batteryKwh: 42.0, chargeKw: 11.0, range: 320 },
+  mg_zs:       { name: 'MG ZS EV', brand: 'MG', kwh100: 17.0, batteryKwh: 72.6, chargeKw: 7.4, range: 440 },
+  custom:      { name: 'Özel Araç', brand: 'Özel', kwh100: 18.0, batteryKwh: 60.0, chargeKw: 7.4, range: 400 }
 };

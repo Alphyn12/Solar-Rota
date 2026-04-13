@@ -1,0 +1,162 @@
+// Shared defensive helpers for rendering and imported state.
+
+const NUMBER_LIMITS = {
+  lat: [-90, 90],
+  lon: [-180, 180],
+  ghi: [500, 2500],
+  roofArea: [0, 200000],
+  tilt: [0, 70],
+  azimuth: [0, 359],
+  azimuthCoeff: [0.3, 1.1],
+  shadingFactor: [0, 80],
+  soilingFactor: [0, 50],
+  tariff: [0, 1000],
+  exportTariff: [0, 1000],
+  skttTariff: [0, 1000],
+  contractedTariff: [0, 1000],
+  contractedPowerKw: [0, 100000],
+  annualPriceIncrease: [-0.5, 2],
+  discountRate: [0, 2],
+  dailyConsumption: [0, 100000],
+  usdToTry: [0.0001, 10000],
+  omRate: [0, 20],
+  insuranceRate: [0, 20],
+  step: [1, 5]
+};
+
+const STRING_LIMITS = {
+  cityName: 80,
+  azimuthName: 40,
+  panelType: 40,
+  tariffType: 40,
+  tariffMode: 40,
+  tariffRegime: 40,
+  displayCurrency: 3,
+  inverterType: 40,
+  tariffSourceDate: 20
+};
+
+const BOOLEAN_KEYS = new Set([
+  'batteryEnabled', 'netMeteringEnabled', 'omEnabled', 'costOverridesEnabled',
+  'billAnalysisEnabled', 'evEnabled', 'heatPumpEnabled', 'taxEnabled',
+  'cableLossEnabled', 'osmShadowEnabled'
+]);
+
+const OBJECT_KEYS = new Set([
+  'battery', 'ev', 'heatPump', 'tax', 'costOverrides', 'cableLoss',
+  'roofGeometry', 'osmShadow', 'bomSelection'
+]);
+
+const ARRAY_KEYS = new Set([
+  'roofSections', 'monthlyConsumption', 'hourlyConsumption8760', 'bomItems',
+  'glareTargets'
+]);
+
+const ENUM_VALUES = {
+  panelType: new Set(['mono', 'poly', 'bifacial']),
+  tariffType: new Set(['residential', 'commercial', 'industrial', 'custom']),
+  tariffMode: new Set(['auto', 'custom', 'pst', 'sktt', 'contract']),
+  tariffRegime: new Set(['auto', 'pst', 'sktt', 'contract']),
+  displayCurrency: new Set(['TRY', 'USD']),
+  inverterType: new Set(['string', 'micro', 'optimizer'])
+};
+
+const ALLOWED_TOP_LEVEL_KEYS = new Set([
+  ...Object.keys(NUMBER_LIMITS),
+  ...Object.keys(STRING_LIMITS),
+  ...BOOLEAN_KEYS,
+  ...OBJECT_KEYS,
+  ...ARRAY_KEYS
+]);
+
+export function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function clampNumber(value, min, max, fallback = min) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function cleanString(value, maxLen) {
+  return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, '').slice(0, maxLen);
+}
+
+function cleanPlainObject(value, depth = 0) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || depth > 3) return null;
+  const out = {};
+  for (const [key, raw] of Object.entries(value)) {
+    const safeKey = cleanString(key, 80);
+    if (!safeKey) continue;
+    if (typeof raw === 'number' || typeof raw === 'boolean') out[safeKey] = raw;
+    else if (typeof raw === 'string') out[safeKey] = cleanString(raw, 200);
+    else if (Array.isArray(raw)) out[safeKey] = raw.slice(0, 100).map(item => cleanPlainValue(item, depth + 1)).filter(v => v !== undefined);
+    else if (raw && typeof raw === 'object') out[safeKey] = cleanPlainObject(raw, depth + 1);
+  }
+  return out;
+}
+
+function cleanPlainValue(value, depth = 0) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return cleanString(value, 200);
+  if (Array.isArray(value)) return value.slice(0, 100).map(item => cleanPlainValue(item, depth + 1)).filter(v => v !== undefined);
+  if (value && typeof value === 'object') return cleanPlainObject(value, depth);
+  return undefined;
+}
+
+function sanitizeArray(key, value) {
+  if (!Array.isArray(value)) return undefined;
+  if (key === 'monthlyConsumption') return value.slice(0, 12).map(v => clampNumber(v, 0, 1000000, 0));
+  if (key === 'hourlyConsumption8760') return value.slice(0, 8760).map(v => clampNumber(v, 0, 1000000, 0));
+  if (key === 'roofSections') {
+    return value.slice(0, 24).map(sec => ({
+      id: cleanString(sec?.id ?? `sec-${Date.now()}`, 40),
+      area: clampNumber(sec?.area, 0, 200000, 0),
+      tilt: clampNumber(sec?.tilt, 0, 70, 20),
+      azimuth: clampNumber(sec?.azimuth, 0, 359, 180),
+      azimuthCoeff: clampNumber(sec?.azimuthCoeff, 0.3, 1.1, 1),
+      azimuthName: cleanString(sec?.azimuthName ?? '', 40),
+      shadingFactor: clampNumber(sec?.shadingFactor, 0, 80, 0)
+    })).filter(sec => sec.area > 0);
+  }
+  return value.slice(0, 200).map(item => cleanPlainValue(item)).filter(v => v !== undefined);
+}
+
+export function sanitizeSharedState(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const out = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (!ALLOWED_TOP_LEVEL_KEYS.has(key)) continue;
+    if (NUMBER_LIMITS[key]) {
+      const [min, max] = NUMBER_LIMITS[key];
+      out[key] = clampNumber(value, min, max, min);
+    } else if (STRING_LIMITS[key]) {
+      const clean = cleanString(value, STRING_LIMITS[key]);
+      if (ENUM_VALUES[key] && !ENUM_VALUES[key].has(clean)) continue;
+      out[key] = clean;
+    } else if (BOOLEAN_KEYS.has(key)) {
+      out[key] = !!value;
+    } else if (OBJECT_KEYS.has(key)) {
+      out[key] = cleanPlainObject(value);
+    } else if (ARRAY_KEYS.has(key)) {
+      const sanitized = sanitizeArray(key, value);
+      if (sanitized !== undefined) out[key] = sanitized;
+    }
+  }
+  return out;
+}
+
+export function createShareStateSnapshot(state) {
+  const snapshot = {};
+  for (const key of ALLOWED_TOP_LEVEL_KEYS) {
+    if (key in state) snapshot[key] = state[key];
+  }
+  return sanitizeSharedState(snapshot);
+}

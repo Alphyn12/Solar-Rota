@@ -5,11 +5,11 @@
 import {
   TURKISH_CITIES, PANEL_TYPES, BATTERY_MODELS, COMPASS_DIRS,
   PSH_FALLBACK, CITY_SUMMER_TEMPS, MONTHS, MONTH_WEIGHTS,
-  DEFAULT_TARIFFS, INVERTER_TYPES, HEAT_PUMP_DATA
+  DEFAULT_TARIFFS, INVERTER_TYPES, HEAT_PUMP_DATA, EV_MODELS
 } from './data.js';
 import { showToast, animateCounter, launchConfetti, resetConfetti, renderPRGauge } from './ui-charts.js';
 import { renderResults, renderMonthlyChart, downloadPDF, shareResults, loadFromHash } from './ui-render.js';
-import { toggleEngReport, renderEngReport } from './eng-report.js';
+import { toggleEngReport, renderEngReport, renderEngCalcPanel } from './eng-report.js';
 import { runCalculation, calculateBatteryMetrics, calculateNMMetrics } from './calc-engine.js';
 import { renderHourlyProfile, setHourlySeason } from './hourly-profile.js';
 import { toggleBillBlock, onBillToggle, onBillInput, billQuickFill, billClear } from './bill-analysis.js';
@@ -25,9 +25,34 @@ import { openComparison, closeComparison, runComparison } from './comparison.js'
 import { saveCurrentCalculation, openDashboard, closeDashboard, updateDashboard, compareDashboardSelected, deleteSavedRecord, clearAllSaved } from './dashboard.js';
 import { showHeatmapCard, toggleHeatmapAnimation, setHeatmapMonth } from './heatmap.js';
 import { i18n, switchLanguage } from './i18n.js';
+import { initRoofDrawing } from './roof-geometry.js';
+import { toggleOSMShadow, refreshOSMShadowAnalysis } from './osm-shadow.js';
+import { initBomBuilder, selectBomItem } from './bom.js';
+import { initExchangeRateService, refreshExchangeRate, setManualUsdTryRate, convertTry } from './exchange-rate.js';
 
 // ── Global data referansı ────────────────────────────────────────────────────
-window._appData = { PANEL_TYPES, BATTERY_MODELS, COMPASS_DIRS, INVERTER_TYPES, MONTHS, HEAT_PUMP_DATA };
+window._appData = { PANEL_TYPES, BATTERY_MODELS, COMPASS_DIRS, INVERTER_TYPES, MONTHS, HEAT_PUMP_DATA, EV_MODELS };
+
+// ── Para birimi seçici ───────────────────────────────────────────────────────
+const CURRENCY_STORAGE_KEY = 'guneshesap_display_currency_v1';
+
+function switchCurrency(currency) {
+  if (!['TRY', 'USD'].includes(currency)) return;
+  window.state.displayCurrency = currency;
+  const selectEl = document.getElementById('display-currency');
+  if (selectEl) selectEl.value = currency;
+  try { localStorage.setItem(CURRENCY_STORAGE_KEY, currency); } catch { /* ignore */ }
+  document.querySelectorAll('[data-currency]').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.currency === currency)
+  );
+  buildPanelCards();
+  buildInverterCards();
+  updatePanelPreview();
+  window.updateTariffAssumptions?.();
+  if (window.state.results) window.renderResults?.();
+  window.renderExchangeRateStatus?.();
+}
+window.switchCurrency = switchCurrency;
 
 // ═══════════════════════════════════════════════════════════
 // STATE
@@ -43,14 +68,22 @@ window.state = {
   // Çoklu çatı
   multiRoof: false,
   roofSections: [],
+  roofGeometry: null,
+  osmShadowEnabled: false,
+  osmShadow: null,
+  satelliteEnhancementEnabled: false,
+  satelliteEnhancement: null,
+  glareTargets: [],
+  glareAnalysis: null,
   // Tüketim & BESS
-  dailyConsumption: 20,
+  dailyConsumption: 10,
   batteryEnabled: false,
-  battery: { model: 'pylontech', capacity: 9.6, dod: 0.90, efficiency: 0.92 },
+  battery: { model: 'pylontech_us5000c', capacity: 9.6, dod: 0.90, efficiency: 0.94, chemistry: 'LFP', warranty: 10, cycles: 6000 },
   // Saatlik mahsuplaşma / şebeke ihracatı
   netMeteringEnabled: false,
   usdToTry: 38.5,
   displayCurrency: 'TRY',
+  exchangeRate: null,
   // Tarife
   tariff: 7.16,
   tariffType: 'residential',
@@ -72,6 +105,9 @@ window.state = {
   insuranceRate: 0.5,
   costOverridesEnabled: false,
   costOverrides: {},
+  bomItems: [],
+  bomSelection: {},
+  bomTotals: null,
   // Faz B
   billAnalysisEnabled: false,
   monthlyConsumption: null,
@@ -93,15 +129,71 @@ window.state = {
 let map, marker;
 window.map = null;
 window.marker = null;
+window._drawingMode = false;
+window._glarePickMode = false;
+window._activeTileLayer = 'dark';
 
 function initMap() {
-  map = L.map('map').setView([39.0, 35.0], 6);
+  map = L.map('map', { zoomControl: true }).setView([39.0, 35.0], 6);
   window.map = map;
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap &copy; CARTO',
-    subdomains: 'abcd', maxZoom: 19, detectRetina: false
-  }).addTo(map);
 
+  // ── Tile katmanları ──────────────────────────────────────
+  const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd', maxZoom: 19, crossOrigin: 'anonymous'
+  });
+
+  const satelliteLayer = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+    maxZoom: 19, maxNativeZoom: 18
+  });
+
+  const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19, crossOrigin: 'anonymous'
+  });
+
+  satelliteLayer.on('tileerror', () => {
+    clearTimeout(window._tileErrorToastTimer);
+    window._tileErrorToastTimer = setTimeout(() => {
+      window.showToast?.('Bazı uydu karoları yüklenemedi. Zoom seviyesini düşürün.', 'warning');
+    }, 1200);
+  });
+
+  // Başlangıçta karanlık harita
+  darkLayer.addTo(map);
+  window._darkLayer = darkLayer;
+  window._satelliteLayer = satelliteLayer;
+  window._osmLayer = osmLayer;
+  window._activeTileLayer = 'dark';
+
+  // ── Layer control ────────────────────────────────────────
+  L.control.layers({
+    'Koyu (Genel)': darkLayer,
+    'Uydu (Çatı Çizimi İçin)': satelliteLayer,
+    'OpenStreetMap': osmLayer
+  }, {}, { position: 'bottomleft', collapsed: false }).addTo(map);
+
+  // Layer değişimi izle
+  map.on('baselayerchange', e => {
+    const name = e.name;
+    if (name.includes('Uydu')) {
+      window._activeTileLayer = 'satellite';
+      const btn = document.getElementById('map-layer-label');
+      if (btn) btn.textContent = 'Koyu';
+    } else if (name.includes('OSM') || name.includes('Open')) {
+      window._activeTileLayer = 'osm';
+      const btn = document.getElementById('map-layer-label');
+      if (btn) btn.textContent = 'Uydu';
+    } else {
+      window._activeTileLayer = 'dark';
+      const btn = document.getElementById('map-layer-label');
+      if (btn) btn.textContent = 'Uydu';
+    }
+  });
+
+  // ── Şehir işaretçileri ──────────────────────────────────
   TURKISH_CITIES.forEach(city => {
     const color = getGHIColor(city.ghi);
     L.circleMarker([city.lat, city.lon], {
@@ -110,21 +202,57 @@ function initMap() {
     }).addTo(map).bindTooltip(`${city.name} — GHI: ${city.ghi} kWh/m²/yıl`);
   });
 
+  // ── Konum işaretçisi ────────────────────────────────────
   const markerIcon = L.divIcon({
     html: `<div style="width:22px;height:22px;background:#F59E0B;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.5)"></div>`,
     className: '', iconSize: [22, 22], iconAnchor: [11, 11]
   });
   marker = L.marker([39.0, 35.0], { icon: markerIcon, draggable: true }).addTo(map);
   window.marker = marker;
+
   marker.on('dragend', e => {
+    if (window._drawingMode || window._glarePickMode) return;
     const ll = e.target.getLatLng();
     selectLocationFromLatLon(ll.lat, ll.lng, true);
   });
-  map.on('click', e => selectLocationFromLatLon(e.latlng.lat, e.latlng.lng, true));
 
+  // ── Map click — çizim/glare modunda konum değiştirme ──
+  map.on('click', e => {
+    if (window._drawingMode || window._glarePickMode) return;
+    selectLocationFromLatLon(e.latlng.lat, e.latlng.lng, true);
+  });
+
+  initRoofDrawing(map);
+
+  // invalidateSize — birden fazla noktada
   setTimeout(() => map.invalidateSize(), 100);
   setTimeout(() => map.invalidateSize(), 600);
+  setTimeout(() => map.invalidateSize(), 1500);
 }
+
+// ── Harita katmanı toggle butonu ────────────────────────
+function toggleMapLayer() {
+  if (!window.map) return;
+  const current = window._activeTileLayer;
+  if (current === 'satellite') {
+    window._satelliteLayer.remove();
+    window._osmLayer.remove();
+    window._darkLayer.addTo(window.map);
+    window._activeTileLayer = 'dark';
+    const lbl = document.getElementById('map-layer-label');
+    if (lbl) lbl.textContent = 'Uydu';
+    document.getElementById('map-satellite-btn')?.classList.remove('active');
+  } else {
+    window._darkLayer.remove();
+    window._osmLayer.remove();
+    window._satelliteLayer.addTo(window.map);
+    window._activeTileLayer = 'satellite';
+    const lbl = document.getElementById('map-layer-label');
+    if (lbl) lbl.textContent = 'Koyu';
+    document.getElementById('map-satellite-btn')?.classList.add('active');
+  }
+}
+window.toggleMapLayer = toggleMapLayer;
 
 function getGHIColor(ghi) {
   if (ghi < 1300) return '#6B7280';
@@ -161,6 +289,7 @@ function selectLocationFromLatLon(lat, lon, checkBounds) {
     document.getElementById('selected-loc-text').textContent =
       `${lat.toFixed(4)}°K, ${lon.toFixed(4)}°D`;
   }
+  if (window.state.osmShadowEnabled) refreshOSMShadowAnalysis();
 }
 
 function isInTurkey(lat, lon) {
@@ -182,6 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
   buildInverterCards();
   loadFromHash();
   updateDashboard();
+  // BOM builder ilk açılışta initBomBuilder() ile başlatılır (HTML onclick)
 
   const input = document.getElementById('city-search');
   const list = document.getElementById('autocomplete-list');
@@ -228,6 +358,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // i18n başlat
   i18n.init().catch(() => {});
+  initExchangeRateService().catch(() => {}).then(() => {
+    // Para birimi tercihini localStorage'dan geri yükle
+    try {
+      const saved = localStorage.getItem(CURRENCY_STORAGE_KEY);
+      if (saved === 'TRY' || saved === 'USD') switchCurrency(saved);
+    } catch { /* ignore */ }
+  });
 });
 
 function highlightAC(items) {
@@ -270,37 +407,78 @@ function useGeolocation() {
 // ═══════════════════════════════════════════════════════════
 // STEP 2 — TILT & SHADING & SOILING
 // ═══════════════════════════════════════════════════════════
+// Eğim katsayısı tablosu (optimum 33° = 1.00)
+const TILT_COEFFS = {0:0.78, 10:0.90, 15:0.94, 20:0.97, 25:0.99, 30:1.00, 33:1.00, 35:1.00, 40:0.99, 45:0.97, 50:0.94, 60:0.87, 75:0.75, 90:0.62};
+function getTiltCoeff(deg) {
+  const keys = Object.keys(TILT_COEFFS).map(Number).sort((a,b) => a-b);
+  let lo = keys[0], hi = keys[keys.length-1];
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (deg >= keys[i] && deg <= keys[i+1]) { lo = keys[i]; hi = keys[i+1]; break; }
+  }
+  if (lo === hi) return TILT_COEFFS[lo];
+  const t = (deg - lo) / (hi - lo);
+  return TILT_COEFFS[lo] + t * (TILT_COEFFS[hi] - TILT_COEFFS[lo]);
+}
+
 function updateTilt(val) {
-  val = parseInt(val);
+  val = Math.max(0, Math.min(70, parseInt(val, 10) || 0));
   window.state.tilt = val;
   document.getElementById('tilt-val').textContent = val + '°';
   positionRangeThumb('tilt-slider', 'tilt-val', 0, 90);
 
-  const cx = 50, cy = 80, len = 110;
-  const rad = (val * Math.PI) / 180;
-  const x2 = cx + len * Math.cos(Math.PI - rad);
-  const y2 = cy - len * Math.sin(rad);
-  document.getElementById('tilt-line').setAttribute('x1', cx);
-  document.getElementById('tilt-line').setAttribute('y1', cy);
-  document.getElementById('tilt-line').setAttribute('x2', x2);
-  document.getElementById('tilt-line').setAttribute('y2', y2);
-  document.getElementById('tilt-angle-text').textContent = val + '°';
-  document.getElementById('tilt-angle-text').setAttribute('x', cx + 35);
-  document.getElementById('tilt-angle-text').setAttribute('y', cy - 8);
+  // Pivot point: (155, 145) — çatı köşesi
+  const pivotX = 155, pivotY = 145;
+  const panelGroup = document.getElementById('panel-group');
+  if (panelGroup) panelGroup.setAttribute('transform', `rotate(-${val}, ${pivotX}, ${pivotY})`);
 
+  // Açı yayı
+  const arcEl = document.getElementById('tilt-arc');
+  if (arcEl) {
+    const arcR = 28;
+    const radEnd = (val * Math.PI) / 180;
+    const arcEndX = pivotX + arcR * Math.cos(Math.PI - radEnd);
+    const arcEndY = pivotY - arcR * Math.sin(radEnd);
+    const largeArc = val > 90 ? 1 : 0;
+    arcEl.setAttribute('d', `M${pivotX + arcR},${pivotY} A${arcR},${arcR} 0 ${largeArc},0 ${arcEndX.toFixed(1)},${arcEndY.toFixed(1)}`);
+  }
+
+  // Açı text
+  const angleText = document.getElementById('tilt-angle-text');
+  if (angleText) {
+    const textR = 42;
+    const midRad = (val / 2 * Math.PI) / 180;
+    angleText.setAttribute('x', (pivotX + textR * Math.cos(Math.PI - midRad)).toFixed(1));
+    angleText.setAttribute('y', (pivotY - textR * Math.sin(midRad) + 5).toFixed(1));
+    angleText.textContent = val + '°';
+  }
+
+  // Verim katsayısı
+  const coeff = getTiltCoeff(val);
+  const coeffEl = document.getElementById('tilt-coeff-text');
+  if (coeffEl) coeffEl.textContent = `Verim: ×${coeff.toFixed(2)}`;
+
+  // Optimal badge
+  const badge = document.getElementById('opt-badge');
+  const badgeText = document.getElementById('opt-badge-text');
   const info = document.getElementById('tilt-info');
-  info.className = '';
   if (val >= 25 && val <= 40) {
-    info.className = 'tilt-good'; info.textContent = 'Optimal açı aralığı ✓';
+    if (badge) { badge.setAttribute('fill', 'rgba(16,185,129,0.15)'); badge.setAttribute('stroke', 'rgba(16,185,129,0.4)'); }
+    if (badgeText) { badgeText.setAttribute('fill', '#10B981'); badgeText.textContent = 'Optimal aralık (25°–40°) ✓'; }
+    if (info) { info.style.cssText = 'color:#10B981;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3)'; info.textContent = 'Optimal açı aralığı ✓'; }
   } else if ((val >= 15 && val < 25) || (val > 40 && val <= 55)) {
-    info.className = 'tilt-warn'; info.textContent = 'Kabul edilebilir açı aralığı';
+    if (badge) { badge.setAttribute('fill', 'rgba(245,158,11,0.12)'); badge.setAttribute('stroke', 'rgba(245,158,11,0.35)'); }
+    if (badgeText) { badgeText.setAttribute('fill', '#F59E0B'); badgeText.textContent = `Kabul edilebilir (${val < 25 ? '15°–25°' : '40°–55°'})`; }
+    if (info) { info.style.cssText = 'color:#F59E0B;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3)'; info.textContent = 'Kabul edilebilir açı aralığı'; }
   } else {
-    info.className = 'tilt-bad'; info.textContent = 'Verimsiz açı — düzeltme önerilir';
+    if (badge) { badge.setAttribute('fill', 'rgba(239,68,68,0.1)'); badge.setAttribute('stroke', 'rgba(239,68,68,0.35)'); }
+    if (badgeText) { badgeText.setAttribute('fill', '#EF4444'); badgeText.textContent = 'Verimsiz açı — düzeltme önerilir'; }
+    if (info) { info.style.cssText = 'color:#EF4444;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3)'; info.textContent = 'Verimsiz açı — düzeltme önerilir'; }
   }
 }
 
 function updateShading(val) {
-  window.state.shadingFactor = parseInt(val);
+  val = Math.max(0, Math.min(80, parseInt(val, 10) || 0));
+  window.state.shadingFactor = val;
   document.getElementById('shading-val').textContent = val + '%';
   positionRangeThumb('shading-slider', 'shading-val', 0, 50);
   const desc = ['Gölge yok', 'Az gölge', 'Orta gölge', 'Ciddi gölge'];
@@ -309,7 +487,8 @@ function updateShading(val) {
 }
 
 function updateSoiling(val) {
-  window.state.soilingFactor = parseInt(val) || 0;
+  val = Math.max(0, Math.min(50, parseInt(val, 10) || 0));
+  window.state.soilingFactor = val;
   document.getElementById('soiling-val').textContent = val + '%';
   positionRangeThumb('soiling-slider', 'soiling-val', 0, 10);
   const descs = ['Temiz panel', 'Minimal kirlenme', 'Az kirlenme', 'Orta düzey kirlenme', 'Yüksek kirlenme'];
@@ -426,20 +605,32 @@ function selectDirection(dir) {
 function buildPanelCards() {
   const wrap = document.getElementById('panel-cards-wrap');
   wrap.innerHTML = '';
+  const panelDescriptions = {
+    mono: 'En yaygın tercih. Yüksek verimlilik ve kompakt kurulum; çoğu konut ve ticari proje için ideal denge.',
+    poly: 'Ekonomik seçenek. Daha geniş alana ihtiyaç duyar; maliyet öncelikli ve büyük çatılar için uygundur.',
+    bifacial: 'Hem ön hem arka yüzeyden enerji üretir. Açık çatı veya zeminde %10 ek kazanç; 30 yıl garantiyle en uzun ömürlü.'
+  };
+  const cur = window.state.displayCurrency || 'TRY';
+  const rate = window.state.usdToTry || 40;
   Object.entries(PANEL_TYPES).forEach(([key, p]) => {
+    const priceVal = convertTry(p.pricePerWatt, cur, rate);
+    const priceLabel = cur === 'USD'
+      ? `$${priceVal.toFixed(3)}/W`
+      : `${priceVal.toFixed(1)} ₺/W`;
     const card = document.createElement('div');
     card.className = 'panel-card' + (key === window.state.panelType ? ' selected' : '');
     card.id = `panel-card-${key}`;
     card.innerHTML = `
       <div class="panel-check">✓</div>
       <div class="panel-card-title">${p.name}</div>
+      <div style="font-size:0.71rem;color:var(--text-muted);line-height:1.5;margin:6px 4px 10px;text-align:center">${panelDescriptions[key]}</div>
       <div class="panel-card-eff">${(p.efficiency * 100).toFixed(1)}%</div>
       <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">Verimlilik</div>
       <div class="panel-card-stats">
         <div class="panel-stat"><span class="panel-stat-label">Güç</span><span>${p.wattPeak} Wp</span></div>
         <div class="panel-stat"><span class="panel-stat-label">Sıcaklık Katsayısı</span><span>${(p.tempCoeff*100).toFixed(2)}%/°C</span></div>
         <div class="panel-stat"><span class="panel-stat-label">Yıllık Bozulma</span><span>${(p.degradation*100).toFixed(1)}%</span></div>
-        <div class="panel-stat"><span class="panel-stat-label">Fiyat</span><span>${p.pricePerWatt.toFixed(1)} TL/W</span></div>
+        <div class="panel-stat"><span class="panel-stat-label">Fiyat</span><span>${priceLabel}</span></div>
         <div class="panel-stat"><span class="panel-stat-label">Garanti</span><span>${p.warranty} yıl</span></div>
       </div>`;
     card.addEventListener('click', () => {
@@ -468,12 +659,20 @@ function updatePanelPreview() {
   }
 
   const systemPower = (totalPanelCount * panel.wattPeak / 1000).toFixed(2);
-  const cost = totalPanelCount * panel.wattPeak * panel.pricePerWatt;
+  window.state.previewSystemPower = Number(systemPower);
+  const costTry = totalPanelCount * panel.wattPeak * panel.pricePerWatt;
+  const cur = window.state.displayCurrency || 'TRY';
+  const rate = window.state.usdToTry || 40;
+  const costDisplay = cur === 'USD'
+    ? convertTry(costTry, 'USD', rate).toLocaleString('en-US', { maximumFractionDigits: 0 })
+    : Math.round(costTry).toLocaleString('tr-TR');
 
   document.getElementById('prev-count').textContent = totalPanelCount;
   document.getElementById('prev-power').textContent = systemPower;
   document.getElementById('prev-area').textContent = (totalPanelCount * panelArea).toFixed(1);
-  document.getElementById('prev-cost').textContent = Math.round(cost).toLocaleString('tr-TR');
+  document.getElementById('prev-cost').textContent = costDisplay;
+  const costLabel = document.getElementById('prev-cost-label');
+  if (costLabel) costLabel.textContent = cur === 'USD' ? 'Tahmini Maliyet ($)' : 'Tahmini Maliyet (₺)';
 
   const preview = document.getElementById('panel-count-preview');
   if (preview) preview.textContent = totalPanelCount > 0 ? `≈ ${totalPanelCount} panel sığar (${systemPower} kWp)` : '';
@@ -493,7 +692,12 @@ function goToStep(n) {
   state.step = n;
   if (n === 1) {
     resetConfetti();
-    if (map) setTimeout(() => map.invalidateSize(), 50);
+    if (map) {
+      requestAnimationFrame(() => {
+        map.invalidateSize();
+        setTimeout(() => map.invalidateSize(), 300);
+      });
+    }
   }
   if (n === 5) {
     setTimeout(() => {
@@ -682,7 +886,7 @@ function updateSecShade(id, val) {
 // GÜNLÜK TÜKETİM
 // ═══════════════════════════════════════════════════════════
 function updateConsumption(val) {
-  window.state.dailyConsumption = parseInt(val) || 20;
+  window.state.dailyConsumption = parseInt(val) || 10;
   const el = document.getElementById('consumption-val');
   if (el) el.textContent = val + ' kWh/gün';
   const desc = document.getElementById('consumption-desc');
@@ -714,8 +918,13 @@ function renderBatteryModels() {
   if (!wrap) return;
   wrap.innerHTML = Object.entries(BATTERY_MODELS).map(([key, m]) => `
     <button class="bat-model-btn${window.state.battery.model === key ? ' selected' : ''}" onclick="selectBatteryModel('${key}')">
-      <div style="font-weight:600;font-size:0.85rem">${m.name}</div>
-      <div style="font-size:0.75rem;color:var(--text-muted)">${m.spec}</div>
+      <div style="font-weight:700;font-size:0.82rem;color:var(--text)">${m.name}</div>
+      <div style="font-size:0.71rem;color:var(--text-muted);margin-top:2px">${m.spec}</div>
+      ${m.chemistry ? `<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">
+        <span style="font-size:0.68rem;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:4px;padding:1px 5px;color:#6EE7B7">${m.chemistry}</span>
+        ${m.cycles ? `<span style="font-size:0.68rem;background:rgba(255,255,255,0.06);border:1px solid var(--border-subtle);border-radius:4px;padding:1px 5px;color:var(--text-muted)">${m.cycles.toLocaleString('tr-TR')} döngü</span>` : ''}
+        ${m.warranty ? `<span style="font-size:0.68rem;background:rgba(255,255,255,0.06);border:1px solid var(--border-subtle);border-radius:4px;padding:1px 5px;color:var(--text-muted)">${m.warranty} yıl garanti</span>` : ''}
+      </div>` : ''}
     </button>`).join('');
 }
 
@@ -858,3 +1067,23 @@ window.updateCostOverrides = updateCostOverrides;
 window.selectCity = selectCity;
 window.useGeolocation = useGeolocation;
 window.isInTurkey = isInTurkey;
+window.clearRoofDrawing = function() {
+  if (window.roofDrawnItems) {
+    window.roofDrawnItems.clearLayers();
+    if (window.syncRoofLayers) window.syncRoofLayers(window.roofDrawnItems);
+    window.state.roofArea = 0;
+    window.state.roofGeometry = null;
+    const roofAreaInput = document.getElementById('roof-area');
+    if (roofAreaInput) roofAreaInput.value = '';
+    showToast('Çatı çizimleri temizlendi.', 'info');
+    document.getElementById('clear-roof-btn').style.display = 'none';
+    const badge = document.getElementById('roof-area-badge');
+    if (badge) badge.style.display = 'none';
+  }
+};
+window.toggleOSMShadow = toggleOSMShadow;
+window.refreshOSMShadowAnalysis = refreshOSMShadowAnalysis;
+window.initBomBuilder = initBomBuilder;
+window.selectBomItem = selectBomItem;
+window.refreshExchangeRate = refreshExchangeRate;
+window.setManualUsdTryRate = setManualUsdTryRate;

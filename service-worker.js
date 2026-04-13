@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gunesHesap-v8';
+const CACHE_NAME = 'gunesHesap-v9';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',
@@ -7,6 +7,7 @@ const STATIC_ASSETS = [
   '/css/components.css',
   '/js/app.js',
   '/js/bill-analysis.js',
+  '/js/bom.js',
   '/js/cable-loss.js',
   '/js/calc-core.js',
   '/js/calc-engine.js',
@@ -15,12 +16,18 @@ const STATIC_ASSETS = [
   '/js/data.js',
   '/js/eng-report.js',
   '/js/ev-charging.js',
+  '/js/exchange-rate.js',
+  '/js/glare.js',
   '/js/heat-pump.js',
   '/js/heatmap.js',
   '/js/hourly-profile.js',
   '/js/i18n.js',
   '/js/inverter.js',
+  '/js/osm-shadow.js',
+  '/js/roof-geometry.js',
+  '/js/satellite-enhance.js',
   '/js/scenarios.js',
+  '/js/security.js',
   '/js/structural.js',
   '/js/sun-path.js',
   '/js/tax.js',
@@ -29,20 +36,30 @@ const STATIC_ASSETS = [
   '/locales/tr.json',
   '/locales/en.json',
   '/locales/de.json',
+  '/fixtures/bom-suppliers.json',
   '/icon-192.svg',
   '/icon-512.svg'
 ];
 
 const API_DOMAINS = [
   're.jrc.ec.europa.eu',
-  'api.open-meteo.com'
+  'api.open-meteo.com',
+  'overpass-api.de',
+  'cdn.jsdelivr.net',
+  'api.exchangerate-api.com',
+  'open.er-api.com'
 ];
 
 // ── Install: tüm static assets'i önbelleğe al ──────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      return Promise.allSettled(
+        STATIC_ASSETS.map((asset) => cache.add(asset))
+      ).then((results) => {
+        const failures = results.filter((r) => r.status === 'rejected');
+        if (failures.length) console.warn('[SW] Some assets were not precached:', failures.length);
+      });
     }).then(() => {
       // Yeni SW hemen aktif olsun, eski SW bekletmesin
       return self.skipWaiting();
@@ -68,7 +85,14 @@ self.addEventListener('activate', (event) => {
 
 // ── Yardımcı: URL'nin API domain'e ait olup olmadığını kontrol et ───────────
 function isApiRequest(url) {
-  return API_DOMAINS.some((domain) => url.hostname.includes(domain));
+  return API_DOMAINS.some((domain) => url.hostname === domain || url.hostname.endsWith(`.${domain}`));
+}
+
+function apiOfflineResponse() {
+  return new Response(
+    JSON.stringify({ error: 'offline', message: 'Network unavailable and no cached API response exists.' }),
+    { status: 503, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } }
+  );
 }
 
 // ── Yardımcı: Network First — timeout ile ──────────────────────────────────
@@ -83,20 +107,7 @@ function networkFirstWithTimeout(request, timeoutMs = 10000) {
         if (cached) {
           resolve(cached);
         } else {
-          // Cache'de de yok → offline fallback
-          caches.match('/index.html').then((fallback) => {
-            resolve(fallback || new Response(
-              `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
-              <title>Çevrimdışı — GüneşHesap</title>
-              <meta name="viewport" content="width=device-width,initial-scale=1">
-              <style>body{background:#0F172A;color:#F1F5F9;font-family:sans-serif;
-              display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center}
-              h1{color:#F59E0B;margin-bottom:8px}p{color:#94A3B8}</style></head>
-              <body><div><h1>Çevrimdışısınız</h1>
-              <p>İnternet bağlantınızı kontrol edip sayfayı yenileyin.</p></div></body></html>`,
-              { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-            ));
-          });
+          resolve(apiOfflineResponse());
         }
       });
     }, timeoutMs);
@@ -126,19 +137,7 @@ function networkFirstWithTimeout(request, timeoutMs = 10000) {
           if (cached) {
             resolve(cached);
           } else {
-            caches.match('/index.html').then((fallback) => {
-              resolve(fallback || new Response(
-                `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
-                <title>Çevrimdışı — GüneşHesap</title>
-                <meta name="viewport" content="width=device-width,initial-scale=1">
-                <style>body{background:#0F172A;color:#F1F5F9;font-family:sans-serif;
-                display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center}
-                h1{color:#F59E0B;margin-bottom:8px}p{color:#94A3B8}</style></head>
-                <body><div><h1>Çevrimdışısınız</h1>
-                <p>İnternet bağlantınızı kontrol edip sayfayı yenileyin.</p></div></body></html>`,
-                { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-              ));
-            });
+            resolve(apiOfflineResponse());
           }
         });
       });
@@ -191,6 +190,11 @@ self.addEventListener('fetch', (event) => {
 
   // Chrome extension ve browser-internal isteklerini atla
   if (url.protocol === 'chrome-extension:') return;
+
+  if (event.request.method !== 'GET') {
+    if (isApiRequest(url)) event.respondWith(fetch(event.request).catch(() => apiOfflineResponse()));
+    return;
+  }
 
   if (isApiRequest(url)) {
     // API istekleri: Network First (20s timeout) → cache fallback

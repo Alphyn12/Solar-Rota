@@ -3,6 +3,9 @@
 // GüneşHesap v2.0
 // ═══════════════════════════════════════════════════════════
 import { PANEL_TYPES, MONTHS, COMPASS_DIRS } from './data.js';
+import { convertTry, renderExchangeRateStatus } from './exchange-rate.js';
+import { i18n } from './i18n.js';
+import { createShareStateSnapshot, escapeHtml, sanitizeSharedState } from './security.js';
 
 let monthlyChart = null;
 
@@ -17,7 +20,7 @@ function moneyContext(state = window.state) {
 function money(value, opts = {}) {
   const ctx = moneyContext();
   const raw = Number(value) || 0;
-  const converted = ctx.currency === 'USD' ? raw / ctx.usdToTry : raw;
+  const converted = convertTry(raw, ctx.currency, ctx.usdToTry);
   const digits = opts.digits ?? (ctx.currency === 'USD' ? 0 : 0);
   return converted.toLocaleString(ctx.locale, { maximumFractionDigits: digits, minimumFractionDigits: opts.minDigits ?? 0 }) + ' ' + ctx.suffix;
 }
@@ -25,7 +28,7 @@ function money(value, opts = {}) {
 function moneyRate(value, unit = 'kWh') {
   const ctx = moneyContext();
   const raw = Number(value) || 0;
-  const converted = ctx.currency === 'USD' ? raw / ctx.usdToTry : raw;
+  const converted = convertTry(raw, ctx.currency, ctx.usdToTry);
   return converted.toLocaleString(ctx.locale, { maximumFractionDigits: ctx.currency === 'USD' ? 3 : 2 }) + ` ${ctx.suffix}/${unit}`;
 }
 
@@ -33,6 +36,7 @@ export function renderResults() {
   const state = window.state;
   const r = state.results;
   const p = PANEL_TYPES[state.panelType];
+  renderExchangeRateStatus();
 
   window.animateCounter('kpi-energy', r.annualEnergy, v => Math.round(v).toLocaleString('tr-TR'));
   window.animateCounter('kpi-savings', r.annualSavings, v => money(v));
@@ -42,11 +46,11 @@ export function renderResults() {
   document.getElementById('kpi-tree-sub').textContent = `≈ ${r.trees} ağaç eşdeğeri`;
 
   document.querySelector('#step-5 .kpi-card:nth-child(2) .kpi-unit').textContent =
-    (state.displayCurrency === 'USD' ? 'USD / yıl' : 'TL / yıl');
+    (state.displayCurrency === 'USD' ? `USD / ${i18n.t('units.year')}` : `TL / ${i18n.t('units.year')}`);
   document.getElementById('fin-cost').textContent = money(r.totalCost);
-  document.getElementById('fin-payback').textContent = r.simplePaybackYear ? r.simplePaybackYear + ' yıl' : '>25 yıl';
+  document.getElementById('fin-payback').textContent = r.simplePaybackYear ? r.simplePaybackYear + ` ${i18n.t('units.year')}` : `>25 ${i18n.t('units.year')}`;
   const discountedPaybackEl = document.getElementById('fin-discounted-payback');
-  if (discountedPaybackEl) discountedPaybackEl.textContent = r.discountedPaybackYear ? r.discountedPaybackYear + ' yıl' : '>25 yıl';
+  if (discountedPaybackEl) discountedPaybackEl.textContent = r.discountedPaybackYear ? r.discountedPaybackYear + ` ${i18n.t('units.year')}` : `>25 ${i18n.t('units.year')}`;
   document.getElementById('fin-total').textContent = money(r.npvTotal);
   document.getElementById('fin-roi').textContent = r.roi + '%';
   document.getElementById('fin-irr').textContent = r.irr === 'N/A' ? 'N/A' : r.irr + '%';
@@ -55,7 +59,7 @@ export function renderResults() {
   const omRow = document.getElementById('fin-om-row');
   const invRow = document.getElementById('fin-inverter-row');
   if (r.annualOMCost > 0 || r.annualInsurance > 0) {
-    if (omRow) { omRow.style.display = ''; document.getElementById('fin-om-cost').textContent = '-' + money(r.annualOMCost + r.annualInsurance) + '/yıl'; }
+    if (omRow) { omRow.style.display = ''; document.getElementById('fin-om-cost').textContent = '-' + money(r.annualOMCost + r.annualInsurance) + `/${i18n.t('units.year')}`; }
     if (invRow) { invRow.style.display = ''; document.getElementById('fin-inverter-cost').textContent = '-' + money(r.inverterReplaceCost); }
   } else {
     if (omRow) omRow.style.display = 'none';
@@ -80,24 +84,26 @@ export function renderResults() {
     ['Çatı Yönü', state.azimuthName],
     ['Gölgelenme', state.shadingFactor + '%'],
     ['Kirlenme', state.soilingFactor + '%'],
+    ['OSM Gölge Etkisi', r.osmShadowFactor ? `${Number(r.osmShadowFactor).toFixed(1)}% ek varsayım` : 'Kapalı / yok'],
+    ['Harita Çatı Alanı', state.roofGeometry ? `${state.roofGeometry.areaM2.toFixed(1)} m² | ${state.roofGeometry.azimuthName} ${Math.round(state.roofGeometry.azimuth)}°` : '—'],
     ['İnverter Tipi', r.inverterType ? r.inverterType.charAt(0).toUpperCase() + r.inverterType.slice(1) : 'String'],
     ['İnverter Verimi', (r.inverterEfficiency || '97') + '%'],
-    ['Spesifik Verim', r.ysp + ' kWh/kWp'],
-    ['Kapasite Faktörü', r.cf + '%'],
-    ['Performans Oranı', r.pr + '%'],
+    ['Spesifik Verim <span style="cursor:help;opacity:0.6" title="Kurulu her kWp gücün yılda ürettiği enerji. Türkiyeʼde iyi bir sistem 1.400–1.700 kWh/kWp üretir. Konum, eğim ve gölge kalitesini ölçen en özlü göstergedir.">?</span>', r.ysp + ' kWh/kWp'],
+    ['Kapasite Faktörü <span style="cursor:help;opacity:0.6" title="Sistemin teorik maksimum kapasitesine oranla ne kadar çalıştığı (%). Güneş enerjisinde %15–22 beklenir; yükseldikçe konum ve konfigürasyon kalitesi artar.">?</span>', r.cf + '%'],
+    ['Performans Oranı (PR) <span style="cursor:help;opacity:0.6" title="Gerçek üretimin teorik ideale oranı (%). %75–85 iyi, %85+ mükemmel. Gölge, sıcaklık, kirlenme ve kablo kayıpları bu oranı düşürür.">?</span>', r.pr + '%'],
     ['CO₂ Tasarrufu', r.co2Savings + ' ton/yıl'],
     ['Hesap Metodu', `${r.calculationMode || '—'} / ${r.methodologyVersion || '—'}`],
     ['PVGIS loss parametresi', `${r.pvgisLossParam ?? 0}%`],
     ['PVGIS POA', `${r.pvgisPoa || '—'} kWh/m²/yıl`],
     ['Tarife', moneyRate(r.tariff, 'kWh')],
     ['Tarife Rejimi', `${r.tariffModel?.effectiveRegime || '—'} / Sözleşme gücü: ${r.tariffModel?.contractedPowerKw || 0} kW`],
-    ['Para Birimi', `${state.displayCurrency || 'TRY'} (USD/TRY: ${Number(state.usdToTry || 38.5).toFixed(2)})`],
+    ['Para Birimi', `${state.displayCurrency || 'TRY'} (USD/TRY: ${Number(state.usdToTry || 38.5).toFixed(2)} | ${state.exchangeRate?.source || 'manual/fallback'})`],
     ['Tarife Kaynak Tarihi', r.tariffModel?.sourceDate || '—'],
     ['Yıllık Fiyat Artışı', ((r.annualPriceIncrease || 0) * 100).toFixed(1) + '%'],
   ];
   rows.forEach(([k, v]) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${k}</td><td>${v}</td>`;
+    tr.innerHTML = `<td>${k}</td><td>${escapeHtml(v)}</td>`;
     tbody.appendChild(tr);
   });
 
@@ -115,9 +121,9 @@ export function renderResults() {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${i + 1}. Yüzey</td>
-        <td>${sec.sectionArea} m²</td>
-        <td>${sec.sectionAzimuthName}</td>
-        <td>${sec.sectionTilt}°</td>
+        <td>${escapeHtml(sec.sectionArea)} m²</td>
+        <td>${escapeHtml(sec.sectionAzimuthName)}</td>
+        <td>${escapeHtml(sec.sectionTilt)}°</td>
         <td>${sec.panelCount}</td>
         <td>${sec.systemPower.toFixed(2)}</td>
         <td>${Math.round(sec.annualEnergy).toLocaleString('tr-TR')} kWh</td>`;
@@ -142,7 +148,7 @@ export function renderResults() {
   renderBESSResults(r.bessMetrics);
   renderNMResults(r.nmMetrics, state.netMeteringEnabled);
   renderWarningsAndAudit(state, r);
-  renderPanelLayoutSketch(state, r, p);
+  renderBomResults(r.costBreakdown?.bom);
 
   // Faz B: Fatura analizi sonuçları
   if (r.billAnalysis) renderBillAnalysisResults(r.billAnalysis);
@@ -191,6 +197,33 @@ function renderNMResults(nm, enabled) {
   document.getElementById('nm-self-consumption').textContent = `${nm.selfConsumptionPct}%`;
 }
 
+function renderBomResults(bom) {
+  const techCard = document.getElementById('tech-table-body')?.closest('.card');
+  if (!techCard) return;
+  let card = document.getElementById('bom-result-card');
+  if (!card) {
+    card = document.createElement('div');
+    card.id = 'bom-result-card';
+    card.className = 'card';
+    card.style.marginTop = '16px';
+    techCard.insertAdjacentElement('afterend', card);
+  }
+  if (!bom?.rows?.length) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+  card.innerHTML = `
+    <div class="card-title">Itemized BOM / CapEx</div>
+    <table class="tech-table">
+      <tbody>
+        ${bom.rows.map(row => `<tr><td>${escapeHtml(row.supplier)} — ${escapeHtml(row.name)}</td><td>${Number(row.quantity || 0).toFixed(row.unit === 'fixed' ? 0 : 1)} ${escapeHtml(row.unit)}</td><td>${money(row.total)}</td></tr>`).join('')}
+        <tr><td colspan="2"><strong>BOM Ara Toplam</strong></td><td><strong>${money(bom.subtotal)}</strong></td></tr>
+      </tbody>
+    </table>
+  `;
+}
+
 function renderWarningsAndAudit(state, r) {
   const techCard = document.getElementById('tech-table-body')?.closest('.card');
   if (!techCard) return;
@@ -207,7 +240,7 @@ function renderWarningsAndAudit(state, r) {
   const warnings = Array.isArray(r.calculationWarnings) ? r.calculationWarnings : [];
   const warningHtml = warnings.length
     ? `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:12px;margin-bottom:12px;color:#FCA5A5;font-size:0.82rem">
-        <strong>Hata yakala uyarıları:</strong><br>${warnings.map(w => `• ${w}`).join('<br>')}
+        <strong>Hata yakala uyarıları:</strong><br>${warnings.map(w => `• ${escapeHtml(w)}`).join('<br>')}
       </div>`
     : `<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:12px;margin-bottom:12px;color:#A7F3D0;font-size:0.82rem">Hata yakala modu kritik anomali bulmadı.</div>`;
 
@@ -216,43 +249,44 @@ function renderWarningsAndAudit(state, r) {
     ${warningHtml}
     <table class="tech-table">
       <tbody>
-        <tr><td>Konum</td><td>${state.cityName || '—'} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
-        <tr><td>Tarife</td><td>${r.tariffModel?.type || state.tariffType} | ${r.tariffModel?.effectiveRegime || '—'} | ${moneyRate(r.tariff, 'kWh')} | Kaynak: ${r.tariffModel?.sourceDate || '—'}</td></tr>
+        <tr><td>Konum</td><td>${escapeHtml(state.cityName || '—')} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
+        <tr><td>Tarife</td><td>${escapeHtml(r.tariffModel?.type || state.tariffType)} | ${escapeHtml(r.tariffModel?.effectiveRegime || '—')} | ${moneyRate(r.tariff, 'kWh')} | Kaynak: ${escapeHtml(r.tariffModel?.sourceDate || '—')}</td></tr>
         <tr><td>Tüketim</td><td>${Math.round(r.hourlySummary?.annualLoad || state.dailyConsumption * 365).toLocaleString('tr-TR')} kWh/yıl</td></tr>
         <tr><td>Öz tüketim / İhracat</td><td>${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString('tr-TR')} kWh / ücretli ${Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString('tr-TR')} kWh / toplam ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString('tr-TR')} kWh</td></tr>
         <tr><td>Üretim güven aralığı</td><td>Kötü yıl: ${Math.round(r.annualEnergy * 0.90).toLocaleString('tr-TR')} kWh | Baz: ${r.annualEnergy.toLocaleString('tr-TR')} kWh | İyi yıl: ${Math.round(r.annualEnergy * 1.10).toLocaleString('tr-TR')} kWh</td></tr>
-        <tr><td>Güven seviyesi</td><td>${r.confidenceLevel} (${r.calculationMode})</td></tr>
+        <tr><td>Güven seviyesi</td><td>${escapeHtml(r.confidenceLevel)} (${escapeHtml(r.calculationMode)})</td></tr>
         <tr><td>Veri gizliliği</td><td>Kayıtlı hesaplar sadece bu tarayıcıdaki localStorage alanında tutulur.</td></tr>
       </tbody>
     </table>
   `;
+
+  // Türkiye SVG haritasında şehir noktasını güncelle
+  updateTurkeyMapDot(state.lat, state.lon, state.cityName);
 }
 
-function renderPanelLayoutSketch(state, r, panel) {
-  const sectionCard = document.getElementById('section-breakdown-card');
-  if (!sectionCard) return;
-  let card = document.getElementById('panel-layout-card');
-  if (!card) {
-    card = document.createElement('div');
-    card.id = 'panel-layout-card';
-    card.className = 'card';
-    card.style.marginTop = '16px';
-    sectionCard.insertAdjacentElement('afterend', card);
+function updateTurkeyMapDot(lat, lon, cityName) {
+  // SVG viewBox: 0 0 800 360 — Türkiye coğrafi sınırları: lon 26–45, lat 36–42
+  const svgW = 800, svgH = 360;
+  const lonMin = 26, lonMax = 45, latMin = 36, latMax = 42;
+  if (!lat || !lon) return;
+
+  const x = ((lon - lonMin) / (lonMax - lonMin)) * svgW;
+  const y = svgH - ((lat - latMin) / (latMax - latMin)) * svgH;
+
+  const pulse = document.getElementById('city-pulse-dot');
+  const inner = document.getElementById('city-dot-inner');
+  const label = document.getElementById('city-dot-label');
+
+  if (pulse) { pulse.setAttribute('cx', x.toFixed(0)); pulse.setAttribute('cy', y.toFixed(0)); pulse.setAttribute('opacity', '0.9'); }
+  if (inner) { inner.setAttribute('cx', x.toFixed(0)); inner.setAttribute('cy', y.toFixed(0)); inner.setAttribute('opacity', '1'); }
+  if (label) {
+    label.setAttribute('x', x.toFixed(0));
+    label.setAttribute('y', (y - 14).toFixed(0));
+    label.setAttribute('opacity', '1');
+    label.textContent = cityName || '';
   }
-  const cols = Math.max(1, Math.ceil(Math.sqrt(r.panelCount)));
-  const rows = Math.max(1, Math.ceil(r.panelCount / cols));
-  const cells = Array.from({ length: rows * cols }, (_, i) =>
-    `<span style="display:block;aspect-ratio:${panel.width}/${panel.height};border:1px solid ${i < r.panelCount ? 'rgba(245,158,11,0.65)' : 'rgba(71,85,105,0.25)'};background:${i < r.panelCount ? 'rgba(245,158,11,0.18)' : 'transparent'};border-radius:3px"></span>`
-  ).join('');
-  card.innerHTML = `
-    <div class="card-title">Kabaca Panel Yerleşim Kontrolü</div>
-    <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:12px">Bu çizim kesin saha yerleşimi değildir; baca, parapet, yangın boşluğu ve gölge objeleri ayrıca saha keşfinde kontrol edilmelidir.</div>
-    <div style="display:grid;grid-template-columns:repeat(${cols},minmax(10px,1fr));gap:4px;max-width:420px">
-      ${cells}
-    </div>
-    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:10px">${r.panelCount} panel | Yaklaşık panel alanı: ${(r.panelCount * panel.width * panel.height).toFixed(1)} m² | Kullanılan çatı alanı varsayımı: %75</div>
-  `;
 }
+
 
 export function renderMonthlyChart(data, avgConsumption) {
   const canvas = document.getElementById('monthly-chart-canvas');
@@ -276,7 +310,7 @@ export function renderMonthlyChart(data, avgConsumption) {
       datasets: [
         {
           type: 'bar',
-          label: 'Aylık Üretim (kWh)',
+          label: i18n.t('charts.monthlyProduction'),
           data: safeData,
           backgroundColor: grad,
           borderColor: 'rgba(245,158,11,0.9)',
@@ -285,17 +319,28 @@ export function renderMonthlyChart(data, avgConsumption) {
           borderSkipped: false,
           order: 2
         },
-        {
-          type: 'line',
-          label: `Tahmini Tüketim (~${Math.round(avgConsumption || 250).toLocaleString('tr-TR')} kWh/ay)`,
-          data: new Array(12).fill(avgConsumption || 250),
-          borderColor: '#06B6D4',
-          borderDash: [5, 5],
-          borderWidth: 2,
-          pointRadius: 0,
-          fill: false,
-          order: 1
-        }
+        (() => {
+          const billMonths = window.state?.monthlyConsumption;
+          const hasBill = Array.isArray(billMonths) && billMonths.length === 12 && billMonths.some(v => v > 0);
+          const consumptionData = hasBill
+            ? billMonths.map(v => (v == null || isNaN(v) ? 0 : v))
+            : new Array(12).fill(avgConsumption || 250);
+          const consumptionLabel = hasBill
+            ? 'Fatura Tüketimi (kWh)'
+            : `Ortalama Tüketim (~${Math.round(avgConsumption || 250).toLocaleString('tr-TR')} kWh/ay)`;
+          return {
+            type: 'line',
+            label: consumptionLabel,
+            data: consumptionData,
+            borderColor: '#06B6D4',
+            borderDash: hasBill ? [] : [5, 5],
+            borderWidth: hasBill ? 2.5 : 2,
+            pointRadius: hasBill ? 4 : 0,
+            pointBackgroundColor: '#06B6D4',
+            fill: false,
+            order: 1
+          };
+        })()
       ]
     },
     options: {
@@ -443,7 +488,7 @@ function renderBillAnalysisResults(ba) {
     <div class="result-metrics-grid">
       <div class="result-metric"><div class="result-metric-val">${ba.annualConsumption.toLocaleString('tr-TR')}</div><div class="result-metric-label">kWh/yıl tüketim</div></div>
       <div class="result-metric"><div class="result-metric-val">${ba.avgCoveragePct.toFixed(1)}%</div><div class="result-metric-label">Ortalama aylık karşılama</div></div>
-      <div class="result-metric"><div class="result-metric-val">${money(ba.annualSaving)}</div><div class="result-metric-label">Aylık eşleşme tasarrufu</div></div>
+      <div class="result-metric"><div class="result-metric-val">${money(ba.annualSaving)}</div><div class="result-metric-label">Yıllık eşleşme tasarrufu</div></div>
       <div class="result-metric"><div class="result-metric-val">${MONTHS[best.month]} / ${MONTHS[worst.month]}</div><div class="result-metric-label">En iyi / en zayıf ay</div></div>
     </div>
   `;
@@ -650,8 +695,7 @@ export function downloadTechnicalPDF() {
 
 export function shareResults() {
   const state = window.state;
-  const { results, ...stateSnapshot } = state;
-  const params = { v: 2, state: stateSnapshot };
+  const params = { v: 3, state: createShareStateSnapshot(state) };
   const encoded = btoa(encodeURIComponent(JSON.stringify(params)));
   const url = window.location.origin + window.location.pathname + '#' + encoded;
   navigator.clipboard.writeText(url).then(() => {
@@ -666,25 +710,27 @@ export function loadFromHash() {
   try {
     const hash = window.location.hash.slice(1);
     if (!hash) return;
+    if (hash.length > 200000) throw new Error('Shared state is too large');
     const params = JSON.parse(decodeURIComponent(atob(hash)));
     if (params.v >= 2 && params.state) {
-      Object.assign(state, params.state, { results: null, step: 1 });
-      if (params.state.cityName) document.getElementById('city-search').value = params.state.cityName;
-      if (params.state.roofArea) document.getElementById('roof-area').value = params.state.roofArea;
-      if (params.state.tilt !== undefined) { document.getElementById('tilt-slider').value = params.state.tilt; window.updateTilt(params.state.tilt); }
-      if (params.state.shadingFactor !== undefined) { document.getElementById('shading-slider').value = params.state.shadingFactor; window.updateShading(params.state.shadingFactor); }
-      if (params.state.soilingFactor !== undefined) { document.getElementById('soiling-slider').value = params.state.soilingFactor; window.updateSoiling(params.state.soilingFactor); }
-      if (params.state.tariff !== undefined) document.getElementById('tariff-input').value = params.state.tariff;
-      if (params.state.exportTariff !== undefined && document.getElementById('export-tariff-input')) document.getElementById('export-tariff-input').value = params.state.exportTariff;
-      if (params.state.tariffRegime !== undefined && document.getElementById('tariff-regime')) document.getElementById('tariff-regime').value = params.state.tariffRegime;
-      if (params.state.skttTariff !== undefined && document.getElementById('sktt-tariff-input')) document.getElementById('sktt-tariff-input').value = params.state.skttTariff;
-      if (params.state.contractedTariff !== undefined && document.getElementById('contracted-tariff-input')) document.getElementById('contracted-tariff-input').value = params.state.contractedTariff;
-      if (params.state.contractedPowerKw !== undefined && document.getElementById('contracted-power-input')) document.getElementById('contracted-power-input').value = params.state.contractedPowerKw;
-      if (params.state.usdToTry !== undefined && document.getElementById('usd-try-input')) document.getElementById('usd-try-input').value = params.state.usdToTry;
-      if (params.state.displayCurrency && document.getElementById('display-currency')) document.getElementById('display-currency').value = params.state.displayCurrency;
-      if (params.state.annualPriceIncrease !== undefined && document.getElementById('price-increase-input')) document.getElementById('price-increase-input').value = (params.state.annualPriceIncrease * 100).toFixed(0);
-      if (params.state.discountRate !== undefined && document.getElementById('discount-rate-input')) document.getElementById('discount-rate-input').value = (params.state.discountRate * 100).toFixed(0);
-      if (params.state.tariffType && document.getElementById('tariff-type')) document.getElementById('tariff-type').value = params.state.tariffType;
+      const safeState = sanitizeSharedState(params.state);
+      Object.assign(state, safeState, { results: null, step: 1 });
+      if (safeState.cityName) document.getElementById('city-search').value = safeState.cityName;
+      if (safeState.roofArea) document.getElementById('roof-area').value = safeState.roofArea;
+      if (safeState.tilt !== undefined) { document.getElementById('tilt-slider').value = safeState.tilt; window.updateTilt(safeState.tilt); }
+      if (safeState.shadingFactor !== undefined) { document.getElementById('shading-slider').value = safeState.shadingFactor; window.updateShading(safeState.shadingFactor); }
+      if (safeState.soilingFactor !== undefined) { document.getElementById('soiling-slider').value = safeState.soilingFactor; window.updateSoiling(safeState.soilingFactor); }
+      if (safeState.tariff !== undefined) document.getElementById('tariff-input').value = safeState.tariff;
+      if (safeState.exportTariff !== undefined && document.getElementById('export-tariff-input')) document.getElementById('export-tariff-input').value = safeState.exportTariff;
+      if (safeState.tariffRegime !== undefined && document.getElementById('tariff-regime')) document.getElementById('tariff-regime').value = safeState.tariffRegime;
+      if (safeState.skttTariff !== undefined && document.getElementById('sktt-tariff-input')) document.getElementById('sktt-tariff-input').value = safeState.skttTariff;
+      if (safeState.contractedTariff !== undefined && document.getElementById('contracted-tariff-input')) document.getElementById('contracted-tariff-input').value = safeState.contractedTariff;
+      if (safeState.contractedPowerKw !== undefined && document.getElementById('contracted-power-input')) document.getElementById('contracted-power-input').value = safeState.contractedPowerKw;
+      if (safeState.usdToTry !== undefined && document.getElementById('usd-try-input')) document.getElementById('usd-try-input').value = safeState.usdToTry;
+      if (safeState.displayCurrency && document.getElementById('display-currency')) document.getElementById('display-currency').value = safeState.displayCurrency;
+      if (safeState.annualPriceIncrease !== undefined && document.getElementById('price-increase-input')) document.getElementById('price-increase-input').value = (safeState.annualPriceIncrease * 100).toFixed(0);
+      if (safeState.discountRate !== undefined && document.getElementById('discount-rate-input')) document.getElementById('discount-rate-input').value = (safeState.discountRate * 100).toFixed(0);
+      if (safeState.tariffType && document.getElementById('tariff-type')) document.getElementById('tariff-type').value = safeState.tariffType;
       if (window.map && state.lat && state.lon) window.map.setView([state.lat, state.lon], 9);
       if (window.marker && state.lat && state.lon) window.marker.setLatLng([state.lat, state.lon]);
       if (state.cityName) {
@@ -697,24 +743,28 @@ export function loadFromHash() {
       return;
     }
     if (params.lat) {
-      state.lat = params.lat; state.lon = params.lon;
-      state.cityName = params.city; state.ghi = params.ghi;
-      if (params.city) document.getElementById('city-search').value = params.city;
+      const legacy = sanitizeSharedState({ lat: params.lat, lon: params.lon, cityName: params.city, ghi: params.ghi });
+      state.lat = legacy.lat; state.lon = legacy.lon;
+      state.cityName = legacy.cityName; state.ghi = legacy.ghi;
+      if (legacy.cityName) document.getElementById('city-search').value = legacy.cityName;
       document.getElementById('selected-loc-text').textContent =
-        `${params.city} — ${parseFloat(params.lat).toFixed(4)}°K`;
-      if (window.map) window.map.setView([params.lat, params.lon], 9);
-      if (window.marker) window.marker.setLatLng([params.lat, params.lon]);
+        `${legacy.cityName} — ${parseFloat(legacy.lat).toFixed(4)}°K`;
+      if (window.map) window.map.setView([legacy.lat, legacy.lon], 9);
+      if (window.marker) window.marker.setLatLng([legacy.lat, legacy.lon]);
     }
-    if (params.area) { state.roofArea = params.area; document.getElementById('roof-area').value = params.area; }
-    if (params.tilt !== undefined) { state.tilt = params.tilt; document.getElementById('tilt-slider').value = params.tilt; window.updateTilt(params.tilt); }
+    const legacy = sanitizeSharedState({ roofArea: params.area, tilt: params.tilt, shadingFactor: params.sh, panelType: params.pt });
+    if (legacy.roofArea) { state.roofArea = legacy.roofArea; document.getElementById('roof-area').value = legacy.roofArea; }
+    if (legacy.tilt !== undefined) { state.tilt = legacy.tilt; document.getElementById('tilt-slider').value = legacy.tilt; window.updateTilt(legacy.tilt); }
     if (params.az !== undefined) {
       const dir = COMPASS_DIRS.find(d => d.azimuth === params.az);
       if (dir) window.selectDirection(dir);
     }
-    if (params.sh !== undefined) { state.shadingFactor = params.sh; document.getElementById('shading-slider').value = params.sh; window.updateShading(params.sh); }
-    if (params.pt) { state.panelType = params.pt; window.buildPanelCards(); }
+    if (legacy.shadingFactor !== undefined) { state.shadingFactor = legacy.shadingFactor; document.getElementById('shading-slider').value = legacy.shadingFactor; window.updateShading(legacy.shadingFactor); }
+    if (legacy.panelType) { state.panelType = legacy.panelType; window.buildPanelCards(); }
     window.showToast('Paylaşılan hesap yüklendi.', 'info');
-  } catch (e) { /* invalid hash */ }
+  } catch (e) {
+    window.showToast?.('Paylaşım bağlantısı geçersiz veya güvenli şemaya uymuyor.', 'error');
+  }
 }
 
 // window'a expose et

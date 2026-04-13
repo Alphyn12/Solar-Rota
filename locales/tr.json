@@ -13,14 +13,18 @@
   },
   "step1": {
     "title": "Konumunuzu Seçin",
-    "subtitle": "Haritaya tıklayın veya şehir adı arayın",
+    "subtitle": "Türkiye'deki güneş potansiyelinizi keşfetmek için şehrinizi işaretleyin veya haritada bir nokta seçin.",
     "search": "İl adı arayın...",
     "geoBtn": "Konumumu Kullan",
+    "locationCard": "Konum Seçin",
     "next": "Çatı Bilgilerine Geç"
   },
   "step2": {
     "title": "Çatı Konfigürasyonu",
+    "subtitle": "Eğim ve cephe yönü enerji üretimini etkiler. Doğru girin, doğru hesaplayın.",
+    "roofInfo": "Çatı Bilgileri",
     "roofArea": "Çatı Alanı (m²)",
+    "roofOrientation": "Çatı Yönü ve Gölgelenme",
     "tilt": "Eğim Açısı",
     "direction": "Çatı Yönü",
     "shading": "Gölgelenme",
@@ -45,7 +49,8 @@
     "subtitle": "PVGIS verisi ve enerji üretimi hesaplanıyor..."
   },
   "step5": {
-    "title": "Hesaplama Sonuçları",
+    "title": "Sonuçlarınız Hazır",
+    "subtitle": "25 yıllık enerji üretimi ve finansal projeksiyon. Tüm hesaplar aşağıda şeffaf biçimde gösterilmektedir.",
     "annualEnergy": "Yıllık Enerji",
     "annualSavings": "Yıllık Tasarruf",
     "systemPower": "Sistem Gücü",
@@ -62,7 +67,7 @@
     "engReport": "Mühendis Hesap Raporu"
   },
   "results": {
-    "monthlyChart": "Aylık Üretim Grafiği",
+    "monthlyChart": "Aylık Enerji Üretimi (kWh)",
     "hourlyProfile": "Saatlik Üretim Profili",
     "sunPath": "Güneş Yolu Diyagramı",
     "heatmap": "Türkiye Üretim Haritası",
@@ -70,14 +75,43 @@
     "comparison": "Teklif Karşılaştır",
     "prGauge": "Performans Oranı (PR)"
   },
+  "charts": {
+    "monthlyProduction": "Aylık üretim",
+    "estimatedConsumption": "Tahmini tüketim"
+  },
+  "finance": {
+    "analysis": "Finansal Analiz",
+    "tariffDesc": "2026 tarife seçimi: SKTT, PST ve sözleşmeli güç seçenekleri proje koşullarına göre değerlendirilir. Birim fiyatları faturanızdan doğrulayın.",
+    "exchangeLoading": "USD/TRY kuru yükleniyor...",
+    "settlementBadge": "Saatlik mahsuplaşma",
+    "simplePayback": "Basit Geri Ödeme Süresi",
+    "discountedPayback": "İskontolu Geri Ödeme Süresi",
+    "npv": "Proje NPV (iskontolu net bugünkü değer)",
+    "roi": "Yatırım Karlılığı (ROI)",
+    "irr": "İç Getiri Oranı (IRR)",
+    "lcoe": "Normalleştirilmiş Maliyet (LCOE)",
+    "om": "Yıllık Bakım + Sigorta Gideri",
+    "inverterReplace": "İnverter Yenileme (Yıl 12)"
+  },
+  "units": {
+    "year": "yıl",
+    "kwhPerYear": "kWh / yıl",
+    "kwpInstalled": "kWp kurulu güç",
+    "tonsCo2PerYear": "ton CO₂ / yıl"
+  },
+  "dashboard": {
+    "saved": "Kayıtlı Hesaplar"
+  },
   "common": {
     "yes": "Evet",
     "no": "Hayır",
+    "back": "← Geri",
     "save": "Kaydet",
     "cancel": "İptal",
     "close": "Kapat",
     "loading": "Yükleniyor...",
     "error": "Hata",
-    "success": "Başarılı"
+    "success": "Başarılı",
+    "pending": "-"
   }
 }

@@ -2,6 +2,18 @@
    COMPONENTS.CSS — GüneşHesap v2.0 Modüler Bileşenler
    ═══════════════════════════════════════════════════════════ */
 
+/* ── BÖLÜM TANITIM METNİ ────────────────────────────────── */
+.section-intro {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.03);
+  border-left: 3px solid var(--primary);
+  border-radius: 0 8px 8px 0;
+}
+
 /* ── DİL SEÇİCİ ──────────────────────────────────────────── */
 .lang-switcher {
   display: flex;
@@ -32,6 +44,40 @@
 }
 
 .lang-btn.active {
+  background: var(--primary);
+  color: #000;
+}
+
+/* ── PARA BİRİMİ SEÇİCİ ────────────────────────────────── */
+.currency-switcher {
+  display: flex;
+  gap: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.currency-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+.currency-btn:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+}
+
+.currency-btn.active {
   background: var(--primary);
   color: #000;
 }

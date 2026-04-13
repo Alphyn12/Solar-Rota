@@ -13,14 +13,18 @@
   },
   "step1": {
     "title": "Select Your Location",
-    "subtitle": "Click on the map or search by city name",
+    "subtitle": "Mark your city or choose a point on the map to estimate solar potential in Turkey.",
     "search": "Search for a city...",
     "geoBtn": "Use My Location",
+    "locationCard": "Select Location",
     "next": "Continue to Roof Configuration"
   },
   "step2": {
     "title": "Roof Configuration",
+    "subtitle": "Tilt and orientation affect solar yield. Enter realistic roof geometry for a better estimate.",
+    "roofInfo": "Roof Information",
     "roofArea": "Roof Area (m²)",
+    "roofOrientation": "Roof Orientation and Shading",
     "tilt": "Tilt Angle",
     "direction": "Roof Direction",
     "shading": "Shading",
@@ -45,7 +49,8 @@
     "subtitle": "Fetching PVGIS data and computing energy production..."
   },
   "step5": {
-    "title": "Calculation Results",
+    "title": "Your Results Are Ready",
+    "subtitle": "A 25-year energy and financial projection is shown below with transparent assumptions.",
     "annualEnergy": "Annual Energy",
     "annualSavings": "Annual Savings",
     "systemPower": "System Power",
@@ -62,7 +67,7 @@
     "engReport": "Engineering Report"
   },
   "results": {
-    "monthlyChart": "Monthly Production Chart",
+    "monthlyChart": "Monthly Energy Production (kWh)",
     "hourlyProfile": "Hourly Production Profile",
     "sunPath": "Sun Path Diagram",
     "heatmap": "Turkey Production Heatmap",
@@ -70,14 +75,43 @@
     "comparison": "Compare Offers",
     "prGauge": "Performance Ratio (PR)"
   },
+  "charts": {
+    "monthlyProduction": "Monthly production",
+    "estimatedConsumption": "Estimated consumption"
+  },
+  "finance": {
+    "analysis": "Financial Analysis",
+    "tariffDesc": "2026 tariff selection evaluates PST, SKTT, and contracted-power options by project conditions. Verify unit rates against your bill.",
+    "exchangeLoading": "Loading USD/TRY rate...",
+    "settlementBadge": "Hourly settlement",
+    "simplePayback": "Simple Payback Period",
+    "discountedPayback": "Discounted Payback Period",
+    "npv": "Project NPV (discounted net present value)",
+    "roi": "Return on Investment (ROI)",
+    "irr": "Internal Rate of Return (IRR)",
+    "lcoe": "Levelized Cost of Energy (LCOE)",
+    "om": "Annual Maintenance + Insurance Cost",
+    "inverterReplace": "Inverter Replacement (Year 12)"
+  },
+  "units": {
+    "year": "year",
+    "kwhPerYear": "kWh / year",
+    "kwpInstalled": "kWp installed capacity",
+    "tonsCo2PerYear": "tons CO₂ / year"
+  },
+  "dashboard": {
+    "saved": "Saved Calculations"
+  },
   "common": {
     "yes": "Yes",
     "no": "No",
+    "back": "← Back",
     "save": "Save",
     "cancel": "Cancel",
     "close": "Close",
     "loading": "Loading...",
     "error": "Error",
-    "success": "Success"
+    "success": "Success",
+    "pending": "-"
   }
 }

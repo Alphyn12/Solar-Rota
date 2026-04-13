@@ -6,6 +6,7 @@ import {
   PANEL_TYPES, BATTERY_MODELS, PSH_FALLBACK, CITY_SUMMER_TEMPS,
   MONTH_WEIGHTS, INVERTER_TYPES, HEAT_PUMP_DATA
 } from './data.js';
+import { calculateBomTotal, selectBomItems } from './bom.js';
 import {
   METHODOLOGY_VERSION, PVGIS_LOSS_PARAM, buildTariffModel, calcIRR,
   calculateEVLoad, calculateHeatPumpLoad, calculateSystemLayout,
@@ -52,6 +53,29 @@ function setLoadingProgress(pct, msgIdx) {
   if (msgEl && LOADING_MSGS[msgIdx]) msgEl.textContent = LOADING_MSGS[msgIdx];
 }
 
+function modelBatteryCost(battery) {
+  const model = BATTERY_MODELS[battery?.model];
+  const modelPrice = Number(model?.price_try);
+  if (Number.isFinite(modelPrice) && modelPrice > 0) return Math.round(modelPrice);
+  const capacity = Math.max(0, Number(battery?.capacity ?? model?.capacity) || 0);
+  return Math.round(capacity * 8000);
+}
+
+function classifyOutputConfidence({ usedFallback, warnings = [], state }) {
+  const blocking = [];
+  if (usedFallback) blocking.push('PVGIS yerine PSH fallback kullanıldı.');
+  if (!state?.roofGeometry) blocking.push('Çatı geometrisi saha keşfiyle doğrulanmadı.');
+  if (state?.osmShadowEnabled && !state?.osmShadow?.buildings) blocking.push('OSM gölge analizi doğrulanmış bina verisi içermiyor.');
+  if (warnings.length) blocking.push(...warnings.slice(0, 5));
+  if (state?.quoteReadyApproved === true && !usedFallback && blocking.length === 0) {
+    return { level: 'quote-ready', label: 'quote-ready', blockers: [] };
+  }
+  if (!usedFallback && blocking.length <= 2) {
+    return { level: 'engineering estimate', label: 'engineering estimate', blockers: blocking };
+  }
+  return { level: 'rough estimate', label: 'rough estimate', blockers: blocking };
+}
+
 export function calculateBatteryMetrics(annualEnergy, dailyConsumption, battery) {
   const dailyProduction = annualEnergy / 365;
   const usableCapacity  = battery.capacity * battery.dod;
@@ -67,7 +91,7 @@ export function calculateBatteryMetrics(annualEnergy, dailyConsumption, battery)
   const totalSelfConsumed = directSelfConsumption + nightCovered;
   const gridIndependence  = Math.min(totalSelfConsumed / dailyConsumption, 1.0);
   const nightCoverage     = nightConsumption > 0 ? Math.min(nightCovered / nightConsumption, 1.0) : 0;
-  const batteryCost       = Math.round(battery.capacity * 8000);
+  const batteryCost       = modelBatteryCost(battery);
 
   return {
     gridIndependence: (gridIndependence * 100).toFixed(1),
@@ -107,7 +131,8 @@ export function calculateNMMetrics(annualEnergy, systemPower, dailyConsumption, 
 
 export async function runCalculation() {
   const state = window.state;
-  document.getElementById('fallback-banner').style.display = 'none';
+  const fallbackBanner = document.getElementById('fallback-banner');
+  if (fallbackBanner) fallbackBanner.style.display = 'none';
   spawnLoadingParticles();
   setLoadingProgress(10, 0);
 
@@ -165,6 +190,9 @@ export async function runCalculation() {
     cableLossPct = state.cableLoss.totalLossPct || 0;
     cableLossFactor = 1 - cableLossPct / 100;
   }
+  const osmShadowFactor = state.osmShadowEnabled
+    ? Math.max(0, Number(state.osmShadow?.shadowFactorPct) || 0)
+    : 0;
 
   const sectionResults = await Promise.all(allSections.map(async sec => {
     const secPC = Math.floor(sec.area * 0.75 / panelArea);
@@ -173,14 +201,20 @@ export async function runCalculation() {
 
     let rawEnergy = null, rawMonthly = null, rawPoa = null, usedFallback = false;
 
-    async function fetchPVGIS(retries = 2) {
+    async function fetchPVGIS(retries = 3) {
       const pvgisAzimut = sec.azimuth - 180;
-      const pvgisUrl = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${state.lat}&lon=${state.lon}&peakpower=${secPower}&loss=${PVGIS_LOSS_PARAM}&angle=${sec.tilt}&aspect=${pvgisAzimut}&outputformat=json`;
+      const baseParams = `lat=${state.lat}&lon=${state.lon}&peakpower=${secPower}&loss=${PVGIS_LOSS_PARAM}&angle=${sec.tilt}&aspect=${pvgisAzimut}&outputformat=json&pvtechchoice=crystSi&mountingplace=free`;
+      const urls = [
+        `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?${baseParams}`,
+        `https://re.jrc.ec.europa.eu/api/v5_3/PVcalc?${baseParams}`,
+        `https://re.jrc.ec.europa.eu/api/PVcalc?${baseParams}`,
+      ];
       for (let attempt = 0; attempt < retries; attempt++) {
+        const url = urls[Math.min(attempt, urls.length - 1)];
         try {
           const ctrl = new AbortController();
-          const timeout = setTimeout(() => ctrl.abort(), 18000);
-          const res = await fetch(pvgisUrl, { signal: ctrl.signal, mode: 'cors' });
+          const timeout = setTimeout(() => ctrl.abort(), 30000);
+          const res = await fetch(url, { signal: ctrl.signal, credentials: 'omit', cache: 'no-store' });
           clearTimeout(timeout);
           if (res.ok) {
             const data = await res.json();
@@ -189,14 +223,21 @@ export async function runCalculation() {
               rawEnergy = ey;
               rawPoa = data.outputs?.totals?.fixed?.['H(i)_y'] || data.outputs?.totals?.fixed?.H_i_y || null;
               if (data.outputs?.monthly?.fixed) rawMonthly = data.outputs.monthly.fixed.map(m => m.E_m);
+              window._pvgisLastError = null;
               return;
             }
+          } else {
+            window._pvgisLastError = `HTTP ${res.status} (deneme ${attempt + 1})`;
+            console.warn('[PVGIS]', window._pvgisLastError);
           }
-        } catch(e) { /* retry */ }
-        if (attempt < retries - 1) await new Promise(r => setTimeout(r, 1500));
+        } catch(e) {
+          window._pvgisLastError = e?.message || String(e);
+          console.warn('[PVGIS] Deneme', attempt + 1, 'başarısız:', e);
+        }
+        if (attempt < retries - 1) await new Promise(r => setTimeout(r, 2000));
       }
     }
-    await fetchPVGIS(2);
+    await fetchPVGIS(3);
 
     if (!rawEnergy) {
       usedFallback = true;
@@ -212,10 +253,11 @@ export async function runCalculation() {
     // 4. Bifaciyal kazanım (arka yüzeyden ek enerji)
     // 5. İnverter verimi (AC dönüşümü)
     // 6. Kablo kaybı (iletim)
+    const effectiveShadingFactor = Math.min(80, Math.max(0, Number(sec.shadingFactor) || 0) + osmShadowFactor);
     const adjustedE = rawEnergy
       * (usedFallback ? (1 + tempLoss) : 1.0)
       * (usedFallback ? sec.azimuthCoeff : 1.0)
-      * (1 - sec.shadingFactor / 100)
+      * (1 - effectiveShadingFactor / 100)
       * (1 - state.soilingFactor / 100)
       * bifacialBonus
       * inverterEfficiencyFactor
@@ -234,7 +276,9 @@ export async function runCalculation() {
       panelCount: secPC, systemPower: secPower,
       annualEnergy: adjustedE, monthlyData: monthly,
       pvgisRawEnergy: rawEnergy, pvgisPoa: rawPoa, usedFallback,
-      shadingLoss:    rawEnergy * (sec.shadingFactor / 100),
+      shadingLoss:    rawEnergy * (effectiveShadingFactor / 100),
+      effectiveShadingFactor,
+      osmShadowFactor,
       tempLossEnergy: usedFallback ? rawEnergy * Math.abs(Math.min(tempLoss, 0)) : 0,
       azimuthLossEnergy: usedFallback ? rawEnergy * (1 - sec.azimuthCoeff) : 0,
       bifacialGainEnergy: rawEnergy * (bifacialBonus - 1),
@@ -265,10 +309,20 @@ export async function runCalculation() {
   const bifacialGainEnergy  = validSections.reduce((s, r) => s + r.bifacialGainEnergy, 0);
   const soilingLoss         = validSections.reduce((s, r) => s + r.soilingLoss, 0);
   const totalCableLoss      = validSections.reduce((s, r) => s + (r.cableLoss || 0), 0);
+  const effectiveShadingFactor = systemPower > 0
+    ? validSections.reduce((s, r) => s + (Number(r.effectiveShadingFactor) || 0) * r.systemPower, 0) / systemPower
+    : Number(state.shadingFactor) || 0;
 
   clearInterval(msgInterval);
   setLoadingProgress(100, 3);
-  if (usedFallback) document.getElementById('fallback-banner').style.display = 'block';
+  if (usedFallback) {
+    const banner = document.getElementById('fallback-banner');
+    if (banner) {
+      const reason = window._pvgisLastError ? ` (${window._pvgisLastError.slice(0, 80)})` : '';
+      banner.textContent = `PVGIS API'sine ulaşılamadı${reason}. Yerel güneşlenme verileriyle hesaplama yapılıyor.`;
+      banner.style.display = 'block';
+    }
+  }
 
   // ── 2026 Maliyet Kırılımı ───────────────────────────────────────────────────
   // İnverter tipi maliyeti
@@ -278,14 +332,15 @@ export async function runCalculation() {
   const invUnit = systemPower < 10 ? invPrices.lt10 : systemPower < 50 ? invPrices.lt50 : invPrices.gt50;
 
   const costOverrides = state.costOverridesEnabled ? (state.costOverrides || {}) : {};
-  const panelPricePerWatt = costOverrides.panelPricePerWatt || panel.pricePerWatt;
-  const invUnitEffective = costOverrides.inverterPerKwp || invUnit;
-  const mountingPerKwp = costOverrides.mountingPerKwp || 2200;
-  const dcCablePerKwp = costOverrides.dcCablePerKwp || 600;
-  const acElecPerKwp = costOverrides.acElecPerKwp || 900;
-  const laborPerKwp = costOverrides.laborPerKwp || 1800;
+  const pickOverride = (key, fallback) => Number.isFinite(Number(costOverrides[key])) ? Number(costOverrides[key]) : fallback;
+  const panelPricePerWatt = pickOverride('panelPricePerWatt', panel.pricePerWatt);
+  const invUnitEffective = pickOverride('inverterPerKwp', invUnit);
+  const mountingPerKwp = pickOverride('mountingPerKwp', 2200);
+  const dcCablePerKwp = pickOverride('dcCablePerKwp', 600);
+  const acElecPerKwp = pickOverride('acElecPerKwp', 900);
+  const laborPerKwp = pickOverride('laborPerKwp', 1800);
   const defaultPermit = systemPower < 5 ? 8000 : systemPower < 10 ? 6000 : systemPower < 20 ? 5000 : 4000;
-  const permitCost  = costOverrides.permitFixed || defaultPermit;
+  const permitCost  = pickOverride('permitFixed', defaultPermit);
   const kdvRate = Number.isFinite(costOverrides.kdvRate) ? costOverrides.kdvRate : 0.20;
 
   const panelCost   = systemPower * 1000 * panelPricePerWatt;
@@ -297,6 +352,16 @@ export async function runCalculation() {
   const subtotal    = panelCost + inverterCost + mountingCost + dcCableCost + acElecCost + laborCost + permitCost;
   const kdv         = subtotal * kdvRate;
   let solarCost     = subtotal + kdv;
+  const bomTotalsForSystem = Array.isArray(state.bomItems) && state.bomItems.length
+    ? calculateBomTotal(selectBomItems(state.bomItems, state.bomSelection || {}), {
+        wp: systemPower * 1000,
+        kwp: systemPower,
+        fixed: 1,
+        meter: Math.max(20, systemPower * 10),
+        day: Math.max(1, Math.ceil(systemPower / 5))
+      })
+    : null;
+  if (bomTotalsForSystem) state.bomTotals = bomTotalsForSystem;
 
   let tariffModel = buildTariffModel(state);
   let tariff = tariffModel.importRate || 7.16;
@@ -330,7 +395,7 @@ export async function runCalculation() {
     evMetrics = calculateEVMetrics(adjustedEnergy, state.dailyConsumption, state.ev, tariff);
   }
   if (state.heatPumpEnabled && state.heatPump) {
-    heatPumpMetrics = calculateHeatPumpMetrics(state.heatPump, tariff);
+    heatPumpMetrics = calculateHeatPumpMetrics(state.heatPump, tariff, heatPumpLoad);
   }
 
   const hourlySummaryRaw = simulateHourlyEnergy(monthlyData, monthlyLoad, {
@@ -405,7 +470,7 @@ export async function runCalculation() {
     lcoeCostSum += (y.expenses || 0) / df;
     lcoeEnergySum += y.energy / df;
   });
-  const lcoe = lcoeEnergySum > 0 ? (lcoeCostSum / lcoeEnergySum).toFixed(2) : '—';
+  const lcoe = lcoeEnergySum > 0 ? Number((lcoeCostSum / lcoeEnergySum).toFixed(2)) : null;
 
   const ysp  = systemPower > 0 ? (adjustedEnergy / systemPower).toFixed(0) : 0;
   const cf   = systemPower > 0 ? ((adjustedEnergy / (systemPower * 8760)) * 100).toFixed(1) : 0;
@@ -440,12 +505,14 @@ export async function runCalculation() {
     usedFallback,
     pvgisRawEnergy: Math.round(pvgisRawEnergy), pvgisPoa: Math.round(pvgisPoa),
     shadingLoss: Math.round(shadingLoss),
+    effectiveShadingFactor: Number(effectiveShadingFactor.toFixed(1)),
     tempLossEnergy: Math.round(tempLossEnergy),
     azimuthLossEnergy: Math.round(azimuthLossEnergy),
     bifacialGainEnergy: Math.round(bifacialGainEnergy),
     soilingLoss: Math.round(soilingLoss),
     cableLoss: Math.round(totalCableLoss),
     cableLossPct,
+    osmShadowFactor,
     ysp, cf, irr, lcoe,
     tariff, annualPriceIncrease, discountRate, tariffModel,
     yearlyTable,
@@ -459,14 +526,15 @@ export async function runCalculation() {
       acElec: Math.round(acElecCost), labor: Math.round(laborCost),
       permits: Math.round(permitCost), subtotal: Math.round(subtotal),
       kdv: Math.round(kdv), kdvRate, total: Math.round(solarCost), invUnit: invUnitEffective,
-      battery: batteryCostVal, totalWithBattery: Math.round(totalCost)
+      battery: batteryCostVal, totalWithBattery: Math.round(totalCost),
+      bom: bomTotalsForSystem || state.bomTotals || null
     },
     methodologyVersion: METHODOLOGY_VERSION,
     pvgisLossParam: PVGIS_LOSS_PARAM,
     displayCurrency: state.displayCurrency || 'TRY',
     usdToTry: state.usdToTry || 38.5,
-    confidenceLevel: usedFallback ? 'low' : 'normal',
     calculationMode: usedFallback ? 'fallback-psh' : 'pvgis-live',
+    pvgisFailReason: usedFallback ? (window._pvgisLastError || 'unknown') : null,
     hourlySummary: hourlySummaryRaw,
     batterySummary,
     monthlyLoad,
@@ -477,7 +545,13 @@ export async function runCalculation() {
     sectionResults: validSections.length > 1 ? validSections : null
   };
   results.calculationWarnings = detectCalculationWarnings(results);
+  const confidence = classifyOutputConfidence({ usedFallback, warnings: results.calculationWarnings, state });
+  results.confidenceLevel = confidence.level;
+  results.confidence = confidence;
   window.state.results = results;
+
+  // Step-4'te mühendis hesap özeti
+  if (window.renderEngCalcPanel) window.renderEngCalcPanel();
 
   setTimeout(() => {
     window.goToStep(5);
@@ -500,9 +574,10 @@ function calculateEVMetrics(annualEnergy, dailyConsumption, ev, tariff) {
 
   // Gündüz şarj → self-consumption
   let solarChargeRatio = 0;
-  if (ev.chargeTime === 'day') {
+  if (ev.chargeTime === 'day' && daily_kWh > 0) {
     const dailySolarPeak = annualEnergy / 365;
-    solarChargeRatio = Math.min(daily_kWh / dailySolarPeak, 0.8);
+    const practicalDaytimeEnergy = Math.max(0, dailySolarPeak) * 0.45;
+    solarChargeRatio = Math.min(practicalDaytimeEnergy / daily_kWh, 0.8);
   }
 
   const solarChargeKwh = annual_kWh * solarChargeRatio;
@@ -513,7 +588,8 @@ function calculateEVMetrics(annualEnergy, dailyConsumption, ev, tariff) {
   const netSaving = fuelCostSaved - electricityCost;
 
   const panelArea = 1.134 * 1.762;
-  const additionalPanels = Math.ceil(annual_kWh / (annualEnergy / Math.max(1, Math.floor(window.state.roofArea * 0.75 / panelArea))));
+  const productionPerPanel = annualEnergy / Math.max(1, Math.floor(window.state.roofArea * 0.75 / panelArea));
+  const additionalPanels = productionPerPanel > 0 ? Math.ceil(annual_kWh / productionPerPanel) : 0;
 
   return {
     daily_kWh: daily_kWh.toFixed(2),
@@ -529,21 +605,16 @@ function calculateEVMetrics(annualEnergy, dailyConsumption, ev, tariff) {
 }
 
 // ── Isı Pompası Hesabı ──────────────────────────────────────────────────────
-function calculateHeatPumpMetrics(hp, tariff) {
-  const { HEAT_PUMP_DATA } = window._appData || {};
-  const hpData = {
-    cop_heating: { good: 4.0, avg: 3.5, poor: 3.0 },
-    heat_load: { good: 50, avg: 80, poor: 120 },
-    gas_price: 7.50,
-    gas_kwh_per_m3: 10.64
-  };
-
+function calculateHeatPumpMetrics(hp, tariff, load = null) {
+  const hpData = HEAT_PUMP_DATA;
   const insulation = hp.insulation === 'low' ? 'poor' : hp.insulation;
-  const cop = hpData.cop_heating[insulation] || 3.5;
-  const heatLoad = hpData.heat_load[insulation] || 80;
-  const annual_heat_demand = hp.area * heatLoad;
-  const hp_electricity = annual_heat_demand / cop;
-  const gas_cost = (annual_heat_demand / hpData.gas_kwh_per_m3) * hpData.gas_price;
+  const cop = load?.cop || hpData.spf_heating?.[insulation] || hpData.cop_heating?.[insulation] || 3.5;
+  const annual_heat_demand = load?.heatDemand ?? (Math.max(0, Number(hp.area) || 0) * (hpData.heat_load[insulation] || 80) * 8 * hpData.heating_season_months * 30 / 1000);
+  const hp_electricity = load?.annualKwh ?? annual_heat_demand / cop;
+  let gas_cost = 0;
+  if (hp.currentHeating === 'fueloil') gas_cost = (annual_heat_demand / hpData.fuel_oil_kwh_per_liter) * hpData.fuel_oil_price;
+  else if (hp.currentHeating === 'electric') gas_cost = annual_heat_demand * tariff;
+  else gas_cost = (annual_heat_demand / hpData.gas_kwh_per_m3) * hpData.gas_price;
   const electricity_cost = hp_electricity * tariff;
   const savings = gas_cost - electricity_cost;
 
@@ -554,7 +625,7 @@ function calculateHeatPumpMetrics(hp, tariff) {
     electricity_cost: Math.round(electricity_cost),
     savings: Math.round(savings),
     cop: cop.toFixed(1),
-    coverageRatio: 0  // Solar coverage hesaplanır UI'da
+    coverageRatio: 0
   };
 }
 
@@ -589,7 +660,9 @@ function calculateTaxBenefits(totalCost, npvBase, tax, discountRate, kdvAmount =
     taxShieldNPV += (annual_dep * tax.corporateTaxRate / 100) / Math.pow(1 + discountRate, y);
   }
   const kdv_recovery = tax.kdvRecovery ? kdvAmount : 0;
-  const investment_deduction = tax.investmentDeduction ? totalCost * 0.50 * (tax.corporateTaxRate / 100) : 0;
+  const incentiveRate = Math.max(0, Number(tax.investmentContribution) || 0) / 100;
+  const hasIncentive = !!(tax.investmentDeduction || tax.hasIncentiveCert || incentiveRate > 0);
+  const investment_deduction = hasIncentive ? totalCost * incentiveRate * (tax.corporateTaxRate / 100) : 0;
 
   const totalTaxBenefit = taxShieldNPV + kdv_recovery + investment_deduction;
   const effectiveCost = totalCost - totalTaxBenefit;
