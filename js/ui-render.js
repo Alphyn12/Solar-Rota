@@ -6,6 +6,8 @@ import { PANEL_TYPES, MONTHS, COMPASS_DIRS } from './data.js';
 import { convertTry, renderExchangeRateStatus } from './exchange-rate.js';
 import { i18n } from './i18n.js';
 import { createShareStateSnapshot, escapeHtml, sanitizeSharedState } from './security.js';
+import { buildStructuredProposalExport } from './evidence-governance.js';
+import { buildCrmLeadExport } from './crm-export.js';
 
 let monthlyChart = null;
 
@@ -97,6 +99,8 @@ export function renderResults() {
     ['PVGIS POA', `${r.pvgisPoa || '—'} kWh/m²/yıl`],
     ['Tarife', moneyRate(r.tariff, 'kWh')],
     ['Tarife Rejimi', `${r.tariffModel?.effectiveRegime || '—'} / Sözleşme gücü: ${r.tariffModel?.contractedPowerKw || 0} kW`],
+    ['SKTT Limiti', r.tariffModel?.regulation?.limitKwh ? `${Number(r.tariffModel.regulation.limitKwh).toLocaleString('tr-TR')} kWh/yıl` : '—'],
+    ['İhracat Mahsuplaşma', `${r.tariffModel?.exportCompensationPolicy?.interval || '—'} / sınır: ${r.tariffModel?.exportCompensationPolicy?.annualSellableExportCapKwh ? Math.round(r.tariffModel.exportCompensationPolicy.annualSellableExportCapKwh).toLocaleString('tr-TR') + ' kWh/yıl' : '—'}`],
     ['Para Birimi', `${state.displayCurrency || 'TRY'} (USD/TRY: ${Number(state.usdToTry || 38.5).toFixed(2)} | ${state.exchangeRate?.source || 'manual/fallback'})`],
     ['Tarife Kaynak Tarihi', r.tariffModel?.sourceDate || '—'],
     ['Yıllık Fiyat Artışı', ((r.annualPriceIncrease || 0) * 100).toFixed(1) + '%'],
@@ -219,6 +223,10 @@ function renderBomResults(bom) {
       <tbody>
         ${bom.rows.map(row => `<tr><td>${escapeHtml(row.supplier)} — ${escapeHtml(row.name)}</td><td>${Number(row.quantity || 0).toFixed(row.unit === 'fixed' ? 0 : 1)} ${escapeHtml(row.unit)}</td><td>${money(row.total)}</td></tr>`).join('')}
         <tr><td colspan="2"><strong>BOM Ara Toplam</strong></td><td><strong>${money(bom.subtotal)}</strong></td></tr>
+        ${window.state?.results?.proposalGovernance?.bomCommercials ? `
+        <tr><td colspan="2">Kontenjan / Risk Payı</td><td>${money(window.state.results.proposalGovernance.bomCommercials.contingency)}</td></tr>
+        <tr><td colspan="2">Brüt Marj</td><td>${money(window.state.results.proposalGovernance.bomCommercials.margin)} (${window.state.results.proposalGovernance.bomCommercials.grossMarginPct}%)</td></tr>
+        <tr><td colspan="2"><strong>Önerilen Satış Fiyatı</strong></td><td><strong>${money(window.state.results.proposalGovernance.bomCommercials.proposedSellPrice)}</strong></td></tr>` : ''}
       </tbody>
     </table>
   `;
@@ -238,6 +246,28 @@ function renderWarningsAndAudit(state, r) {
   }
 
   const warnings = Array.isArray(r.calculationWarnings) ? r.calculationWarnings : [];
+  const gov = r.proposalGovernance || {};
+  const confidence = gov.confidence || {};
+  const approval = gov.approval || {};
+  const financing = gov.financing || {};
+  const maintenance = gov.maintenance || {};
+  const revision = gov.revision || {};
+  const evidence = r.evidenceGovernance || {};
+  const tariffSource = r.tariffSourceGovernance || {};
+  const ledgerRows = (gov.ledger?.entries || []).slice(0, 8).map(entry =>
+    `<tr><td>${escapeHtml(entry.key)}</td><td>${escapeHtml(entry.value)}</td><td>${escapeHtml(entry.confidence)}</td><td>${escapeHtml(entry.sourceLabel || '—')}</td></tr>`
+  ).join('');
+  const revisionRows = (revision.diff || []).slice(0, 8).map(item =>
+    `<tr><td>${escapeHtml(item.key)}</td><td>${escapeHtml(item.before ?? '—')}</td><td>${escapeHtml(item.after ?? '—')}</td></tr>`
+  ).join('');
+  const evidenceRows = Object.entries(evidence.registry || {}).map(([key, record]) => {
+    const latestFile = (record.files || []).slice(-1)[0];
+    const fileText = latestFile ? `${latestFile.name} / ${String(latestFile.sha256 || '').slice(0, 12)}` : '—';
+    return `<tr><td>${escapeHtml(key)}</td><td>${escapeHtml(record.status)}</td><td>${escapeHtml(record.ref || '—')}</td><td>${escapeHtml(record.checkedAt || record.issuedAt || '—')}</td><td>${escapeHtml(record.validUntil || '—')}</td><td>${escapeHtml(fileText)}</td></tr>`;
+  }).join('');
+  const auditRows = (state.auditLog || []).slice(-10).reverse().map(entry =>
+    `<tr><td>${escapeHtml(entry.timestamp || '—')}</td><td>${escapeHtml(entry.action || '—')}</td><td>${escapeHtml(entry.user?.name || '—')} (${escapeHtml(entry.user?.role || '—')})</td></tr>`
+  ).join('');
   const warningHtml = warnings.length
     ? `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:12px;margin-bottom:12px;color:#FCA5A5;font-size:0.82rem">
         <strong>Hata yakala uyarıları:</strong><br>${warnings.map(w => `• ${escapeHtml(w)}`).join('<br>')}
@@ -255,9 +285,25 @@ function renderWarningsAndAudit(state, r) {
         <tr><td>Öz tüketim / İhracat</td><td>${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString('tr-TR')} kWh / ücretli ${Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString('tr-TR')} kWh / toplam ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString('tr-TR')} kWh</td></tr>
         <tr><td>Üretim güven aralığı</td><td>Kötü yıl: ${Math.round(r.annualEnergy * 0.90).toLocaleString('tr-TR')} kWh | Baz: ${r.annualEnergy.toLocaleString('tr-TR')} kWh | İyi yıl: ${Math.round(r.annualEnergy * 1.10).toLocaleString('tr-TR')} kWh</td></tr>
         <tr><td>Güven seviyesi</td><td>${escapeHtml(r.confidenceLevel)} (${escapeHtml(r.calculationMode)})</td></tr>
+        <tr><td>Teklif Hazırlığı</td><td>${escapeHtml(r.quoteReadiness?.status || '—')}${r.quoteReadiness?.blockers?.length ? ' | ' + escapeHtml(r.quoteReadiness.blockers.slice(0, 3).join(' · ')) : ''}</td></tr>
+        <tr><td>Regülasyon Motoru</td><td>${escapeHtml(r.quoteReadiness?.version || r.tariffModel?.exportCompensationPolicy?.version || '—')}</td></tr>
+        <tr><td>Tarife Kaynak Yönetimi</td><td>${escapeHtml(tariffSource.sourceLabel || '—')} | kontrol yaşı: ${tariffSource.ageDays ?? '—'} gün | ${tariffSource.stale ? 'STALE' : 'güncel'}</td></tr>
+        <tr><td>Proposal Güven Skoru</td><td>${confidence.score ?? '—'} / 100 · ${escapeHtml(confidence.level || '—')}</td></tr>
+        <tr><td>Onay Durumu</td><td>${escapeHtml(approval.state || 'draft')}${approval.approvalRecord ? ' | immutable: ' + escapeHtml(approval.approvalRecord.id) : ''}${approval.blockers?.length ? ' | ' + escapeHtml(approval.blockers.join(' · ')) : ''}</td></tr>
+        <tr><td>Finansman</td><td>Aylık ödeme: ${financing.monthlyPayment ? money(financing.monthlyPayment) : '—'} | DSCR: ${financing.firstYearDebtServiceCoverage ?? '—'}</td></tr>
+        <tr><td>Bakım Sözleşmesi</td><td>${money(maintenance.annualBase || 0)}/yıl | 10 yıl: ${money(maintenance.tenYearNominal || 0)} | ${escapeHtml(maintenance.contractStatus || '—')}</td></tr>
+        <tr><td>Şebeke Başvuru</td><td>${gov.gridChecklistComplete ? 'Tamamlandı' : 'Eksik evrak var'}</td></tr>
         <tr><td>Veri gizliliği</td><td>Kayıtlı hesaplar sadece bu tarayıcıdaki localStorage alanında tutulur.</td></tr>
       </tbody>
     </table>
+    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">Varsayım Defteri</div>
+    <table class="tech-table"><thead><tr><th>Varsayım</th><th>Değer</th><th>Güven</th><th>Kaynak</th></tr></thead><tbody>${ledgerRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table>
+    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">Kanıt Kayıtları</div>
+    <table class="tech-table"><thead><tr><th>Kanıt</th><th>Durum</th><th>Ref</th><th>Kontrol/Tarih</th><th>Geçerlilik</th><th>Dosya / SHA-256</th></tr></thead><tbody>${evidenceRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table>
+    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">Revizyon Farkı</div>
+    <table class="tech-table"><thead><tr><th>Alan</th><th>Önce</th><th>Sonra</th></tr></thead><tbody>${revisionRows || '<tr><td colspan="3">İlk revizyon veya fark yok.</td></tr>'}</tbody></table>
+    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">Audit Log</div>
+    <table class="tech-table"><thead><tr><th>Zaman</th><th>Aksiyon</th><th>Kullanıcı</th></tr></thead><tbody>${auditRows || '<tr><td colspan="3">Henüz kayıt yok.</td></tr>'}</tbody></table>
   `;
 
   // Türkiye SVG haritasında şehir noktasını güncelle
@@ -723,13 +769,21 @@ export function loadFromHash() {
       if (safeState.tariff !== undefined) document.getElementById('tariff-input').value = safeState.tariff;
       if (safeState.exportTariff !== undefined && document.getElementById('export-tariff-input')) document.getElementById('export-tariff-input').value = safeState.exportTariff;
       if (safeState.tariffRegime !== undefined && document.getElementById('tariff-regime')) document.getElementById('tariff-regime').value = safeState.tariffRegime;
+      if (safeState.exportSettlementMode !== undefined && document.getElementById('export-settlement-mode')) document.getElementById('export-settlement-mode').value = safeState.exportSettlementMode;
       if (safeState.skttTariff !== undefined && document.getElementById('sktt-tariff-input')) document.getElementById('sktt-tariff-input').value = safeState.skttTariff;
       if (safeState.contractedTariff !== undefined && document.getElementById('contracted-tariff-input')) document.getElementById('contracted-tariff-input').value = safeState.contractedTariff;
       if (safeState.contractedPowerKw !== undefined && document.getElementById('contracted-power-input')) document.getElementById('contracted-power-input').value = safeState.contractedPowerKw;
+      if (safeState.previousYearConsumptionKwh !== undefined && document.getElementById('previous-year-consumption-input')) document.getElementById('previous-year-consumption-input').value = safeState.previousYearConsumptionKwh;
+      if (safeState.currentYearConsumptionKwh !== undefined && document.getElementById('current-year-consumption-input')) document.getElementById('current-year-consumption-input').value = safeState.currentYearConsumptionKwh;
+      if (safeState.sellableExportCapKwh !== undefined && document.getElementById('sellable-export-cap-input')) document.getElementById('sellable-export-cap-input').value = safeState.sellableExportCapKwh;
       if (safeState.usdToTry !== undefined && document.getElementById('usd-try-input')) document.getElementById('usd-try-input').value = safeState.usdToTry;
       if (safeState.displayCurrency && document.getElementById('display-currency')) document.getElementById('display-currency').value = safeState.displayCurrency;
       if (safeState.annualPriceIncrease !== undefined && document.getElementById('price-increase-input')) document.getElementById('price-increase-input').value = (safeState.annualPriceIncrease * 100).toFixed(0);
       if (safeState.discountRate !== undefined && document.getElementById('discount-rate-input')) document.getElementById('discount-rate-input').value = (safeState.discountRate * 100).toFixed(0);
+      if (safeState.expenseEscalationRate !== undefined && document.getElementById('expense-escalation-input')) document.getElementById('expense-escalation-input').value = (safeState.expenseEscalationRate * 100).toFixed(0);
+      if (document.getElementById('quote-bill-verified')) document.getElementById('quote-bill-verified').checked = !!safeState.hasSignedCustomerBillData;
+      if (document.getElementById('quote-inputs-verified')) document.getElementById('quote-inputs-verified').checked = !!safeState.quoteInputsVerified;
+      if (document.getElementById('quote-ready-approved')) document.getElementById('quote-ready-approved').checked = !!safeState.quoteReadyApproved;
       if (safeState.tariffType && document.getElementById('tariff-type')) document.getElementById('tariff-type').value = safeState.tariffType;
       if (window.map && state.lat && state.lon) window.map.setView([state.lat, state.lon], 9);
       if (window.marker && state.lat && state.lon) window.marker.setLatLng([state.lat, state.lon]);
@@ -767,10 +821,46 @@ export function loadFromHash() {
   }
 }
 
+export function exportProposalHandoff() {
+  const state = window.state;
+  if (!state?.results) {
+    window.showToast?.('Önce hesaplama yapın.', 'error');
+    return;
+  }
+  const payload = buildStructuredProposalExport(state, state.results);
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `guneshesap-proposal-handoff-${(state.cityName || 'site').toString().replace(/[^a-z0-9_-]+/gi, '-')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  window.showToast?.('Yapılandırılmış proposal handoff JSON indirildi.', 'success');
+}
+
+export function exportCrmLead() {
+  const state = window.state;
+  if (!state?.results) {
+    window.showToast?.('Önce hesaplama yapın.', 'error');
+    return;
+  }
+  const payload = buildCrmLeadExport(state, state.results);
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `guneshesap-crm-lead-${(state.cityName || 'site').toString().replace(/[^a-z0-9_-]+/gi, '-')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  window.showToast?.('CRM/lead handoff JSON indirildi.', 'success');
+}
+
 // window'a expose et
 window.renderResults = renderResults;
 window.renderMonthlyChart = renderMonthlyChart;
 window.downloadPDF = downloadPDF;
 window.downloadTechnicalPDF = downloadTechnicalPDF;
 window.shareResults = shareResults;
+window.exportProposalHandoff = exportProposalHandoff;
+window.exportCrmLead = exportCrmLead;
 window.loadFromHash = loadFromHash;

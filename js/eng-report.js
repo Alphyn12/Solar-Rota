@@ -50,6 +50,7 @@ export function renderEngReport() {
   const cablePct    = r.cableLossPct ? r.cableLossPct.toFixed(1) : '0.0';
   const cb          = r.costBreakdown;
   const totalEnergy25y = r.yearlyTable.reduce((s, y) => s + y.energy, 0);
+  const gov = r.proposalGovernance || {};
 
   let html = `
   <div class="eng-section-header">
@@ -267,6 +268,32 @@ NPVₜ = NCFₜ ÷ (1+d)ᵗ    d=${(r.discountRate*100).toFixed(0)}%
     </div>
     <div class="formula-note">Yeşil satır (✓) geri ödeme yılını gösterir. Yıllık giderler: O&M ${money(r.annualOMCost)} + Sigorta ${money(r.annualInsurance)} = ${money(r.annualOMCost + r.annualInsurance)}/yıl.</div>
   </div>`;
+
+  if (gov.confidence) {
+    const evidence = r.evidenceGovernance || {};
+    const tariffSource = r.tariffSourceGovernance || {};
+    const evidenceFileCount = Object.values(evidence.registry || {}).reduce((sum, record) => sum + ((record.files || []).length), 0);
+    html += `
+  <div class="eng-section-header">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+    Proposal Governance
+  </div>
+  <div class="formula-card">
+    <div class="formula-title">Teklif Hazırlığı ve Varsayım İzlenebilirliği</div>
+    <div class="formula-body">Güven skoru: ${gov.confidence.score}/100
+Seviye: ${gov.confidence.level}
+Onay durumu: ${gov.approval?.state || 'draft'}
+Onay kaydı: ${gov.approval?.approvalRecord?.id || '—'}
+Şebeke başvuru kontrol listesi: ${gov.gridChecklistComplete ? 'tamamlandı' : 'eksik'}
+Regülasyon versiyonu: ${r.quoteReadiness?.version || r.tariffModel?.exportCompensationPolicy?.version || '—'}
+Revizyon: ${gov.revision?.id || '—'}
+Kanıt durumu: ${evidence.validation?.status || '—'}
+Kanıt dosyası sayısı: ${evidenceFileCount}
+Audit log kayıt sayısı: ${(state.auditLog || []).length}
+Tarife kaynak yaşı: ${tariffSource.ageDays ?? '—'} gün${tariffSource.stale ? ' (STALE)' : ''}</div>
+    <div class="formula-note">Quote-ready çıktı yalnızca onay, fatura kanıtı, tedarikçi teklifi, tarife kanıtı, şebeke başvuru kanıtı, çatı doğrulaması ve kritik blocker bulunmaması durumunda müşteri teklifi olarak kullanılmalıdır. Bu rapor statik proje, hukuki görüş veya resmi başvuru belgesi yerine geçmez.</div>
+  </div>`;
+  }
 
   // ── 8. BESS Analizi ────────────────────────────────────────────────────────
   if (r.bessMetrics) {

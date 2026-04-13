@@ -1,0 +1,309 @@
+// Proposal governance, confidence, revision, and commercial workflow helpers.
+import { canApproveProposal, describeApprover, normalizeUserIdentity } from './identity.js';
+
+export const PROPOSAL_GOVERNANCE_VERSION = 'GH-PROP-2026.04-v1';
+
+const APPROVAL_STATES = new Set(['draft', 'engineering-review', 'finance-review', 'approved', 'rejected']);
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function finiteNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function pct(value, fallback = 0) {
+  return Math.max(-1, Math.min(5, finiteNumber(value, fallback)));
+}
+
+export function createAssumptionLedger(state = {}, results = {}) {
+  const tariff = results.tariffModel || {};
+  const exchange = state.exchangeRate || {};
+  const evidence = results.evidenceGovernance?.registry || {};
+  return {
+    version: PROPOSAL_GOVERNANCE_VERSION,
+    generatedAt: nowIso(),
+    entries: [
+      {
+        key: 'production.dataSource',
+        value: results.usedFallback ? 'fallback-psh' : 'pvgis-live',
+        confidence: results.usedFallback ? 'low' : 'medium',
+        sourceLabel: results.usedFallback ? 'Local PSH fallback' : 'PVGIS API',
+        sourceDate: results.usedFallback ? results.methodologyVersion : tariff.sourceDate || null
+      },
+      {
+        key: 'tariff.regime',
+        value: tariff.effectiveRegime || 'unknown',
+        confidence: evidence.tariffSource?.status === 'verified' && !results.tariffSourceGovernance?.stale ? 'high' : 'low',
+        sourceLabel: tariff.sourceLabel || 'Manual tariff input',
+        sourceDate: tariff.sourceDate || null
+      },
+      {
+        key: 'export.compensation',
+        value: tariff.exportCompensationPolicy?.interval || 'unknown',
+        confidence: evidence.regulationSource?.status === 'verified' ? 'medium' : 'low',
+        sourceLabel: tariff.exportCompensationPolicy?.capBasis || 'unknown',
+        sourceDate: tariff.exportCompensationPolicy?.settlementDate || null
+      },
+      {
+        key: 'evidence.customerBill',
+        value: evidence.customerBill?.status || 'missing',
+        confidence: evidence.customerBill?.status === 'verified' ? 'high' : 'low',
+        sourceLabel: evidence.customerBill?.ref || 'missing',
+        sourceDate: evidence.customerBill?.checkedAt || evidence.customerBill?.issuedAt || null
+      },
+      {
+        key: 'currency.usdTry',
+        value: finiteNumber(state.usdToTry, results.usdToTry || 0),
+        confidence: exchange.source && exchange.source !== 'manual/fallback' ? 'medium' : 'low',
+        sourceLabel: exchange.source || 'manual/fallback',
+        sourceDate: exchange.fetchedAt || null
+      },
+      {
+        key: 'bom.commercials',
+        value: state.bomCommercials?.supplierQuoteState || 'not-requested',
+        confidence: state.bomCommercials?.supplierQuoteState === 'received' ? 'high' : 'low',
+        sourceLabel: state.bomCommercials?.supplierQuoteRef || 'BOM fixture/manual',
+        sourceDate: state.bomCommercials?.supplierQuoteDate || null
+      },
+      {
+        key: 'approval.state',
+        value: state.proposalApproval?.state || 'draft',
+        confidence: state.proposalApproval?.state === 'approved' ? 'high' : 'low',
+        sourceLabel: state.proposalApproval?.approvedBy || 'not-approved',
+        sourceDate: state.proposalApproval?.approvedAt || null
+      }
+    ]
+  };
+}
+
+export function calculateProposalConfidence({ state = {}, results = {}, quoteReadiness = null } = {}) {
+  let score = 100;
+  const factors = [];
+  const add = (points, reason) => {
+    score -= points;
+    factors.push({ points: -points, reason });
+  };
+
+  if (results.usedFallback) add(25, 'PVGIS canlı veri yok.');
+  if (!state.roofGeometry) add(15, 'Çatı geometrisi doğrulanmadı.');
+  if (!state.hasSignedCustomerBillData && !Array.isArray(state.monthlyConsumption)) add(15, 'Fatura/tüketim kanıtı yok.');
+  if (results.evidenceGovernance?.validation?.blockers?.length) add(Math.min(25, results.evidenceGovernance.validation.blockers.length * 5), 'Kanıt yönetimi eksik.');
+  if (results.tariffSourceGovernance?.stale) add(12, 'Tarife kaynağı eski veya doğrulanmamış.');
+  if (!state.quoteInputsVerified) add(10, 'Teklif varsayımları onaylanmadı.');
+  if (state.proposalApproval?.state !== 'approved' || !state.proposalApproval?.approvalRecord?.immutable) add(15, 'Proposal onayı tamamlanmadı veya immutable kayıt yok.');
+  if (results.tariffModel?.regulation?.warnings?.length) add(10, 'Tarife rejimi uyarıları var.');
+  if (results.nmMetrics?.unpaidGridExport > 0) add(5, 'Ücretlendirilmeyen ihracat var.');
+  if (state.bomCommercials?.supplierQuoteState !== 'received') add(7, 'Tedarikçi teklif durumu alınmadı.');
+  if (state.gridApplicationChecklist && !isGridChecklistComplete(state.gridApplicationChecklist)) add(8, 'Şebeke başvuru kontrol listesi eksik.');
+  if (quoteReadiness?.blockers?.length) add(Math.min(20, quoteReadiness.blockers.length * 3), 'Quote-readiness blocker mevcut.');
+
+  const normalized = Math.max(0, Math.min(100, Math.round(score)));
+  const level = normalized >= 85 && state.proposalApproval?.state === 'approved'
+    ? 'quote-ready proposal'
+    : normalized >= 65
+      ? 'engineering estimate'
+      : 'rough estimate';
+  return { score: normalized, level, factors };
+}
+
+export function buildApprovalWorkflow(state = {}, confidence = null) {
+  const current = state.proposalApproval || {};
+  const user = normalizeUserIdentity(state.userIdentity || { name: current.updatedBy || current.approvedBy || 'local-user', role: 'sales' });
+  const existingRecord = current.approvalRecord || null;
+  const requestedState = current.state || 'draft';
+  const safeState = APPROVAL_STATES.has(requestedState) ? requestedState : 'draft';
+  const blockers = [];
+  if (safeState === 'approved') {
+    if (!canApproveProposal(user) && !existingRecord) blockers.push('Yalnızca approver/admin rolü proposal onayı verebilir.');
+    if (!state.quoteInputsVerified) blockers.push('Teklif varsayımları doğrulanmadan onay verilemez.');
+    if (!state.hasSignedCustomerBillData && !Array.isArray(state.monthlyConsumption)) blockers.push('Fatura/tüketim kanıtı olmadan onay verilemez.');
+    if (confidence && confidence.score < 85) blockers.push('Güven skoru 85 altında; quote-ready onay bloke edildi.');
+    if (state.evidence?.customerBill?.status !== 'verified') blockers.push('Müşteri fatura kanıtı doğrulanmadan onay verilemez.');
+    const supplierEvidenceOk = state.evidence?.supplierQuote?.status === 'verified' || state.bomCommercials?.supplierQuoteState === 'received';
+    if (!supplierEvidenceOk) blockers.push('Tedarikçi teklif kanıtı doğrulanmadan onay verilemez.');
+    if (state.evidence?.tariffSource?.status !== 'verified') blockers.push('Tarife kaynak kanıtı doğrulanmadan onay verilemez.');
+    if (existingRecord && current.approvedBy && current.approvedBy !== existingRecord.approvedBy) {
+      blockers.push('Mevcut immutable onay kaydı sessizce değiştirilemez; yeni revizyon/onay süreci açılmalı.');
+    }
+  }
+  const effectiveState = blockers.length && safeState === 'approved' ? 'finance-review' : safeState;
+  const approvalRecord = existingRecord || (effectiveState === 'approved'
+    ? {
+      id: `approval-${Date.now()}`,
+      state: 'approved',
+      approvedBy: current.approvedBy || describeApprover(user),
+      approvedAt: current.approvedAt || nowIso(),
+      user,
+      immutable: true,
+      version: PROPOSAL_GOVERNANCE_VERSION
+    }
+    : null);
+  return {
+    state: effectiveState,
+    requestedState: safeState,
+    blockers,
+    approvedBy: approvalRecord?.approvedBy || (effectiveState === 'approved' ? current.approvedBy || describeApprover(user) : null),
+    approvedAt: approvalRecord?.approvedAt || (effectiveState === 'approved' ? current.approvedAt || nowIso() : null),
+    approvalRecord,
+    authorizedRole: canApproveProposal(user),
+    history: Array.isArray(current.history) ? current.history.slice(-20) : []
+  };
+}
+
+export function calculateBomCommercials(subtotal = 0, state = {}) {
+  const cfg = state.bomCommercials || {};
+  const marginRate = pct(cfg.marginRate, 0.18);
+  const contingencyRate = pct(cfg.contingencyRate, 0.05);
+  const supplierQuoteState = cfg.supplierQuoteState || 'not-requested';
+  const validUntil = cfg.supplierQuoteValidUntil || state.evidence?.supplierQuote?.validUntil || null;
+  const baseSubtotal = Math.max(0, finiteNumber(subtotal));
+  const contingency = baseSubtotal * contingencyRate;
+  const margin = (baseSubtotal + contingency) * marginRate;
+  const proposedSellPrice = baseSubtotal + contingency + margin;
+  return {
+    marginRate,
+    contingencyRate,
+    supplierQuoteState,
+    supplierQuoteRef: cfg.supplierQuoteRef || '',
+    supplierQuoteDate: cfg.supplierQuoteDate || null,
+    supplierQuoteValidUntil: validUntil,
+    quoteExpired: validUntil ? new Date(`${validUntil}T00:00:00Z`) < new Date('2026-04-13T00:00:00Z') : false,
+    subtotal: Math.round(baseSubtotal),
+    contingency: Math.round(contingency),
+    margin: Math.round(margin),
+    proposedSellPrice: Math.round(proposedSellPrice),
+    grossMarginPct: proposedSellPrice > 0 ? Number((margin / proposedSellPrice * 100).toFixed(1)) : 0
+  };
+}
+
+export function calculateFinancingModel(totalCost = 0, annualNetCashFlow = 0, state = {}) {
+  const cfg = state.financing || {};
+  const principal = Math.max(0, finiteNumber(cfg.principal, totalCost));
+  const downPayment = Math.max(0, finiteNumber(cfg.downPayment, 0));
+  const loanPrincipal = Math.max(0, principal - downPayment);
+  const annualRate = Math.max(0, finiteNumber(cfg.annualRate, 0.35));
+  const termYears = Math.max(1, Math.round(finiteNumber(cfg.termYears, 5)));
+  const monthlyRate = annualRate / 12;
+  const n = termYears * 12;
+  const monthlyPayment = monthlyRate > 0
+    ? loanPrincipal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -n))
+    : loanPrincipal / n;
+  const annualDebtService = monthlyPayment * 12;
+  return {
+    principal: Math.round(principal),
+    downPayment: Math.round(downPayment),
+    loanPrincipal: Math.round(loanPrincipal),
+    annualRate,
+    termYears,
+    monthlyPayment: Math.round(monthlyPayment),
+    annualDebtService: Math.round(annualDebtService),
+    firstYearDebtServiceCoverage: annualDebtService > 0 ? Number((annualNetCashFlow / annualDebtService).toFixed(2)) : null
+  };
+}
+
+export function buildMaintenancePlan(totalCost = 0, state = {}) {
+  const cfg = state.maintenanceContract || {};
+  const baseRate = pct(cfg.baseRate, Math.max(0, finiteNumber(state.omRate, 1) / 100));
+  const escalationRate = pct(cfg.escalationRate, Math.max(0, finiteNumber(state.expenseEscalationRate, 0.10)));
+  const includeMonitoring = cfg.includeMonitoring ?? true;
+  const includeCleaning = cfg.includeCleaning ?? true;
+  const annualBase = Math.max(0, finiteNumber(totalCost) * baseRate);
+  return {
+    baseRate,
+    escalationRate,
+    includeMonitoring,
+    includeCleaning,
+    contractStatus: cfg.contractStatus || 'not-offered',
+    annualBase: Math.round(annualBase),
+    tenYearNominal: Math.round(Array.from({ length: 10 }, (_, i) => annualBase * Math.pow(1 + escalationRate, i)).reduce((a, b) => a + b, 0))
+  };
+}
+
+export function defaultGridApplicationChecklist(existing = {}) {
+  const items = [
+    ['bill', 'Son 12 aylık tüketim/fatura kanıtı'],
+    ['titleOrLease', 'Tapu/kira ve kullanım hakkı evrakı'],
+    ['connectionOpinion', 'Dağıtım şirketi bağlantı görüşü'],
+    ['singleLine', 'Tek hat şeması'],
+    ['staticReview', 'Statik uygunluk/taşıyıcı sistem kontrolü'],
+    ['layout', 'Çatı yerleşim planı'],
+    ['inverterDocs', 'İnverter/panel teknik dokümanları'],
+    ['metering', 'Sayaç/mahsuplaşma gereksinimleri']
+  ];
+  return Object.fromEntries(items.map(([key, label]) => [
+    key,
+    { label, done: !!existing[key]?.done, evidence: existing[key]?.evidence || '' }
+  ]));
+}
+
+export function isGridChecklistComplete(checklist = {}) {
+  const normalized = defaultGridApplicationChecklist(checklist);
+  return Object.values(normalized).every(item => item.done);
+}
+
+export function createProposalRevision(state = {}, results = {}, previous = null) {
+  const user = normalizeUserIdentity(state.userIdentity || { name: state.proposalApproval?.updatedBy || 'local-user', role: 'sales' });
+  const watched = {
+    cityName: state.cityName,
+    roofArea: state.roofArea,
+    panelType: state.panelType,
+    inverterType: state.inverterType,
+    tariffType: state.tariffType,
+    tariffRegime: state.tariffRegime,
+    exportTariff: state.exportTariff,
+    totalCost: results.totalCost,
+    annualEnergy: results.annualEnergy,
+    annualSavings: results.annualSavings,
+    npvTotal: results.npvTotal,
+    confidenceLevel: results.confidenceLevel,
+    quoteStatus: results.quoteReadiness?.status
+  };
+  return {
+    id: `rev-${Date.now()}`,
+    createdAt: nowIso(),
+    author: user.name,
+    authorRole: user.role,
+    watched,
+    diff: previous ? diffProposalRevisions(previous, { watched }) : []
+  };
+}
+
+export function diffProposalRevisions(prev = {}, next = {}) {
+  const before = prev.watched || {};
+  const after = next.watched || {};
+  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])];
+  return keys
+    .filter(key => before[key] !== after[key])
+    .map(key => ({ key, before: before[key], after: after[key] }));
+}
+
+export function buildProposalGovernance(state = {}, results = {}) {
+  const quoteReadiness = results.quoteReadiness || null;
+  const confidence = calculateProposalConfidence({ state, results, quoteReadiness });
+  const approval = buildApprovalWorkflow(state, confidence);
+  const bomCommercials = calculateBomCommercials(results.costBreakdown?.bom?.subtotal || results.costBreakdown?.subtotal || 0, state);
+  const firstYearCashFlow = results.yearlyTable?.[0]?.netCashFlow || results.annualSavings || 0;
+  const financing = calculateFinancingModel(results.totalCost || 0, firstYearCashFlow, state);
+  const maintenance = buildMaintenancePlan(results.totalCost || 0, state);
+  const gridChecklist = defaultGridApplicationChecklist(state.gridApplicationChecklist || {});
+  const ledger = createAssumptionLedger(state, results);
+  const previousRevision = Array.isArray(state.proposalRevisions) ? state.proposalRevisions[0] : null;
+  const revision = createProposalRevision(state, results, previousRevision);
+
+  return {
+    version: PROPOSAL_GOVERNANCE_VERSION,
+    generatedAt: nowIso(),
+    confidence,
+    approval,
+    bomCommercials,
+    financing,
+    maintenance,
+    gridChecklist,
+    gridChecklistComplete: isGridChecklistComplete(gridChecklist),
+    ledger,
+    revision
+  };
+}

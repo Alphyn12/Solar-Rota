@@ -6,6 +6,9 @@ import {
   PANEL_TYPES, HOURLY_SOLAR_PROFILE, RESIDENTIAL_LOAD, COMMERCIAL_LOAD,
   INDUSTRIAL_LOAD, MONTH_WEIGHTS, TARIFF_META
 } from './data.js';
+import {
+  applyExportCompensation, buildExportCompensationPolicy, determineSkttRegime, TARIFF_DATA_LIFECYCLE
+} from './turkey-regulation.js';
 
 export const METHODOLOGY_VERSION = 'GH-CALC-2026.04-v2.1';
 export const PVGIS_LOSS_PARAM = 0;
@@ -239,7 +242,18 @@ export function simulateHourlyEnergy(monthlyProduction, monthlyLoad, options = {
     };
   });
 
-  const capped = capPaidExportByMonth(monthly);
+  const exportPolicy = options.exportPolicy || buildExportCompensationPolicy({
+    tariffType: options.tariffType,
+    annualConsumptionKwh: annualLoad,
+    dailyConsumption: annualLoad / 365,
+    exportSettlementMode: options.exportSettlementMode,
+    netMeteringSettlement: options.netMeteringSettlement,
+    settlementDate: options.settlementDate,
+    previousYearConsumptionKwh: options.previousYearConsumptionKwh,
+    currentYearConsumptionKwh: options.currentYearConsumptionKwh,
+    sellableExportCapKwh: options.sellableExportCapKwh
+  });
+  const capped = applyExportCompensation(monthly, exportPolicy);
 
   return {
     annualProduction,
@@ -260,20 +274,7 @@ export function simulateHourlyEnergy(monthlyProduction, monthlyLoad, options = {
 }
 
 export function capPaidExportByMonth(monthly) {
-  const cappedMonthly = (Array.isArray(monthly) ? monthly : []).map(m => {
-    const rawExport = Math.max(0, Number(m.gridExport) || 0);
-    const load = Math.max(0, Number(m.load) || 0);
-    const paidGridExport = Math.min(rawExport, load);
-    return {
-      paidGridExport,
-      unpaidGridExport: Math.max(0, rawExport - paidGridExport)
-    };
-  });
-  return {
-    paidGridExport: cappedMonthly.reduce((s, m) => s + m.paidGridExport, 0),
-    unpaidGridExport: cappedMonthly.reduce((s, m) => s + m.unpaidGridExport, 0),
-    monthly: cappedMonthly
-  };
+  return applyExportCompensation(monthly, { interval: 'monthly' });
 }
 
 export function simulateBatteryOnHourlySummary(hourlySummary, battery, options = {}) {
@@ -346,7 +347,7 @@ export function simulateBatteryOnHourlySummary(hourlySummary, battery, options =
   });
 
   const totalSelf = hourlySummary.selfConsumption + batteryDischarge;
-  const capped = capPaidExportByMonth(monthly);
+  const capped = applyExportCompensation(monthly, options.exportPolicy || { interval: 'monthly' });
   const cyclesPerYear = usableCapacity > 0 ? batteryDischarge / usableCapacity : 0;
 
   return {
@@ -382,14 +383,15 @@ export function buildTariffModel(state) {
   const skttRate = Math.max(0, Number(state.skttTariff) || Number(state.tariff) || 0);
   const contractedRate = Math.max(0, Number(state.contractedTariff) || Number(state.tariff) || 0);
   const tariffRegime = state.tariffRegime || 'auto';
-  const effectiveRegime = tariffRegime === 'auto'
-    ? (meta.skttLimitKwh && annualConsumptionKwh > meta.skttLimitKwh ? 'sktt' : 'pst')
-    : tariffRegime;
+  const regulation = determineSkttRegime({ ...state, annualConsumptionKwh });
+  const effectiveRegime = regulation.effectiveRegime;
   const importRateByRegime = effectiveRegime === 'sktt'
     ? skttRate
     : effectiveRegime === 'contract'
       ? contractedRate
       : Math.max(0, Number(state.tariff) || 0);
+  const annualPriceIncrease = Math.max(-0.5, Number(state.annualPriceIncrease ?? 0.12));
+  const exportCompensationPolicy = buildExportCompensationPolicy({ ...state, annualConsumptionKwh });
 
   return {
     type: tariffType,
@@ -402,20 +404,25 @@ export function buildTariffModel(state) {
     pstRate: Math.max(0, Number(state.tariff) || 0),
     skttRate,
     contractedRate,
-    exportRate: Math.max(0, Number(state.exportTariff) || Number(state.tariff) || 0),
-    annualPriceIncrease: Math.max(-0.5, Number(state.annualPriceIncrease ?? 0.12)),
+    exportRate: Math.max(0, Number(state.exportTariff) || 0),
+    annualPriceIncrease,
     discountRate: Math.max(0, Number(state.discountRate ?? 0.18)),
+    expenseEscalationRate: Math.max(-0.5, Number(state.expenseEscalationRate ?? Math.min(0.25, annualPriceIncrease))),
     sourceDate: state.tariffSourceDate || meta.sourceDate,
     sourceLabel: meta.sourceLabel,
+    sourceUrl: state.evidence?.tariffSource?.sourceUrl || '',
+    sourceLifecycle: TARIFF_DATA_LIFECYCLE,
     skttLimitKwh: meta.skttLimitKwh,
-    includesTax: state.tariffIncludesTax ?? true
+    includesTax: state.tariffIncludesTax ?? true,
+    regulation,
+    exportCompensationPolicy
   };
 }
 
 export function computeFinancialTable({
   annualEnergy, hourlySummary, batterySummary, totalCost, tariffModel,
   panel, annualOMCost, annualInsurance, inverterLifetime, inverterReplaceCost,
-  netMeteringEnabled, exportRateOverride
+  netMeteringEnabled, exportRateOverride, batteryLifetime = 0, batteryReplaceCost = 0
 }) {
   const rows = [];
   let cumulativeNet = 0;
@@ -437,8 +444,11 @@ export function computeFinancialTable({
     const selfE = degradedEnergy * selfRatio;
     const exportE = degradedEnergy * exportRatio;
     const yearSavings = selfE * electricityPrice + (netMeteringEnabled ? exportE * escalatedExportRate : 0);
-    let yearExpenses = annualOMCost + annualInsurance;
-    if (year === inverterLifetime) yearExpenses += inverterReplaceCost;
+    let yearExpenses = (annualOMCost + annualInsurance) * Math.pow(1 + (tariffModel.expenseEscalationRate || 0), year - 1);
+    const invLife = Math.round(Number(inverterLifetime) || 0);
+    if (invLife > 0 && year % invLife === 0) yearExpenses += inverterReplaceCost * Math.pow(1 + (tariffModel.expenseEscalationRate || 0), year - 1);
+    const batLife = Math.round(Number(batteryLifetime) || 0);
+    if (batLife > 0 && year % batLife === 0) yearExpenses += batteryReplaceCost * Math.pow(1 + (tariffModel.expenseEscalationRate || 0), year - 1);
     totalExpenses25y += yearExpenses;
     const netCashFlow = yearSavings - yearExpenses;
     const npv = netCashFlow / Math.pow(1 + tariffModel.discountRate, year);
@@ -450,6 +460,9 @@ export function computeFinancialTable({
       year,
       energy: Math.round(degradedEnergy),
       rate: electricityPrice.toFixed(2),
+      exportRate: escalatedExportRate.toFixed(2),
+      selfConsumptionKwh: Math.round(selfE),
+      paidExportKwh: Math.round(exportE),
       savings: Math.round(yearSavings),
       expenses: Math.round(yearExpenses),
       netCashFlow: Math.round(netCashFlow),
@@ -520,6 +533,8 @@ export function detectCalculationWarnings(results) {
   if (results.usedFallback) warnings.push('PVGIS verisi alınamadı; fallback PSH hesabı düşük güven seviyesidir.');
   if (results.nmMetrics?.unpaidGridExport > 0) warnings.push('Üretim fazlasının bir kısmı ödeme hesabına alınmadı; ihracat sınırı uygulanıyor.');
   if (results.tariffModel?.effectiveRegime === 'sktt' && !results.tariffModel?.skttRate) warnings.push('SKTT seçili ancak SKTT birim fiyatı tanımlı değil.');
+  if (results.tariffModel?.exportRate <= 0 && results.netMeteringEnabled) warnings.push('Şebeke ihracatı açık ancak ihracat birim fiyatı 0 TL/kWh.');
+  if (results.tariffModel?.regulation?.warnings?.length) warnings.push(...results.tariffModel.regulation.warnings);
   if (Number(results.tariffModel?.contractedPowerKw) > 0 && Number(results.systemPower) > Number(results.tariffModel.contractedPowerKw)) {
     warnings.push('Kurulu güç sözleşme gücünü aşıyor; bağlantı görüşü ve mahsuplaşma sınırları proje bazında kontrol edilmeli.');
   }

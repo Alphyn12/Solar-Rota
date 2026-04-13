@@ -15,8 +15,12 @@ const NUMBER_LIMITS = {
   skttTariff: [0, 1000],
   contractedTariff: [0, 1000],
   contractedPowerKw: [0, 100000],
+  previousYearConsumptionKwh: [0, 100000000],
+  currentYearConsumptionKwh: [0, 100000000],
+  sellableExportCapKwh: [0, 100000000],
   annualPriceIncrease: [-0.5, 2],
   discountRate: [0, 2],
+  expenseEscalationRate: [-0.5, 2],
   dailyConsumption: [0, 100000],
   usdToTry: [0.0001, 10000],
   omRate: [0, 20],
@@ -31,6 +35,8 @@ const STRING_LIMITS = {
   tariffType: 40,
   tariffMode: 40,
   tariffRegime: 40,
+  exportSettlementMode: 20,
+  settlementDate: 20,
   displayCurrency: 3,
   inverterType: 40,
   tariffSourceDate: 20
@@ -39,17 +45,21 @@ const STRING_LIMITS = {
 const BOOLEAN_KEYS = new Set([
   'batteryEnabled', 'netMeteringEnabled', 'omEnabled', 'costOverridesEnabled',
   'billAnalysisEnabled', 'evEnabled', 'heatPumpEnabled', 'taxEnabled',
-  'cableLossEnabled', 'osmShadowEnabled'
+  'cableLossEnabled', 'osmShadowEnabled', 'hasBilateralContract',
+  'hasSignedCustomerBillData', 'quoteInputsVerified', 'quoteReadyApproved'
 ]);
 
 const OBJECT_KEYS = new Set([
   'battery', 'ev', 'heatPump', 'tax', 'costOverrides', 'cableLoss',
-  'roofGeometry', 'osmShadow', 'bomSelection'
+  'roofGeometry', 'osmShadow', 'bomSelection', 'bomCommercials', 'financing',
+  'maintenanceContract', 'gridApplicationChecklist', 'proposalApproval', 'evidence',
+  'userIdentity'
 ]);
 
 const ARRAY_KEYS = new Set([
   'roofSections', 'monthlyConsumption', 'hourlyConsumption8760', 'bomItems',
-  'glareTargets'
+  'glareTargets', 'proposalRevisions',
+  'auditLog'
 ]);
 
 const ENUM_VALUES = {
@@ -57,6 +67,7 @@ const ENUM_VALUES = {
   tariffType: new Set(['residential', 'commercial', 'industrial', 'custom']),
   tariffMode: new Set(['auto', 'custom', 'pst', 'sktt', 'contract']),
   tariffRegime: new Set(['auto', 'pst', 'sktt', 'contract']),
+  exportSettlementMode: new Set(['auto', 'hourly', 'monthly']),
   displayCurrency: new Set(['TRY', 'USD']),
   inverterType: new Set(['string', 'micro', 'optimizer'])
 };

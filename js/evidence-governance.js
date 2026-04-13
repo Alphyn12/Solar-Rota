@@ -1,0 +1,259 @@
+// Evidence/source governance helpers for quote-ready proposal workflow.
+
+export const EVIDENCE_GOVERNANCE_VERSION = 'GH-EVID-2026.04-v1';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_TODAY = '2026-04-13';
+
+function parseDate(value) {
+  if (!value) return null;
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function todayDate(today = DEFAULT_TODAY) {
+  return parseDate(today) || new Date();
+}
+
+function daysBetween(a, b) {
+  return Math.floor((b.getTime() - a.getTime()) / DAY_MS);
+}
+
+function normalizeEvidenceRecord(record = {}, defaults = {}) {
+  const status = record.status || defaults.status || 'missing';
+  const files = Array.isArray(record.files) ? record.files : (Array.isArray(defaults.files) ? defaults.files : []);
+  return {
+    type: defaults.type || record.type || 'generic',
+    status,
+    ref: String(record.ref || defaults.ref || '').trim(),
+    sourceUrl: String(record.sourceUrl || defaults.sourceUrl || '').trim(),
+    sourceLabel: String(record.sourceLabel || defaults.sourceLabel || '').trim(),
+    issuedAt: record.issuedAt || defaults.issuedAt || null,
+    checkedAt: record.checkedAt || defaults.checkedAt || null,
+    validUntil: record.validUntil || defaults.validUntil || null,
+    validationStatus: record.validationStatus || defaults.validationStatus || (status === 'verified' ? 'validated' : 'unvalidated'),
+    notes: String(record.notes || defaults.notes || '').trim(),
+    files: files.map(file => ({
+      id: String(file.id || '').trim(),
+      name: String(file.name || '').trim(),
+      size: Number(file.size) || 0,
+      mimeType: String(file.mimeType || file.type || '').trim(),
+      sha256: String(file.sha256 || '').trim(),
+      storage: String(file.storage || '').trim(),
+      attachedAt: file.attachedAt || null,
+      validationStatus: file.validationStatus || 'unvalidated'
+    })).filter(file => file.id && file.sha256)
+  };
+}
+
+function hasValidatedFile(record = {}) {
+  return Array.isArray(record.files) && record.files.some(file => file.sha256 && file.validationStatus !== 'rejected');
+}
+
+export function isEvidenceFresh(record = {}, { today = DEFAULT_TODAY, maxAgeDays = 30 } = {}) {
+  const checked = parseDate(record.checkedAt || record.issuedAt);
+  if (!checked) return false;
+  return daysBetween(checked, todayDate(today)) <= maxAgeDays;
+}
+
+export function isEvidenceExpired(record = {}, { today = DEFAULT_TODAY } = {}) {
+  const validUntil = parseDate(record.validUntil);
+  return !!validUntil && validUntil < todayDate(today);
+}
+
+export function buildEvidenceRegistry(state = {}, results = {}, { today = DEFAULT_TODAY } = {}) {
+  const evidence = state.evidence || {};
+  const tariffModel = results.tariffModel || {};
+  const exportPolicy = tariffModel.exportCompensationPolicy || {};
+  const supplier = state.bomCommercials || {};
+
+  const registry = {
+    customerBill: normalizeEvidenceRecord(evidence.customerBill, {
+      type: 'customerBill',
+      status: state.hasSignedCustomerBillData || Array.isArray(state.monthlyConsumption) ? 'verified' : 'missing',
+      ref: evidence.customerBill?.ref || (Array.isArray(state.monthlyConsumption) ? 'monthly-consumption-input' : ''),
+      checkedAt: evidence.customerBill?.checkedAt || null,
+      sourceLabel: 'Customer bill / consumption evidence'
+    }),
+    supplierQuote: normalizeEvidenceRecord(evidence.supplierQuote, {
+      type: 'supplierQuote',
+      status: supplier.supplierQuoteState === 'received' ? 'verified' : supplier.supplierQuoteState || 'missing',
+      ref: supplier.supplierQuoteRef || '',
+      issuedAt: supplier.supplierQuoteDate || null,
+      validUntil: supplier.supplierQuoteValidUntil || null,
+      sourceLabel: 'Supplier BOM quote'
+    }),
+    tariffSource: normalizeEvidenceRecord(evidence.tariffSource, {
+      type: 'tariffSource',
+      status: tariffModel.sourceDate && tariffModel.sourceLabel ? 'verified' : 'missing',
+      ref: tariffModel.sourceDate || '',
+      sourceLabel: tariffModel.sourceLabel || 'Tariff source',
+      sourceUrl: tariffModel.sourceUrl || exportPolicy.sources?.[0]?.url || '',
+      checkedAt: state.tariffSourceCheckedAt || tariffModel.sourceDate || null
+    }),
+    regulationSource: normalizeEvidenceRecord(evidence.regulationSource, {
+      type: 'regulationSource',
+      status: exportPolicy.sources?.length ? 'verified' : 'missing',
+      ref: exportPolicy.version || '',
+      sourceLabel: exportPolicy.sources?.map(s => s.label).join(' + ') || 'Regulation source',
+      sourceUrl: exportPolicy.sources?.[0]?.url || '',
+      checkedAt: exportPolicy.sources?.[0]?.checkedDate || null
+    }),
+    gridApplication: normalizeEvidenceRecord(evidence.gridApplication, {
+      type: 'gridApplication',
+      status: state.gridApplicationChecklist && Object.values(state.gridApplicationChecklist).every(item => item?.done && item?.evidence)
+        ? 'verified'
+        : 'missing',
+      ref: 'grid-checklist',
+      checkedAt: evidence.gridApplication?.checkedAt || null,
+      sourceLabel: 'Grid application checklist'
+    })
+  };
+
+  const validation = validateEvidenceRegistry(registry, { today });
+  return { version: EVIDENCE_GOVERNANCE_VERSION, today, registry, validation };
+}
+
+export function validateEvidenceRegistry(registry = {}, { today = DEFAULT_TODAY } = {}) {
+  const blockers = [];
+  const warnings = [];
+  const required = ['customerBill', 'supplierQuote', 'tariffSource', 'regulationSource', 'gridApplication'];
+
+  required.forEach(key => {
+    const record = registry[key] || {};
+    if (record.status !== 'verified' || record.validationStatus === 'rejected') {
+      blockers.push(`${key}: doğrulanmış kanıt yok.`);
+    }
+    if (['customerBill', 'supplierQuote'].includes(key) && record.status === 'verified' && !hasValidatedFile(record)) {
+      blockers.push(`${key}: doğrulanmış dosya eki ve SHA-256 parmak izi yok.`);
+    }
+    if (key === 'tariffSource' && record.status === 'verified' && !hasValidatedFile(record) && !record.sourceUrl) {
+      blockers.push('tariffSource: kaynak doküman eki veya kaynak URL yok.');
+    }
+    if (key === 'tariffSource' && !isEvidenceFresh(record, { today, maxAgeDays: 45 })) {
+      blockers.push('tariffSource: kaynak kontrol tarihi eski veya eksik.');
+    }
+    if (key === 'regulationSource' && !isEvidenceFresh(record, { today, maxAgeDays: 90 })) {
+      warnings.push('regulationSource: regülasyon kaynak kontrol tarihi 90 günden eski veya eksik.');
+    }
+    if (isEvidenceExpired(record, { today })) {
+      blockers.push(`${key}: kanıt geçerlilik tarihi dolmuş.`);
+    }
+    if (key === 'supplierQuote' && record.status === 'verified' && !record.validUntil) {
+      warnings.push('supplierQuote: geçerlilik tarihi yok; marj ve satış fiyatı riskli.');
+    }
+  });
+
+  return {
+    status: blockers.length ? 'incomplete' : 'complete',
+    blockers,
+    warnings
+  };
+}
+
+export function isEvidenceComplete(evidenceGovernance) {
+  return evidenceGovernance?.validation?.status === 'complete';
+}
+
+export function buildTariffSourceGovernance(tariffModel = {}, evidenceGovernance = null, { today = DEFAULT_TODAY } = {}) {
+  const tariffEvidence = evidenceGovernance?.registry?.tariffSource || {};
+  const sourceDate = parseDate(tariffEvidence.checkedAt || tariffModel.sourceDate);
+  const ageDays = sourceDate ? daysBetween(sourceDate, todayDate(today)) : null;
+  const stale = ageDays == null || ageDays > 45;
+  return {
+    sourceLabel: tariffModel.sourceLabel || tariffEvidence.sourceLabel || 'unknown',
+    sourceDate: tariffEvidence.checkedAt || tariffModel.sourceDate || null,
+    sourceUrl: tariffEvidence.sourceUrl || tariffModel.sourceUrl || '',
+    validationStatus: tariffEvidence.validationStatus || 'unvalidated',
+    lifecycle: tariffModel.sourceLifecycle || null,
+    effectiveFrom: tariffModel.sourceLifecycle?.sources?.[0]?.effectiveFrom || null,
+    effectiveTo: tariffModel.sourceLifecycle?.sources?.[0]?.effectiveTo || null,
+    ageDays,
+    stale,
+    warning: stale ? 'Tarife kaynak kontrol tarihi 45 günden eski veya eksik.' : null
+  };
+}
+
+export function buildStructuredProposalExport(state = {}, results = {}) {
+  const gov = results.proposalGovernance || {};
+  const evidenceRegistry = results.evidenceGovernance?.registry || {};
+  const evidenceSummary = Object.fromEntries(Object.entries(evidenceRegistry).map(([key, record]) => [
+    key,
+    {
+      status: record.status,
+      validationStatus: record.validationStatus,
+      ref: record.ref,
+      checkedAt: record.checkedAt || record.issuedAt || null,
+      validUntil: record.validUntil || null,
+      files: (record.files || []).map(file => ({
+        id: file.id,
+        name: file.name,
+        size: file.size,
+        mimeType: file.mimeType,
+        sha256: file.sha256,
+        storage: file.storage,
+        attachedAt: file.attachedAt
+      }))
+    }
+  ]));
+  return {
+    schema: 'guneshesap.proposal-handoff.v2',
+    exportedAt: new Date().toISOString(),
+    customer: {
+      cityName: state.cityName || null,
+      lat: state.lat || null,
+      lon: state.lon || null,
+      segment: state.tariffType || null
+    },
+    system: {
+      panelType: state.panelType || null,
+      inverterType: state.inverterType || null,
+      systemPowerKwp: results.systemPower || null,
+      annualEnergyKwh: results.annualEnergy || null,
+      usedFallback: !!results.usedFallback
+    },
+    commercial: {
+      totalCost: results.totalCost || null,
+      proposedSellPrice: gov.bomCommercials?.proposedSellPrice || null,
+      annualSavings: results.annualSavings || null,
+      npv: results.npvTotal || null,
+      irr: results.irr || null,
+      lcoe: results.lcoe || null,
+      confidenceScore: gov.confidence?.score || null,
+      confidenceLevel: gov.confidence?.level || results.confidenceLevel || null,
+      approvalState: gov.approval?.state || null
+    },
+    financialSummary: {
+      simplePaybackYear: results.simplePaybackYear || null,
+      discountedPaybackYear: results.discountedPaybackYear || null,
+      roi: results.roi || null,
+      npvTotal: results.npvTotal || null,
+      irr: results.irr || null,
+      lcoe: results.lcoe || null,
+      annualSavings: results.annualSavings || null,
+      totalCost: results.totalCost || null,
+      financing: gov.financing || null,
+      maintenance: gov.maintenance || null,
+      bomCommercials: gov.bomCommercials || null
+    },
+    tariff: {
+      regime: results.tariffModel?.effectiveRegime || null,
+      importRate: results.tariffModel?.importRate || null,
+      exportRate: results.tariffModel?.exportRate || null,
+      sourceDate: results.tariffModel?.sourceDate || null,
+      sourceLabel: results.tariffModel?.sourceLabel || null
+    },
+    approval: gov.approval || null,
+    governance: {
+      proposal: gov,
+      quoteReadiness: results.quoteReadiness || null,
+      tariffSource: results.tariffSourceGovernance || null,
+      auditLog: Array.isArray(state.auditLog) ? state.auditLog.slice(-100) : []
+    },
+    evidence: results.evidenceGovernance || null,
+    evidenceSummary,
+    ledger: gov.ledger || null,
+    revision: gov.revision || null,
+    blockers: results.quoteReadiness?.blockers || []
+  };
+}

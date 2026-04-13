@@ -29,6 +29,10 @@ import { initRoofDrawing } from './roof-geometry.js';
 import { toggleOSMShadow, refreshOSMShadowAnalysis } from './osm-shadow.js';
 import { initBomBuilder, selectBomItem } from './bom.js';
 import { initExchangeRateService, refreshExchangeRate, setManualUsdTryRate, convertTry } from './exchange-rate.js';
+import { appendAuditEntry } from './audit-log.js';
+import { attachEvidenceFile } from './evidence-files.js';
+import { canApproveProposal, normalizeUserIdentity } from './identity.js';
+import { loadProposalState, saveProposalState } from './storage.js';
 
 // ── Global data referansı ────────────────────────────────────────────────────
 window._appData = { PANEL_TYPES, BATTERY_MODELS, COMPASS_DIRS, INVERTER_TYPES, MONTHS, HEAT_PUMP_DATA, EV_MODELS };
@@ -89,14 +93,20 @@ window.state = {
   tariffType: 'residential',
   tariffMode: 'auto',
   tariffRegime: 'auto',
+  exportSettlementMode: 'auto',
+  previousYearConsumptionKwh: null,
+  currentYearConsumptionKwh: null,
+  sellableExportCapKwh: null,
+  expenseEscalationRate: 0.10,
   contractedPowerKw: 10,
   contractedTariff: 7.16,
   skttTariff: 7.16,
-  exportTariff: 7.16,
+  exportTariff: 0,
   annualPriceIncrease: 0.12,
   discountRate: 0.18,
   tariffIncludesTax: true,
   tariffSourceDate: '2026-04-12',
+  tariffSourceCheckedAt: '2026-04-13',
   // Kirlenme
   soilingFactor: 3,
   // Bakım & İşletme
@@ -108,6 +118,50 @@ window.state = {
   bomItems: [],
   bomSelection: {},
   bomTotals: null,
+  bomCommercials: {
+    marginRate: 0.18,
+    contingencyRate: 0.05,
+    supplierQuoteState: 'not-requested',
+    supplierQuoteRef: '',
+    supplierQuoteDate: null,
+    supplierQuoteValidUntil: null
+  },
+  evidence: {
+    customerBill: { type: 'customerBill', status: 'missing', ref: '', checkedAt: null },
+    supplierQuote: { type: 'supplierQuote', status: 'missing', ref: '', issuedAt: null, validUntil: null },
+    tariffSource: { type: 'tariffSource', status: 'verified', ref: 'EPDK/SKTT-2026-local', checkedAt: '2026-04-13', sourceUrl: 'https://www.epdk.gov.tr/Detay/Icerik/16-38/son-kaynak-tedarik-tarifesi-sktt-ile-ilgili-bil' },
+    regulationSource: { type: 'regulationSource', status: 'verified', ref: 'TR-REG-2026.04.13', checkedAt: '2026-04-13', sourceUrl: 'https://www.epdk.gov.tr/detay/icerik/3-0-0-1160/elektrik-piyasasinda-lisanssiz-elektrik-uretimi-' },
+    gridApplication: { type: 'gridApplication', status: 'missing', ref: '', checkedAt: null }
+  },
+  financing: {
+    principal: null,
+    downPayment: 0,
+    annualRate: 0.35,
+    termYears: 5
+  },
+  maintenanceContract: {
+    baseRate: 0.015,
+    escalationRate: 0.10,
+    includeMonitoring: true,
+    includeCleaning: true,
+    contractStatus: 'not-offered'
+  },
+  gridApplicationChecklist: null,
+  proposalApproval: {
+    state: 'draft',
+    approvedBy: '',
+    approvedAt: null,
+    updatedBy: 'local-user',
+    approvalRecord: null,
+    history: []
+  },
+  proposalRevisions: [],
+  userIdentity: {
+    id: 'local-sales',
+    name: 'local-user',
+    role: 'sales'
+  },
+  auditLog: [],
   // Faz B
   billAnalysisEnabled: false,
   monthlyConsumption: null,
@@ -120,8 +174,30 @@ window.state = {
   heatPump: null,
   // Faz D
   taxEnabled: false,
-  tax: null
+  tax: null,
+  hasSignedCustomerBillData: false,
+  quoteInputsVerified: false,
+  quoteReadyApproved: false
 };
+
+const persistedProposal = !window.location.hash ? loadProposalState() : null;
+if (persistedProposal?.state) {
+  Object.assign(window.state, persistedProposal.state, { results: null, step: 1 });
+}
+
+function persistState() {
+  saveProposalState(window.state);
+}
+
+function currentUser() {
+  window.state.userIdentity = normalizeUserIdentity(window.state.userIdentity || {});
+  return window.state.userIdentity;
+}
+
+function auditAndPersist(action, details = {}) {
+  appendAuditEntry(window.state, action, details, currentUser());
+  persistState();
+}
 
 // ═══════════════════════════════════════════════════════════
 // MAP INIT
@@ -300,6 +376,7 @@ function isInTurkey(lat, lon) {
 // AUTOCOMPLETE
 // ═══════════════════════════════════════════════════════════
 let acIndex = -1;
+let lastTariffAuditSnapshot = null;
 document.addEventListener('DOMContentLoaded', () => {
   try { initMap(); } catch(e) {
     console.error('initMap hatası:', e);
@@ -310,6 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
   buildCompass();
   buildInverterCards();
   loadFromHash();
+  syncEnterpriseInputsFromState();
   updateDashboard();
   // BOM builder ilk açılışta initBomBuilder() ile başlatılır (HTML onclick)
 
@@ -514,7 +592,7 @@ function updateTariffType(type) {
     const contractEl = document.getElementById('contracted-tariff-input');
     if (skttEl) skttEl.value = window.state.skttTariff;
     if (contractEl) contractEl.value = window.state.contractedTariff;
-    window.state.exportTariff = window.state.tariff;
+    window.state.exportTariff = 0;
     const exportEl = document.getElementById('export-tariff-input');
     if (exportEl) exportEl.value = window.state.exportTariff;
   }
@@ -523,19 +601,301 @@ function updateTariffType(type) {
 
 function updateTariffAssumptions() {
   const s = window.state;
-  s.tariff = parseFloat(document.getElementById('tariff-input')?.value) || s.tariff || 7.16;
-  s.exportTariff = parseFloat(document.getElementById('export-tariff-input')?.value) || s.tariff;
+  const readNumber = (id, fallback) => {
+    const raw = document.getElementById(id)?.value;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  s.tariff = readNumber('tariff-input', s.tariff || 7.16);
+  s.exportTariff = readNumber('export-tariff-input', s.exportTariff ?? 0);
   s.tariffRegime = document.getElementById('tariff-regime')?.value || s.tariffRegime || 'auto';
   s.tariffMode = s.tariffRegime;
-  s.contractedPowerKw = parseFloat(document.getElementById('contracted-power-input')?.value) || s.contractedPowerKw || 0;
-  s.contractedTariff = parseFloat(document.getElementById('contracted-tariff-input')?.value) || s.tariff;
-  s.skttTariff = parseFloat(document.getElementById('sktt-tariff-input')?.value) || s.tariff;
-  s.usdToTry = parseFloat(document.getElementById('usd-try-input')?.value) || s.usdToTry || 38.5;
+  s.exportSettlementMode = document.getElementById('export-settlement-mode')?.value || s.exportSettlementMode || 'auto';
+  s.contractedPowerKw = readNumber('contracted-power-input', s.contractedPowerKw || 0);
+  s.contractedTariff = readNumber('contracted-tariff-input', s.contractedTariff ?? s.tariff);
+  s.skttTariff = readNumber('sktt-tariff-input', s.skttTariff ?? s.tariff);
+  s.previousYearConsumptionKwh = readNumber('previous-year-consumption-input', s.previousYearConsumptionKwh ?? 0);
+  s.currentYearConsumptionKwh = readNumber('current-year-consumption-input', s.currentYearConsumptionKwh ?? 0);
+  s.sellableExportCapKwh = readNumber('sellable-export-cap-input', s.sellableExportCapKwh ?? 0);
+  s.usdToTry = readNumber('usd-try-input', s.usdToTry || 38.5);
   s.displayCurrency = document.getElementById('display-currency')?.value || s.displayCurrency || 'TRY';
-  s.annualPriceIncrease = (parseFloat(document.getElementById('price-increase-input')?.value) || 0) / 100;
-  s.discountRate = (parseFloat(document.getElementById('discount-rate-input')?.value) || 0) / 100;
+  s.annualPriceIncrease = readNumber('price-increase-input', 12) / 100;
+  s.discountRate = readNumber('discount-rate-input', 18) / 100;
+  s.expenseEscalationRate = readNumber('expense-escalation-input', 10) / 100;
   s.tariffIncludesTax = document.getElementById('tariff-tax-included')?.checked ?? true;
+  s.hasSignedCustomerBillData = document.getElementById('quote-bill-verified')?.checked ?? false;
+  s.quoteInputsVerified = document.getElementById('quote-inputs-verified')?.checked ?? false;
+  s.quoteReadyApproved = document.getElementById('quote-ready-approved')?.checked ?? false;
   s.tariffSourceDate = document.getElementById('tariff-source-date')?.value || '2026-04-12';
+  s.tariffSourceCheckedAt = document.getElementById('tariff-source-checked-at')?.value || s.tariffSourceDate;
+  s.evidence = {
+    ...(s.evidence || {}),
+    customerBill: {
+      ...(s.evidence?.customerBill || {}),
+      status: document.getElementById('bill-evidence-status')?.value || (s.hasSignedCustomerBillData ? 'verified' : 'missing'),
+      ref: document.getElementById('bill-evidence-ref')?.value || s.evidence?.customerBill?.ref || '',
+      checkedAt: document.getElementById('bill-evidence-date')?.value || s.evidence?.customerBill?.checkedAt || null
+    },
+    tariffSource: {
+      ...(s.evidence?.tariffSource || {}),
+      status: document.getElementById('tariff-evidence-status')?.value || s.evidence?.tariffSource?.status || 'missing',
+      ref: document.getElementById('tariff-evidence-ref')?.value || s.evidence?.tariffSource?.ref || 'manual-tariff',
+      checkedAt: s.tariffSourceCheckedAt,
+      sourceUrl: document.getElementById('tariff-evidence-url')?.value || s.evidence?.tariffSource?.sourceUrl || ''
+    }
+  };
+  const snapshot = JSON.stringify({
+    tariff: s.tariff,
+    tariffType: s.tariffType,
+    tariffRegime: s.tariffRegime,
+    exportTariff: s.exportTariff,
+    sourceCheckedAt: s.tariffSourceCheckedAt,
+    billEvidence: s.evidence.customerBill?.status,
+    tariffEvidence: s.evidence.tariffSource?.status
+  });
+  if (lastTariffAuditSnapshot && lastTariffAuditSnapshot !== snapshot) {
+    appendAuditEntry(s, 'assumptions.tariff_updated', {
+      tariff: s.tariff,
+      tariffType: s.tariffType,
+      tariffRegime: s.tariffRegime,
+      exportTariff: s.exportTariff,
+      sourceCheckedAt: s.tariffSourceCheckedAt
+    }, currentUser());
+  }
+  lastTariffAuditSnapshot = snapshot;
+  persistState();
+}
+
+function updateProposalGovernanceInput() {
+  const s = window.state;
+  const numPct = (id, fallback) => {
+    const n = Number(document.getElementById(id)?.value);
+    return Number.isFinite(n) ? n / 100 : fallback;
+  };
+  updateUserIdentityInput();
+  const requestedApprovalState = document.getElementById('proposal-approval-state')?.value || s.proposalApproval?.state || 'draft';
+  const previousApprovalState = s.proposalApproval?.state || 'draft';
+  const existingApprovalRecord = s.proposalApproval?.approvalRecord || null;
+  s.proposalApproval = {
+    ...(s.proposalApproval || {}),
+    state: requestedApprovalState,
+    approvedBy: document.getElementById('proposal-approved-by')?.value || s.proposalApproval?.approvedBy || '',
+    updatedBy: s.userIdentity?.name || s.proposalApproval?.updatedBy || 'local-user',
+    approvalRecord: existingApprovalRecord
+  };
+  if (requestedApprovalState === 'approved' && !existingApprovalRecord && canApproveProposal(s.userIdentity)) {
+    const approvedAt = new Date().toISOString();
+    const approvedBy = s.proposalApproval.approvedBy || `${s.userIdentity.name} (${s.userIdentity.role})`;
+    s.proposalApproval.approvedBy = approvedBy;
+    s.proposalApproval.approvedAt = approvedAt;
+    s.proposalApproval.approvalRecord = {
+      id: `approval-${Date.now()}`,
+      state: 'approved',
+      approvedBy,
+      approvedAt,
+      user: { ...s.userIdentity },
+      immutable: true
+    };
+    appendAuditEntry(s, 'approval.created', { approvedBy, approvedAt }, s.userIdentity);
+  } else if (requestedApprovalState === 'approved' && !canApproveProposal(s.userIdentity) && !existingApprovalRecord) {
+    window.showToast?.('Onay için approver/admin rolü gerekli.', 'error');
+    appendAuditEntry(s, 'approval.blocked_role', { requestedBy: s.userIdentity?.name, role: s.userIdentity?.role }, s.userIdentity);
+  } else if (requestedApprovalState === 'approved' && existingApprovalRecord) {
+    if (s.proposalApproval.approvedBy !== existingApprovalRecord.approvedBy) {
+      appendAuditEntry(s, 'approval.immutable_edit_blocked', {
+        attemptedApprovedBy: s.proposalApproval.approvedBy,
+        retainedApprovedBy: existingApprovalRecord.approvedBy
+      }, s.userIdentity);
+    }
+    s.proposalApproval.approvedBy = existingApprovalRecord.approvedBy;
+    s.proposalApproval.approvedAt = existingApprovalRecord.approvedAt;
+  } else if (previousApprovalState !== requestedApprovalState) {
+    appendAuditEntry(s, 'approval.state_changed', { from: previousApprovalState, to: requestedApprovalState }, s.userIdentity);
+  }
+  s.bomCommercials = {
+    ...(s.bomCommercials || {}),
+    marginRate: numPct('bom-margin-rate', s.bomCommercials?.marginRate ?? 0.18),
+    contingencyRate: numPct('bom-contingency-rate', s.bomCommercials?.contingencyRate ?? 0.05),
+    supplierQuoteState: document.getElementById('supplier-quote-state')?.value || s.bomCommercials?.supplierQuoteState || 'not-requested',
+    supplierQuoteRef: document.getElementById('supplier-quote-ref')?.value || s.bomCommercials?.supplierQuoteRef || '',
+    supplierQuoteDate: document.getElementById('supplier-quote-date')?.value || s.bomCommercials?.supplierQuoteDate || null,
+    supplierQuoteValidUntil: document.getElementById('supplier-quote-valid-until')?.value || s.bomCommercials?.supplierQuoteValidUntil || null
+  };
+  s.evidence = {
+    ...(s.evidence || {}),
+    supplierQuote: {
+      ...(s.evidence?.supplierQuote || {}),
+      status: s.bomCommercials.supplierQuoteState === 'received' ? 'verified' : s.bomCommercials.supplierQuoteState,
+      ref: s.bomCommercials.supplierQuoteRef,
+      issuedAt: s.bomCommercials.supplierQuoteDate,
+      validUntil: s.bomCommercials.supplierQuoteValidUntil
+    }
+  };
+  s.financing = {
+    ...(s.financing || {}),
+    annualRate: numPct('loan-annual-rate', s.financing?.annualRate ?? 0.35),
+    termYears: Number(document.getElementById('loan-term-years')?.value) || s.financing?.termYears || 5
+  };
+  s.maintenanceContract = {
+    ...(s.maintenanceContract || {}),
+    contractStatus: document.getElementById('maintenance-contract-status')?.value || s.maintenanceContract?.contractStatus || 'not-offered'
+  };
+  if (document.getElementById('grid-checklist-complete')?.checked) {
+    const labels = {
+      bill: 'Son 12 aylık tüketim/fatura kanıtı',
+      titleOrLease: 'Tapu/kira ve kullanım hakkı evrakı',
+      connectionOpinion: 'Dağıtım şirketi bağlantı görüşü',
+      singleLine: 'Tek hat şeması',
+      staticReview: 'Statik uygunluk/taşıyıcı sistem kontrolü',
+      layout: 'Çatı yerleşim planı',
+      inverterDocs: 'İnverter/panel teknik dokümanları',
+      metering: 'Sayaç/mahsuplaşma gereksinimleri'
+    };
+    s.gridApplicationChecklist = Object.fromEntries(Object.entries(labels).map(([key, label]) => [key, { label, done: true, evidence: 'manual-confirmation' }]));
+    s.evidence = {
+      ...(s.evidence || {}),
+      gridApplication: {
+        ...(s.evidence?.gridApplication || {}),
+        status: 'verified',
+        ref: 'grid-checklist-manual',
+        checkedAt: new Date().toISOString().slice(0, 10)
+      }
+    };
+  }
+  appendAuditEntry(s, 'proposal.governance_updated', {
+    approvalState: s.proposalApproval.state,
+    supplierQuoteState: s.bomCommercials.supplierQuoteState,
+    maintenanceContract: s.maintenanceContract.contractStatus
+  }, s.userIdentity);
+  persistState();
+  if (s.results) window.renderResults?.();
+}
+
+function updateUserIdentityInput() {
+  const s = window.state;
+  s.userIdentity = normalizeUserIdentity({
+    ...(s.userIdentity || {}),
+    name: document.getElementById('user-name-input')?.value || s.userIdentity?.name || 'local-user',
+    role: document.getElementById('user-role-input')?.value || s.userIdentity?.role || 'sales'
+  });
+  persistState();
+}
+
+function syncEnterpriseInputsFromState() {
+  const s = window.state;
+  const setVal = (id, value) => {
+    const el = document.getElementById(id);
+    if (el && value !== undefined && value !== null) el.value = value;
+  };
+  const setChecked = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.checked = !!value;
+  };
+  setVal('city-search', s.cityName || '');
+  setVal('roof-area', s.roofArea || '');
+  setVal('tariff-type', s.tariffType);
+  setVal('tariff-regime', s.tariffRegime);
+  setVal('tariff-input', s.tariff);
+  setVal('sktt-tariff-input', s.skttTariff);
+  setVal('contracted-tariff-input', s.contractedTariff);
+  setVal('contracted-power-input', s.contractedPowerKw);
+  setVal('export-tariff-input', s.exportTariff);
+  setVal('export-settlement-mode', s.exportSettlementMode);
+  setVal('previous-year-consumption-input', s.previousYearConsumptionKwh ?? 0);
+  setVal('current-year-consumption-input', s.currentYearConsumptionKwh ?? 0);
+  setVal('sellable-export-cap-input', s.sellableExportCapKwh ?? 0);
+  setVal('price-increase-input', Math.round((s.annualPriceIncrease ?? 0.12) * 100));
+  setVal('discount-rate-input', Math.round((s.discountRate ?? 0.18) * 100));
+  setVal('expense-escalation-input', Math.round((s.expenseEscalationRate ?? 0.10) * 100));
+  setVal('tariff-source-date', s.tariffSourceDate);
+  setVal('tariff-source-checked-at', s.tariffSourceCheckedAt);
+  setVal('tariff-evidence-status', s.evidence?.tariffSource?.status);
+  setVal('tariff-evidence-ref', s.evidence?.tariffSource?.ref);
+  setVal('tariff-evidence-url', s.evidence?.tariffSource?.sourceUrl);
+  setVal('display-currency', s.displayCurrency);
+  setVal('usd-try-input', s.usdToTry);
+  setChecked('tariff-tax-included', s.tariffIncludesTax);
+  setChecked('quote-bill-verified', s.hasSignedCustomerBillData);
+  setVal('bill-evidence-ref', s.evidence?.customerBill?.ref);
+  setVal('bill-evidence-date', s.evidence?.customerBill?.checkedAt);
+  setVal('bill-evidence-status', s.evidence?.customerBill?.status);
+  setVal('user-name-input', s.userIdentity?.name);
+  setVal('user-role-input', s.userIdentity?.role);
+  setVal('proposal-approval-state', s.proposalApproval?.state);
+  setVal('proposal-approved-by', s.proposalApproval?.approvedBy);
+  setVal('bom-margin-rate', Math.round((s.bomCommercials?.marginRate ?? 0.18) * 100));
+  setVal('bom-contingency-rate', Math.round((s.bomCommercials?.contingencyRate ?? 0.05) * 100));
+  setVal('supplier-quote-state', s.bomCommercials?.supplierQuoteState);
+  setVal('supplier-quote-ref', s.bomCommercials?.supplierQuoteRef);
+  setVal('supplier-quote-date', s.bomCommercials?.supplierQuoteDate);
+  setVal('supplier-quote-valid-until', s.bomCommercials?.supplierQuoteValidUntil);
+  setVal('loan-annual-rate', Math.round((s.financing?.annualRate ?? 0.35) * 100));
+  setVal('loan-term-years', s.financing?.termYears);
+  setVal('maintenance-contract-status', s.maintenanceContract?.contractStatus);
+  setChecked('quote-inputs-verified', s.quoteInputsVerified);
+  setChecked('quote-ready-approved', s.quoteReadyApproved);
+  if (window.map && s.lat && s.lon) window.map.setView([s.lat, s.lon], 9);
+  if (window.marker && s.lat && s.lon) window.marker.setLatLng([s.lat, s.lon]);
+  if (s.cityName && document.getElementById('selected-loc-text')) {
+    document.getElementById('selected-loc-text').textContent =
+      `${s.cityName} — ${Number(s.lat || 0).toFixed(4)}°K, ${Number(s.lon || 0).toFixed(4)}°D (GHI: ${s.ghi || '—'})`;
+  }
+  renderEvidenceFileStatus();
+}
+
+function renderEvidenceFileStatus() {
+  const rows = ['customerBill', 'supplierQuote', 'tariffSource'].map(type => {
+    const files = window.state.evidence?.[type]?.files || [];
+    const latest = files[files.length - 1];
+    return `${type}: ${latest ? `${latest.name} · ${Math.round((latest.size || 0) / 1024)} KB · ${String(latest.sha256 || '').slice(0, 12)}` : 'dosya yok'}`;
+  });
+  const el = document.getElementById('evidence-file-status');
+  if (el) el.textContent = rows.join(' | ');
+}
+
+async function attachEvidenceFromInput(type, input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  try {
+    const result = await attachEvidenceFile(window.state, type, file, currentUser());
+    if (!result.ok) {
+      window.showToast?.(result.errors.join(' '), 'error');
+      return;
+    }
+    if (type === 'customerBill') {
+      const refEl = document.getElementById('bill-evidence-ref');
+      const dateEl = document.getElementById('bill-evidence-date');
+      const statusEl = document.getElementById('bill-evidence-status');
+      if (refEl) refEl.value = result.metadata.name;
+      if (dateEl) dateEl.value = result.metadata.attachedAt.slice(0, 10);
+      if (statusEl) statusEl.value = 'verified';
+      window.state.hasSignedCustomerBillData = true;
+      const billVerified = document.getElementById('quote-bill-verified');
+      if (billVerified) billVerified.checked = true;
+    }
+    if (type === 'supplierQuote') {
+      const refEl = document.getElementById('supplier-quote-ref');
+      const stateEl = document.getElementById('supplier-quote-state');
+      if (refEl) refEl.value = result.metadata.name;
+      if (stateEl) stateEl.value = 'received';
+      window.state.bomCommercials = { ...(window.state.bomCommercials || {}), supplierQuoteState: 'received', supplierQuoteRef: result.metadata.name };
+    }
+    if (type === 'tariffSource') {
+      const refEl = document.getElementById('tariff-evidence-ref');
+      const statusEl = document.getElementById('tariff-evidence-status');
+      if (refEl) refEl.value = result.metadata.name;
+      if (statusEl) statusEl.value = 'verified';
+    }
+    updateTariffAssumptions();
+    updateProposalGovernanceInput();
+    renderEvidenceFileStatus();
+    persistState();
+    window.showToast?.('Kanıt dosyası eklendi ve parmak izi kaydedildi.', 'success');
+  } catch (error) {
+    window.showToast?.(`Kanıt dosyası kaydedilemedi: ${error.message}`, 'error');
+  } finally {
+    if (input) input.value = '';
+  }
 }
 
 function positionRangeThumb(sliderId, valId, min, max) {
@@ -1016,8 +1376,8 @@ if ('serviceWorker' in navigator) {
 }
 
 window.addEventListener('load', () => {
-  updateTilt(33);
-  updateShading(10);
+  updateTilt(window.state.tilt ?? 33);
+  updateShading(window.state.shadingFactor ?? 10);
   setTimeout(() => {
     positionRangeThumb('tilt-slider','tilt-val',0,90);
     positionRangeThumb('shading-slider','shading-val',0,50);
@@ -1036,6 +1396,10 @@ window.updateShading = updateShading;
 window.updateSoiling = updateSoiling;
 window.updateTariffType = updateTariffType;
 window.updateTariffAssumptions = updateTariffAssumptions;
+window.updateProposalGovernanceInput = updateProposalGovernanceInput;
+window.updateUserIdentityInput = updateUserIdentityInput;
+window.attachEvidenceFromInput = attachEvidenceFromInput;
+window.persistProposalState = persistState;
 window.updateConsumption = updateConsumption;
 window.positionRangeThumb = positionRangeThumb;
 window.buildCompass = buildCompass;

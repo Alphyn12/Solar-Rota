@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "start": "npx serve . -l 3000 --no-clipboard",
-    "test": "node tests/calc-core.test.mjs && node tests/calc-regression.test.mjs && node tests/advanced-features.test.mjs && node tests/currency-i18n.test.mjs && node tests/security-state.test.mjs",
+    "test": "node tests/calc-core.test.mjs && node tests/calc-regression.test.mjs && node tests/advanced-features.test.mjs && node tests/currency-i18n.test.mjs && node tests/security-state.test.mjs && node tests/turkey-regulation.test.mjs && node tests/proposal-governance.test.mjs && node tests/evidence-governance.test.mjs && node tests/enterprise-governance.test.mjs",
     "test:usd": "python tests/playwright-usd-smoke.py",
     "test:i18n": "python tests/playwright-i18n-smoke.py",
     "check": "node tests/syntax-check.mjs"

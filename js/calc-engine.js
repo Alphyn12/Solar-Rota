@@ -14,6 +14,9 @@ import {
   getMonthlyLoadKwh, buildBaseHourlyLoad8760, simulateBatteryOnHourlySummary,
   simulateHourlyEnergy, sumMonthlyArrays
 } from './calc-core.js';
+import { buildQuoteReadiness } from './turkey-regulation.js';
+import { buildProposalGovernance } from './proposal-governance.js';
+import { buildEvidenceRegistry, buildTariffSourceGovernance } from './evidence-governance.js';
 
 const LOADING_MSGS = [
   "PVGIS'ten güneş ışınım verisi alınıyor...",
@@ -67,7 +70,7 @@ function classifyOutputConfidence({ usedFallback, warnings = [], state }) {
   if (!state?.roofGeometry) blocking.push('Çatı geometrisi saha keşfiyle doğrulanmadı.');
   if (state?.osmShadowEnabled && !state?.osmShadow?.buildings) blocking.push('OSM gölge analizi doğrulanmış bina verisi içermiyor.');
   if (warnings.length) blocking.push(...warnings.slice(0, 5));
-  if (state?.quoteReadyApproved === true && !usedFallback && blocking.length === 0) {
+  if (state?.quoteReadyApproved === true && state?.quoteInputsVerified === true && !usedFallback && blocking.length === 0) {
     return { level: 'quote-ready', label: 'quote-ready', blockers: [] };
   }
   if (!usedFallback && blocking.length <= 2) {
@@ -104,7 +107,9 @@ export function calculateBatteryMetrics(annualEnergy, dailyConsumption, battery)
   };
 }
 
-export function calculateNMMetrics(annualEnergy, systemPower, dailyConsumption, tariff, annualPriceIncrease, usdToTry, hourlySummary = null, batterySummary = null) {
+export function calculateNMMetrics(annualEnergy, systemPower, dailyConsumption, tariffModelOrRate, annualPriceIncrease, usdToTry, hourlySummary = null, batterySummary = null) {
+  const tariffModel = typeof tariffModelOrRate === 'object' ? tariffModelOrRate : null;
+  const tariff = tariffModel ? tariffModel.exportRate : tariffModelOrRate;
   const annualConsumption = hourlySummary?.annualLoad ?? dailyConsumption * 365;
   const selfConsumedEnergy = batterySummary?.totalSelfConsumption ?? hourlySummary?.selfConsumption ?? Math.min(annualConsumption, annualEnergy);
   const selfConsumptionRatio = annualEnergy > 0 ? Math.min(selfConsumedEnergy / annualEnergy, 1.0) : 0;
@@ -124,8 +129,11 @@ export function calculateNMMetrics(annualEnergy, systemPower, dailyConsumption, 
     selfConsumedEnergy: Math.round(selfConsumedEnergy),
     selfConsumptionPct: (selfConsumptionRatio * 100).toFixed(1),
     isLicenseFree: true,
-    systemType: 'Lisanssız Üretim — Saatlik mahsuplaşma ve ihracat sınırı',
-    settlementMode: hourlySummary ? 'Saatlik profil tabanlı' : 'Yıllık fallback oranı'
+    systemType: tariffModel?.exportCompensationPolicy?.interval === 'hourly'
+      ? 'Lisanssız Üretim — Saatlik mahsuplaşma + yıllık tüketim ihracat sınırı'
+      : 'Lisanssız Üretim — Aylık mahsuplaşma + tüketim ihracat sınırı',
+    settlementMode: tariffModel?.exportCompensationPolicy?.interval || (hourlySummary ? 'hourly-profile' : 'annual-fallback'),
+    exportPolicy: tariffModel?.exportCompensationPolicy || null
   };
 }
 
@@ -400,14 +408,22 @@ export async function runCalculation() {
 
   const hourlySummaryRaw = simulateHourlyEnergy(monthlyData, monthlyLoad, {
     tariffType: state.tariffType,
-    hourlyLoad8760
+    hourlyLoad8760,
+    exportPolicy: tariffModel.exportCompensationPolicy,
+    previousYearConsumptionKwh: state.previousYearConsumptionKwh,
+    currentYearConsumptionKwh: state.currentYearConsumptionKwh,
+    sellableExportCapKwh: state.sellableExportCapKwh,
+    settlementDate: state.settlementDate
   });
 
   let bessMetrics = null;
   let batterySummary = null;
   let batteryCostVal = 0;
   if (state.batteryEnabled) {
-    batterySummary = simulateBatteryOnHourlySummary(hourlySummaryRaw, state.battery, { paidBatteryExportAllowed: false });
+    batterySummary = simulateBatteryOnHourlySummary(hourlySummaryRaw, state.battery, {
+      paidBatteryExportAllowed: false,
+      exportPolicy: tariffModel.exportCompensationPolicy
+    });
     bessMetrics = calculateBatteryMetrics(adjustedEnergy, hourlySummaryRaw.annualLoad / 365, state.battery);
     if (batterySummary) {
       bessMetrics.gridIndependence = (batterySummary.gridIndependence * 100).toFixed(1);
@@ -421,7 +437,7 @@ export async function runCalculation() {
 
   let nmMetrics = calculateNMMetrics(
     adjustedEnergy, systemPower, hourlySummaryRaw.annualLoad / 365,
-    tariffModel.exportRate, annualPriceIncrease, state.usdToTry, hourlySummaryRaw, batterySummary
+    tariffModel, annualPriceIncrease, state.usdToTry, hourlySummaryRaw, batterySummary
   );
   if (!state.netMeteringEnabled) {
     nmMetrics = { ...nmMetrics, annualExportRevenue: 0, systemType: 'Şebeke satışı kapalı — fazla üretim geliri 0 TL' };
@@ -439,6 +455,9 @@ export async function runCalculation() {
   const annualInsurance = state.omEnabled ? Math.round(solarCost * (state.insuranceRate / 100)) : 0;
   const inverterLifetime = invType.lifetime || 12;
   const inverterReplaceCost = state.omEnabled ? Math.round(inverterCost * 1.1) : 0;
+  const batteryModel = BATTERY_MODELS[state.battery?.model];
+  const batteryLifetime = state.batteryEnabled ? (Number(state.battery?.warranty || batteryModel?.warranty) || 10) : 0;
+  const batteryReplaceCost = state.batteryEnabled ? Math.round(batteryCostVal * 0.85) : 0;
 
   const lidFactor = panel.firstYearDeg || 0;
   const financial = computeFinancialTable({
@@ -453,7 +472,9 @@ export async function runCalculation() {
     inverterLifetime,
     inverterReplaceCost,
     netMeteringEnabled: state.netMeteringEnabled,
-    exportRateOverride: exportRate
+    exportRateOverride: exportRate,
+    batteryLifetime,
+    batteryReplaceCost
   });
   const yearlyTable = financial.rows;
   const paybackYear = financial.paybackYear;
@@ -516,7 +537,7 @@ export async function runCalculation() {
     ysp, cf, irr, lcoe,
     tariff, annualPriceIncrease, discountRate, tariffModel,
     yearlyTable,
-    annualOMCost, annualInsurance, inverterReplaceCost, inverterLifetime, totalExpenses25y,
+    annualOMCost, annualInsurance, inverterReplaceCost, inverterLifetime, batteryReplaceCost, batteryLifetime, totalExpenses25y,
     lidFactor: (lidFactor * 100).toFixed(1),
     inverterType: invTypeKey,
     inverterEfficiency: (inverterEfficiencyFactor * 100).toFixed(1),
@@ -533,6 +554,7 @@ export async function runCalculation() {
     pvgisLossParam: PVGIS_LOSS_PARAM,
     displayCurrency: state.displayCurrency || 'TRY',
     usdToTry: state.usdToTry || 38.5,
+    netMeteringEnabled: !!state.netMeteringEnabled,
     calculationMode: usedFallback ? 'fallback-psh' : 'pvgis-live',
     pvgisFailReason: usedFallback ? (window._pvgisLastError || 'unknown') : null,
     hourlySummary: hourlySummaryRaw,
@@ -545,10 +567,24 @@ export async function runCalculation() {
     sectionResults: validSections.length > 1 ? validSections : null
   };
   results.calculationWarnings = detectCalculationWarnings(results);
+  results.evidenceGovernance = buildEvidenceRegistry(state, results);
+  results.tariffSourceGovernance = buildTariffSourceGovernance(tariffModel, results.evidenceGovernance);
+  if (results.tariffSourceGovernance.warning) results.calculationWarnings.push(results.tariffSourceGovernance.warning);
+  results.quoteReadiness = buildQuoteReadiness({ state, results, tariffModel, evidenceGovernance: results.evidenceGovernance });
+  results.proposalGovernance = buildProposalGovernance(state, results);
   const confidence = classifyOutputConfidence({ usedFallback, warnings: results.calculationWarnings, state });
-  results.confidenceLevel = confidence.level;
-  results.confidence = confidence;
+  const proposalLevel = results.proposalGovernance?.confidence?.level;
+  results.confidenceLevel = results.quoteReadiness.status === 'quote-ready' && proposalLevel === 'quote-ready proposal'
+    ? 'quote-ready proposal'
+    : proposalLevel || confidence.level;
+  results.confidence = {
+    ...confidence,
+    score: results.proposalGovernance?.confidence?.score,
+    factors: results.proposalGovernance?.confidence?.factors || confidence.blockers || []
+  };
+  state.proposalRevisions = [results.proposalGovernance.revision, ...(state.proposalRevisions || [])].slice(0, 20);
   window.state.results = results;
+  window.persistProposalState?.();
 
   // Step-4'te mühendis hesap özeti
   if (window.renderEngCalcPanel) window.renderEngCalcPanel();

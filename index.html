@@ -1197,13 +1197,46 @@ input[type=range]::-moz-range-thumb{
         </div>
         <div>
           <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">İhracat / Mahsup Fiyatı (TL/kWh) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Üretip şebekeye sattığınız ya da mahsup ettiğiniz fazla enerji için alınan birim fiyat. Türkiye'de genellikle 2-4 TL/kWh arasındadır. Sıfır girilirse yalnızca öz-tüketim tasarrufu hesaplanır.</span></span></div>
-          <input type="number" id="export-tariff-input" value="7.16" min="0" step="0.01"
+          <input type="number" id="export-tariff-input" value="0" min="0" step="0.01"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:150px;font-size:0.9rem"
+            oninput="updateTariffAssumptions()"/>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Mahsuplaşma Modu</div>
+          <select id="export-settlement-mode" onchange="updateTariffAssumptions()"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;min-width:130px">
+            <option value="auto" selected>Otomatik</option>
+            <option value="hourly">Saatlik</option>
+            <option value="monthly">Aylık</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Önceki Yıl Tüketim (kWh)</div>
+          <input type="number" id="previous-year-consumption-input" value="0" min="0" step="1"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:160px;font-size:0.9rem"
+            oninput="updateTariffAssumptions()"/>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Cari Yıl Tüketim (kWh)</div>
+          <input type="number" id="current-year-consumption-input" value="0" min="0" step="1"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:150px;font-size:0.9rem"
+            oninput="updateTariffAssumptions()"/>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Satılabilir İhracat Sınırı (kWh)</div>
+          <input type="number" id="sellable-export-cap-input" value="0" min="0" step="1"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:175px;font-size:0.9rem"
             oninput="updateTariffAssumptions()"/>
         </div>
         <div>
           <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Yıllık Fiyat Artışı (%) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Elektrik tarifesinin yılda kaç yüzde artacağı tahmini. Son 10 yıl ortalaması %25-40'tır; ileriye dönük muhafazakâr tahmin için %15-20 önerilir. Yüksek artış tahmini geri ödeme süresini kısaltır.</span></span></div>
           <input type="number" id="price-increase-input" value="12" min="-50" max="200" step="1"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:135px;font-size:0.9rem"
+            oninput="updateTariffAssumptions()"/>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Gider Eskalasyonu (%)</div>
+          <input type="number" id="expense-escalation-input" value="10" min="-50" max="200" step="1"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:135px;font-size:0.9rem"
             oninput="updateTariffAssumptions()"/>
         </div>
@@ -1218,6 +1251,40 @@ input[type=range]::-moz-range-thumb{
           <input type="date" id="tariff-source-date" value="2026-04-12"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:150px;font-size:0.9rem"
             oninput="updateTariffAssumptions()"/>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Kaynak Kontrol Tarihi</div>
+          <input type="date" id="tariff-source-checked-at" value="2026-04-13"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:160px;font-size:0.9rem"
+            oninput="updateTariffAssumptions()"/>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Tarife Kanıt Durumu</div>
+          <select id="tariff-evidence-status" onchange="updateTariffAssumptions()"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;min-width:130px">
+            <option value="verified" selected>Doğrulandı</option>
+            <option value="pending">Bekliyor</option>
+            <option value="missing">Eksik</option>
+            <option value="rejected">Reddedildi</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Tarife Kanıt Ref</div>
+          <input type="text" id="tariff-evidence-ref" value="EPDK/SKTT-2026-local"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:175px;font-size:0.9rem"
+            oninput="updateTariffAssumptions()"/>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Tarife Kaynak URL</div>
+          <input type="url" id="tariff-evidence-url" value="https://www.epdk.gov.tr/Detay/Icerik/16-38/son-kaynak-tedarik-tarifesi-sktt-ile-ilgili-bil"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:260px;font-size:0.9rem"
+            oninput="updateTariffAssumptions()"/>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Tarife Kaynak Dosyası</div>
+          <input type="file" id="tariff-evidence-file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv"
+            onchange="attachEvidenceFromInput('tariffSource', this)"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);width:250px;font-size:0.78rem"/>
         </div>
         <div>
           <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Sonuç Para Birimi</div>
@@ -1239,7 +1306,142 @@ input[type=range]::-moz-range-thumb{
       <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-muted);margin-top:8px;cursor:pointer">
         <input type="checkbox" id="tariff-tax-included" checked onchange="updateTariffAssumptions()"> Birim fiyat vergi/dağıtım dahil kabul edilsin
       </label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-muted);cursor:pointer">
+          <input type="checkbox" id="quote-bill-verified" onchange="updateTariffAssumptions()"> Fatura/tüketim verisi doğrulandı
+        </label>
+        <input type="text" id="bill-evidence-ref" placeholder="Fatura kanıt ref / dosya adı" oninput="updateTariffAssumptions()"
+          style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);width:190px;font-size:0.8rem"/>
+        <input type="date" id="bill-evidence-date" onchange="updateTariffAssumptions()"
+          style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);width:145px;font-size:0.8rem"/>
+        <select id="bill-evidence-status" onchange="updateTariffAssumptions()"
+          style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:0.8rem">
+          <option value="missing" selected>Fatura kanıtı eksik</option>
+          <option value="pending">Fatura kanıtı bekliyor</option>
+          <option value="verified">Fatura kanıtı doğrulandı</option>
+        </select>
+        <input type="file" id="bill-evidence-file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv"
+          onchange="attachEvidenceFromInput('customerBill', this)"
+          style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);width:220px;font-size:0.78rem"/>
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-muted);cursor:pointer">
+          <input type="checkbox" id="quote-inputs-verified" onchange="updateTariffAssumptions()"> Teklif varsayımları doğrulandı
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-muted);cursor:pointer">
+          <input type="checkbox" id="quote-ready-approved" onchange="updateTariffAssumptions()"> Quote-ready onayı verildi
+        </label>
+      </div>
+      <div id="evidence-file-status" style="font-size:0.74rem;color:var(--text-muted);margin-top:6px">customerBill: dosya yok | supplierQuote: dosya yok | tariffSource: dosya yok</div>
       <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px" id="tariff-desc">2026 tarife seçimi: mesken yıllık 4.000 kWh, mesken dışı 15.000 kWh SKTT eşiğiyle değerlendirilir. Birim fiyatları faturanızdan doğrulayın.</div>
+    </div>
+
+    <div class="advanced-feature-block" style="margin-bottom:18px">
+      <div class="feature-toggle-head">
+        <div>
+          <div style="font-weight:700;color:var(--text);font-size:0.9rem">Proposal Governance</div>
+          <div style="font-size:0.74rem;color:var(--text-muted)">Onay, marj, finansman ve bakım varsayımları</div>
+        </div>
+      </div>
+      <div class="feature-toggle-body">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:12px">
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Kullanıcı</div>
+            <input type="text" id="user-name-input" value="local-user" placeholder="Ad Soyad" oninput="updateUserIdentityInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:160px;font-size:0.9rem"/>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Rol</div>
+            <select id="user-role-input" onchange="updateUserIdentityInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;min-width:135px">
+              <option value="sales" selected>Sales</option>
+              <option value="engineer">Engineer</option>
+              <option value="approver">Approver</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div style="font-size:0.74rem;color:var(--text-muted);max-width:520px">Onay yalnızca approver/admin rolüyle verilir. Onay kaydı oluşturulduktan sonra sessizce değiştirilemez; yeni revizyon süreci gerekir.</div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Onay Durumu</div>
+            <select id="proposal-approval-state" onchange="updateProposalGovernanceInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;min-width:150px">
+              <option value="draft" selected>Taslak</option>
+              <option value="engineering-review">Mühendislik İncelemesi</option>
+              <option value="finance-review">Finans İncelemesi</option>
+              <option value="approved">Onaylandı</option>
+              <option value="rejected">Reddedildi</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Onaylayan</div>
+            <input type="text" id="proposal-approved-by" placeholder="İsim / rol" oninput="updateProposalGovernanceInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:150px;font-size:0.9rem"/>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">BOM Marjı (%)</div>
+            <input type="number" id="bom-margin-rate" value="18" min="0" max="80" step="1" oninput="updateProposalGovernanceInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:110px;font-size:0.9rem"/>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Risk Payı (%)</div>
+            <input type="number" id="bom-contingency-rate" value="5" min="0" max="50" step="1" oninput="updateProposalGovernanceInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:110px;font-size:0.9rem"/>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Tedarikçi Teklifi</div>
+            <select id="supplier-quote-state" onchange="updateProposalGovernanceInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;min-width:135px">
+              <option value="not-requested" selected>İstenmedi</option>
+              <option value="requested">İstendi</option>
+              <option value="received">Alındı</option>
+              <option value="expired">Süresi Doldu</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Teklif Ref</div>
+            <input type="text" id="supplier-quote-ref" placeholder="SQ-2026-001" oninput="updateProposalGovernanceInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:140px;font-size:0.9rem"/>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Teklif Tarihi</div>
+            <input type="date" id="supplier-quote-date" onchange="updateProposalGovernanceInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:145px;font-size:0.9rem"/>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Teklif Geçerlilik</div>
+            <input type="date" id="supplier-quote-valid-until" onchange="updateProposalGovernanceInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:145px;font-size:0.9rem"/>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Tedarikçi Teklif Dosyası</div>
+            <input type="file" id="supplier-quote-file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv"
+              onchange="attachEvidenceFromInput('supplierQuote', this)"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);width:230px;font-size:0.78rem"/>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Kredi Faizi (%/yıl)</div>
+            <input type="number" id="loan-annual-rate" value="35" min="0" max="200" step="1" oninput="updateProposalGovernanceInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:120px;font-size:0.9rem"/>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Kredi Vadesi (yıl)</div>
+            <input type="number" id="loan-term-years" value="5" min="1" max="20" step="1" oninput="updateProposalGovernanceInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:115px;font-size:0.9rem"/>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Bakım Sözleşmesi</div>
+            <select id="maintenance-contract-status" onchange="updateProposalGovernanceInput()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;min-width:135px">
+              <option value="not-offered" selected>Sunulmadı</option>
+              <option value="offered">Sunuldu</option>
+              <option value="accepted">Kabul Edildi</option>
+            </select>
+          </div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-muted);margin-top:10px;cursor:pointer">
+          <input type="checkbox" id="grid-checklist-complete" onchange="updateProposalGovernanceInput()"> Şebeke başvuru kontrol listesi tamamlandı
+        </label>
+      </div>
     </div>
 
     <!-- Günlük tüketim -->
@@ -1991,6 +2193,14 @@ input[type=range]::-moz-range-thumb{
     <button class="btn btn-secondary" onclick="shareResults()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
       Sonucu Paylaş
+    </button>
+    <button class="btn btn-secondary" onclick="exportProposalHandoff()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Proposal JSON
+    </button>
+    <button class="btn btn-secondary" onclick="exportCrmLead()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5M8 17h8"/></svg>
+      CRM JSON
     </button>
     <button class="btn btn-success" onclick="saveCurrentCalculation()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
