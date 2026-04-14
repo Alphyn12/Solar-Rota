@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gunesHesap-v10';
+const CACHE_NAME = 'gunesHesap-v12';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',
@@ -7,11 +7,14 @@ const STATIC_ASSETS = [
   '/css/components.css',
   '/js/app.js',
   '/js/bill-analysis.js',
+  '/js/backend-config.js',
   '/js/bom.js',
   '/js/cable-loss.js',
   '/js/calc-core.js',
   '/js/calc-engine.js',
+  '/js/calculation-service.js',
   '/js/comparison.js',
+  '/js/consumption-evidence.js',
   '/js/audit-log.js',
   '/js/crm-export.js',
   '/js/dashboard.js',
@@ -28,12 +31,18 @@ const STATIC_ASSETS = [
   '/js/i18n.js',
   '/js/identity.js',
   '/js/inverter.js',
+  '/js/location-validation.js',
   '/js/osm-shadow.js',
+  '/js/pv-engine-contracts.js',
+  '/js/pvlib-bridge.js',
   '/js/proposal-governance.js',
   '/js/roof-geometry.js',
   '/js/satellite-enhance.js',
   '/js/scenarios.js',
+  '/js/scenario-workflows.js',
   '/js/security.js',
+  '/js/solar-art.js',
+  '/js/solar-engine-adapter.js',
   '/js/structural.js',
   '/js/sun-path.js',
   '/js/storage.js',
@@ -45,6 +54,7 @@ const STATIC_ASSETS = [
   '/locales/en.json',
   '/locales/de.json',
   '/fixtures/bom-suppliers.json',
+  '/assets/solar-proposal-mark.svg',
   '/icon-192.svg',
   '/icon-512.svg'
 ];

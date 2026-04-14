@@ -48,6 +48,62 @@ def main():
                     el.dispatchEvent(new Event("input", { bubbles: true }));
                 }""",
             )
+            scenario_state = page.evaluate(
+                """() => {
+                    window.selectScenario("off-grid");
+                    return {
+                        key: window.state.scenarioKey,
+                        batteryEnabled: window.state.batteryEnabled,
+                        netMeteringEnabled: window.state.netMeteringEnabled,
+                        nmDisplay: document.getElementById("nm-block").style.display,
+                        summary: document.getElementById("scenario-selected-summary").innerText
+                    };
+                }"""
+            )
+            assert scenario_state["key"] == "off-grid", scenario_state
+            assert scenario_state["batteryEnabled"] is True, scenario_state
+            assert scenario_state["netMeteringEnabled"] is False, scenario_state
+            assert scenario_state["nmDisplay"] == "none", scenario_state
+            assert "Off-Grid" in scenario_state["summary"], scenario_state
+
+            blocked_approval = page.evaluate(
+                """() => {
+                    document.getElementById("user-role-input").value = "approver";
+                    document.getElementById("proposal-approval-state").value = "approved";
+                    window.updateProposalGovernanceInput();
+                    return {
+                        state: window.state.proposalApproval.state,
+                        hasRecord: !!window.state.proposalApproval.approvalRecord
+                    };
+                }"""
+            )
+            assert blocked_approval["state"] != "approved", blocked_approval
+            assert blocked_approval["hasRecord"] is False, blocked_approval
+
+            custom_battery = page.evaluate(
+                """() => {
+                    window.onBatteryToggle(true);
+                    window.renderBatteryModels();
+                    window.selectBatteryModel("custom");
+                    document.getElementById("bat-capacity").value = "12.5";
+                    document.getElementById("bat-dod").value = "85";
+                    document.getElementById("bat-eff").value = "93";
+                    window.updateBatteryCustom();
+                    return {
+                        display: document.getElementById("bat-custom-inputs").style.display,
+                        model: window.state.battery.model,
+                        capacity: window.state.battery.capacity,
+                        dod: window.state.battery.dod,
+                        efficiency: window.state.battery.efficiency
+                    };
+                }"""
+            )
+            assert custom_battery["display"] == "block", custom_battery
+            assert custom_battery["model"] == "custom", custom_battery
+            assert custom_battery["capacity"] == 12.5, custom_battery
+            assert round(custom_battery["dod"], 2) == 0.85, custom_battery
+            assert round(custom_battery["efficiency"], 2) == 0.93, custom_battery
+
             page.evaluate(
                 """async () => {
                     Object.assign(window.state, {

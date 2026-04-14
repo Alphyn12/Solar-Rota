@@ -209,7 +209,8 @@ export const MONTH_WEIGHTS = [0.055,0.062,0.085,0.095,0.105,0.115,0.112,0.108,0.
 export const DEFAULT_TARIFFS = {
   residential: 7.16,
   commercial: 8.44,
-  industrial: 6.80
+  industrial: 6.80,
+  agriculture: 5.80
 };
 
 export const TARIFF_META = {
@@ -230,6 +231,12 @@ export const TARIFF_META = {
     sourceLabel: 'EPDK/SKTT 2026 bilgilendirme, kullanıcı manuel TL/kWh girişi',
     sourceDate: '2026-04-12',
     skttLimitKwh: 15000
+  },
+  agriculture: {
+    label: 'Tarımsal Sulama',
+    sourceLabel: 'EPDK tarımsal sulama tarife doğrulaması, kullanıcı manuel TL/kWh girişi',
+    sourceDate: '2026-04-12',
+    skttLimitKwh: null
   },
   custom: {
     label: 'Özel',

@@ -34,6 +34,25 @@ function moneyRate(value, unit = 'kWh') {
   return converted.toLocaleString(ctx.locale, { maximumFractionDigits: ctx.currency === 'USD' ? 3 : 2 }) + ` ${ctx.suffix}/${unit}`;
 }
 
+function engineSummaryText(results = {}, state = window.state || {}) {
+  const source = results.authoritativeEngineSource || results.engineSource || results.backendEngineSource;
+  const label = source?.source || results.calculationMode || 'PVGIS/JS';
+  const quality = source?.engineQuality || source?.confidence || results.confidence?.level || 'medium';
+  const fallback = results.authoritativeEngineFallbackReason || (state.backendEngineAvailable === false ? state.backendEngineLastError : '');
+  return fallback ? `Authoritative engine: ${label} · fallback: ${fallback}` : `Authoritative engine: ${label} · ${quality}`;
+}
+
+function backendEngineText(results = {}, state = window.state || {}) {
+  const source = results.authoritativeEngineSource || results.engineSource || results.backendEngineSource || results.backendEngineResponse?.engineSource;
+  if (source) {
+    const backed = source.pvlibBacked ? 'pvlib-backed' : source.fallbackUsed || results.authoritativeEngineFallbackReason ? 'fallback' : 'primary';
+    const annual = results.authoritativeEngineResponse?.production?.annualEnergyKwh || results.backendEngineResponse?.production?.annualEnergyKwh || results.annualEnergy;
+    const energy = annual ? ` / ${Number(annual).toLocaleString('tr-TR')} kWh/yıl` : '';
+    return `${source.provider || 'engine'} / ${source.source || results.calculationMode || '—'} / ${backed}${energy}`;
+  }
+  return state.backendEngineAvailable === false ? `fallback active / ${state.backendEngineLastError || 'backend unavailable'}` : 'browser calculation active';
+}
+
 export function renderResults() {
   const state = window.state;
   const r = state.results;
@@ -46,6 +65,12 @@ export function renderResults() {
   window.animateCounter('kpi-co2', parseFloat(r.co2Savings), v => v.toFixed(2));
   document.getElementById('kpi-panels-sub').textContent = `${r.panelCount} adet panel`;
   document.getElementById('kpi-tree-sub').textContent = `≈ ${r.trees} ağaç eşdeğeri`;
+  const scenarioLabel = document.getElementById('result-scenario-label');
+  const scenarioFrame = document.getElementById('result-scenario-frame');
+  const engineSource = document.getElementById('result-engine-source');
+  if (scenarioLabel) scenarioLabel.textContent = state.scenarioContext?.label || 'On-Grid';
+  if (scenarioFrame) scenarioFrame.textContent = state.scenarioContext?.resultFrame || 'Grid-connected savings and proposal readiness';
+  if (engineSource) engineSource.textContent = engineSummaryText(r, state);
 
   document.querySelector('#step-5 .kpi-card:nth-child(2) .kpi-unit').textContent =
     (state.displayCurrency === 'USD' ? `USD / ${i18n.t('units.year')}` : `TL / ${i18n.t('units.year')}`);
@@ -77,6 +102,7 @@ export function renderResults() {
 
   const tbody = document.getElementById('tech-table-body');
   tbody.innerHTML = '';
+  const isPvlibAuthoritative = !!r.authoritativeEngineSource?.pvlibBacked;
   const rows = [
     ['Panel Sayısı', r.panelCount + ' adet'],
     ['Panel Tipi', p.name],
@@ -95,12 +121,15 @@ export function renderResults() {
     ['Performans Oranı (PR) <span style="cursor:help;opacity:0.6" title="Gerçek üretimin teorik ideale oranı (%). %75–85 iyi, %85+ mükemmel. Gölge, sıcaklık, kirlenme ve kablo kayıpları bu oranı düşürür.">?</span>', r.pr + '%'],
     ['CO₂ Tasarrufu', r.co2Savings + ' ton/yıl'],
     ['Hesap Metodu', `${r.calculationMode || '—'} / ${r.methodologyVersion || '—'}`],
-    ['PVGIS loss parametresi', `${r.pvgisLossParam ?? 0}%`],
-    ['PVGIS POA', `${r.pvgisPoa || '—'} kWh/m²/yıl`],
+    ['Senaryo', `${state.scenarioContext?.label || state.scenarioKey || 'On-Grid'} / ${state.scenarioContext?.resultFrame || '—'}`],
+    ['Authoritative Engine', backendEngineText(r, state)],
+    ['Fallback Reason', r.authoritativeEngineFallbackReason || '—'],
+    [isPvlibAuthoritative ? 'pvlib irradiance source' : 'PVGIS loss parametresi', isPvlibAuthoritative ? 'Clear-sky + request GHI scaling' : `${r.pvgisLossParam ?? 0}%`],
+    [isPvlibAuthoritative ? 'pvlib POA reference' : 'PVGIS POA', `${r.pvgisPoa || '—'} kWh/m²/yıl`],
     ['Tarife', moneyRate(r.tariff, 'kWh')],
     ['Tarife Rejimi', `${r.tariffModel?.effectiveRegime || '—'} / Sözleşme gücü: ${r.tariffModel?.contractedPowerKw || 0} kW`],
     ['SKTT Limiti', r.tariffModel?.regulation?.limitKwh ? `${Number(r.tariffModel.regulation.limitKwh).toLocaleString('tr-TR')} kWh/yıl` : '—'],
-    ['İhracat Mahsuplaşma', `${r.tariffModel?.exportCompensationPolicy?.interval || '—'} / sınır: ${r.tariffModel?.exportCompensationPolicy?.annualSellableExportCapKwh ? Math.round(r.tariffModel.exportCompensationPolicy.annualSellableExportCapKwh).toLocaleString('tr-TR') + ' kWh/yıl' : '—'}`],
+    ['İhracat Mahsuplaşma', state.netMeteringEnabled ? `${r.tariffModel?.exportCompensationPolicy?.interval || '—'} / sınır: ${r.tariffModel?.exportCompensationPolicy?.annualSellableExportCapKwh ? Math.round(r.tariffModel.exportCompensationPolicy.annualSellableExportCapKwh).toLocaleString('tr-TR') + ' kWh/yıl' : '—'}` : 'Kapalı / bu senaryoda gelir hesabına alınmadı'],
     ['Para Birimi', `${state.displayCurrency || 'TRY'} (USD/TRY: ${Number(state.usdToTry || 38.5).toFixed(2)} | ${state.exchangeRate?.source || 'manual/fallback'})`],
     ['Tarife Kaynak Tarihi', r.tariffModel?.sourceDate || '—'],
     ['Yıllık Fiyat Artışı', ((r.annualPriceIncrease || 0) * 100).toFixed(1) + '%'],
@@ -156,7 +185,7 @@ export function renderResults() {
 
   // Faz B: Fatura analizi sonuçları
   if (r.billAnalysis) renderBillAnalysisResults(r.billAnalysis);
-  else document.getElementById('bill-result-card')?.remove();
+  else { const _bc = document.getElementById('bill-result-card'); if (_bc) _bc.style.display = 'none'; }
 
   // Faz C: EV Şarj sonuçları
   renderEVResults(r.evMetrics);
@@ -193,7 +222,8 @@ function renderBESSResults(bess) {
 function renderNMResults(nm, enabled) {
   const section = document.getElementById('nm-result-section');
   if (!section) return;
-  if (!nm) { section.style.display = 'none'; return; }
+  const scenarioAllowsExport = window.state?.scenarioContext?.visibleBlocks?.netMetering !== false;
+  if (!nm || !enabled || !scenarioAllowsExport) { section.style.display = 'none'; return; }
   section.style.display = 'block';
   document.getElementById('nm-license-badge').textContent = enabled ? nm.systemType : 'Satış kapalı';
   document.getElementById('nm-export-kwh').textContent = `${nm.paidGridExport.toLocaleString('tr-TR')} / ${nm.annualGridExport.toLocaleString('tr-TR')}`;
@@ -282,9 +312,12 @@ function renderWarningsAndAudit(state, r) {
         <tr><td>Konum</td><td>${escapeHtml(state.cityName || '—')} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
         <tr><td>Tarife</td><td>${escapeHtml(r.tariffModel?.type || state.tariffType)} | ${escapeHtml(r.tariffModel?.effectiveRegime || '—')} | ${moneyRate(r.tariff, 'kWh')} | Kaynak: ${escapeHtml(r.tariffModel?.sourceDate || '—')}</td></tr>
         <tr><td>Tüketim</td><td>${Math.round(r.hourlySummary?.annualLoad || state.dailyConsumption * 365).toLocaleString('tr-TR')} kWh/yıl</td></tr>
-        <tr><td>Öz tüketim / İhracat</td><td>${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString('tr-TR')} kWh / ücretli ${Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString('tr-TR')} kWh / toplam ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString('tr-TR')} kWh</td></tr>
+        <tr><td>${state.netMeteringEnabled ? 'Öz tüketim / İhracat' : 'Öz tüketim / Fazla üretim'}</td><td>${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString('tr-TR')} kWh${state.netMeteringEnabled ? ' / ücretli ' + Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString('tr-TR') + ' kWh / toplam ' + Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString('tr-TR') + ' kWh' : ' / ihracat geliri kapalı'}</td></tr>
         <tr><td>Üretim güven aralığı</td><td>Kötü yıl: ${Math.round(r.annualEnergy * 0.90).toLocaleString('tr-TR')} kWh | Baz: ${r.annualEnergy.toLocaleString('tr-TR')} kWh | İyi yıl: ${Math.round(r.annualEnergy * 1.10).toLocaleString('tr-TR')} kWh</td></tr>
         <tr><td>Güven seviyesi</td><td>${escapeHtml(r.confidenceLevel)} (${escapeHtml(r.calculationMode)})</td></tr>
+        <tr><td>Senaryo</td><td>${escapeHtml(state.scenarioContext?.label || state.scenarioKey || 'On-Grid')} | ${escapeHtml(state.scenarioContext?.nextAction || '—')}</td></tr>
+        <tr><td>Authoritative Engine</td><td>${escapeHtml(backendEngineText(r, state))} | ${escapeHtml(r.sourceQualityNote || '—')}</td></tr>
+        <tr><td>Fallback Reason</td><td>${escapeHtml(r.authoritativeEngineFallbackReason || '—')}</td></tr>
         <tr><td>Teklif Hazırlığı</td><td>${escapeHtml(r.quoteReadiness?.status || '—')}${r.quoteReadiness?.blockers?.length ? ' | ' + escapeHtml(r.quoteReadiness.blockers.slice(0, 3).join(' · ')) : ''}</td></tr>
         <tr><td>Regülasyon Motoru</td><td>${escapeHtml(r.quoteReadiness?.version || r.tariffModel?.exportCompensationPolicy?.version || '—')}</td></tr>
         <tr><td>Tarife Kaynak Yönetimi</td><td>${escapeHtml(tariffSource.sourceLabel || '—')} | kontrol yaşı: ${tariffSource.ageDays ?? '—'} gün | ${tariffSource.stale ? 'STALE' : 'güncel'}</td></tr>
@@ -716,7 +749,7 @@ export function downloadTechnicalPDF() {
   y += 8;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text(normalizeTR(`Metodoloji: ${r.methodologyVersion || '—'} | Hesap modu: ${r.calculationMode || '—'} | PVGIS loss=${r.pvgisLossParam ?? '—'}`), marginX, y);
+  doc.text(normalizeTR(`Metodoloji: ${r.methodologyVersion || '—'} | Hesap modu: ${r.calculationMode || '—'} | Engine=${r.authoritativeEngineSource?.source || r.engineSource?.source || '—'}`), marginX, y);
   y += 8;
 
   const lines = reportText

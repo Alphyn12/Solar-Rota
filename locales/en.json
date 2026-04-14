@@ -11,6 +11,23 @@
     "step4": "Calculating",
     "step5": "Results"
   },
+  "hero": {
+    "kicker": "Solar proposal platform",
+    "title": "Unite site, production, finance, and approval in one proposal workspace.",
+    "subtitle": "Choose a scenario and GüneşHesap adjusts assumptions, visible modules, evidence controls, and proposal language.",
+    "proof": {
+      "engineering": "Engineering-grade path",
+      "engineeringText": "PVGIS/JS with a Python backend pilot and pvlib-ready contract.",
+      "governance": "Quote governance",
+      "governanceText": "Evidence, approval, source freshness, and audit controls stay active.",
+      "client": "Client-facing output",
+      "clientText": "Savings, ROI, confidence, and next actions are framed for decisions."
+    }
+  },
+  "scenario": {
+    "title": "Choose the solution scenario first",
+    "subtitle": "The selection changes assumptions, visible modules, results framing, and recommended next steps."
+  },
   "step1": {
     "title": "Select Your Location",
     "subtitle": "Mark your city or choose a point on the map to estimate solar potential in Turkey.",
@@ -101,6 +118,10 @@
   },
   "dashboard": {
     "saved": "Saved Calculations"
+  },
+  "governance": {
+    "title": "Proposal Governance",
+    "subtitle": "Approval, margin, financing, and maintenance assumptions"
   },
   "common": {
     "yes": "Yes",

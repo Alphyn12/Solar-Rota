@@ -41,6 +41,9 @@ export function renderEngReport() {
   const usableArea  = state.roofArea * 0.75;
   const pvgisAzimut = state.azimuth - 180;
   const netEnergy   = r.annualEnergy;
+  const authoritativeSource = r.authoritativeEngineSource || r.engineSource || {};
+  const authoritativeTitle = authoritativeSource.pvlibBacked ? 'Python pvlib-backed production engine' : authoritativeSource.source || r.calculationMode || 'Browser PVGIS/JS engine';
+  const fallbackReason = r.authoritativeEngineFallbackReason || null;
   const maxRef      = r.pvgisRawEnergy || netEnergy;
   const shadingPct  = (r.shadingLoss / maxRef * 100).toFixed(1);
   const tempPct     = (r.tempLossEnergy / maxRef * 100).toFixed(1);
@@ -53,6 +56,19 @@ export function renderEngReport() {
   const gov = r.proposalGovernance || {};
 
   let html = `
+  <div class="eng-section-header">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+    Authoritative Production Engine
+  </div>
+  <div class="formula-card">
+    <div class="formula-title">${escapeHtml(authoritativeTitle)}</div>
+    <div class="formula-body">Engine provider: ${escapeHtml(authoritativeSource.provider || '—')}
+Engine quality: ${escapeHtml(authoritativeSource.engineQuality || authoritativeSource.confidence || '—')}
+Calculation mode: ${escapeHtml(r.authoritativeEngineMode || r.calculationMode || '—')}
+Annual production used downstream: ${fmt(r.annualEnergy)} kWh/yıl
+${fallbackReason ? `Fallback reason: ${escapeHtml(fallbackReason)}` : 'Fallback reason: —'}</div>
+    <div class="formula-note">This report, financial table, audit panel, and proposal export use the same authoritative production source for this calculation run.</div>
+  </div>
   <div class="eng-section-header">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
     1. Panel &amp; Sistem Tasarımı
@@ -94,18 +110,18 @@ E_net = E_AC × (1 − %${cablePct}) = ${fmt(r.annualEnergy)} kWh/yıl` : ''}</d
   <!-- 3. PVGIS -->
   <div class="eng-section-header">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
-    3. PVGIS Veri Girişi
+    3. ${authoritativeSource.pvlibBacked ? 'pvlib Model Zinciri' : 'PVGIS Veri Girişi'}
   </div>
   <div class="formula-card">
-    <div class="formula-title">PVGIS API v5.2 — JRC / EC</div>
-    <div class="formula-body">Endpoint: re.jrc.ec.europa.eu/api/v5_2/PVcalc
+    <div class="formula-title">${authoritativeSource.pvlibBacked ? 'pvlib solar position / POA / temperature / PVWatts MVP' : 'PVGIS API v5.2 — JRC / EC'}</div>
+    <div class="formula-body">${authoritativeSource.pvlibBacked ? 'Backend: FastAPI Python pvlib engine' : 'Endpoint: re.jrc.ec.europa.eu/api/v5_2/PVcalc'}
 lat=${state.lat?.toFixed(4)}  lon=${state.lon?.toFixed(4)}
 peakpower=${r.systemPower.toFixed(2)} kWp   loss=${r.pvgisLossParam ?? 0}%
 angle=${state.tilt}°   aspect=${pvgisAzimut}°  (Güney=0°, Batı=+90°, Doğu=-90°)
 
-PVGIS Brüt Üretim: ${fmt(r.pvgisRawEnergy)} kWh/yıl
+${authoritativeSource.pvlibBacked ? 'pvlib DC/POA referansı' : 'PVGIS Brüt Üretim'}: ${fmt(r.pvgisRawEnergy)} kWh/yıl
 GHI: ${state.ghi} kWh/m²/yıl${r.usedFallback ? '\n⚠ API erişilemedi — PSH tabanlı yerel hesap kullanıldı' : ''}</div>
-    <div class="formula-note">PVGIS çağrısı loss=${r.pvgisLossParam ?? 0}% ile yapılır; gölgelenme, kirlenme, bifacial, inverter ve kablo kayıpları GüneşHesap metodolojisi (${r.methodologyVersion || '—'}) içinde ayrıca uygulanır.</div>
+    <div class="formula-note">${authoritativeSource.pvlibBacked ? 'pvlib MVP yolu güneş pozisyonu, POA transpozisyonu, hücre sıcaklığı ve PVWatts DC hesabını backend tarafında çalıştırır; inverter eğrileri ve AOI kayıpları hâlâ yaklaşık kalır.' : `PVGIS çağrısı loss=${r.pvgisLossParam ?? 0}% ile yapılır; gölgelenme, kirlenme, bifacial, inverter ve kablo kayıpları GüneşHesap metodolojisi (${r.methodologyVersion || '—'}) içinde ayrıca uygulanır.`}</div>
   </div>
 
   <!-- 4. Loss Waterfall -->
@@ -317,7 +333,7 @@ Batarya kurulu maliyet (seçili model varsayımı): ${money(bm.batteryCost)}</di
   }
 
   // ── 9. Saatlik mahsuplaşma ─────────────────────────────────────────────────
-  if (r.nmMetrics) {
+  if (r.nmMetrics && state.netMeteringEnabled) {
     const nm = r.nmMetrics;
     const sectionNum = r.bessMetrics ? 9 : 8;
     html += `

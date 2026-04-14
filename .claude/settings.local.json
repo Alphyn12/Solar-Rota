@@ -14,7 +14,9 @@
       "Bash(python3 -c \" import re with open\\('index.html'\\) as f: content = f.read\\(\\) opens = len\\(re.findall\\(r'<div[^>]*>', content\\)\\) closes = len\\(re.findall\\(r'</div>', content\\)\\) print\\(f'Open divs: {opens}, Close divs: {closes}, Diff: {opens - closes}'\\) \")",
       "Bash(npm start:*)",
       "Bash(find C:\\\\Users\\\\Monster\\\\Desktop\\\\GüneşHesap:*)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Bash(dir \"C:\\\\Users\\\\Monster\\\\Desktop\\\\GüneşHesap\")",
+      "Bash(node_modules/.bin/node --version)"
     ]
   }
 }

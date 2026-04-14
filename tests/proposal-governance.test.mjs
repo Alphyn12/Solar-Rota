@@ -16,6 +16,25 @@ const blockedApproval = buildApprovalWorkflow(
 assert.equal(blockedApproval.state, 'finance-review');
 assert.ok(blockedApproval.blockers.length > 0);
 
+const zeroConsumptionApproval = buildApprovalWorkflow(
+  {
+    proposalApproval: { state: 'approved' },
+    quoteInputsVerified: true,
+    hasSignedCustomerBillData: false,
+    monthlyConsumption: new Array(12).fill(0),
+    userIdentity: { name: 'qa', role: 'approver' },
+    evidence: {
+      customerBill: { status: 'verified' },
+      supplierQuote: { status: 'verified' },
+      tariffSource: { status: 'verified' }
+    },
+    bomCommercials: { supplierQuoteState: 'received' }
+  },
+  { score: 90 }
+);
+assert.equal(zeroConsumptionApproval.state, 'finance-review');
+assert.ok(zeroConsumptionApproval.blockers.some(blocker => blocker.includes('Fatura/tüketim')));
+
 const bom = calculateBomCommercials(100000, {
   bomCommercials: { marginRate: 0.2, contingencyRate: 0.05, supplierQuoteState: 'received' }
 });

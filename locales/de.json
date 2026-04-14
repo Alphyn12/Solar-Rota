@@ -11,6 +11,23 @@
     "step4": "Berechnung",
     "step5": "Ergebnisse"
   },
+  "hero": {
+    "kicker": "Solar-Angebotsplattform",
+    "title": "Standort, Ertrag, Finanzen und Freigabe in einem Angebotsbereich bündeln.",
+    "subtitle": "Wählen Sie ein Szenario; GüneşHesap passt Annahmen, sichtbare Module, Nachweise und Angebotssprache an.",
+    "proof": {
+      "engineering": "Engineering-Pfad",
+      "engineeringText": "PVGIS/JS mit Python-Backend-Pilot und pvlib-fähigem Vertrag.",
+      "governance": "Angebotssteuerung",
+      "governanceText": "Nachweise, Freigaben, Quellenfrische und Auditkontrollen bleiben aktiv.",
+      "client": "Kundenfähige Ausgabe",
+      "clientText": "Einsparung, ROI, Vertrauen und nächste Schritte werden entscheidungsorientiert dargestellt."
+    }
+  },
+  "scenario": {
+    "title": "Zuerst Lösungsszenario wählen",
+    "subtitle": "Die Auswahl ändert Annahmen, sichtbare Module, Ergebnisrahmen und empfohlene nächste Schritte."
+  },
   "step1": {
     "title": "Standort auswählen",
     "subtitle": "Markieren Sie Ihre Stadt oder wählen Sie einen Punkt auf der Karte, um das Solarpotenzial in der Türkei zu schätzen.",
@@ -101,6 +118,10 @@
   },
   "dashboard": {
     "saved": "Gespeicherte Berechnungen"
+  },
+  "governance": {
+    "title": "Angebotssteuerung",
+    "subtitle": "Freigabe-, Margen-, Finanzierungs- und Wartungsannahmen"
   },
   "common": {
     "yes": "Ja",

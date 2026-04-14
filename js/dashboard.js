@@ -3,8 +3,11 @@
 // GüneşHesap v2.0
 // ═══════════════════════════════════════════════════════════
 
+import { clampNumber, escapeHtml } from './security.js';
+
 const MAX_SAVED = 20;
 const STORAGE_KEY = 'guneshesap_saved';
+const MAX_IMPORT_RECORDS = 50;
 
 function money(value) {
   const state = window.state || {};
@@ -24,12 +27,59 @@ function moneyRate(value, unit = 'kWh') {
 
 function getSaved() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.map((record, index) => sanitizeDashboardRecord(record, Date.now() + index)).filter(Boolean).slice(0, MAX_SAVED) : [];
   } catch { return []; }
 }
 
 function setSaved(list) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  const sanitized = Array.isArray(list)
+    ? list.map((record, index) => sanitizeDashboardRecord(record, Date.now() + index)).filter(Boolean).slice(0, MAX_SAVED)
+    : [];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+}
+
+function cleanString(value, maxLen = 120) {
+  return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, '').slice(0, maxLen);
+}
+
+function cleanNumber(value, min = 0, max = 1_000_000_000, fallback = 0) {
+  return clampNumber(value, min, max, fallback);
+}
+
+export function sanitizeDashboardRecord(record, fallbackId = Date.now()) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  const id = Number.isSafeInteger(Number(record.id)) && Number(record.id) > 0
+    ? Number(record.id)
+    : fallbackId;
+  const displayCurrency = record.displayCurrency === 'USD' ? 'USD' : 'TRY';
+  return {
+    id,
+    timestamp: cleanString(record.timestamp || new Date().toLocaleString('tr-TR'), 80),
+    cityName: cleanString(record.cityName || '', 80),
+    systemPower: cleanNumber(record.systemPower, 0, 100000),
+    panelType: cleanString(record.panelType || '', 40),
+    annualEnergy: cleanNumber(record.annualEnergy, 0, 1_000_000_000),
+    totalCost: cleanNumber(record.totalCost, 0, 1_000_000_000_000),
+    paybackYear: cleanNumber(record.paybackYear, 0, 100, 0),
+    roi: cleanNumber(record.roi, -1000, 10000, 0),
+    lcoe: cleanNumber(record.lcoe, 0, 100000, 0),
+    npv: cleanNumber(record.npv, -1_000_000_000_000, 1_000_000_000_000, 0),
+    usdToTry: cleanNumber(record.usdToTry, 0.0001, 10000, 38.5),
+    displayCurrency,
+    tilt: cleanNumber(record.tilt, 0, 90, 0),
+    azimuthName: cleanString(record.azimuthName || '', 40)
+  };
+}
+
+function wireDashboardEvents(body) {
+  body.querySelector('[data-dashboard-action="compare"]')?.addEventListener('click', compareDashboardSelected);
+  body.querySelector('[data-dashboard-action="export"]')?.addEventListener('click', exportSavedRecords);
+  body.querySelector('[data-dashboard-action="clear"]')?.addEventListener('click', clearAllSaved);
+  body.querySelector('[data-dashboard-import]')?.addEventListener('change', event => importSavedRecords(event.target.files?.[0]));
+  body.querySelectorAll('[data-delete-record]').forEach(btn => {
+    btn.addEventListener('click', () => deleteSavedRecord(Number(btn.dataset.deleteRecord)));
+  });
 }
 
 export function saveCurrentCalculation() {
@@ -84,7 +134,8 @@ export function updateDashboard() {
   const saved = getSaved();
   const btn = document.getElementById('dashboard-btn');
   if (btn) {
-    btn.textContent = `Kayıtlı Hesaplar (${saved.length})`;
+    const label = window.i18n?.t?.('dashboard.saved') || 'Kayıtlı Hesaplar';
+    btn.textContent = `${label} (${saved.length})`;
     btn.style.display = saved.length > 0 ? '' : 'none';
   }
 }
@@ -104,12 +155,12 @@ function renderDashboard() {
   body.innerHTML = `
     <div style="margin-bottom:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <span style="font-size:0.85rem;color:var(--text-muted)">Karşılaştırmak için max 3 hesap seçin:</span>
-      <button onclick="compareDashboardSelected()" style="background:var(--primary);color:#000;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:0.82rem;font-weight:600">Karşılaştır</button>
-      <button onclick="exportSavedRecords()" style="background:var(--surface-light);color:var(--text);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.82rem">Dışa Aktar</button>
+      <button data-dashboard-action="compare" style="background:var(--primary);color:#000;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:0.82rem;font-weight:600">Karşılaştır</button>
+      <button data-dashboard-action="export" style="background:var(--surface-light);color:var(--text);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.82rem">Dışa Aktar</button>
       <label style="background:var(--surface-light);color:var(--text);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.82rem">
-        İçe Aktar <input type="file" accept=".json" onchange="importSavedRecords(this.files?.[0])" style="display:none"/>
+        İçe Aktar <input type="file" accept=".json" data-dashboard-import style="display:none"/>
       </label>
-      <button onclick="clearAllSaved()" style="background:var(--surface-light);color:var(--text-muted);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.82rem">Tümünü Sil</button>
+      <button data-dashboard-action="clear" style="background:var(--surface-light);color:var(--text-muted);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.82rem">Tümünü Sil</button>
     </div>
     <div class="dashboard-list">
       ${saved.map(rec => `
@@ -117,24 +168,25 @@ function renderDashboard() {
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div>
               <input type="checkbox" id="dash-chk-${rec.id}" value="${rec.id}" style="margin-right:8px;accent-color:var(--primary)"/>
-              <strong style="color:var(--primary)">${rec.cityName || '—'}</strong>
-              <span style="color:var(--text-muted);font-size:0.78rem;margin-left:8px">${rec.timestamp}</span>
+              <strong style="color:var(--primary)">${escapeHtml(rec.cityName || '—')}</strong>
+              <span style="color:var(--text-muted);font-size:0.78rem;margin-left:8px">${escapeHtml(rec.timestamp)}</span>
             </div>
-            <button onclick="deleteSavedRecord(${rec.id})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem">✕</button>
+            <button data-delete-record="${rec.id}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.85rem">✕</button>
           </div>
           <div class="dashboard-card-metrics">
-            <span>${rec.systemPower?.toFixed(1)} kWp</span>
-            <span>${rec.annualEnergy?.toLocaleString('tr-TR')} kWh/yıl</span>
-            <span>${money(rec.totalCost)}</span>
-            <span>Geri ödeme: ${rec.paybackYear || '>25'} yıl</span>
-            <span>LCOE: ${moneyRate(rec.lcoe, 'kWh')}</span>
-            <span>ROI: ${rec.roi}%</span>
+            <span>${escapeHtml(rec.systemPower.toFixed(1))} kWp</span>
+            <span>${escapeHtml(rec.annualEnergy.toLocaleString('tr-TR'))} kWh/yıl</span>
+            <span>${escapeHtml(money(rec.totalCost))}</span>
+            <span>Geri ödeme: ${escapeHtml(rec.paybackYear || '>25')} yıl</span>
+            <span>LCOE: ${escapeHtml(moneyRate(rec.lcoe, 'kWh'))}</span>
+            <span>ROI: ${escapeHtml(rec.roi)}%</span>
           </div>
         </div>
       `).join('')}
     </div>
     <div id="dashboard-compare-result" style="margin-top:20px"></div>
   `;
+  wireDashboardEvents(body);
 
   updateDashboard();
 }
@@ -172,14 +224,14 @@ export function compareDashboardSelected() {
       <thead>
         <tr>
           <th>Metrik</th>
-          ${selected.map((r, i) => `<th>${r.cityName || 'Hesap ' + (i+1)}</th>`).join('')}
+          ${selected.map((r, i) => `<th>${escapeHtml(r.cityName || 'Hesap ' + (i+1))}</th>`).join('')}
         </tr>
       </thead>
       <tbody>
         ${metrics.map(([label, fn]) => `
           <tr>
-            <td>${label}</td>
-            ${selected.map(r => `<td>${fn(r) || '—'}</td>`).join('')}
+            <td>${escapeHtml(label)}</td>
+            ${selected.map(r => `<td>${escapeHtml(fn(r) || '—')}</td>`).join('')}
           </tr>
         `).join('')}
       </tbody>
@@ -214,11 +266,17 @@ export function importSavedRecords(file) {
   reader.onload = () => {
     try {
       const parsed = JSON.parse(String(reader.result || '{}'));
-      const incoming = Array.isArray(parsed.records) ? parsed.records : [];
+      const incoming = Array.isArray(parsed.records)
+        ? parsed.records.slice(0, MAX_IMPORT_RECORDS).map((record, index) => sanitizeDashboardRecord(record, Date.now() + index)).filter(Boolean)
+        : [];
+      if (!incoming.length) {
+        window.showToast?.('İçe aktarılacak geçerli kayıt bulunamadı.', 'error');
+        return;
+      }
       const merged = [...incoming, ...getSaved()].slice(0, MAX_SAVED);
       setSaved(merged);
       renderDashboard();
-      window.showToast?.('Kayıtlar içe aktarıldı.', 'success');
+      window.showToast?.(`${incoming.length} kayıt içe aktarıldı.`, 'success');
     } catch {
       window.showToast?.('Kayıt dosyası okunamadı.', 'error');
     }
@@ -227,12 +285,14 @@ export function importSavedRecords(file) {
 }
 
 // window'a expose et
-window.saveCurrentCalculation = saveCurrentCalculation;
-window.openDashboard = openDashboard;
-window.closeDashboard = closeDashboard;
-window.updateDashboard = updateDashboard;
-window.compareDashboardSelected = compareDashboardSelected;
-window.deleteSavedRecord = deleteSavedRecord;
-window.clearAllSaved = clearAllSaved;
-window.exportSavedRecords = exportSavedRecords;
-window.importSavedRecords = importSavedRecords;
+if (typeof window !== 'undefined') {
+  window.saveCurrentCalculation = saveCurrentCalculation;
+  window.openDashboard = openDashboard;
+  window.closeDashboard = closeDashboard;
+  window.updateDashboard = updateDashboard;
+  window.compareDashboardSelected = compareDashboardSelected;
+  window.deleteSavedRecord = deleteSavedRecord;
+  window.clearAllSaved = clearAllSaved;
+  window.exportSavedRecords = exportSavedRecords;
+  window.importSavedRecords = importSavedRecords;
+}

@@ -5,7 +5,7 @@ const NUMBER_LIMITS = {
   lon: [-180, 180],
   ghi: [500, 2500],
   roofArea: [0, 200000],
-  tilt: [0, 70],
+  tilt: [0, 90],
   azimuth: [0, 359],
   azimuthCoeff: [0.3, 1.1],
   shadingFactor: [0, 80],
@@ -39,7 +39,10 @@ const STRING_LIMITS = {
   settlementDate: 20,
   displayCurrency: 3,
   inverterType: 40,
-  tariffSourceDate: 20
+  tariffSourceDate: 20,
+  scenarioKey: 40,
+  scenarioSelectedAt: 40,
+  enginePreference: 40
 };
 
 const BOOLEAN_KEYS = new Set([
@@ -53,7 +56,7 @@ const OBJECT_KEYS = new Set([
   'battery', 'ev', 'heatPump', 'tax', 'costOverrides', 'cableLoss',
   'roofGeometry', 'osmShadow', 'bomSelection', 'bomCommercials', 'financing',
   'maintenanceContract', 'gridApplicationChecklist', 'proposalApproval', 'evidence',
-  'userIdentity'
+  'userIdentity', 'scenarioContext', 'engineContext'
 ]);
 
 const ARRAY_KEYS = new Set([
@@ -64,10 +67,12 @@ const ARRAY_KEYS = new Set([
 
 const ENUM_VALUES = {
   panelType: new Set(['mono', 'poly', 'bifacial']),
-  tariffType: new Set(['residential', 'commercial', 'industrial', 'custom']),
+  tariffType: new Set(['residential', 'commercial', 'industrial', 'agriculture', 'custom']),
   tariffMode: new Set(['auto', 'custom', 'pst', 'sktt', 'contract']),
   tariffRegime: new Set(['auto', 'pst', 'sktt', 'contract']),
   exportSettlementMode: new Set(['auto', 'hourly', 'monthly']),
+  scenarioKey: new Set(['on-grid', 'off-grid', 'agricultural-irrigation', 'heat-pump', 'flexible-mobile', 'ev-charging']),
+  enginePreference: new Set(['auto', 'js-local', 'pvgis-hybrid-js', 'python-backend', 'pvlib-service']),
   displayCurrency: new Set(['TRY', 'USD']),
   inverterType: new Set(['string', 'micro', 'optimizer'])
 };
@@ -125,12 +130,15 @@ function cleanPlainValue(value, depth = 0) {
 function sanitizeArray(key, value) {
   if (!Array.isArray(value)) return undefined;
   if (key === 'monthlyConsumption') return value.slice(0, 12).map(v => clampNumber(v, 0, 1000000, 0));
-  if (key === 'hourlyConsumption8760') return value.slice(0, 8760).map(v => clampNumber(v, 0, 1000000, 0));
+  if (key === 'hourlyConsumption8760') {
+    if (value.length !== 8760) return undefined;
+    return value.map(v => clampNumber(v, 0, 1000000, 0));
+  }
   if (key === 'roofSections') {
     return value.slice(0, 24).map(sec => ({
       id: cleanString(sec?.id ?? `sec-${Date.now()}`, 40),
       area: clampNumber(sec?.area, 0, 200000, 0),
-      tilt: clampNumber(sec?.tilt, 0, 70, 20),
+      tilt: clampNumber(sec?.tilt, 0, 90, 20),
       azimuth: clampNumber(sec?.azimuth, 0, 359, 180),
       azimuthCoeff: clampNumber(sec?.azimuthCoeff, 0.3, 1.1, 1),
       azimuthName: cleanString(sec?.azimuthName ?? '', 40),

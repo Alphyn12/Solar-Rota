@@ -11,6 +11,23 @@
     "step4": "Hesaplama",
     "step5": "Sonuçlar"
   },
+  "hero": {
+    "kicker": "Solar teklif platformu",
+    "title": "Saha, üretim, finans ve onay akışını tek teklif merkezinde birleştirin.",
+    "subtitle": "Senaryoyu seçin; GüneşHesap varsayımları, görünür modülleri, kanıt kontrollerini ve teklif dilini buna göre ayarlasın.",
+    "proof": {
+      "engineering": "Mühendislik yolu",
+      "engineeringText": "PVGIS/JS yanında Python backend pilotu ve pvlib uyumlu sözleşme.",
+      "governance": "Teklif yönetişimi",
+      "governanceText": "Kanıt, onay, kaynak tazeliği ve audit kontrolleri aktif kalır.",
+      "client": "Müşteri çıktısı",
+      "clientText": "Tasarruf, ROI, güven ve sonraki aksiyonlar karar odaklı sunulur."
+    }
+  },
+  "scenario": {
+    "title": "Önce çözüm senaryosunu seçin",
+    "subtitle": "Seçim; varsayımları, görünür modülleri, sonuç dilini ve önerilen sonraki adımları değiştirir."
+  },
   "step1": {
     "title": "Konumunuzu Seçin",
     "subtitle": "Türkiye'deki güneş potansiyelinizi keşfetmek için şehrinizi işaretleyin veya haritada bir nokta seçin.",
@@ -101,6 +118,10 @@
   },
   "dashboard": {
     "saved": "Kayıtlı Hesaplar"
+  },
+  "governance": {
+    "title": "Teklif Yönetişimi",
+    "subtitle": "Onay, marj, finansman ve bakım varsayımları"
   },
   "common": {
     "yes": "Evet",

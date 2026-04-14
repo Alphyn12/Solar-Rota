@@ -10,6 +10,7 @@ export const EVIDENCE_STORE_NAME = 'evidenceFiles';
 
 const STATE_KEYS = [
   'step', 'lat', 'lon', 'cityName', 'ghi', 'roofArea', 'tilt', 'azimuth',
+  'scenarioKey', 'scenarioContext', 'scenarioSelectedAt', 'enginePreference', 'engineContext',
   'azimuthCoeff', 'azimuthName', 'shadingFactor', 'soilingFactor', 'panelType',
   'inverterType', 'multiRoof', 'roofSections', 'roofGeometry', 'dailyConsumption',
   'batteryEnabled', 'battery', 'netMeteringEnabled', 'usdToTry', 'displayCurrency',

@@ -144,6 +144,7 @@ export const i18n = {
 
   afterLanguageChange() {
     window.renderExchangeRateStatus?.();
+    window.updateDashboard?.();
     if (window.state?.results) {
       window.renderResults?.();
       window.renderEngReport?.();

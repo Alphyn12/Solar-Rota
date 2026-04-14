@@ -1,0 +1,179 @@
+export const DEFAULT_SCENARIO_KEY = 'on-grid';
+
+export const SCENARIO_DEFINITIONS = {
+  'on-grid': {
+    key: 'on-grid',
+    label: 'On-Grid',
+    shortLabel: 'On-grid',
+    description: 'Bill savings, self-consumption, export revenue, ROI, and proposal readiness.',
+    workflowLabel: 'Grid-connected proposal workflow',
+    resultFrame: 'Grid-connected savings and proposal readiness',
+    nextAction: 'Validate the site, bill evidence, tariff source, and supplier quote before quote-ready approval.',
+    confidenceHint: 'Best for commercial proposals when PVGIS, bill evidence, and source checks are verified.',
+    defaults: {
+      netMeteringEnabled: true,
+      batteryEnabled: false,
+      tariffType: 'commercial',
+      tariff: 8.44,
+      skttTariff: 8.44,
+      contractedTariff: 8.44,
+      dailyConsumption: 30,
+      exportSettlementMode: 'auto',
+      quoteInputsVerified: false
+    },
+    visibleBlocks: { netMetering: true, battery: true, heatPump: true, ev: true, tax: true, governance: true },
+    proposalTone: 'commercial-grid'
+  },
+  'off-grid': {
+    key: 'off-grid',
+    label: 'Off-Grid',
+    shortLabel: 'Off-grid',
+    description: 'Autonomy, battery capacity, critical loads, and night coverage.',
+    workflowLabel: 'Autonomy and battery sufficiency workflow',
+    resultFrame: 'Autonomy-first off-grid system sizing',
+    nextAction: 'Define critical loads and validate battery autonomy before proposal approval.',
+    confidenceHint: 'Export revenue is intentionally de-emphasized; battery dispatch and critical-load evidence drive confidence.',
+    defaults: {
+      netMeteringEnabled: false,
+      batteryEnabled: true,
+      dailyConsumption: 12,
+      tariffType: 'residential',
+      tariff: 7.16,
+      battery: { model: 'pylontech_us5000c', capacity: 9.6, dod: 0.90, efficiency: 0.94, chemistry: 'LFP', warranty: 10, cycles: 6000 },
+      exportSettlementMode: 'monthly'
+    },
+    visibleBlocks: { netMetering: false, battery: true, heatPump: true, ev: false, tax: false, governance: true },
+    proposalTone: 'autonomy'
+  },
+  'agricultural-irrigation': {
+    key: 'agricultural-irrigation',
+    label: 'Agricultural Irrigation',
+    shortLabel: 'Irrigation',
+    description: 'Seasonal pump loads, daytime solar match, and rural operating cost reduction.',
+    workflowLabel: 'Seasonal pump-load proposal workflow',
+    resultFrame: 'Daytime irrigation load offset and seasonal yield',
+    nextAction: 'Confirm pump power, watering season, and daytime load profile before quote-ready approval.',
+    confidenceHint: 'Confidence depends on pump schedule and seasonal consumption evidence.',
+    defaults: {
+      netMeteringEnabled: false,
+      batteryEnabled: false,
+      dailyConsumption: 45,
+      tariffType: 'agriculture',
+      tariff: 5.80,
+      skttTariff: 5.80,
+      contractedTariff: 5.80,
+      tariffRegime: 'custom',
+      exportSettlementMode: 'monthly'
+    },
+    visibleBlocks: { netMetering: false, battery: true, heatPump: false, ev: false, tax: true, governance: true },
+    proposalTone: 'agri'
+  },
+  'heat-pump': {
+    key: 'heat-pump',
+    label: 'Heat Pump',
+    shortLabel: 'Heat pump',
+    description: 'Heating/cooling electrification, SPF assumptions, and solar offset.',
+    workflowLabel: 'Electrification offset workflow',
+    resultFrame: 'Solar-assisted heating and cooling offset',
+    nextAction: 'Validate heated area, insulation class, and current heating fuel cost assumptions.',
+    confidenceHint: 'Heat pump SPF and building envelope assumptions are the dominant risk.',
+    defaults: {
+      heatPumpEnabled: true,
+      heatPump: { area: 120, insulation: 'avg', heatingType: 'both', currentHeating: 'gas' },
+      dailyConsumption: 18,
+      netMeteringEnabled: true,
+      batteryEnabled: false,
+      tariffType: 'residential',
+      tariff: 7.16
+    },
+    visibleBlocks: { netMetering: true, battery: true, heatPump: true, ev: false, tax: true, governance: true },
+    proposalTone: 'electrification'
+  },
+  'flexible-mobile': {
+    key: 'flexible-mobile',
+    label: 'Flexible Panel / Caravan / Boat',
+    shortLabel: 'Mobile',
+    description: 'Portable loads, compact off-grid use, and simplified client-facing guidance.',
+    workflowLabel: 'Portable energy workflow',
+    resultFrame: 'Portable solar and compact battery autonomy',
+    nextAction: 'Confirm daily appliance loads and storage target; keep commercial proposal controls optional.',
+    confidenceHint: 'Use as an early sizing estimate unless field load measurements are attached.',
+    defaults: {
+      netMeteringEnabled: false,
+      batteryEnabled: true,
+      dailyConsumption: 4,
+      roofArea: 12,
+      tariffType: 'residential',
+      tariff: 7.16,
+      panelType: 'mono',
+      battery: { model: 'custom', name: 'Özel Batarya', capacity: 3.0, dod: 0.80, efficiency: 0.90, chemistry: 'LFP', warranty: 5, cycles: 3000, price_try: 0, brand: 'Özel' }
+    },
+    visibleBlocks: { netMetering: false, battery: true, heatPump: false, ev: false, tax: false, governance: false },
+    proposalTone: 'portable'
+  },
+  'ev-charging': {
+    key: 'ev-charging',
+    label: 'EV Charging Station',
+    shortLabel: 'EV charging',
+    description: 'Charging demand, daytime solar synergy, and commercial electricity offset.',
+    workflowLabel: 'Charging infrastructure workflow',
+    resultFrame: 'Solar-backed EV charging demand and ROI',
+    nextAction: 'Confirm charge sessions, charger power, and daytime utilization before quote-ready approval.',
+    confidenceHint: 'Charging profile evidence and commercial tariff validation drive quote confidence.',
+    defaults: {
+      evEnabled: true,
+      ev: { type: 'custom', dailyKm: 120, consumptionPer100km: 18, chargeTime: 'day', chargerPowerKw: 22, fuelPricePerLiter: 45, fuelConsumptionL100km: 8 },
+      dailyConsumption: 55,
+      tariffType: 'commercial',
+      tariff: 8.44,
+      skttTariff: 8.44,
+      contractedTariff: 8.44,
+      netMeteringEnabled: true,
+      batteryEnabled: false
+    },
+    visibleBlocks: { netMetering: true, battery: true, heatPump: false, ev: true, tax: true, governance: true },
+    proposalTone: 'charging'
+  }
+};
+
+export function getScenarioDefinition(key = DEFAULT_SCENARIO_KEY) {
+  return SCENARIO_DEFINITIONS[key] || SCENARIO_DEFINITIONS[DEFAULT_SCENARIO_KEY];
+}
+
+export function listScenarioDefinitions() {
+  return Object.values(SCENARIO_DEFINITIONS);
+}
+
+export function applyScenarioDefaults(state = {}, key = DEFAULT_SCENARIO_KEY) {
+  const scenario = getScenarioDefinition(key);
+  const defaults = scenario.defaults || {};
+  const next = { ...state, scenarioKey: scenario.key, scenarioSelectedAt: new Date().toISOString() };
+  Object.entries(defaults).forEach(([field, value]) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      next[field] = { ...(next[field] || {}), ...value };
+    } else {
+      next[field] = value;
+    }
+  });
+  next.scenarioContext = {
+    key: scenario.key,
+    label: scenario.label,
+    workflowLabel: scenario.workflowLabel,
+    resultFrame: scenario.resultFrame,
+    nextAction: scenario.nextAction,
+    confidenceHint: scenario.confidenceHint,
+    proposalTone: scenario.proposalTone,
+    visibleBlocks: scenario.visibleBlocks
+  };
+  return next;
+}
+
+export function scenarioSourceQualityNote(scenarioKey, calculationMode = 'fallback-psh') {
+  const scenario = getScenarioDefinition(scenarioKey);
+  const source = calculationMode === 'pvgis-live' || calculationMode === 'pvgis-hybrid'
+    ? 'PVGIS-based'
+    : calculationMode === 'pvlib-service' || calculationMode === 'python-backend' || calculationMode === 'python-backend-pvlib-ready'
+      ? 'Python backend pvlib-ready'
+      : 'local simplified';
+  return `${scenario.shortLabel}: ${source} engine context. ${scenario.confidenceHint}`;
+}

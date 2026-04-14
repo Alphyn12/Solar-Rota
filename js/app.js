@@ -5,12 +5,13 @@
 import {
   TURKISH_CITIES, PANEL_TYPES, BATTERY_MODELS, COMPASS_DIRS,
   PSH_FALLBACK, CITY_SUMMER_TEMPS, MONTHS, MONTH_WEIGHTS,
-  DEFAULT_TARIFFS, INVERTER_TYPES, HEAT_PUMP_DATA, EV_MODELS
+  DEFAULT_TARIFFS, INVERTER_TYPES, HEAT_PUMP_DATA, EV_MODELS, TARIFF_META
 } from './data.js';
 import { showToast, animateCounter, launchConfetti, resetConfetti, renderPRGauge } from './ui-charts.js';
 import { renderResults, renderMonthlyChart, downloadPDF, shareResults, loadFromHash } from './ui-render.js';
 import { toggleEngReport, renderEngReport, renderEngCalcPanel } from './eng-report.js';
-import { runCalculation, calculateBatteryMetrics, calculateNMMetrics } from './calc-engine.js';
+import { runCalculation } from './calculation-service.js';
+import { calculateBatteryMetrics, calculateNMMetrics } from './calc-engine.js';
 import { renderHourlyProfile, setHourlySeason } from './hourly-profile.js';
 import { toggleBillBlock, onBillToggle, onBillInput, billQuickFill, billClear } from './bill-analysis.js';
 import { buildInverterCards, selectInverter } from './inverter.js';
@@ -31,11 +32,24 @@ import { initBomBuilder, selectBomItem } from './bom.js';
 import { initExchangeRateService, refreshExchangeRate, setManualUsdTryRate, convertTry } from './exchange-rate.js';
 import { appendAuditEntry } from './audit-log.js';
 import { attachEvidenceFile } from './evidence-files.js';
-import { canApproveProposal, normalizeUserIdentity } from './identity.js';
+import { normalizeUserIdentity } from './identity.js';
+import { buildApprovalWorkflow } from './proposal-governance.js';
+import { currentDateIso } from './evidence-governance.js';
+import { TARIFF_DATA_LIFECYCLE, TURKEY_REGULATORY_VERSION } from './turkey-regulation.js';
+import { isLocationInTurkey } from './location-validation.js';
+import { applyScenarioDefaults, getScenarioDefinition, listScenarioDefinitions, DEFAULT_SCENARIO_KEY } from './scenario-workflows.js';
+import { createSolarProposalMark } from './solar-art.js';
 import { loadProposalState, saveProposalState } from './storage.js';
 
 // ── Global data referansı ────────────────────────────────────────────────────
 window._appData = { PANEL_TYPES, BATTERY_MODELS, COMPASS_DIRS, INVERTER_TYPES, MONTHS, HEAT_PUMP_DATA, EV_MODELS };
+
+// BUG-12 fix: Never fall back to currentDateIso() — a missing sourceDate should be null so
+// the governance blocker ("Tarife kaynak kontrol tarihi eksik") fires correctly instead of
+// being silently masked by today's date.
+const DEFAULT_TARIFF_SOURCE_DATE = TARIFF_META.residential?.sourceDate || null;
+const DEFAULT_TARIFF_SOURCE_CHECKED_AT = TARIFF_DATA_LIFECYCLE.sources?.[0]?.checkedDate || DEFAULT_TARIFF_SOURCE_DATE || null;
+const DEFAULT_REGULATION_SOURCE_CHECKED_AT = TARIFF_DATA_LIFECYCLE.sources?.[1]?.checkedDate || DEFAULT_TARIFF_SOURCE_CHECKED_AT || null;
 
 // ── Para birimi seçici ───────────────────────────────────────────────────────
 const CURRENCY_STORAGE_KEY = 'guneshesap_display_currency_v1';
@@ -63,12 +77,17 @@ window.switchCurrency = switchCurrency;
 // ═══════════════════════════════════════════════════════════
 window.state = {
   step: 1,
+  scenarioKey: DEFAULT_SCENARIO_KEY,
+  scenarioContext: getScenarioDefinition(DEFAULT_SCENARIO_KEY),
   lat: null, lon: null, cityName: null, ghi: null,
   roofArea: null, tilt: 33, azimuth: 180, azimuthCoeff: 1.00,
   azimuthName: "Güney", shadingFactor: 10,
   panelType: 'mono',
   inverterType: 'string',
   results: null,
+  enginePreference: 'auto',
+  backendEngineAvailable: null,
+  backendEngineLastError: null,
   // Çoklu çatı
   multiRoof: false,
   roofSections: [],
@@ -105,8 +124,8 @@ window.state = {
   annualPriceIncrease: 0.12,
   discountRate: 0.18,
   tariffIncludesTax: true,
-  tariffSourceDate: '2026-04-12',
-  tariffSourceCheckedAt: '2026-04-13',
+  tariffSourceDate: DEFAULT_TARIFF_SOURCE_DATE,
+  tariffSourceCheckedAt: DEFAULT_TARIFF_SOURCE_CHECKED_AT,
   // Kirlenme
   soilingFactor: 3,
   // Bakım & İşletme
@@ -129,8 +148,8 @@ window.state = {
   evidence: {
     customerBill: { type: 'customerBill', status: 'missing', ref: '', checkedAt: null },
     supplierQuote: { type: 'supplierQuote', status: 'missing', ref: '', issuedAt: null, validUntil: null },
-    tariffSource: { type: 'tariffSource', status: 'verified', ref: 'EPDK/SKTT-2026-local', checkedAt: '2026-04-13', sourceUrl: 'https://www.epdk.gov.tr/Detay/Icerik/16-38/son-kaynak-tedarik-tarifesi-sktt-ile-ilgili-bil' },
-    regulationSource: { type: 'regulationSource', status: 'verified', ref: 'TR-REG-2026.04.13', checkedAt: '2026-04-13', sourceUrl: 'https://www.epdk.gov.tr/detay/icerik/3-0-0-1160/elektrik-piyasasinda-lisanssiz-elektrik-uretimi-' },
+    tariffSource: { type: 'tariffSource', status: 'verified', ref: 'EPDK/SKTT-2026-local', checkedAt: DEFAULT_TARIFF_SOURCE_CHECKED_AT, sourceUrl: 'https://www.epdk.gov.tr/Detay/Icerik/16-38/son-kaynak-tedarik-tarifesi-sktt-ile-ilgili-bil' },
+    regulationSource: { type: 'regulationSource', status: 'verified', ref: TURKEY_REGULATORY_VERSION, checkedAt: DEFAULT_REGULATION_SOURCE_CHECKED_AT, sourceUrl: 'https://www.epdk.gov.tr/detay/icerik/3-0-0-1160/elektrik-piyasasinda-lisanssiz-elektrik-uretimi-' },
     gridApplication: { type: 'gridApplication', status: 'missing', ref: '', checkedAt: null }
   },
   financing: {
@@ -369,7 +388,7 @@ function selectLocationFromLatLon(lat, lon, checkBounds) {
 }
 
 function isInTurkey(lat, lon) {
-  return lat >= 35.8 && lat <= 42.2 && lon >= 25.6 && lon <= 44.8;
+  return isLocationInTurkey(lat, lon);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -388,6 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
   buildInverterCards();
   loadFromHash();
   syncEnterpriseInputsFromState();
+  initScenarioExperience();
   updateDashboard();
   // BOM builder ilk açılışta initBomBuilder() ile başlatılır (HTML onclick)
 
@@ -461,6 +481,118 @@ function selectCity(city) {
   marker.setLatLng([city.lat, city.lon]);
 }
 
+function initScenarioExperience() {
+  const artMount = document.getElementById('solar-art-mount');
+  if (artMount && !artMount.querySelector('img')) artMount.appendChild(createSolarProposalMark({ alt: 'GüneşHesap solar proposal platform artwork' }));
+  renderScenarioCards();
+  updateScenarioUI();
+}
+
+function renderScenarioCards() {
+  const wrap = document.getElementById('scenario-card-grid');
+  if (!wrap) return;
+  wrap.innerHTML = listScenarioDefinitions().map(scenario => `
+    <button type="button" class="scenario-choice-card${window.state.scenarioKey === scenario.key ? ' selected' : ''}" data-scenario-key="${scenario.key}">
+      <span class="scenario-choice-kicker">${scenario.workflowLabel}</span>
+      <strong>${scenario.label}</strong>
+      <span>${scenario.description}</span>
+    </button>
+  `).join('');
+  wrap.querySelectorAll('[data-scenario-key]').forEach(btn => {
+    btn.addEventListener('click', () => selectScenario(btn.dataset.scenarioKey));
+  });
+}
+
+function updateScenarioUI() {
+  const scenario = getScenarioDefinition(window.state.scenarioKey);
+  window.state.scenarioContext = {
+    ...(window.state.scenarioContext || {}),
+    key: scenario.key,
+    label: scenario.label,
+    workflowLabel: scenario.workflowLabel,
+    resultFrame: scenario.resultFrame,
+    nextAction: scenario.nextAction,
+    confidenceHint: scenario.confidenceHint,
+    proposalTone: scenario.proposalTone,
+    visibleBlocks: scenario.visibleBlocks
+  };
+  document.querySelectorAll('.scenario-choice-card').forEach(card => {
+    card.classList.toggle('selected', card.dataset.scenarioKey === scenario.key);
+  });
+  const selected = document.getElementById('scenario-selected-summary');
+  if (selected) {
+    selected.innerHTML = `
+      <strong>${scenario.label}</strong>
+      <span>${scenario.resultFrame}</span>
+      <em>${scenario.nextAction}</em>
+    `;
+  }
+  const stepLabel = document.getElementById('scenario-step-label');
+  if (stepLabel) stepLabel.textContent = scenario.workflowLabel;
+  const resultFrame = document.getElementById('result-scenario-frame');
+  if (resultFrame && window.state.results) {
+    const backendSource = window.state.results.backendEngineSource || window.state.results.backendEngineResponse?.engineSource;
+    resultFrame.textContent = `${scenario.resultFrame} · ${backendSource?.source || window.state.results.engineSource?.source || window.state.results.calculationMode || 'PVGIS/JS'}`;
+  }
+  const hint = document.getElementById('scenario-guidance-panel');
+  if (hint) {
+    hint.innerHTML = `
+      <strong>${scenario.shortLabel} workflow</strong>
+      <span>${scenario.confidenceHint}</span>
+      <span>${scenario.nextAction}</span>
+    `;
+  }
+  const visibility = scenario.visibleBlocks || {};
+  const toggleBlock = (id, visible = true) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = visible ? '' : 'none';
+  };
+  toggleBlock('nm-block', visibility.netMetering !== false);
+  toggleBlock('battery-block', visibility.battery !== false);
+  toggleBlock('heat-pump-block', visibility.heatPump !== false);
+  toggleBlock('ev-block', visibility.ev !== false);
+  toggleBlock('tax-block', visibility.tax !== false);
+  const govBlock = document.getElementById('proposal-governance-block');
+  if (govBlock) govBlock.classList.toggle('compact-governance', visibility.governance === false);
+}
+
+function syncScenarioControls() {
+  const s = window.state;
+  const batteryToggle = document.getElementById('battery-toggle');
+  if (batteryToggle) batteryToggle.checked = !!s.batteryEnabled;
+  const nmToggle = document.getElementById('nm-toggle');
+  if (nmToggle) nmToggle.checked = !!s.netMeteringEnabled;
+  const hpToggle = document.getElementById('hp-toggle');
+  if (hpToggle) hpToggle.checked = !!s.heatPumpEnabled;
+  const evToggle = document.getElementById('ev-toggle');
+  if (evToggle) evToggle.checked = !!s.evEnabled;
+  const taxToggle = document.getElementById('tax-toggle');
+  if (taxToggle) taxToggle.checked = !!s.taxEnabled;
+  const consumptionSlider = document.getElementById('consumption-slider');
+  if (consumptionSlider) consumptionSlider.value = s.dailyConsumption || 10;
+  updateConsumption(s.dailyConsumption || 10);
+  if (batteryToggle) onBatteryToggle(!!s.batteryEnabled);
+  if (nmToggle) onNMToggle(!!s.netMeteringEnabled);
+  if (hpToggle) onHeatPumpToggle(!!s.heatPumpEnabled);
+  if (evToggle) onEVToggle(!!s.evEnabled);
+  if (taxToggle) onTaxToggle(!!s.taxEnabled);
+  updateTariffType(s.tariffType || 'residential');
+  syncEnterpriseInputsFromState();
+}
+
+function selectScenario(key) {
+  const next = applyScenarioDefaults(window.state, key);
+  Object.assign(window.state, next);
+  appendAuditEntry(window.state, 'scenario.selected', {
+    scenarioKey: window.state.scenarioKey,
+    label: window.state.scenarioContext?.label
+  }, currentUser());
+  updateScenarioUI();
+  syncScenarioControls();
+  persistState();
+  showToast(`${window.state.scenarioContext?.label || 'Senaryo'} akışı seçildi.`, 'success');
+}
+
 function useGeolocation() {
   if (!navigator.geolocation) { showToast('Tarayıcınız konum belirlemeyi desteklemiyor.', 'error'); return; }
   const btn = document.getElementById('geolocation-btn');
@@ -499,7 +631,7 @@ function getTiltCoeff(deg) {
 }
 
 function updateTilt(val) {
-  val = Math.max(0, Math.min(70, parseInt(val, 10) || 0));
+  val = Math.max(0, Math.min(90, parseInt(val, 10) || 0));
   window.state.tilt = val;
   document.getElementById('tilt-val').textContent = val + '°';
   positionRangeThumb('tilt-slider', 'tilt-val', 0, 90);
@@ -558,7 +690,7 @@ function updateShading(val) {
   val = Math.max(0, Math.min(80, parseInt(val, 10) || 0));
   window.state.shadingFactor = val;
   document.getElementById('shading-val').textContent = val + '%';
-  positionRangeThumb('shading-slider', 'shading-val', 0, 50);
+  positionRangeThumb('shading-slider', 'shading-val', 0, 80);
   const desc = ['Gölge yok', 'Az gölge', 'Orta gölge', 'Ciddi gölge'];
   const idx = val == 0 ? 0 : val <= 15 ? 1 : val <= 35 ? 2 : 3;
   document.getElementById('shading-desc').textContent = desc[idx];
@@ -568,7 +700,7 @@ function updateSoiling(val) {
   val = Math.max(0, Math.min(50, parseInt(val, 10) || 0));
   window.state.soilingFactor = val;
   document.getElementById('soiling-val').textContent = val + '%';
-  positionRangeThumb('soiling-slider', 'soiling-val', 0, 10);
+  positionRangeThumb('soiling-slider', 'soiling-val', 0, 50);
   const descs = ['Temiz panel', 'Minimal kirlenme', 'Az kirlenme', 'Orta düzey kirlenme', 'Yüksek kirlenme'];
   const idx = val == 0 ? 0 : val <= 2 ? 1 : val <= 4 ? 2 : val <= 7 ? 3 : 4;
   document.getElementById('soiling-desc').textContent = descs[idx];
@@ -581,6 +713,7 @@ function updateTariffType(type) {
     residential: '2026 tarife seçimi: yıllık tüketim 4.000 kWh üstündeyse SKTT seçilebilir. Birim fiyatları faturanızdan doğrulayın.',
     commercial: '2026 tarife seçimi: mesken dışı yıllık tüketim 15.000 kWh üstündeyse SKTT seçilebilir. Sözleşmeli tarife varsa girin.',
     industrial: '2026 tarife seçimi: mesken dışı yıllık tüketim 15.000 kWh üstündeyse SKTT seçilebilir. Sözleşmeli tarife varsa girin.',
+    agriculture: 'Tarımsal sulama senaryosu: pompa gücü, sezon ve gündüz çalışma profili doğrulanmalı. Birim fiyatı faturanızdan girin.',
     custom: 'Kullanıcı tanımlı tarife'
   };
   if (type !== 'custom') {
@@ -626,7 +759,7 @@ function updateTariffAssumptions() {
   s.hasSignedCustomerBillData = document.getElementById('quote-bill-verified')?.checked ?? false;
   s.quoteInputsVerified = document.getElementById('quote-inputs-verified')?.checked ?? false;
   s.quoteReadyApproved = document.getElementById('quote-ready-approved')?.checked ?? false;
-  s.tariffSourceDate = document.getElementById('tariff-source-date')?.value || '2026-04-12';
+  s.tariffSourceDate = document.getElementById('tariff-source-date')?.value || s.tariffSourceDate || DEFAULT_TARIFF_SOURCE_DATE;
   s.tariffSourceCheckedAt = document.getElementById('tariff-source-checked-at')?.value || s.tariffSourceDate;
   s.evidence = {
     ...(s.evidence || {}),
@@ -676,42 +809,6 @@ function updateProposalGovernanceInput() {
   const requestedApprovalState = document.getElementById('proposal-approval-state')?.value || s.proposalApproval?.state || 'draft';
   const previousApprovalState = s.proposalApproval?.state || 'draft';
   const existingApprovalRecord = s.proposalApproval?.approvalRecord || null;
-  s.proposalApproval = {
-    ...(s.proposalApproval || {}),
-    state: requestedApprovalState,
-    approvedBy: document.getElementById('proposal-approved-by')?.value || s.proposalApproval?.approvedBy || '',
-    updatedBy: s.userIdentity?.name || s.proposalApproval?.updatedBy || 'local-user',
-    approvalRecord: existingApprovalRecord
-  };
-  if (requestedApprovalState === 'approved' && !existingApprovalRecord && canApproveProposal(s.userIdentity)) {
-    const approvedAt = new Date().toISOString();
-    const approvedBy = s.proposalApproval.approvedBy || `${s.userIdentity.name} (${s.userIdentity.role})`;
-    s.proposalApproval.approvedBy = approvedBy;
-    s.proposalApproval.approvedAt = approvedAt;
-    s.proposalApproval.approvalRecord = {
-      id: `approval-${Date.now()}`,
-      state: 'approved',
-      approvedBy,
-      approvedAt,
-      user: { ...s.userIdentity },
-      immutable: true
-    };
-    appendAuditEntry(s, 'approval.created', { approvedBy, approvedAt }, s.userIdentity);
-  } else if (requestedApprovalState === 'approved' && !canApproveProposal(s.userIdentity) && !existingApprovalRecord) {
-    window.showToast?.('Onay için approver/admin rolü gerekli.', 'error');
-    appendAuditEntry(s, 'approval.blocked_role', { requestedBy: s.userIdentity?.name, role: s.userIdentity?.role }, s.userIdentity);
-  } else if (requestedApprovalState === 'approved' && existingApprovalRecord) {
-    if (s.proposalApproval.approvedBy !== existingApprovalRecord.approvedBy) {
-      appendAuditEntry(s, 'approval.immutable_edit_blocked', {
-        attemptedApprovedBy: s.proposalApproval.approvedBy,
-        retainedApprovedBy: existingApprovalRecord.approvedBy
-      }, s.userIdentity);
-    }
-    s.proposalApproval.approvedBy = existingApprovalRecord.approvedBy;
-    s.proposalApproval.approvedAt = existingApprovalRecord.approvedAt;
-  } else if (previousApprovalState !== requestedApprovalState) {
-    appendAuditEntry(s, 'approval.state_changed', { from: previousApprovalState, to: requestedApprovalState }, s.userIdentity);
-  }
   s.bomCommercials = {
     ...(s.bomCommercials || {}),
     marginRate: numPct('bom-margin-rate', s.bomCommercials?.marginRate ?? 0.18),
@@ -761,6 +858,47 @@ function updateProposalGovernanceInput() {
         checkedAt: new Date().toISOString().slice(0, 10)
       }
     };
+  }
+  s.proposalApproval = {
+    ...(s.proposalApproval || {}),
+    state: requestedApprovalState,
+    approvedBy: document.getElementById('proposal-approved-by')?.value || s.proposalApproval?.approvedBy || '',
+    approvedAt: s.proposalApproval?.approvedAt || null,
+    updatedBy: s.userIdentity?.name || s.proposalApproval?.updatedBy || 'local-user',
+    approvalRecord: existingApprovalRecord
+  };
+  const workflow = buildApprovalWorkflow(s, s.results?.proposalGovernance?.confidence || s.results?.confidence || null);
+  s.proposalApproval = {
+    ...(s.proposalApproval || {}),
+    state: workflow.state,
+    approvedBy: workflow.approvedBy || (workflow.state === 'approved' ? s.proposalApproval?.approvedBy : ''),
+    approvedAt: workflow.approvedAt || (workflow.state === 'approved' ? s.proposalApproval?.approvedAt : null),
+    approvalRecord: workflow.approvalRecord,
+    history: workflow.history
+  };
+  const approvalSelect = document.getElementById('proposal-approval-state');
+  if (approvalSelect && approvalSelect.value !== workflow.state) approvalSelect.value = workflow.state;
+  const approvedByInput = document.getElementById('proposal-approved-by');
+  if (approvedByInput) approvedByInput.value = s.proposalApproval.approvedBy || '';
+
+  if (requestedApprovalState === 'approved' && workflow.state !== 'approved') {
+    window.showToast?.(`Onay bloke edildi: ${workflow.blockers.slice(0, 2).join(' ')}`, 'error');
+    appendAuditEntry(s, 'approval.blocked_requirements', {
+      requestedBy: s.userIdentity?.name,
+      role: s.userIdentity?.role,
+      blockers: workflow.blockers
+    }, s.userIdentity);
+  } else if (requestedApprovalState === 'approved' && workflow.state === 'approved' && !existingApprovalRecord) {
+    appendAuditEntry(s, 'approval.created', {
+      approvedBy: workflow.approvedBy,
+      approvedAt: workflow.approvedAt
+    }, s.userIdentity);
+  } else if (requestedApprovalState === 'approved' && existingApprovalRecord && workflow.blockers.includes('Mevcut immutable onay kaydı sessizce değiştirilemez; yeni revizyon/onay süreci açılmalı.')) {
+    appendAuditEntry(s, 'approval.immutable_edit_blocked', {
+      retainedApprovedBy: existingApprovalRecord.approvedBy
+    }, s.userIdentity);
+  } else if (previousApprovalState !== workflow.state) {
+    appendAuditEntry(s, 'approval.state_changed', { from: previousApprovalState, to: workflow.state }, s.userIdentity);
   }
   appendAuditEntry(s, 'proposal.governance_updated', {
     approvalState: s.proposalApproval.state,
@@ -1135,7 +1273,7 @@ function validateStep3() {
   updateTariffAssumptions();
   updateCostOverrides();
   goToStep(4);
-  runCalculation();
+  runCalculation().catch(e => window.showToast?.(`Hesaplama hatası: ${e.message}`, 'error'));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1211,7 +1349,7 @@ function renderRoofSections() {
         </div>
         <div class="form-group" style="margin:0">
           <label style="font-size:0.8rem">Gölgelenme (%)</label>
-          <input type="number" id="sec-shade-${sec.id}" value="${sec.shadingFactor}" min="0" max="50"
+          <input type="number" id="sec-shade-${sec.id}" value="${sec.shadingFactor}" min="0" max="80"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
             oninput="updateSecShade(${sec.id},this.value)"/>
         </div>
@@ -1239,7 +1377,7 @@ function updateSecTilt(id, val) {
 }
 function updateSecShade(id, val) {
   const sec = window.state.roofSections.find(s => s.id === id);
-  if (sec) sec.shadingFactor = Math.max(0, Math.min(50, parseInt(val) || 0));
+  if (sec) sec.shadingFactor = Math.max(0, Math.min(80, parseInt(val) || 0));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1271,13 +1409,14 @@ function onBatteryToggle(checked) {
   if (checked && !document.getElementById('bat-models-wrap').innerHTML) {
     renderBatteryModels();
   }
+  if (checked) syncBatteryCustomInputs();
 }
 
 function renderBatteryModels() {
   const wrap = document.getElementById('bat-models-wrap');
   if (!wrap) return;
   wrap.innerHTML = Object.entries(BATTERY_MODELS).map(([key, m]) => `
-    <button class="bat-model-btn${window.state.battery.model === key ? ' selected' : ''}" onclick="selectBatteryModel('${key}')">
+    <button type="button" class="bat-model-btn${window.state.battery.model === key ? ' selected' : ''}" data-battery-model="${key}">
       <div style="font-weight:700;font-size:0.82rem;color:var(--text)">${m.name}</div>
       <div style="font-size:0.71rem;color:var(--text-muted);margin-top:2px">${m.spec}</div>
       ${m.chemistry ? `<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">
@@ -1286,36 +1425,68 @@ function renderBatteryModels() {
         ${m.warranty ? `<span style="font-size:0.68rem;background:rgba(255,255,255,0.06);border:1px solid var(--border-subtle);border-radius:4px;padding:1px 5px;color:var(--text-muted)">${m.warranty} yıl garanti</span>` : ''}
       </div>` : ''}
     </button>`).join('');
+  wrap.querySelectorAll('[data-battery-model]').forEach(btn => {
+    btn.addEventListener('click', () => selectBatteryModel(btn.dataset.batteryModel));
+  });
+  syncBatteryCustomInputs();
+}
+
+function syncBatteryCustomInputs() {
+  const battery = window.state.battery || BATTERY_MODELS.custom;
+  const isCustom = battery.model === 'custom';
+  const customWrap = document.getElementById('bat-custom-inputs');
+  if (customWrap) customWrap.style.display = isCustom ? 'block' : 'none';
+  const capEl = document.getElementById('bat-capacity');
+  const dodEl = document.getElementById('bat-dod');
+  const effEl = document.getElementById('bat-eff');
+  if (capEl) capEl.value = Number(battery.capacity ?? BATTERY_MODELS.custom.capacity).toFixed(1);
+  if (dodEl) dodEl.value = Math.round(Number(battery.dod ?? BATTERY_MODELS.custom.dod) * 100);
+  if (effEl) effEl.value = Math.round(Number(battery.efficiency ?? BATTERY_MODELS.custom.efficiency) * 100);
+  updateBatCapacity(capEl?.value ?? battery.capacity);
+  updateBatDod(dodEl?.value ?? Math.round((battery.dod || 0.8) * 100));
+  updateBatEff(effEl?.value ?? Math.round((battery.efficiency || 0.9) * 100));
 }
 
 function selectBatteryModel(key) {
   const m = BATTERY_MODELS[key];
+  if (!m) return;
   window.state.battery = { ...m, model: key };
   document.querySelectorAll('.bat-model-btn').forEach(b => b.classList.remove('selected'));
-  const btn = document.querySelector(`[onclick="selectBatteryModel('${key}')"]`);
+  const btn = document.querySelector(`[data-battery-model="${key}"]`);
   if (btn) btn.classList.add('selected');
-  const capEl = document.getElementById('bat-capacity');
-  const dodEl = document.getElementById('bat-dod');
-  const effEl = document.getElementById('bat-eff');
-  if (capEl && key !== 'custom') capEl.value = m.capacity;
-  if (dodEl && key !== 'custom') dodEl.value = Math.round(m.dod * 100);
-  if (effEl && key !== 'custom') effEl.value = Math.round(m.efficiency * 100);
+  syncBatteryCustomInputs();
 }
 
 function updateBatCapacity(val) {
-  window.state.battery.capacity = parseFloat(val) || 9.6;
+  window.state.battery = { ...(window.state.battery || BATTERY_MODELS.custom) };
+  window.state.battery.capacity = Math.max(1, Math.min(50, parseFloat(val) || BATTERY_MODELS.custom.capacity));
   const el = document.getElementById('bat-cap-val');
-  if (el) el.textContent = val + ' kWh';
+  if (el) el.textContent = window.state.battery.capacity + ' kWh';
 }
 function updateBatDod(val) {
-  window.state.battery.dod = parseInt(val) / 100;
+  window.state.battery = { ...(window.state.battery || BATTERY_MODELS.custom) };
+  window.state.battery.dod = Math.max(0.5, Math.min(1, (parseInt(val, 10) || 80) / 100));
   const el = document.getElementById('bat-dod-val');
-  if (el) el.textContent = val + '%';
+  if (el) el.textContent = Math.round(window.state.battery.dod * 100) + '%';
 }
 function updateBatEff(val) {
-  window.state.battery.efficiency = parseInt(val) / 100;
+  window.state.battery = { ...(window.state.battery || BATTERY_MODELS.custom) };
+  window.state.battery.efficiency = Math.max(0.75, Math.min(0.97, (parseInt(val, 10) || 90) / 100));
   const el = document.getElementById('bat-eff-val');
-  if (el) el.textContent = val + '%';
+  if (el) el.textContent = Math.round(window.state.battery.efficiency * 100) + '%';
+}
+function updateBatteryCustom() {
+  const capValue = document.getElementById('bat-capacity')?.value;
+  const dodValue = document.getElementById('bat-dod')?.value;
+  const effValue = document.getElementById('bat-eff')?.value;
+  const base = { ...BATTERY_MODELS.custom, ...(window.state.battery || {}) };
+  window.state.battery = { ...base, model: 'custom', name: BATTERY_MODELS.custom.name, spec: BATTERY_MODELS.custom.spec, price_try: 0 };
+  document.querySelectorAll('.bat-model-btn').forEach(b => b.classList.toggle('selected', b.dataset.batteryModel === 'custom'));
+  const customWrap = document.getElementById('bat-custom-inputs');
+  if (customWrap) customWrap.style.display = 'block';
+  updateBatCapacity(capValue ?? window.state.battery.capacity);
+  updateBatDod(dodValue ?? Math.round(window.state.battery.dod * 100));
+  updateBatEff(effValue ?? Math.round(window.state.battery.efficiency * 100));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1421,6 +1592,7 @@ window.selectBatteryModel = selectBatteryModel;
 window.updateBatCapacity = updateBatCapacity;
 window.updateBatDod = updateBatDod;
 window.updateBatEff = updateBatEff;
+window.updateBatteryCustom = updateBatteryCustom;
 window.toggleNMBlock = toggleNMBlock;
 window.onNMToggle = onNMToggle;
 window.toggleOMBlock = toggleOMBlock;
@@ -1428,6 +1600,8 @@ window.onOMToggle = onOMToggle;
 window.toggleCostOverridesBlock = toggleCostOverridesBlock;
 window.onCostOverridesToggle = onCostOverridesToggle;
 window.updateCostOverrides = updateCostOverrides;
+window.selectScenario = selectScenario;
+window.updateScenarioUI = updateScenarioUI;
 window.selectCity = selectCity;
 window.useGeolocation = useGeolocation;
 window.isInTurkey = isInTurkey;

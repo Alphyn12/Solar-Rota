@@ -5,9 +5,12 @@
   "private": true,
   "scripts": {
     "start": "npx serve . -l 3000 --no-clipboard",
-    "test": "node tests/calc-core.test.mjs && node tests/calc-regression.test.mjs && node tests/advanced-features.test.mjs && node tests/currency-i18n.test.mjs && node tests/security-state.test.mjs && node tests/turkey-regulation.test.mjs && node tests/proposal-governance.test.mjs && node tests/evidence-governance.test.mjs && node tests/enterprise-governance.test.mjs",
+    "test": "node tests/calc-core.test.mjs && node tests/calc-regression.test.mjs && node tests/advanced-features.test.mjs && node tests/currency-i18n.test.mjs && node tests/security-state.test.mjs && node tests/input-validation.test.mjs && node tests/scenario-engine-contracts.test.mjs && node tests/turkey-regulation.test.mjs && node tests/proposal-governance.test.mjs && node tests/evidence-governance.test.mjs && node tests/enterprise-governance.test.mjs",
     "test:usd": "python tests/playwright-usd-smoke.py",
     "test:i18n": "python tests/playwright-i18n-smoke.py",
+    "backend:dev": "python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload",
+    "backend:test": "python -m pytest -p no:cacheprovider backend/tests",
+    "backend:bridge-smoke": "node tests/backend-bridge-smoke.mjs",
     "check": "node tests/syntax-check.mjs"
   }
 }

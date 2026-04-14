@@ -1,9 +1,13 @@
 // Evidence/source governance helpers for quote-ready proposal workflow.
+import { hasMeaningfulConsumptionEvidence } from './consumption-evidence.js';
 
 export const EVIDENCE_GOVERNANCE_VERSION = 'GH-EVID-2026.04-v1';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_TODAY = '2026-04-13';
+
+export function currentDateIso() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function parseDate(value) {
   if (!value) return null;
@@ -11,7 +15,7 @@ function parseDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function todayDate(today = DEFAULT_TODAY) {
+function todayDate(today = currentDateIso()) {
   return parseDate(today) || new Date();
 }
 
@@ -50,28 +54,29 @@ function hasValidatedFile(record = {}) {
   return Array.isArray(record.files) && record.files.some(file => file.sha256 && file.validationStatus !== 'rejected');
 }
 
-export function isEvidenceFresh(record = {}, { today = DEFAULT_TODAY, maxAgeDays = 30 } = {}) {
+export function isEvidenceFresh(record = {}, { today = currentDateIso(), maxAgeDays = 30 } = {}) {
   const checked = parseDate(record.checkedAt || record.issuedAt);
   if (!checked) return false;
   return daysBetween(checked, todayDate(today)) <= maxAgeDays;
 }
 
-export function isEvidenceExpired(record = {}, { today = DEFAULT_TODAY } = {}) {
+export function isEvidenceExpired(record = {}, { today = currentDateIso() } = {}) {
   const validUntil = parseDate(record.validUntil);
   return !!validUntil && validUntil < todayDate(today);
 }
 
-export function buildEvidenceRegistry(state = {}, results = {}, { today = DEFAULT_TODAY } = {}) {
+export function buildEvidenceRegistry(state = {}, results = {}, { today = currentDateIso() } = {}) {
   const evidence = state.evidence || {};
   const tariffModel = results.tariffModel || {};
   const exportPolicy = tariffModel.exportCompensationPolicy || {};
   const supplier = state.bomCommercials || {};
+  const hasConsumptionEvidence = hasMeaningfulConsumptionEvidence(state);
 
   const registry = {
     customerBill: normalizeEvidenceRecord(evidence.customerBill, {
       type: 'customerBill',
-      status: state.hasSignedCustomerBillData || Array.isArray(state.monthlyConsumption) ? 'verified' : 'missing',
-      ref: evidence.customerBill?.ref || (Array.isArray(state.monthlyConsumption) ? 'monthly-consumption-input' : ''),
+      status: hasConsumptionEvidence ? 'verified' : 'missing',
+      ref: evidence.customerBill?.ref || (hasConsumptionEvidence ? 'consumption-evidence-input' : ''),
       checkedAt: evidence.customerBill?.checkedAt || null,
       sourceLabel: 'Customer bill / consumption evidence'
     }),
@@ -114,7 +119,7 @@ export function buildEvidenceRegistry(state = {}, results = {}, { today = DEFAUL
   return { version: EVIDENCE_GOVERNANCE_VERSION, today, registry, validation };
 }
 
-export function validateEvidenceRegistry(registry = {}, { today = DEFAULT_TODAY } = {}) {
+export function validateEvidenceRegistry(registry = {}, { today = currentDateIso() } = {}) {
   const blockers = [];
   const warnings = [];
   const required = ['customerBill', 'supplierQuote', 'tariffSource', 'regulationSource', 'gridApplication'];
@@ -155,7 +160,7 @@ export function isEvidenceComplete(evidenceGovernance) {
   return evidenceGovernance?.validation?.status === 'complete';
 }
 
-export function buildTariffSourceGovernance(tariffModel = {}, evidenceGovernance = null, { today = DEFAULT_TODAY } = {}) {
+export function buildTariffSourceGovernance(tariffModel = {}, evidenceGovernance = null, { today = currentDateIso() } = {}) {
   const tariffEvidence = evidenceGovernance?.registry?.tariffSource || {};
   const sourceDate = parseDate(tariffEvidence.checkedAt || tariffModel.sourceDate);
   const ageDays = sourceDate ? daysBetween(sourceDate, todayDate(today)) : null;
@@ -206,6 +211,13 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       segment: state.tariffType || null
     },
     system: {
+      scenario: state.scenarioContext || { key: state.scenarioKey || 'on-grid' },
+      engineSource: results.authoritativeEngineSource || results.engineSource || null,
+      authoritativeEngineSource: results.authoritativeEngineSource || results.engineSource || null,
+      authoritativeEngineMode: results.authoritativeEngineMode || results.calculationMode || null,
+      authoritativeEngineFallbackReason: results.authoritativeEngineFallbackReason || null,
+      authoritativeProduction: results.authoritativeEngineResponse?.production || null,
+      authoritativeLosses: results.authoritativeEngineResponse?.losses || null,
       panelType: state.panelType || null,
       inverterType: state.inverterType || null,
       systemPowerKwp: results.systemPower || null,

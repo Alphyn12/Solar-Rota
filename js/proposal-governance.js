@@ -1,4 +1,5 @@
 // Proposal governance, confidence, revision, and commercial workflow helpers.
+import { hasMeaningfulConsumptionEvidence } from './consumption-evidence.js';
 import { canApproveProposal, describeApprover, normalizeUserIdentity } from './identity.js';
 
 export const PROPOSAL_GOVERNANCE_VERSION = 'GH-PROP-2026.04-v1';
@@ -89,7 +90,7 @@ export function calculateProposalConfidence({ state = {}, results = {}, quoteRea
 
   if (results.usedFallback) add(25, 'PVGIS canlı veri yok.');
   if (!state.roofGeometry) add(15, 'Çatı geometrisi doğrulanmadı.');
-  if (!state.hasSignedCustomerBillData && !Array.isArray(state.monthlyConsumption)) add(15, 'Fatura/tüketim kanıtı yok.');
+  if (!hasMeaningfulConsumptionEvidence(state)) add(15, 'Fatura/tüketim kanıtı yok.');
   if (results.evidenceGovernance?.validation?.blockers?.length) add(Math.min(25, results.evidenceGovernance.validation.blockers.length * 5), 'Kanıt yönetimi eksik.');
   if (results.tariffSourceGovernance?.stale) add(12, 'Tarife kaynağı eski veya doğrulanmamış.');
   if (!state.quoteInputsVerified) add(10, 'Teklif varsayımları onaylanmadı.');
@@ -118,13 +119,19 @@ export function buildApprovalWorkflow(state = {}, confidence = null) {
   const blockers = [];
   if (safeState === 'approved') {
     if (!canApproveProposal(user) && !existingRecord) blockers.push('Yalnızca approver/admin rolü proposal onayı verebilir.');
+    if (state.results?.usedFallback) blockers.push('PVGIS canlı veri yok; fallback üretim quote-ready kabul edilmez.');
+    if (!state.roofGeometry) blockers.push('Çatı geometrisi harita/saha çizimiyle doğrulanmadı.');
     if (!state.quoteInputsVerified) blockers.push('Teklif varsayımları doğrulanmadan onay verilemez.');
-    if (!state.hasSignedCustomerBillData && !Array.isArray(state.monthlyConsumption)) blockers.push('Fatura/tüketim kanıtı olmadan onay verilemez.');
+    if (!hasMeaningfulConsumptionEvidence(state)) blockers.push('Fatura/tüketim kanıtı olmadan onay verilemez.');
     if (confidence && confidence.score < 85) blockers.push('Güven skoru 85 altında; quote-ready onay bloke edildi.');
     if (state.evidence?.customerBill?.status !== 'verified') blockers.push('Müşteri fatura kanıtı doğrulanmadan onay verilemez.');
     const supplierEvidenceOk = state.evidence?.supplierQuote?.status === 'verified' || state.bomCommercials?.supplierQuoteState === 'received';
     if (!supplierEvidenceOk) blockers.push('Tedarikçi teklif kanıtı doğrulanmadan onay verilemez.');
     if (state.evidence?.tariffSource?.status !== 'verified') blockers.push('Tarife kaynak kanıtı doğrulanmadan onay verilemez.');
+    if (state.gridApplicationChecklist && !isGridChecklistComplete(state.gridApplicationChecklist)) blockers.push('Şebeke başvuru kontrol listesi eksik.');
+    if (!state.gridApplicationChecklist) blockers.push('Şebeke başvuru kontrol listesi oluşturulmadı.');
+    if (state.results?.evidenceGovernance?.validation?.blockers?.length) blockers.push(...state.results.evidenceGovernance.validation.blockers);
+    if (Array.isArray(state.results?.calculationWarnings) && state.results.calculationWarnings.length) blockers.push(...state.results.calculationWarnings);
     if (existingRecord && current.approvedBy && current.approvedBy !== existingRecord.approvedBy) {
       blockers.push('Mevcut immutable onay kaydı sessizce değiştirilemez; yeni revizyon/onay süreci açılmalı.');
     }
@@ -153,7 +160,7 @@ export function buildApprovalWorkflow(state = {}, confidence = null) {
   };
 }
 
-export function calculateBomCommercials(subtotal = 0, state = {}) {
+export function calculateBomCommercials(subtotal = 0, state = {}, { today = new Date().toISOString().slice(0, 10) } = {}) {
   const cfg = state.bomCommercials || {};
   const marginRate = pct(cfg.marginRate, 0.18);
   const contingencyRate = pct(cfg.contingencyRate, 0.05);
@@ -170,7 +177,7 @@ export function calculateBomCommercials(subtotal = 0, state = {}) {
     supplierQuoteRef: cfg.supplierQuoteRef || '',
     supplierQuoteDate: cfg.supplierQuoteDate || null,
     supplierQuoteValidUntil: validUntil,
-    quoteExpired: validUntil ? new Date(`${validUntil}T00:00:00Z`) < new Date('2026-04-13T00:00:00Z') : false,
+    quoteExpired: validUntil ? new Date(`${validUntil}T00:00:00Z`) < new Date(`${today}T00:00:00Z`) : false,
     subtotal: Math.round(baseSubtotal),
     contingency: Math.round(contingency),
     margin: Math.round(margin),

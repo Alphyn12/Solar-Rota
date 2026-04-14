@@ -12,6 +12,13 @@ assert.equal(isEvidenceFresh({ checkedAt: '2026-04-01' }, { today: '2026-04-13',
 assert.equal(isEvidenceFresh({ checkedAt: '2026-01-01' }, { today: '2026-04-13', maxAgeDays: 45 }), false);
 assert.equal(isEvidenceExpired({ validUntil: '2026-04-01' }, { today: '2026-04-13' }), true);
 
+const emptyMonthlyRegistry = buildEvidenceRegistry(
+  { hasSignedCustomerBillData: false, monthlyConsumption: new Array(12).fill(0), evidence: {} },
+  {},
+  { today: '2026-04-13' }
+);
+assert.equal(emptyMonthlyRegistry.registry.customerBill.status, 'missing');
+
 const registry = buildEvidenceRegistry(
   {
     hasSignedCustomerBillData: true,

@@ -51,8 +51,12 @@ export function import8760Csv(file) {
       .split(/[\s,;]+/)
       .map(v => Number(String(v).replace(',', '.')))
       .filter(v => Number.isFinite(v) && v >= 0);
-    if (values.length < 24) {
-      window.showToast?.('CSV içinde yeterli saatlik tüketim değeri bulunamadı.', 'error');
+    if (values.length !== 8760) {
+      window.showToast?.(`CSV tam 8760 saatlik tüketim değeri içermeli. Bulunan: ${values.length.toLocaleString('tr-TR')}.`, 'error');
+      return;
+    }
+    if (values.reduce((a, b) => a + b, 0) <= 0) {
+      window.showToast?.('CSV tüketim profili sıfırdan büyük toplam kWh içermeli.', 'error');
       return;
     }
     let cursor = 0;
@@ -63,27 +67,30 @@ export function import8760Csv(file) {
       return Math.round(sum);
     });
     window.state.monthlyConsumption = monthly;
-    window.state.hourlyConsumption8760 = values.slice(0, 8760);
+    window.state.hourlyConsumption8760 = values;
     window.state.dailyConsumption = monthly.reduce((a, b) => a + b, 0) / 365;
     MONTHS.forEach((_, i) => {
       const el = document.getElementById(`bill-${i}`);
       if (el) el.value = monthly[i] || 0;
     });
-    onBillInput();
-    window.showToast?.(`${Math.min(values.length, 8760).toLocaleString('tr-TR')} saatlik değer içe aktarıldı.`, 'success');
+    onBillInput({ preserveHourly: true });
+    window.showToast?.('8760 saatlik tüketim profili içe aktarıldı.', 'success');
   };
   reader.readAsText(file);
 }
 
-export function onBillInput() {
+export function onBillInput({ preserveHourly = false } = {}) {
   const state = window.state;
+  let hasAnyInput = false;
   const values = MONTHS.map((_, i) => {
     const el = document.getElementById(`bill-${i}`);
+    if (el && String(el.value).trim() !== '') hasAnyInput = true;
     return el ? (parseFloat(el.value) || 0) : 0;
   });
-  state.monthlyConsumption = values;
-
   const total = values.reduce((a, b) => a + b, 0);
+  state.monthlyConsumption = hasAnyInput && total > 0 ? values : null;
+  if (!preserveHourly) state.hourlyConsumption8760 = null;
+
   const daily = total > 0 ? (total / 365).toFixed(2) : 0;
 
   const summaryEl = document.getElementById('bill-summary');
@@ -118,6 +125,7 @@ export function billClear() {
   });
   const state = window.state;
   state.monthlyConsumption = null;
+  state.hourlyConsumption8760 = null;
   const summaryEl = document.getElementById('bill-summary');
   if (summaryEl) summaryEl.textContent = '';
 }

@@ -17,6 +17,10 @@ import {
 import { buildQuoteReadiness } from './turkey-regulation.js';
 import { buildProposalGovernance } from './proposal-governance.js';
 import { buildEvidenceRegistry, buildTariffSourceGovernance } from './evidence-governance.js';
+import { hasCompleteHourlyProfile8760, hasMeaningfulMonthlyConsumption } from './consumption-evidence.js';
+import { buildPvEngineRequest } from './pv-engine-contracts.js';
+import { sourceMetaForCurrentCalculation } from './solar-engine-adapter.js';
+import { scenarioSourceQualityNote } from './scenario-workflows.js';
 
 const LOADING_MSGS = [
   "PVGIS'ten güneş ışınım verisi alınıyor...",
@@ -303,23 +307,57 @@ export async function runCalculation() {
     window.goToStep(3); return;
   }
 
-  const panelCount    = validSections.reduce((s, r) => s + r.panelCount, 0);
-  const systemPower   = validSections.reduce((s, r) => s + r.systemPower, 0);
-  const adjustedEnergy= validSections.reduce((s, r) => s + r.annualEnergy, 0);
-  const monthlyData   = validSections.reduce((agg, r) => agg.map((v,i) => v + r.monthlyData[i]), new Array(12).fill(0));
-  const usedFallback  = validSections.some(r => r.usedFallback);
-  const pvgisRawEnergy= validSections.reduce((s, r) => s + r.pvgisRawEnergy, 0);
+  let panelCount    = validSections.reduce((s, r) => s + r.panelCount, 0);
+  let systemPower   = validSections.reduce((s, r) => s + r.systemPower, 0);
+  let adjustedEnergy= validSections.reduce((s, r) => s + r.annualEnergy, 0);
+  let monthlyData   = validSections.reduce((agg, r) => agg.map((v,i) => v + r.monthlyData[i]), new Array(12).fill(0));
+  let usedFallback  = validSections.some(r => r.usedFallback);
+  let pvgisRawEnergy= validSections.reduce((s, r) => s + r.pvgisRawEnergy, 0);
   const pvgisPoaWeighted = validSections.reduce((s, r) => s + (Number(r.pvgisPoa) || 0) * r.systemPower, 0);
-  const pvgisPoa = systemPower > 0 ? pvgisPoaWeighted / systemPower : 0;
-  const shadingLoss   = validSections.reduce((s, r) => s + r.shadingLoss, 0);
-  const tempLossEnergy= validSections.reduce((s, r) => s + r.tempLossEnergy, 0);
-  const azimuthLossEnergy   = validSections.reduce((s, r) => s + r.azimuthLossEnergy, 0);
-  const bifacialGainEnergy  = validSections.reduce((s, r) => s + r.bifacialGainEnergy, 0);
-  const soilingLoss         = validSections.reduce((s, r) => s + r.soilingLoss, 0);
-  const totalCableLoss      = validSections.reduce((s, r) => s + (r.cableLoss || 0), 0);
-  const effectiveShadingFactor = systemPower > 0
+  let pvgisPoa = systemPower > 0 ? pvgisPoaWeighted / systemPower : 0;
+  let shadingLoss   = validSections.reduce((s, r) => s + r.shadingLoss, 0);
+  let tempLossEnergy= validSections.reduce((s, r) => s + r.tempLossEnergy, 0);
+  let azimuthLossEnergy   = validSections.reduce((s, r) => s + r.azimuthLossEnergy, 0);
+  let bifacialGainEnergy  = validSections.reduce((s, r) => s + r.bifacialGainEnergy, 0);
+  let soilingLoss         = validSections.reduce((s, r) => s + r.soilingLoss, 0);
+  let totalCableLoss      = validSections.reduce((s, r) => s + (r.cableLoss || 0), 0);
+  let effectiveShadingFactor = systemPower > 0
     ? validSections.reduce((s, r) => s + (Number(r.effectiveShadingFactor) || 0) * r.systemPower, 0) / systemPower
     : Number(state.shadingFactor) || 0;
+  const localProductionSnapshot = {
+    annualEnergy: adjustedEnergy,
+    monthlyData: monthlyData.slice(),
+    systemPower,
+    panelCount,
+    usedFallback,
+    pvgisRawEnergy,
+    pvgisPoa
+  };
+  const authoritativeOverride = state.authoritativeEngineOverride;
+  const authoritativeBackend = authoritativeOverride?.engineSource?.pvlibBacked && !authoritativeOverride?.fallbackUsed && !authoritativeOverride?.engineSource?.fallbackUsed
+    ? authoritativeOverride
+    : null;
+  if (authoritativeBackend) {
+    const bp = authoritativeBackend.production || {};
+    const bl = authoritativeBackend.losses || {};
+    adjustedEnergy = Math.round(Number(bp.annualEnergyKwh || bp.annual_kwh || adjustedEnergy));
+    const backendMonthly = Array.isArray(bp.monthlyEnergyKwh) ? bp.monthlyEnergyKwh : bp.monthly_kwh;
+    if (Array.isArray(backendMonthly) && backendMonthly.length === 12) monthlyData = backendMonthly.map(v => Math.round(Number(v) || 0));
+    systemPower = Number(bp.systemPowerKwp || systemPower);
+    panelCount = Number(bp.panelCount || panelCount);
+    usedFallback = false;
+    pvgisRawEnergy = Math.round(Number(bl.dcAnnualKwh || bl.acAnnualKwh || bp.annualEnergyKwh || adjustedEnergy));
+    pvgisPoa = Number(bl.poaAnnualKwhM2 || pvgisPoa || state.ghi || 0);
+    shadingLoss = Math.round(pvgisRawEnergy * ((Number(bl.shadingPct ?? state.shadingFactor) || 0) / 100));
+    soilingLoss = Math.round(pvgisRawEnergy * ((Number(bl.soilingPct ?? state.soilingFactor) || 0) / 100));
+    tempLossEnergy = Math.max(0, Math.round((Number(bl.dcAnnualKwh || adjustedEnergy) || adjustedEnergy) - adjustedEnergy));
+    azimuthLossEnergy = 0;
+    bifacialGainEnergy = state.panelType === 'bifacial' ? Math.max(0, Math.round(adjustedEnergy * 0.05)) : 0;
+    totalCableLoss = Math.max(0, Math.round(Number(bl.clippingKwh || 0)));
+    effectiveShadingFactor = Number(bl.shadingPct ?? state.shadingFactor ?? effectiveShadingFactor);
+    const banner = document.getElementById('fallback-banner');
+    if (banner) banner.style.display = 'none';
+  }
 
   clearInterval(msgInterval);
   setLoadingProgress(100, 3);
@@ -386,7 +424,7 @@ export async function runCalculation() {
   const extraMonthlyLoad = sumMonthlyArrays(evLoad.monthlyKwh, heatPumpLoad.monthlyKwh);
   const monthlyLoad = getMonthlyLoadKwh(state, extraMonthlyLoad);
   const baseMonthlyLoad = getMonthlyLoadKwh(state, 0);
-  const baseHourlyLoad = Array.isArray(state.hourlyConsumption8760) && state.hourlyConsumption8760.length >= 8760
+  const baseHourlyLoad = hasCompleteHourlyProfile8760(state.hourlyConsumption8760)
     ? state.hourlyConsumption8760.slice(0, 8760).map(v => Math.max(0, Number(v) || 0))
     : buildBaseHourlyLoad8760(baseMonthlyLoad, state.tariffType);
   const hourlyLoad8760 = combineHourlyLoads(baseHourlyLoad, evLoad.hourly8760, heatPumpLoad.hourly8760);
@@ -496,9 +534,13 @@ export async function runCalculation() {
   const ysp  = systemPower > 0 ? (adjustedEnergy / systemPower).toFixed(0) : 0;
   const cf   = systemPower > 0 ? ((adjustedEnergy / (systemPower * 8760)) * 100).toFixed(1) : 0;
   const psh  = systemPower > 0 ? adjustedEnergy / (systemPower * 365) : 0;
-  const pr = (systemPower > 0 && state.ghi > 0)
-    ? (adjustedEnergy / (systemPower * (pvgisPoa || state.ghi)))
-    : (adjustedEnergy / (pvgisRawEnergy || 1));
+  // PR = E_AC / (G_POA × P_STC). pvgisPoa öncelikli; yoksa pvgisRawEnergy (kayıpsız PVGIS çıkışı)
+  // kullan. state.ghi (yatay GHI) POA'dan farklı olduğu için son çare olarak kullanılır.
+  const pr = (systemPower > 0 && pvgisPoa > 0)
+    ? (adjustedEnergy / (systemPower * pvgisPoa))
+    : pvgisRawEnergy > 0
+      ? (adjustedEnergy / pvgisRawEnergy)
+      : (systemPower > 0 && state.ghi > 0 ? adjustedEnergy / (systemPower * state.ghi) : 0);
 
   // ── Yapısal Kontrol ──────────────────────────────────────────────────────────
   let structuralCheck = null;
@@ -511,7 +553,7 @@ export async function runCalculation() {
   if (state.taxEnabled && state.tax) {
     taxMetrics = calculateTaxBenefits(totalCost, npvTotal, state.tax, discountRate, kdv);
   }
-  const billAnalysis = state.billAnalysisEnabled && Array.isArray(state.monthlyConsumption)
+  const billAnalysis = state.billAnalysisEnabled && hasMeaningfulMonthlyConsumption(state.monthlyConsumption)
     ? calculateBillAnalysis(state.monthlyConsumption, monthlyData, tariff)
     : null;
 
@@ -555,8 +597,21 @@ export async function runCalculation() {
     displayCurrency: state.displayCurrency || 'TRY',
     usdToTry: state.usdToTry || 38.5,
     netMeteringEnabled: !!state.netMeteringEnabled,
-    calculationMode: usedFallback ? 'fallback-psh' : 'pvgis-live',
-    pvgisFailReason: usedFallback ? (window._pvgisLastError || 'unknown') : null,
+    calculationMode: authoritativeBackend ? 'python-pvlib-backed' : usedFallback ? 'fallback-psh' : 'pvgis-live',
+    engineSource: authoritativeBackend?.engineSource || sourceMetaForCurrentCalculation({ usedFallback }),
+    engineRequest: buildPvEngineRequest(state),
+    sourceQualityNote: authoritativeBackend
+      ? scenarioSourceQualityNote(state.scenarioKey, 'python-backend')
+      : scenarioSourceQualityNote(state.scenarioKey, usedFallback ? 'fallback-psh' : 'pvgis-live'),
+    pvgisFailReason: usedFallback && !authoritativeBackend ? (window._pvgisLastError || 'unknown') : null,
+    authoritativeEngineSource: authoritativeBackend?.engineSource || sourceMetaForCurrentCalculation({ usedFallback }),
+    authoritativeEngineResponse: authoritativeBackend || null,
+    authoritativeEngineMode: authoritativeBackend ? 'python-pvlib-backed' : usedFallback ? 'local-fallback' : 'browser-pvgis',
+    authoritativeEngineFallbackReason: authoritativeBackend ? null : state.authoritativeEngineFallbackReason || (usedFallback ? (window._pvgisLastError || 'PVGIS unavailable; local fallback used.') : null),
+    localProductionSnapshot,
+    backendEngineSource: authoritativeBackend ? null : undefined,
+    backendEngineResponse: authoritativeBackend ? null : undefined,
+    backendCalculationMode: authoritativeBackend ? null : undefined,
     hourlySummary: hourlySummaryRaw,
     batterySummary,
     monthlyLoad,
@@ -623,7 +678,8 @@ function calculateEVMetrics(annualEnergy, dailyConsumption, ev, tariff) {
   const electricityCost = annual_kWh * tariff;
   const netSaving = fuelCostSaved - electricityCost;
 
-  const panelArea = 1.134 * 1.762;
+  const _evPanel = PANEL_TYPES[window.state?.panelType || 'mono'];
+  const panelArea = (_evPanel?.width || 1.134) * (_evPanel?.height || 1.762);
   const productionPerPanel = annualEnergy / Math.max(1, Math.floor(window.state.roofArea * 0.75 / panelArea));
   const additionalPanels = productionPerPanel > 0 ? Math.ceil(annual_kWh / productionPerPanel) : 0;
 
@@ -714,7 +770,9 @@ function calculateTaxBenefits(totalCost, npvBase, tax, discountRate, kdvAmount =
   };
 }
 
-// window'a expose et
-window.runCalculation = runCalculation;
+// BUG-13 fix: Do NOT expose runCalculation directly on window — app.js imports it from
+// calculation-service.js which wraps this function with the Python backend adapter.
+// A bare window.runCalculation would bypass the adapter, silently skipping pvlib/backend.
+// Use window.runCalculationService (set in calculation-service.js) for console/debug calls.
 window.calculateBatteryMetrics = calculateBatteryMetrics;
 window.calculateNMMetrics = calculateNMMetrics;

@@ -42,6 +42,6 @@ const snapshot = createShareStateSnapshot({
 });
 assert.equal(snapshot.cityName, 'Izmir');
 assert.equal('results' in snapshot, false);
-assert.equal(snapshot.roofSections[0].tilt, 70);
+assert.equal(snapshot.roofSections[0].tilt, 90);
 
 console.log('security state tests passed');

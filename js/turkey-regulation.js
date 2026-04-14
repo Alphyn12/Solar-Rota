@@ -2,6 +2,7 @@
 // This module centralizes date-sensitive regulatory assumptions so quote output
 // can expose exactly which rule set was used.
 import { isEvidenceComplete } from './evidence-governance.js';
+import { hasMeaningfulConsumptionEvidence } from './consumption-evidence.js';
 
 export const TURKEY_REGULATORY_VERSION = 'TR-REG-2026.04.13';
 
@@ -185,7 +186,7 @@ export function buildQuoteReadiness({ state = {}, results = {}, tariffModel = nu
   if (results.usedFallback) blockers.push('PVGIS canlı veri yok; fallback üretim quote-ready kabul edilmez.');
   if (!state.roofGeometry) blockers.push('Çatı geometrisi harita/saha çizimiyle doğrulanmadı.');
   if (!state.quoteInputsVerified) blockers.push('Teklif varsayımları yetkili kullanıcı tarafından doğrulanmadı.');
-  if (!state.hasSignedCustomerBillData && !Array.isArray(state.monthlyConsumption)) blockers.push('Müşteri fatura/tüketim verisi doğrulanmadı.');
+  if (!hasMeaningfulConsumptionEvidence(state)) blockers.push('Müşteri fatura/tüketim verisi doğrulanmadı.');
   if (!tariffModel?.regulation?.effectiveRegime) blockers.push('Tarife rejimi belirlenemedi.');
   if (tariffModel?.regulation?.warnings?.length) blockers.push(...tariffModel.regulation.warnings);
   if (!tariffModel?.exportCompensationPolicy?.sources?.length) blockers.push('İhracat mahsuplaşma kaynağı kayıtlı değil.');

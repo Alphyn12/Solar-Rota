@@ -9,6 +9,7 @@ import {
 import {
   applyExportCompensation, buildExportCompensationPolicy, determineSkttRegime, TARIFF_DATA_LIFECYCLE
 } from './turkey-regulation.js';
+import { hasMeaningfulMonthlyConsumption } from './consumption-evidence.js';
 
 export const METHODOLOGY_VERSION = 'GH-CALC-2026.04-v2.1';
 export const PVGIS_LOSS_PARAM = 0;
@@ -36,7 +37,7 @@ export function getSeasonForMonth(monthIdx) {
 }
 
 export function getMonthlyLoadKwh(state, extraAnnualLoad = 0) {
-  const base = Array.isArray(state.monthlyConsumption) && state.monthlyConsumption.some(v => Number(v) > 0)
+  const base = hasMeaningfulMonthlyConsumption(state.monthlyConsumption)
     ? state.monthlyConsumption.map(v => Math.max(0, Number(v) || 0))
     : new Array(12).fill(Math.max(0, Number(state.dailyConsumption) || 0) * 365 / 12);
 

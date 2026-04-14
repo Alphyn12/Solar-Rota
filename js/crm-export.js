@@ -16,6 +16,7 @@ export function buildCrmLeadExport(state = {}, results = {}) {
       name: state.customerName || null,
       cityName: state.cityName || null,
       segment: state.tariffType || null,
+      scenario: state.scenarioContext?.label || state.scenarioKey || null,
       coordinates: state.lat && state.lon ? { lat: state.lat, lon: state.lon } : null
     },
     qualification: {

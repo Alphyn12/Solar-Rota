@@ -24,12 +24,19 @@ assert.equal(validFile.ok, true);
 
 const approval = buildApprovalWorkflow({
   userIdentity: approver,
+  roofGeometry: { areaM2: 80 },
   quoteInputsVerified: true,
   hasSignedCustomerBillData: true,
   evidence: {
     customerBill: { status: 'verified' },
     supplierQuote: { status: 'verified' },
     tariffSource: { status: 'verified' }
+  },
+  bomCommercials: { supplierQuoteState: 'received' },
+  gridApplicationChecklist: {
+    bill: { done: true }, titleOrLease: { done: true }, connectionOpinion: { done: true },
+    singleLine: { done: true }, staticReview: { done: true }, layout: { done: true },
+    inverterDocs: { done: true }, metering: { done: true }
   },
   proposalApproval: { state: 'approved' }
 }, { score: 90 });
@@ -38,12 +45,19 @@ assert.ok(approval.approvalRecord.immutable);
 
 const blocked = buildApprovalWorkflow({
   userIdentity: { name: 'Satis', role: 'sales' },
+  roofGeometry: { areaM2: 80 },
   quoteInputsVerified: true,
   hasSignedCustomerBillData: true,
   evidence: {
     customerBill: { status: 'verified' },
     supplierQuote: { status: 'verified' },
     tariffSource: { status: 'verified' }
+  },
+  bomCommercials: { supplierQuoteState: 'received' },
+  gridApplicationChecklist: {
+    bill: { done: true }, titleOrLease: { done: true }, connectionOpinion: { done: true },
+    singleLine: { done: true }, staticReview: { done: true }, layout: { done: true },
+    inverterDocs: { done: true }, metering: { done: true }
   },
   proposalApproval: { state: 'approved' }
 }, { score: 90 });

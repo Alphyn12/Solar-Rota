@@ -7,15 +7,16 @@
 <meta name="description" content="Türkiye'nin en kapsamlı güneş paneli enerji ve yatırım hesaplama aracı."/>
 <link rel="manifest" href="/manifest.json"/>
 <meta name="theme-color" content="#F59E0B"/>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" crossorigin="anonymous"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" integrity="sha384-NZLkVuBRMEeB4VeZz27WwTRvlhec30biQ8Xx7zG7JJnkvEKRg5qi6BNbEXo9ydwv" crossorigin="anonymous"/>
 <link rel="stylesheet" href="css/components.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js" crossorigin="anonymous"></script>
+<!-- TODO(csp): migrate remaining inline event handlers/styles to JS modules, then remove 'unsafe-inline' from CSP. -->
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js" integrity="sha384-JP5UPxIO2Tm2o79Fb0tGYMa44jkWar53aBoCbd8ah0+LcCDoohTIYr+zIXyfGIJN" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"
-  crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+  integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" crossorigin="anonymous"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -744,6 +745,38 @@ input[type=range]::-moz-range-thumb{
 .section-table td{padding:7px 10px;border-bottom:1px solid rgba(71,85,105,0.2)}
 .section-table td:not(:first-child){text-align:right}
 .section-table tr.section-total-row td{border-top:2px solid var(--border);font-weight:700;color:var(--primary);border-bottom:none}
+
+/* ── SCENARIO-FIRST COMMERCIAL PROPOSAL UI ── */
+.proposal-hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr);gap:22px;align-items:center;margin-bottom:22px;padding:24px;border:1px solid rgba(245,158,11,.24);border-radius:8px;background:linear-gradient(135deg,rgba(15,23,42,.96),rgba(30,41,59,.82));box-shadow:var(--shadow-card)}
+.proposal-hero-copy{display:grid;gap:14px}
+.proposal-hero-kicker{font-size:.78rem;letter-spacing:0;text-transform:uppercase;color:var(--primary);font-weight:800}
+.proposal-hero-title{font-family:var(--font-display);font-size:3rem;line-height:1.02;color:var(--text);max-width:760px}
+.proposal-hero-title span{color:var(--primary)}
+.proposal-hero-sub{font-size:1rem;color:var(--text-muted);line-height:1.7;max-width:760px}
+.proposal-proof-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:4px}
+.proposal-proof{border:1px solid var(--border-subtle);border-radius:8px;padding:11px 12px;background:rgba(255,255,255,.04);min-height:76px}
+.proposal-proof strong{display:block;color:var(--text);font-size:.9rem;margin-bottom:4px}
+.proposal-proof span{display:block;color:var(--text-muted);font-size:.76rem;line-height:1.45}
+.solar-art-panel{display:grid;place-items:center;min-height:270px;border-radius:8px;background:radial-gradient(circle at 50% 25%,rgba(245,158,11,.2),transparent 58%),rgba(2,6,23,.36);border:1px solid rgba(255,255,255,.08);overflow:hidden}
+.solar-art-mark{width:min(280px,80%);height:auto;filter:drop-shadow(0 18px 32px rgba(0,0,0,.38));transition:transform .35s ease}
+.solar-art-panel:hover .solar-art-mark{transform:translateY(-4px) scale(1.02)}
+.scenario-card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.scenario-choice-card{border:1px solid var(--border-subtle);border-radius:8px;padding:16px;background:rgba(15,23,42,.72);color:var(--text);text-align:left;display:grid;gap:8px;cursor:pointer;min-height:160px;transition:border-color .2s ease,transform .2s ease,background .2s ease}
+.scenario-choice-card:hover{transform:translateY(-2px);border-color:rgba(245,158,11,.45);background:rgba(30,41,59,.9)}
+.scenario-choice-card.selected{border-color:var(--primary);background:rgba(245,158,11,.1);box-shadow:0 0 0 1px rgba(245,158,11,.25)}
+.scenario-choice-card strong{font-family:var(--font-display);font-size:1rem;color:var(--text)}
+.scenario-choice-card span{font-size:.78rem;color:var(--text-muted);line-height:1.45}
+.scenario-choice-kicker{font-size:.68rem!important;color:var(--primary)!important;text-transform:uppercase;font-weight:800;letter-spacing:0}
+.scenario-summary{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;border:1px solid rgba(6,182,212,.25);border-radius:8px;padding:12px 14px;background:rgba(6,182,212,.07);margin-bottom:18px}
+.scenario-summary strong{color:var(--accent);display:block;margin-bottom:3px}
+.scenario-summary span,.scenario-summary em{display:block;color:var(--text-muted);font-size:.8rem;line-height:1.45;font-style:normal}
+.scenario-guidance{display:grid;gap:5px;border:1px solid rgba(245,158,11,.22);border-radius:8px;padding:12px 14px;background:rgba(245,158,11,.06);font-size:.8rem;color:var(--text-muted);margin-bottom:14px}
+.scenario-guidance strong{color:var(--primary)}
+.result-context-strip{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;border:1px solid rgba(16,185,129,.24);border-radius:8px;background:rgba(16,185,129,.07);padding:12px 14px;margin-bottom:16px;color:var(--text-muted);font-size:.84rem}
+.result-context-strip strong{color:#A7F3D0}
+.compact-governance{opacity:.82}
+@media(max-width:960px){.proposal-hero{grid-template-columns:1fr}.scenario-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.proposal-proof-row{grid-template-columns:1fr}.solar-art-panel{min-height:220px}}
+@media(max-width:640px){.proposal-hero{padding:18px}.scenario-card-grid{grid-template-columns:1fr}.proposal-hero-title{font-size:2rem}}
 </style>
 </head>
 <body>
@@ -836,6 +869,29 @@ input[type=range]::-moz-range-thumb{
     <h1 class="step-heading-title">Konumunuzu Seçin</h1>
     <p class="step-heading-sub">Türkiye'deki güneş potansiyelinizi keşfetmek için şehrinizi işaretleyin veya haritada bir nokta seçin.</p>
   </div>
+  <section class="proposal-hero" aria-labelledby="proposal-hero-title">
+    <div class="proposal-hero-copy">
+      <div class="proposal-hero-kicker" data-i18n="hero.kicker">Solar proposal platform</div>
+      <h2 class="proposal-hero-title" id="proposal-hero-title" data-i18n="hero.title">Saha, üretim, finans ve onay akışını tek <span>teklif merkezinde</span> birleştirin.</h2>
+      <p class="proposal-hero-sub" data-i18n="hero.subtitle">Senaryoyu seçin; GüneşHesap varsayımları, görünür modülleri, kanıt kontrollerini ve teklif dilini buna göre ayarlasın.</p>
+      <div class="proposal-proof-row" aria-label="Platform güven göstergeleri">
+        <div class="proposal-proof"><strong data-i18n="hero.proof.engineering">Engineering-grade path</strong><span data-i18n="hero.proof.engineeringText">PVGIS/JS with a Python backend pilot and pvlib-ready contract.</span></div>
+        <div class="proposal-proof"><strong data-i18n="hero.proof.governance">Quote governance</strong><span data-i18n="hero.proof.governanceText">Evidence, approval, source freshness, and audit controls stay active.</span></div>
+        <div class="proposal-proof"><strong data-i18n="hero.proof.client">Client-facing output</strong><span data-i18n="hero.proof.clientText">Savings, ROI, confidence, and next actions are framed for decisions.</span></div>
+      </div>
+    </div>
+    <div class="solar-art-panel" id="solar-art-mount" aria-hidden="true"></div>
+  </section>
+
+  <section aria-labelledby="scenario-title">
+    <div class="step-heading" style="margin-bottom:14px">
+      <div class="step-heading-eyebrow" id="scenario-step-label">Grid-connected proposal workflow</div>
+      <h2 class="step-heading-title" id="scenario-title" style="font-size:1.65rem" data-i18n="scenario.title">Önce çözüm senaryosunu seçin</h2>
+      <p class="step-heading-sub" data-i18n="scenario.subtitle">Seçim; varsayımları, görünür modülleri, sonuç dilini ve önerilen sonraki adımları değiştirir.</p>
+    </div>
+    <div class="scenario-card-grid" id="scenario-card-grid"></div>
+    <div class="scenario-summary" id="scenario-selected-summary" aria-live="polite"></div>
+  </section>
   <div class="two-col">
     <div>
       <div class="card">
@@ -1157,6 +1213,7 @@ input[type=range]::-moz-range-thumb{
             <option value="residential" selected>Konut</option>
             <option value="commercial">Ticari</option>
             <option value="industrial">Sanayi</option>
+            <option value="agriculture">Tarımsal Sulama</option>
             <option value="custom">Özel</option>
           </select>
         </div>
@@ -1254,7 +1311,7 @@ input[type=range]::-moz-range-thumb{
         </div>
         <div>
           <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Kaynak Kontrol Tarihi</div>
-          <input type="date" id="tariff-source-checked-at" value="2026-04-13"
+          <input type="date" id="tariff-source-checked-at"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:160px;font-size:0.9rem"
             oninput="updateTariffAssumptions()"/>
         </div>
@@ -1334,11 +1391,13 @@ input[type=range]::-moz-range-thumb{
       <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px" id="tariff-desc">2026 tarife seçimi: mesken yıllık 4.000 kWh, mesken dışı 15.000 kWh SKTT eşiğiyle değerlendirilir. Birim fiyatları faturanızdan doğrulayın.</div>
     </div>
 
-    <div class="advanced-feature-block" style="margin-bottom:18px">
+    <div class="scenario-guidance" id="scenario-guidance-panel"></div>
+
+    <div class="advanced-feature-block" id="proposal-governance-block" style="margin-bottom:18px">
       <div class="feature-toggle-head">
         <div>
-          <div style="font-weight:700;color:var(--text);font-size:0.9rem">Proposal Governance</div>
-          <div style="font-size:0.74rem;color:var(--text-muted)">Onay, marj, finansman ve bakım varsayımları</div>
+          <div style="font-weight:700;color:var(--text);font-size:0.9rem" data-i18n="governance.title">Proposal Governance</div>
+          <div style="font-size:0.74rem;color:var(--text-muted)" data-i18n="governance.subtitle">Onay, marj, finansman ve bakım varsayımları</div>
         </div>
       </div>
       <div class="feature-toggle-body">
@@ -1545,7 +1604,7 @@ input[type=range]::-moz-range-thumb{
           </label>
           <input type="number" id="usd-try-input-nm" value="38.5" min="1" step="0.5"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:140px;font-size:0.9rem"
-            oninput="setManualUsdTryRate(this.value); const el=document.getElementById('usd-try-input'); if(el) el.value=this.value"/>
+            oninput="setManualUsdTryRate(this.value); const el=document.getElementById('usd-try-input'); if(el) el.value=this.value; updateTariffAssumptions(); if (state.results) renderResults()"/>
         </div>
       </div>
     </div>
@@ -1951,6 +2010,10 @@ input[type=range]::-moz-range-thumb{
     <div class="step-heading-eyebrow">Adım 5 / 5</div>
     <h1 class="step-heading-title">Sonuçlarınız Hazır</h1>
     <p class="step-heading-sub">25 yıllık enerji üretimi ve finansal projeksiyon. Tüm hesaplar aşağıda şeffaf biçimde gösterilmektedir.</p>
+  </div>
+  <div class="result-context-strip">
+    <div><strong id="result-scenario-label">On-Grid</strong> <span id="result-scenario-frame">Grid-connected savings and proposal readiness</span></div>
+    <div id="result-engine-source">Engine: PVGIS hybrid JS</div>
   </div>
   <div class="results-hero" aria-hidden="true"><div class="results-glow"></div></div>
   <div class="kpi-grid">

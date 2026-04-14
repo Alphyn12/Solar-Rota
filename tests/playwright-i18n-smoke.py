@@ -24,6 +24,7 @@ def main():
             page.wait_for_load_state("networkidle")
             page.click('[data-lang="en"]')
             page.wait_for_function("document.querySelector('#step-1 .step-heading-title')?.textContent === 'Select Your Location'")
+            page.wait_for_function("document.querySelector('#scenario-title')?.textContent === 'Choose the solution scenario first'")
             assert page.evaluate("localStorage.getItem('guneshesap_lang')") == "en"
             assert page.locator(".chart-title").first.inner_text() == "Monthly Energy Production (kWh)"
             page.reload()
