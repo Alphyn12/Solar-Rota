@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // COMPARISON — Rekabetçi Teklif Karşılaştırma (Faz D4)
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 import { PANEL_TYPES, INVERTER_TYPES } from './data.js';
 import {

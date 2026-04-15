@@ -1,18 +1,18 @@
 // ═══════════════════════════════════════════════════════════
 // CALC ENGINE — Hesaplama motoru
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 import {
   PANEL_TYPES, BATTERY_MODELS, PSH_FALLBACK, CITY_SUMMER_TEMPS,
   MONTH_WEIGHTS, INVERTER_TYPES, HEAT_PUMP_DATA
 } from './data.js';
-import { calculateBomTotal, selectBomItems } from './bom.js';
+import { calculateBomTotal, getActiveBomCategories, selectBomItems } from './bom.js';
 import {
   METHODOLOGY_VERSION, PVGIS_LOSS_PARAM, buildTariffModel, calcIRR,
   calculateEVLoad, calculateHeatPumpLoad, calculateSystemLayout,
   combineHourlyLoads, computeFinancialTable, detectCalculationWarnings,
   getMonthlyLoadKwh, buildBaseHourlyLoad8760, simulateBatteryOnHourlySummary,
-  simulateHourlyEnergy, sumMonthlyArrays
+  simulateHourlyEnergy, resolveTaxTreatment, sumMonthlyArrays, normalizeMonthlyProductionToAnnual
 } from './calc-core.js';
 import { buildQuoteReadiness } from './turkey-regulation.js';
 import { buildProposalGovernance } from './proposal-governance.js';
@@ -133,11 +133,13 @@ export function calculateNMMetrics(annualEnergy, systemPower, dailyConsumption, 
     selfConsumedEnergy: Math.round(selfConsumedEnergy),
     selfConsumptionPct: (selfConsumptionRatio * 100).toFixed(1),
     isLicenseFree: true,
-    systemType: tariffModel?.exportCompensationPolicy?.interval === 'hourly'
+    systemType: (batterySummary?.exportPolicy || hourlySummary?.exportPolicy || tariffModel?.exportCompensationPolicy)?.interval === 'hourly'
       ? 'Lisanssız Üretim — Saatlik mahsuplaşma + yıllık tüketim ihracat sınırı'
+      : (batterySummary?.exportPolicy || hourlySummary?.exportPolicy || tariffModel?.exportCompensationPolicy)?.interval === 'monthly-aggregate-no-hourly-settlement'
+      ? 'Lisanssız Üretim — Saatlik profil yok; ödeme hesabı ihtiyatlı olarak aylık toplama düşürüldü'
       : 'Lisanssız Üretim — Aylık mahsuplaşma + tüketim ihracat sınırı',
-    settlementMode: tariffModel?.exportCompensationPolicy?.interval || (hourlySummary ? 'hourly-profile' : 'annual-fallback'),
-    exportPolicy: tariffModel?.exportCompensationPolicy || null
+    settlementMode: (batterySummary?.exportPolicy || hourlySummary?.exportPolicy || tariffModel?.exportCompensationPolicy)?.interval || (hourlySummary ? 'hourly-profile' : 'annual-fallback'),
+    exportPolicy: batterySummary?.exportPolicy || hourlySummary?.exportPolicy || tariffModel?.exportCompensationPolicy || null
   };
 }
 
@@ -325,13 +327,14 @@ export async function runCalculation() {
     ? validSections.reduce((s, r) => s + (Number(r.effectiveShadingFactor) || 0) * r.systemPower, 0) / systemPower
     : Number(state.shadingFactor) || 0;
   const localProductionSnapshot = {
-    annualEnergy: adjustedEnergy,
-    monthlyData: monthlyData.slice(),
+    annualEnergy: Math.round(adjustedEnergy),
+    monthlyData: normalizeMonthlyProductionToAnnual(monthlyData, adjustedEnergy),
     systemPower,
     panelCount,
     usedFallback,
     pvgisRawEnergy,
-    pvgisPoa
+    pvgisPoa,
+    source: usedFallback ? 'local-fallback' : 'browser-pvgis'
   };
   const authoritativeOverride = state.authoritativeEngineOverride;
   const authoritativeBackend = authoritativeOverride?.engineSource?.pvlibBacked && !authoritativeOverride?.fallbackUsed && !authoritativeOverride?.engineSource?.fallbackUsed
@@ -343,6 +346,7 @@ export async function runCalculation() {
     adjustedEnergy = Math.round(Number(bp.annualEnergyKwh || bp.annual_kwh || adjustedEnergy));
     const backendMonthly = Array.isArray(bp.monthlyEnergyKwh) ? bp.monthlyEnergyKwh : bp.monthly_kwh;
     if (Array.isArray(backendMonthly) && backendMonthly.length === 12) monthlyData = backendMonthly.map(v => Math.round(Number(v) || 0));
+    monthlyData = normalizeMonthlyProductionToAnnual(monthlyData, adjustedEnergy);
     systemPower = Number(bp.systemPowerKwp || systemPower);
     panelCount = Number(bp.panelCount || panelCount);
     usedFallback = false;
@@ -358,6 +362,39 @@ export async function runCalculation() {
     const banner = document.getElementById('fallback-banner');
     if (banner) banner.style.display = 'none';
   }
+  monthlyData = normalizeMonthlyProductionToAnnual(monthlyData, adjustedEnergy);
+  const authoritativeSourceMeta = authoritativeBackend?.engineSource || sourceMetaForCurrentCalculation({ usedFallback });
+  const authoritativeProduction = {
+    annualEnergyKwh: Math.round(adjustedEnergy),
+    monthlyEnergyKwh: monthlyData.slice(),
+    systemPowerKwp: Number(systemPower.toFixed(3)),
+    panelCount,
+    source: authoritativeSourceMeta.source,
+    engine: authoritativeSourceMeta.engine,
+    engineQuality: authoritativeSourceMeta.engineQuality,
+    pvlibBacked: !!authoritativeSourceMeta.pvlibBacked
+  };
+  const engineParity = {
+    authoritativeSource: authoritativeSourceMeta.source,
+    comparisonSource: localProductionSnapshot.source,
+    localAnnualEnergyKwh: localProductionSnapshot.annualEnergy,
+    authoritativeAnnualEnergyKwh: authoritativeProduction.annualEnergyKwh,
+    deltaKwh: authoritativeProduction.annualEnergyKwh - localProductionSnapshot.annualEnergy,
+    deltaPct: localProductionSnapshot.annualEnergy > 0
+      ? Number((((authoritativeProduction.annualEnergyKwh - localProductionSnapshot.annualEnergy) / localProductionSnapshot.annualEnergy) * 100).toFixed(2))
+      : 0,
+    intentionalDifference: !!authoritativeBackend,
+    notes: authoritativeBackend
+      ? [
+          'Backend pvlib is authoritative for this run.',
+          'Financials, proposal governance, reports, and exports use the backend annual and monthly production values.',
+          'Browser PVGIS/JS production is retained only as a comparison snapshot.'
+        ]
+      : [
+          'Browser PVGIS/JS is authoritative for this run.',
+          'Backend output was unavailable, non-authoritative, or fallback-only and is not mixed into downstream financials.'
+        ]
+  };
 
   clearInterval(msgInterval);
   setLoadingProgress(100, 3);
@@ -399,7 +436,7 @@ export async function runCalculation() {
   const kdv         = subtotal * kdvRate;
   let solarCost     = subtotal + kdv;
   const bomTotalsForSystem = Array.isArray(state.bomItems) && state.bomItems.length
-    ? calculateBomTotal(selectBomItems(state.bomItems, state.bomSelection || {}), {
+    ? calculateBomTotal(selectBomItems(state.bomItems, state.bomSelection || {}, { activeCategories: getActiveBomCategories(state) }), {
         wp: systemPower * 1000,
         kwp: systemPower,
         fixed: 1,
@@ -471,7 +508,15 @@ export async function runCalculation() {
     }
     batteryCostVal = bessMetrics.batteryCost;
   }
-  const totalCost = solarCost + batteryCostVal;
+  const grossTotalCost = solarCost + batteryCostVal;
+  const taxTreatment = resolveTaxTreatment({
+    grossTotalCost,
+    solarKdv: kdv,
+    taxEnabled: state.taxEnabled,
+    tax: state.tax
+  });
+  const totalCost = grossTotalCost;
+  const financialCostBasis = taxTreatment.financialCostBasis;
 
   let nmMetrics = calculateNMMetrics(
     adjustedEnergy, systemPower, hourlySummaryRaw.annualLoad / 365,
@@ -502,7 +547,7 @@ export async function runCalculation() {
     annualEnergy: adjustedEnergy,
     hourlySummary: hourlySummaryRaw,
     batterySummary,
-    totalCost,
+    totalCost: financialCostBasis,
     tariffModel,
     panel,
     annualOMCost,
@@ -520,9 +565,9 @@ export async function runCalculation() {
   const totalExpenses25y = financial.totalExpenses25y;
   const npvTotal = financial.projectNPV;
   const roi = financial.roi;
-  const irr = calcIRR([-totalCost, ...yearlyTable.map(y => y.netCashFlow)]);
+  const irr = calcIRR([-financialCostBasis, ...yearlyTable.map(y => y.netCashFlow)]);
 
-  let lcoeCostSum = totalCost;
+  let lcoeCostSum = financialCostBasis;
   let lcoeEnergySum = 0;
   yearlyTable.forEach(y => {
     const df = Math.pow(1 + discountRate, y.year);
@@ -551,7 +596,7 @@ export async function runCalculation() {
   // ── Vergi Avantajı ───────────────────────────────────────────────────────────
   let taxMetrics = null;
   if (state.taxEnabled && state.tax) {
-    taxMetrics = calculateTaxBenefits(totalCost, npvTotal, state.tax, discountRate, kdv);
+    taxMetrics = calculateTaxBenefits(totalCost, npvTotal, state.tax, discountRate, kdv, taxTreatment);
   }
   const billAnalysis = state.billAnalysisEnabled && hasMeaningfulMonthlyConsumption(state.monthlyConsumption)
     ? calculateBillAnalysis(state.monthlyConsumption, monthlyData, tariff)
@@ -592,22 +637,26 @@ export async function runCalculation() {
       battery: batteryCostVal, totalWithBattery: Math.round(totalCost),
       bom: bomTotalsForSystem || state.bomTotals || null
     },
+    financialCostBasis: Math.round(financialCostBasis),
+    taxTreatment,
     methodologyVersion: METHODOLOGY_VERSION,
     pvgisLossParam: PVGIS_LOSS_PARAM,
     displayCurrency: state.displayCurrency || 'TRY',
     usdToTry: state.usdToTry || 38.5,
     netMeteringEnabled: !!state.netMeteringEnabled,
     calculationMode: authoritativeBackend ? 'python-pvlib-backed' : usedFallback ? 'fallback-psh' : 'pvgis-live',
-    engineSource: authoritativeBackend?.engineSource || sourceMetaForCurrentCalculation({ usedFallback }),
+    engineSource: authoritativeSourceMeta,
     engineRequest: buildPvEngineRequest(state),
     sourceQualityNote: authoritativeBackend
       ? scenarioSourceQualityNote(state.scenarioKey, 'python-backend')
       : scenarioSourceQualityNote(state.scenarioKey, usedFallback ? 'fallback-psh' : 'pvgis-live'),
     pvgisFailReason: usedFallback && !authoritativeBackend ? (window._pvgisLastError || 'unknown') : null,
-    authoritativeEngineSource: authoritativeBackend?.engineSource || sourceMetaForCurrentCalculation({ usedFallback }),
+    authoritativeEngineSource: authoritativeSourceMeta,
     authoritativeEngineResponse: authoritativeBackend || null,
     authoritativeEngineMode: authoritativeBackend ? 'python-pvlib-backed' : usedFallback ? 'local-fallback' : 'browser-pvgis',
     authoritativeEngineFallbackReason: authoritativeBackend ? null : state.authoritativeEngineFallbackReason || (usedFallback ? (window._pvgisLastError || 'PVGIS unavailable; local fallback used.') : null),
+    authoritativeProduction,
+    engineParity,
     localProductionSnapshot,
     backendEngineSource: authoritativeBackend ? null : undefined,
     backendEngineResponse: authoritativeBackend ? null : undefined,
@@ -627,6 +676,18 @@ export async function runCalculation() {
   if (results.tariffSourceGovernance.warning) results.calculationWarnings.push(results.tariffSourceGovernance.warning);
   results.quoteReadiness = buildQuoteReadiness({ state, results, tariffModel, evidenceGovernance: results.evidenceGovernance });
   results.proposalGovernance = buildProposalGovernance(state, results);
+  if (results.proposalGovernance?.approval?.invalidatedApproval) {
+    state.proposalApproval = {
+      ...(state.proposalApproval || {}),
+      state: 'finance-review',
+      approvedAt: null,
+      approvalRecord: null,
+      invalidatedAt: new Date().toISOString(),
+      invalidationReason: 'material-proposal-basis-changed'
+    };
+    results.proposalGovernance = buildProposalGovernance(state, results);
+    results.quoteReadiness = buildQuoteReadiness({ state, results, tariffModel, evidenceGovernance: results.evidenceGovernance });
+  }
   const confidence = classifyOutputConfidence({ usedFallback, warnings: results.calculationWarnings, state });
   const proposalLevel = results.proposalGovernance?.confidence?.level;
   results.confidenceLevel = results.quoteReadiness.status === 'quote-ready' && proposalLevel === 'quote-ready proposal'
@@ -641,11 +702,11 @@ export async function runCalculation() {
   window.state.results = results;
   window.persistProposalState?.();
 
-  // Step-4'te mühendis hesap özeti
+  // Calculation is complete; hand the user to the results step.
   if (window.renderEngCalcPanel) window.renderEngCalcPanel();
 
   setTimeout(() => {
-    window.goToStep(5);
+    window.goToStep(7);
     window.renderResults();
     window.launchConfetti();
     // Saatlik profili güncelle
@@ -745,28 +806,32 @@ function calculateBillAnalysis(monthlyConsumption, monthlyProduction, tariff) {
 }
 
 // ── Vergi Avantajı Hesabı ────────────────────────────────────────────────────
-function calculateTaxBenefits(totalCost, npvBase, tax, discountRate, kdvAmount = 0) {
-  const annual_dep = totalCost / tax.amortizationYears;
+function calculateTaxBenefits(totalCost, npvBase, tax, discountRate, kdvAmount = 0, taxTreatment = null) {
+  const depreciableBase = Math.max(0, Number(taxTreatment?.depreciableBase ?? totalCost) || 0);
+  const annual_dep = depreciableBase / tax.amortizationYears;
   let taxShieldNPV = 0;
   for (let y = 1; y <= tax.amortizationYears; y++) {
     taxShieldNPV += (annual_dep * tax.corporateTaxRate / 100) / Math.pow(1 + discountRate, y);
   }
-  const kdv_recovery = tax.kdvRecovery ? kdvAmount : 0;
+  const kdv_recovery = Math.max(0, Number(taxTreatment?.recoverableKdv ?? (tax.kdvRecovery ? kdvAmount : 0)) || 0);
   const incentiveRate = Math.max(0, Number(tax.investmentContribution) || 0) / 100;
   const hasIncentive = !!(tax.investmentDeduction || tax.hasIncentiveCert || incentiveRate > 0);
-  const investment_deduction = hasIncentive ? totalCost * incentiveRate * (tax.corporateTaxRate / 100) : 0;
+  const investment_deduction = hasIncentive ? depreciableBase * incentiveRate * (tax.corporateTaxRate / 100) : 0;
 
   const totalTaxBenefit = taxShieldNPV + kdv_recovery + investment_deduction;
   const effectiveCost = totalCost - totalTaxBenefit;
+  const nonVatTaxBenefit = taxShieldNPV + investment_deduction;
 
   return {
     annual_dep: Math.round(annual_dep),
+    depreciableBase: Math.round(depreciableBase),
     taxShieldNPV: Math.round(taxShieldNPV),
     kdv_recovery: Math.round(kdv_recovery),
     investment_deduction: Math.round(investment_deduction),
     totalTaxBenefit: Math.round(totalTaxBenefit),
     effectiveCost: Math.round(effectiveCost),
-    adjustedNPV: Math.round(npvBase + totalTaxBenefit)
+    adjustedNPV: Math.round(npvBase + nonVatTaxBenefit),
+    vatTreatment: taxTreatment?.vatTreatment || 'kdv-included-in-financial-cost-basis'
   };
 }
 

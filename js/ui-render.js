@@ -1,10 +1,11 @@
 // ═══════════════════════════════════════════════════════════
 // UI RENDER — Sonuç gösterimi, PDF, Share
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 import { PANEL_TYPES, MONTHS, COMPASS_DIRS } from './data.js';
 import { convertTry, renderExchangeRateStatus } from './exchange-rate.js';
 import { i18n } from './i18n.js';
+import { localeTag, localizeKnownMessage, localizeMessageList, statusLabel, tx } from './output-i18n.js';
 import { createShareStateSnapshot, escapeHtml, sanitizeSharedState } from './security.js';
 import { buildStructuredProposalExport } from './evidence-governance.js';
 import { buildCrmLeadExport } from './crm-export.js';
@@ -39,18 +40,22 @@ function engineSummaryText(results = {}, state = window.state || {}) {
   const label = source?.source || results.calculationMode || 'PVGIS/JS';
   const quality = source?.engineQuality || source?.confidence || results.confidence?.level || 'medium';
   const fallback = results.authoritativeEngineFallbackReason || (state.backendEngineAvailable === false ? state.backendEngineLastError : '');
-  return fallback ? `Authoritative engine: ${label} · fallback: ${fallback}` : `Authoritative engine: ${label} · ${quality}`;
+  return fallback
+    ? `${i18n.t('engine.authoritative')}: ${label} · ${i18n.t('engine.fallback')}: ${fallback}`
+    : `${i18n.t('engine.authoritative')}: ${label} · ${quality}`;
 }
 
 function backendEngineText(results = {}, state = window.state || {}) {
   const source = results.authoritativeEngineSource || results.engineSource || results.backendEngineSource || results.backendEngineResponse?.engineSource;
   if (source) {
-    const backed = source.pvlibBacked ? 'pvlib-backed' : source.fallbackUsed || results.authoritativeEngineFallbackReason ? 'fallback' : 'primary';
+    const backed = source.pvlibBacked ? 'pvlib-backed' : source.fallbackUsed || results.authoritativeEngineFallbackReason ? i18n.t('engine.fallback') : i18n.t('engine.primary');
     const annual = results.authoritativeEngineResponse?.production?.annualEnergyKwh || results.backendEngineResponse?.production?.annualEnergyKwh || results.annualEnergy;
     const energy = annual ? ` / ${Number(annual).toLocaleString('tr-TR')} kWh/yıl` : '';
     return `${source.provider || 'engine'} / ${source.source || results.calculationMode || '—'} / ${backed}${energy}`;
   }
-  return state.backendEngineAvailable === false ? `fallback active / ${state.backendEngineLastError || 'backend unavailable'}` : 'browser calculation active';
+  return state.backendEngineAvailable === false
+    ? `${i18n.t('engine.fallbackActive')} / ${state.backendEngineLastError || i18n.t('engine.backendUnavailable')}`
+    : i18n.t('engine.browserActive');
 }
 
 export function renderResults() {
@@ -72,8 +77,10 @@ export function renderResults() {
   if (scenarioFrame) scenarioFrame.textContent = state.scenarioContext?.resultFrame || 'Grid-connected savings and proposal readiness';
   if (engineSource) engineSource.textContent = engineSummaryText(r, state);
 
-  document.querySelector('#step-5 .kpi-card:nth-child(2) .kpi-unit').textContent =
-    (state.displayCurrency === 'USD' ? `USD / ${i18n.t('units.year')}` : `TL / ${i18n.t('units.year')}`);
+  const savingsUnit = document.querySelector('#step-7 .kpi-card:nth-child(2) .kpi-unit');
+  if (savingsUnit) {
+    savingsUnit.textContent = (state.displayCurrency === 'USD' ? `USD / ${i18n.t('units.year')}` : `TL / ${i18n.t('units.year')}`);
+  }
   document.getElementById('fin-cost').textContent = money(r.totalCost);
   document.getElementById('fin-payback').textContent = r.simplePaybackYear ? r.simplePaybackYear + ` ${i18n.t('units.year')}` : `>25 ${i18n.t('units.year')}`;
   const discountedPaybackEl = document.getElementById('fin-discounted-payback');
@@ -275,7 +282,7 @@ function renderWarningsAndAudit(state, r) {
     techCard.insertAdjacentElement('afterend', audit);
   }
 
-  const warnings = Array.isArray(r.calculationWarnings) ? r.calculationWarnings : [];
+  const warnings = localizeMessageList(Array.isArray(r.calculationWarnings) ? r.calculationWarnings : []);
   const gov = r.proposalGovernance || {};
   const confidence = gov.confidence || {};
   const approval = gov.approval || {};
@@ -293,50 +300,60 @@ function renderWarningsAndAudit(state, r) {
   const evidenceRows = Object.entries(evidence.registry || {}).map(([key, record]) => {
     const latestFile = (record.files || []).slice(-1)[0];
     const fileText = latestFile ? `${latestFile.name} / ${String(latestFile.sha256 || '').slice(0, 12)}` : '—';
-    return `<tr><td>${escapeHtml(key)}</td><td>${escapeHtml(record.status)}</td><td>${escapeHtml(record.ref || '—')}</td><td>${escapeHtml(record.checkedAt || record.issuedAt || '—')}</td><td>${escapeHtml(record.validUntil || '—')}</td><td>${escapeHtml(fileText)}</td></tr>`;
+    return `<tr><td>${escapeHtml(key)}</td><td>${escapeHtml(statusLabel(record.status))}</td><td>${escapeHtml(record.ref || '—')}</td><td>${escapeHtml(record.checkedAt || record.issuedAt || '—')}</td><td>${escapeHtml(record.validUntil || '—')}</td><td>${escapeHtml(fileText)}</td></tr>`;
   }).join('');
   const auditRows = (state.auditLog || []).slice(-10).reverse().map(entry =>
     `<tr><td>${escapeHtml(entry.timestamp || '—')}</td><td>${escapeHtml(entry.action || '—')}</td><td>${escapeHtml(entry.user?.name || '—')} (${escapeHtml(entry.user?.role || '—')})</td></tr>`
   ).join('');
   const warningHtml = warnings.length
     ? `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:12px;margin-bottom:12px;color:#FCA5A5;font-size:0.82rem">
-        <strong>Hata yakala uyarıları:</strong><br>${warnings.map(w => `• ${escapeHtml(w)}`).join('<br>')}
+        <strong>${escapeHtml(i18n.t('audit.warningsTitle'))}:</strong><br>${warnings.map(w => `• ${escapeHtml(w)}`).join('<br>')}
       </div>`
-    : `<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:12px;margin-bottom:12px;color:#A7F3D0;font-size:0.82rem">Hata yakala modu kritik anomali bulmadı.</div>`;
+    : `<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:12px;margin-bottom:12px;color:#A7F3D0;font-size:0.82rem">${escapeHtml(i18n.t('audit.noCriticalAnomalies'))}</div>`;
+
+  const quoteBlockers = localizeMessageList(r.quoteReadiness?.blockers || []).slice(0, 3);
+  const approvalBlockers = localizeMessageList(approval.blockers || []);
+  const gridStatus = gov.gridChecklistComplete ? i18n.t('audit.complete') : i18n.t('audit.missingDocuments');
+  const tariffFreshness = tariffSource.stale ? 'STALE' : i18n.t('audit.current');
+  const parity = r.engineParity || null;
+  const parityText = parity
+    ? `${i18n.t('engine.authoritativeSource')}: ${parity.authoritativeSource || '—'} | ${i18n.t('engine.productionDelta')}: ${Number(parity.deltaKwh || 0).toLocaleString(localeTag())} kWh (${Number(parity.deltaPct || 0).toFixed(2)}%)`
+    : '—';
 
   audit.innerHTML = `
-    <div class="card-title">Audit Paneli</div>
+    <div class="card-title">${escapeHtml(i18n.t('governance.auditPanel'))}</div>
     ${warningHtml}
     <table class="tech-table">
       <tbody>
-        <tr><td>Konum</td><td>${escapeHtml(state.cityName || '—')} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
-        <tr><td>Tarife</td><td>${escapeHtml(r.tariffModel?.type || state.tariffType)} | ${escapeHtml(r.tariffModel?.effectiveRegime || '—')} | ${moneyRate(r.tariff, 'kWh')} | Kaynak: ${escapeHtml(r.tariffModel?.sourceDate || '—')}</td></tr>
-        <tr><td>Tüketim</td><td>${Math.round(r.hourlySummary?.annualLoad || state.dailyConsumption * 365).toLocaleString('tr-TR')} kWh/yıl</td></tr>
-        <tr><td>${state.netMeteringEnabled ? 'Öz tüketim / İhracat' : 'Öz tüketim / Fazla üretim'}</td><td>${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString('tr-TR')} kWh${state.netMeteringEnabled ? ' / ücretli ' + Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString('tr-TR') + ' kWh / toplam ' + Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString('tr-TR') + ' kWh' : ' / ihracat geliri kapalı'}</td></tr>
-        <tr><td>Üretim güven aralığı</td><td>Kötü yıl: ${Math.round(r.annualEnergy * 0.90).toLocaleString('tr-TR')} kWh | Baz: ${r.annualEnergy.toLocaleString('tr-TR')} kWh | İyi yıl: ${Math.round(r.annualEnergy * 1.10).toLocaleString('tr-TR')} kWh</td></tr>
-        <tr><td>Güven seviyesi</td><td>${escapeHtml(r.confidenceLevel)} (${escapeHtml(r.calculationMode)})</td></tr>
-        <tr><td>Senaryo</td><td>${escapeHtml(state.scenarioContext?.label || state.scenarioKey || 'On-Grid')} | ${escapeHtml(state.scenarioContext?.nextAction || '—')}</td></tr>
-        <tr><td>Authoritative Engine</td><td>${escapeHtml(backendEngineText(r, state))} | ${escapeHtml(r.sourceQualityNote || '—')}</td></tr>
-        <tr><td>Fallback Reason</td><td>${escapeHtml(r.authoritativeEngineFallbackReason || '—')}</td></tr>
-        <tr><td>Teklif Hazırlığı</td><td>${escapeHtml(r.quoteReadiness?.status || '—')}${r.quoteReadiness?.blockers?.length ? ' | ' + escapeHtml(r.quoteReadiness.blockers.slice(0, 3).join(' · ')) : ''}</td></tr>
-        <tr><td>Regülasyon Motoru</td><td>${escapeHtml(r.quoteReadiness?.version || r.tariffModel?.exportCompensationPolicy?.version || '—')}</td></tr>
-        <tr><td>Tarife Kaynak Yönetimi</td><td>${escapeHtml(tariffSource.sourceLabel || '—')} | kontrol yaşı: ${tariffSource.ageDays ?? '—'} gün | ${tariffSource.stale ? 'STALE' : 'güncel'}</td></tr>
-        <tr><td>Proposal Güven Skoru</td><td>${confidence.score ?? '—'} / 100 · ${escapeHtml(confidence.level || '—')}</td></tr>
-        <tr><td>Onay Durumu</td><td>${escapeHtml(approval.state || 'draft')}${approval.approvalRecord ? ' | immutable: ' + escapeHtml(approval.approvalRecord.id) : ''}${approval.blockers?.length ? ' | ' + escapeHtml(approval.blockers.join(' · ')) : ''}</td></tr>
-        <tr><td>Finansman</td><td>Aylık ödeme: ${financing.monthlyPayment ? money(financing.monthlyPayment) : '—'} | DSCR: ${financing.firstYearDebtServiceCoverage ?? '—'}</td></tr>
-        <tr><td>Bakım Sözleşmesi</td><td>${money(maintenance.annualBase || 0)}/yıl | 10 yıl: ${money(maintenance.tenYearNominal || 0)} | ${escapeHtml(maintenance.contractStatus || '—')}</td></tr>
-        <tr><td>Şebeke Başvuru</td><td>${gov.gridChecklistComplete ? 'Tamamlandı' : 'Eksik evrak var'}</td></tr>
-        <tr><td>Veri gizliliği</td><td>Kayıtlı hesaplar sadece bu tarayıcıdaki localStorage alanında tutulur.</td></tr>
+        <tr><td>${escapeHtml(i18n.t('audit.location'))}</td><td>${escapeHtml(state.cityName || '—')} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
+        <tr><td>${escapeHtml(i18n.t('audit.tariff'))}</td><td>${escapeHtml(r.tariffModel?.type || state.tariffType)} | ${escapeHtml(r.tariffModel?.effectiveRegime || '—')} | ${moneyRate(r.tariff, 'kWh')} | ${escapeHtml(i18n.t('audit.source'))}: ${escapeHtml(r.tariffModel?.sourceDate || '—')}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('audit.consumption'))}</td><td>${Math.round(r.hourlySummary?.annualLoad || state.dailyConsumption * 365).toLocaleString(localeTag())} kWh/${escapeHtml(i18n.t('units.year'))}</td></tr>
+        <tr><td>${escapeHtml(state.netMeteringEnabled ? i18n.t('audit.selfConsumptionExport') : i18n.t('audit.selfConsumptionSurplus'))}</td><td>${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh${state.netMeteringEnabled ? ' / paid ' + Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString(localeTag()) + ' kWh / total ' + Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag()) + ' kWh' : ' / export revenue disabled'}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('audit.productionConfidenceRange'))}</td><td>${escapeHtml(i18n.t('audit.badYear'))}: ${Math.round(r.annualEnergy * 0.90).toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.baseYear'))}: ${r.annualEnergy.toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.goodYear'))}: ${Math.round(r.annualEnergy * 1.10).toLocaleString(localeTag())} kWh</td></tr>
+        <tr><td>${escapeHtml(i18n.t('governance.confidenceLevel'))}</td><td>${escapeHtml(statusLabel(r.confidenceLevel))} (${escapeHtml(r.calculationMode)})</td></tr>
+        <tr><td>${escapeHtml(i18n.t('scenario.label'))}</td><td>${escapeHtml(state.scenarioContext?.label || state.scenarioKey || 'On-Grid')} | ${escapeHtml(state.scenarioContext?.nextAction || '—')}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('engine.authoritative'))}</td><td>${escapeHtml(backendEngineText(r, state))} | ${escapeHtml(r.sourceQualityNote || '—')}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('engine.parity'))}</td><td>${escapeHtml(parityText)}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('engine.fallbackReason'))}</td><td>${escapeHtml(localizeKnownMessage(r.authoritativeEngineFallbackReason || '—'))}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('governance.quoteReadiness'))}</td><td>${escapeHtml(statusLabel(r.quoteReadiness?.status || '—'))}${quoteBlockers.length ? ' | ' + escapeHtml(quoteBlockers.join(' · ')) : ''}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('audit.regulationEngine'))}</td><td>${escapeHtml(r.quoteReadiness?.version || r.tariffModel?.exportCompensationPolicy?.version || '—')}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('audit.tariffSourceGovernance'))}</td><td>${escapeHtml(tariffSource.sourceLabel || '—')} | ${escapeHtml(i18n.t('audit.sourceAge'))}: ${tariffSource.ageDays ?? '—'} ${escapeHtml(i18n.t('units.year')) === 'year' ? 'days' : 'gün'} | ${escapeHtml(tariffFreshness)}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('governance.proposalConfidence'))}</td><td>${confidence.score ?? '—'} / 100 · ${escapeHtml(statusLabel(confidence.level || '—'))}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('governance.approvalState'))}</td><td>${escapeHtml(statusLabel(approval.state || 'draft'))}${approval.approvalRecord ? ' | immutable: ' + escapeHtml(approval.approvalRecord.id) : ''}${approvalBlockers.length ? ' | ' + escapeHtml(approvalBlockers.join(' · ')) : ''}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('audit.financing'))}</td><td>${escapeHtml(i18n.t('audit.monthlyPayment'))}: ${financing.monthlyPayment ? money(financing.monthlyPayment) : '—'} | DSCR: ${financing.firstYearDebtServiceCoverage ?? '—'}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('audit.maintenanceContract'))}</td><td>${money(maintenance.annualBase || 0)}/${escapeHtml(i18n.t('units.year'))} | 10 ${escapeHtml(i18n.t('units.year'))}: ${money(maintenance.tenYearNominal || 0)} | ${escapeHtml(statusLabel(maintenance.contractStatus || '—'))}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('audit.gridApplication'))}</td><td>${escapeHtml(gridStatus)}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('audit.dataPrivacy'))}</td><td>${escapeHtml(i18n.t('audit.privacyLocalOnly'))}</td></tr>
       </tbody>
     </table>
-    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">Varsayım Defteri</div>
-    <table class="tech-table"><thead><tr><th>Varsayım</th><th>Değer</th><th>Güven</th><th>Kaynak</th></tr></thead><tbody>${ledgerRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table>
-    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">Kanıt Kayıtları</div>
-    <table class="tech-table"><thead><tr><th>Kanıt</th><th>Durum</th><th>Ref</th><th>Kontrol/Tarih</th><th>Geçerlilik</th><th>Dosya / SHA-256</th></tr></thead><tbody>${evidenceRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table>
-    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">Revizyon Farkı</div>
-    <table class="tech-table"><thead><tr><th>Alan</th><th>Önce</th><th>Sonra</th></tr></thead><tbody>${revisionRows || '<tr><td colspan="3">İlk revizyon veya fark yok.</td></tr>'}</tbody></table>
-    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">Audit Log</div>
-    <table class="tech-table"><thead><tr><th>Zaman</th><th>Aksiyon</th><th>Kullanıcı</th></tr></thead><tbody>${auditRows || '<tr><td colspan="3">Henüz kayıt yok.</td></tr>'}</tbody></table>
+    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.assumptionLedger'))}</div>
+    <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.assumption'))}</th><th>${escapeHtml(i18n.t('audit.value'))}</th><th>${escapeHtml(i18n.t('audit.confidence'))}</th><th>${escapeHtml(i18n.t('audit.source'))}</th></tr></thead><tbody>${ledgerRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table>
+    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.evidenceRecords'))}</div>
+    <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.evidence'))}</th><th>${escapeHtml(i18n.t('audit.status'))}</th><th>Ref</th><th>${escapeHtml(i18n.t('audit.checkedDate'))}</th><th>${escapeHtml(i18n.t('audit.validity'))}</th><th>File / SHA-256</th></tr></thead><tbody>${evidenceRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table>
+    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.revisionDiff'))}</div>
+    <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.field'))}</th><th>${escapeHtml(i18n.t('audit.before'))}</th><th>${escapeHtml(i18n.t('audit.after'))}</th></tr></thead><tbody>${revisionRows || `<tr><td colspan="3">${escapeHtml(i18n.t('audit.noRevisionDiff'))}</td></tr>`}</tbody></table>
+    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.auditLog'))}</div>
+    <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.time'))}</th><th>${escapeHtml(i18n.t('audit.action'))}</th><th>${escapeHtml(i18n.t('audit.user'))}</th></tr></thead><tbody>${auditRows || `<tr><td colspan="3">${escapeHtml(i18n.t('audit.noAuditRecords'))}</td></tr>`}</tbody></table>
   `;
 
   // Türkiye SVG haritasında şehir noktasını güncelle
@@ -585,55 +602,66 @@ function normalizeTR(str) {
     .replace(/ü/g,'u').replace(/Ü/g,'U');
 }
 
+function pdfSafeText(value) {
+  const text = String(value ?? '');
+  // jsPDF's built-in Helvetica path is not reliably Unicode-complete for
+  // Turkish glyphs. Preserve normal Latin text, and transliterate only glyphs
+  // known to render poorly until a bundled Unicode font is added.
+  return /[şŞıİğĞçÇöÖüÜ]/.test(text) ? normalizeTR(text) : text;
+}
+
 export function downloadPDF() {
   const state = window.state;
   if (!state.results) return;
   const { jsPDF } = window.jspdf || {};
   if (!jsPDF) {
-    window.showToast?.('PDF kütüphanesi yüklenemedi. İnternet bağlantısını kontrol edin.', 'error');
+    window.showToast?.(i18n.t('report.pdfLibraryMissing'), 'error');
     return;
   }
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const r = state.results;
   const p = PANEL_TYPES[state.panelType];
+  const dateLocale = localeTag();
+  const yearUnit = i18n.t('units.year');
 
   // Kapak Sayfası
   doc.setFillColor(15, 23, 42);
   doc.rect(0, 0, 210, 297, 'F');
   doc.setTextColor(245, 158, 11);
   doc.setFontSize(22); doc.setFont('helvetica', 'bold');
-  doc.text(normalizeTR('GüneşHesap'), 20, 25);
+  doc.text(pdfSafeText('Solar Rota'), 20, 25);
   doc.setFontSize(12); doc.setFont('helvetica', 'normal');
   doc.setTextColor(148, 163, 184);
-  doc.text(normalizeTR('Türkiye Güneş Paneli Enerji ve Yatırım Raporu'), 20, 33);
+  doc.text(pdfSafeText(i18n.t('report.proposalTitle')), 20, 33);
   doc.setFontSize(10);
-  doc.text(`${normalizeTR(state.cityName || 'Bilinmiyor')} — ${new Date().toLocaleDateString('tr-TR')}`, 20, 41);
+  doc.text(`${pdfSafeText(state.cityName || '—')} — ${new Date().toLocaleDateString(dateLocale)}`, 20, 41);
   doc.setFontSize(8); doc.setTextColor(245, 158, 11);
-  doc.text(normalizeTR(`Metodoloji: ${r.methodologyVersion || '—'} | Hesap modu: ${r.calculationMode || '—'} | Kaynak tarihi: ${r.tariffModel?.sourceDate || '—'}`), 20, 48);
+  doc.text(pdfSafeText(`${i18n.t('report.methodology')}: ${r.methodologyVersion || '—'} | ${i18n.t('report.calculationMode')}: ${r.calculationMode || '—'} | ${i18n.t('report.sourceDate')}: ${r.tariffModel?.sourceDate || '—'}`), 20, 48);
   doc.setTextColor(148, 163, 184);
-  doc.text(normalizeTR('On fizibilite raporudur; kesin teklif, statik proje veya resmi izin belgesi yerine gecmez.'), 20, 53);
+  doc.text(pdfSafeText(i18n.t('report.preFeasibilityDisclaimer')), 20, 53);
+  doc.text(pdfSafeText(i18n.t('report.pdfFontNote')), 20, 57);
 
   // Ayırıcı çizgi
   doc.setDrawColor(245, 158, 11); doc.setLineWidth(0.5);
-  doc.line(20, 58, 190, 58);
+  doc.line(20, 62, 190, 62);
 
   // KPI özet
   doc.setTextColor(241, 245, 249); doc.setFontSize(11); doc.setFont('helvetica', 'bold');
   const kpis = [
-    [normalizeTR('Yıllık Üretim'), r.annualEnergy.toLocaleString('tr-TR') + ' kWh'],
-    [normalizeTR('Yıllık Tasarruf'), money(r.annualSavings)],
-    [normalizeTR('Sistem Gücü'), r.systemPower.toFixed(2) + ' kWp'],
-    [normalizeTR('Toplam Maliyet'), money(r.totalCost)],
-    [normalizeTR('Basit Geri Ödeme'), (r.simplePaybackYear || '>25') + ' yıl'],
-    [normalizeTR('İskontolu Geri Ödeme'), (r.discountedPaybackYear || '>25') + ' yıl'],
-    [normalizeTR('NPV (25 yıl)'), money(r.npvTotal)],
+    [pdfSafeText(i18n.t('report.annualProduction')), r.annualEnergy.toLocaleString(dateLocale) + ' kWh'],
+    [pdfSafeText(i18n.t('report.annualSavings')), money(r.annualSavings)],
+    [pdfSafeText(i18n.t('report.systemPower')), r.systemPower.toFixed(2) + ' kWp'],
+    [pdfSafeText(i18n.t('report.totalCost')), money(r.totalCost)],
+    [pdfSafeText(i18n.t('report.simplePayback')), (r.simplePaybackYear || '>25') + ` ${yearUnit}`],
+    [pdfSafeText(i18n.t('report.discountedPayback')), (r.discountedPaybackYear || '>25') + ` ${yearUnit}`],
+    [pdfSafeText(`NPV (25 ${yearUnit})`), money(r.npvTotal)],
     ['IRR', r.irr + '%'],
     ['LCOE', moneyRate(r.lcoe, 'kWh')],
     ['ROI', r.roi + '%'],
-    [normalizeTR('CO₂ Tasarrufu'), r.co2Savings + ' ton/yıl'],
+    [pdfSafeText(i18n.t('report.co2Savings')), r.co2Savings + ` ${i18n.t('units.tonsCo2PerYear')}`],
   ];
 
-  let y = 68;
+  let y = 72;
   doc.setFontSize(9);
   kpis.forEach(([lbl, val]) => {
     doc.setTextColor(148, 163, 184); doc.setFont('helvetica', 'normal');
@@ -647,40 +675,40 @@ export function downloadPDF() {
   doc.addPage();
   doc.setFillColor(15, 23, 42); doc.rect(0, 0, 210, 297, 'F');
   doc.setTextColor(245, 158, 11); doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-  doc.text(normalizeTR('Sistem Tasarımı'), 20, 20);
+  doc.text(pdfSafeText(i18n.t('report.systemDesign')), 20, 20);
   doc.setTextColor(241, 245, 249); doc.setFontSize(9); doc.setFont('helvetica', 'normal');
 
   const techRows = [
-    ['Panel Tipi', p.name], ['Panel Sayısı', r.panelCount + ' adet'],
-    ['Sistem Gücü', r.systemPower.toFixed(2) + ' kWp'],
-    [normalizeTR('Çatı Eğimi'), state.tilt + '°'],
-    [normalizeTR('Çatı Yönü'), normalizeTR(state.azimuthName)],
-    ['PR', r.pr + '%'], ['PSH', r.psh + ' saat/gün'],
-    [normalizeTR('Spesifik Verim'), r.ysp + ' kWh/kWp'],
+    [i18n.t('report.panelType'), p.name], [i18n.t('report.panelCount'), r.panelCount + ` ${i18n.t('report.panelCountUnit')}`],
+    [i18n.t('report.systemPower'), r.systemPower.toFixed(2) + ' kWp'],
+    [i18n.t('report.roofTilt'), state.tilt + '°'],
+    [i18n.t('report.roofAzimuth'), state.azimuthName],
+    ['PR', r.pr + '%'], ['PSH', r.psh + ` ${i18n.t('report.hoursPerDay')}`],
+    [i18n.t('report.specificYield'), r.ysp + ' kWh/kWp'],
   ];
   y = 35;
   techRows.forEach(([k, v]) => {
-    doc.setTextColor(148, 163, 184); doc.text(normalizeTR(k), 25, y);
-    doc.setTextColor(241, 245, 249); doc.text(normalizeTR(v), 100, y);
+    doc.setTextColor(148, 163, 184); doc.text(pdfSafeText(k), 25, y);
+    doc.setTextColor(241, 245, 249); doc.text(pdfSafeText(v), 100, y);
     y += 7;
   });
 
   // Maliyet kırılımı
   y += 5;
   doc.setTextColor(245, 158, 11); doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-  doc.text(normalizeTR('Maliyet Kırılımı'), 20, y); y += 8;
+  doc.text(pdfSafeText(i18n.t('report.costBreakdown')), 20, y); y += 8;
   doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   const cb = r.costBreakdown;
   const costRows = [
-    ['Panel', cb.panel], ['İnverter', cb.inverter],
-    [normalizeTR('Montaj'), cb.mounting], ['DC Kablo', cb.dcCable],
-    ['AC Tesisat', cb.acElec], [normalizeTR('İşçilik'), cb.labor],
-    ['TEDAŞ + İzin', cb.permits], [`KDV (%${Math.round((cb.kdvRate ?? 0.20) * 100)})`, cb.kdv],
-    ['TOPLAM', cb.total]
+    ['Panel', cb.panel], ['Inverter', cb.inverter],
+    [i18n.t('report.mounting'), cb.mounting], ['DC Cable', cb.dcCable],
+    ['AC Electrical', cb.acElec], [i18n.t('report.labor'), cb.labor],
+    ['TEDAŞ + Permit', cb.permits], [`VAT/KDV (%${Math.round((cb.kdvRate ?? 0.20) * 100)})`, cb.kdv],
+    [i18n.t('report.grandTotal'), cb.total]
   ];
   costRows.forEach(([lbl, val]) => {
     doc.setTextColor(148, 163, 184);
-    doc.text(normalizeTR(lbl), 25, y);
+    doc.text(pdfSafeText(lbl), 25, y);
     const w = 40;
     const barW = Math.min((val / cb.total) * w, w);
     doc.setFillColor(245, 158, 11); doc.rect(75, y - 3, barW * 1.2, 4, 'F');
@@ -693,13 +721,13 @@ export function downloadPDF() {
   doc.addPage();
   doc.setFillColor(15, 23, 42); doc.rect(0, 0, 210, 297, 'F');
   doc.setTextColor(245, 158, 11); doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-  doc.text(normalizeTR('25 Yıl Projeksiyon'), 20, 15);
+  doc.text(pdfSafeText(i18n.t('report.yearProjection')), 20, 15);
 
   doc.setFontSize(7); doc.setFont('helvetica', 'bold');
   doc.setTextColor(148, 163, 184);
-  const headers7 = ['Yıl','Üretim','Tarife','Tasarruf','Gider','Net','Kümülatif'];
+  const headers7 = [i18n.t('report.year'), i18n.t('report.production'), i18n.t('report.tariff'), i18n.t('report.savings'), i18n.t('report.expenses'), 'Net', i18n.t('report.cumulative')];
   const xCols = [15, 30, 55, 75, 100, 125, 150, 178];
-  headers7.forEach((h, i) => doc.text(normalizeTR(h), xCols[i], 25));
+  headers7.forEach((h, i) => doc.text(pdfSafeText(h), xCols[i], 25));
   doc.setLineWidth(0.2); doc.setDrawColor(71, 85, 105);
   doc.line(15, 27, 195, 27);
 
@@ -709,15 +737,15 @@ export function downloadPDF() {
     if (row > 275) { doc.addPage(); doc.setFillColor(15,23,42); doc.rect(0,0,210,297,'F'); row = 15; }
     if (yr.year === r.paybackYear) { doc.setFillColor(16,185,129,50); doc.rect(13, row-4, 182, 6, 'F'); }
     doc.setTextColor(241, 245, 249);
-    const vals = [yr.year+'', yr.energy.toLocaleString('tr-TR'), moneyRate(yr.rate, 'kWh'),
+    const vals = [yr.year+'', yr.energy.toLocaleString(dateLocale), moneyRate(yr.rate, 'kWh'),
       money(yr.savings), money(yr.expenses),
       money(yr.netCashFlow), money(yr.cumulative)];
     vals.forEach((v, i) => doc.text(v, xCols[i], row));
     row += 6;
   });
 
-  doc.save(`guneshesap-${normalizeTR(state.cityName || 'rapor')}-${new Date().getFullYear()}.pdf`);
-  window.showToast('PDF rapor indirildi.', 'success');
+  doc.save(`solar-rota-${pdfSafeText(state.cityName || 'rapor')}-${new Date().getFullYear()}.pdf`);
+  window.showToast(i18n.t('report.pdfDownloaded'), 'success');
 }
 
 export function downloadTechnicalPDF() {
@@ -725,7 +753,7 @@ export function downloadTechnicalPDF() {
   if (!state.results) return;
   const { jsPDF } = window.jspdf || {};
   if (!jsPDF) {
-    window.showToast?.('PDF kütüphanesi yüklenemedi. İnternet bağlantısını kontrol edin.', 'error');
+    window.showToast?.(i18n.t('report.pdfLibraryMissing'), 'error');
     return;
   }
 
@@ -733,7 +761,7 @@ export function downloadTechnicalPDF() {
   const body = document.getElementById('eng-report-body');
   const reportText = body?.innerText?.trim();
   if (!reportText) {
-    window.showToast?.('Teknik rapor içeriği üretilemedi.', 'error');
+    window.showToast?.(i18n.t('report.technicalContentMissing'), 'error');
     return;
   }
 
@@ -745,16 +773,18 @@ export function downloadTechnicalPDF() {
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
-  doc.text(normalizeTR('GüneşHesap Teknik Hesap Raporu'), marginX, y);
+  doc.text(pdfSafeText(i18n.t('report.technicalTitle')), marginX, y);
   y += 8;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text(normalizeTR(`Metodoloji: ${r.methodologyVersion || '—'} | Hesap modu: ${r.calculationMode || '—'} | Engine=${r.authoritativeEngineSource?.source || r.engineSource?.source || '—'}`), marginX, y);
+  doc.text(pdfSafeText(`${i18n.t('report.methodology')}: ${r.methodologyVersion || '—'} | ${i18n.t('report.calculationMode')}: ${r.calculationMode || '—'} | Engine=${r.authoritativeEngineSource?.source || r.engineSource?.source || '—'}`), marginX, y);
   y += 8;
+  doc.text(pdfSafeText(i18n.t('report.pdfFontNote')), marginX, y);
+  y += 6;
 
   const lines = reportText
     .split('\n')
-    .map(line => normalizeTR(line.trim()))
+    .map(line => pdfSafeText(line.trim()))
     .filter(Boolean)
     .flatMap(line => doc.splitTextToSize ? doc.splitTextToSize(line, 178) : [line]);
 
@@ -768,8 +798,8 @@ export function downloadTechnicalPDF() {
     y += lineHeight;
   });
 
-  doc.save(`guneshesap-teknik-${normalizeTR(state.cityName || 'rapor')}-${new Date().getFullYear()}.pdf`);
-  window.showToast('Teknik PDF rapor indirildi.', 'success');
+  doc.save(`solar-rota-teknik-${pdfSafeText(state.cityName || 'rapor')}-${new Date().getFullYear()}.pdf`);
+  window.showToast(i18n.t('report.technicalPdfDownloaded'), 'success');
 }
 
 export function shareResults() {
@@ -778,9 +808,9 @@ export function shareResults() {
   const encoded = btoa(encodeURIComponent(JSON.stringify(params)));
   const url = window.location.origin + window.location.pathname + '#' + encoded;
   navigator.clipboard.writeText(url).then(() => {
-    window.showToast('Paylaşım bağlantısı kopyalandı!', 'success');
+    window.showToast(i18n.t('export.shareCopied'), 'success');
   }).catch(() => {
-    prompt('Bağlantıyı kopyalayın:', url);
+    prompt(i18n.t('export.copyLinkPrompt'), url);
   });
 }
 
@@ -826,7 +856,7 @@ export function loadFromHash() {
       }
       window.buildPanelCards();
       window.buildInverterCards();
-      window.showToast('Paylaşılan tam hesap yüklendi.', 'info');
+      window.showToast(i18n.t('export.sharedLoaded'), 'info');
       return;
     }
     if (params.lat) {
@@ -848,16 +878,16 @@ export function loadFromHash() {
     }
     if (legacy.shadingFactor !== undefined) { state.shadingFactor = legacy.shadingFactor; document.getElementById('shading-slider').value = legacy.shadingFactor; window.updateShading(legacy.shadingFactor); }
     if (legacy.panelType) { state.panelType = legacy.panelType; window.buildPanelCards(); }
-    window.showToast('Paylaşılan hesap yüklendi.', 'info');
+    window.showToast(i18n.t('export.sharedLegacyLoaded'), 'info');
   } catch (e) {
-    window.showToast?.('Paylaşım bağlantısı geçersiz veya güvenli şemaya uymuyor.', 'error');
+    window.showToast?.(i18n.t('export.sharedInvalid'), 'error');
   }
 }
 
 export function exportProposalHandoff() {
   const state = window.state;
   if (!state?.results) {
-    window.showToast?.('Önce hesaplama yapın.', 'error');
+    window.showToast?.(i18n.t('export.calculateFirst'), 'error');
     return;
   }
   const payload = buildStructuredProposalExport(state, state.results);
@@ -865,16 +895,16 @@ export function exportProposalHandoff() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `guneshesap-proposal-handoff-${(state.cityName || 'site').toString().replace(/[^a-z0-9_-]+/gi, '-')}.json`;
+  a.download = `solar-rota-proposal-handoff-${(state.cityName || 'site').toString().replace(/[^a-z0-9_-]+/gi, '-')}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  window.showToast?.('Yapılandırılmış proposal handoff JSON indirildi.', 'success');
+  window.showToast?.(i18n.t('export.proposalDownloaded'), 'success');
 }
 
 export function exportCrmLead() {
   const state = window.state;
   if (!state?.results) {
-    window.showToast?.('Önce hesaplama yapın.', 'error');
+    window.showToast?.(i18n.t('export.calculateFirst'), 'error');
     return;
   }
   const payload = buildCrmLeadExport(state, state.results);
@@ -882,10 +912,10 @@ export function exportCrmLead() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `guneshesap-crm-lead-${(state.cityName || 'site').toString().replace(/[^a-z0-9_-]+/gi, '-')}.json`;
+  a.download = `solar-rota-crm-lead-${(state.cityName || 'site').toString().replace(/[^a-z0-9_-]+/gi, '-')}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  window.showToast?.('CRM/lead handoff JSON indirildi.', 'success');
+  window.showToast?.(i18n.t('export.crmDownloaded'), 'success');
 }
 
 // window'a expose et

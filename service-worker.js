@@ -1,10 +1,12 @@
-const CACHE_NAME = 'gunesHesap-v12';
+const CACHE_NAME = 'solarRota-v15';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/css/components.css',
+  '/css/redesign.css',
+  '/css/mobile.css',
   '/js/app.js',
   '/js/bill-analysis.js',
   '/js/backend-config.js',
@@ -33,6 +35,7 @@ const STATIC_ASSETS = [
   '/js/inverter.js',
   '/js/location-validation.js',
   '/js/osm-shadow.js',
+  '/js/output-i18n.js',
   '/js/pv-engine-contracts.js',
   '/js/pvlib-bridge.js',
   '/js/proposal-governance.js',
@@ -40,6 +43,7 @@ const STATIC_ASSETS = [
   '/js/satellite-enhance.js',
   '/js/scenarios.js',
   '/js/scenario-workflows.js',
+  '/js/scenario-icons.js',
   '/js/security.js',
   '/js/solar-art.js',
   '/js/solar-engine-adapter.js',
@@ -185,7 +189,7 @@ function cacheFirst(request) {
         return caches.match('/index.html').then((fallback) => {
           return fallback || new Response(
             `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
-            <title>Çevrimdışı — GüneşHesap</title>
+            <title>Çevrimdışı — Solar Rota</title>
             <meta name="viewport" content="width=device-width,initial-scale=1">
             <style>body{background:#0F172A;color:#F1F5F9;font-family:sans-serif;
             display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center}

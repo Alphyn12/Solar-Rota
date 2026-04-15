@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // HEATMAP — Türkiye Üretim Animasyon Haritası (Faz E1)
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 import { TURKISH_CITIES, PSH_FALLBACK, MONTHS } from './data.js';
 

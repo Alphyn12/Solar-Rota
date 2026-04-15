@@ -3,6 +3,7 @@ export const DEFAULT_SCENARIO_KEY = 'on-grid';
 export const SCENARIO_DEFINITIONS = {
   'on-grid': {
     key: 'on-grid',
+    i18nKey: 'scenarios.onGrid',
     label: 'On-Grid',
     shortLabel: 'On-grid',
     description: 'Bill savings, self-consumption, export revenue, ROI, and proposal readiness.',
@@ -26,6 +27,7 @@ export const SCENARIO_DEFINITIONS = {
   },
   'off-grid': {
     key: 'off-grid',
+    i18nKey: 'scenarios.offGrid',
     label: 'Off-Grid',
     shortLabel: 'Off-grid',
     description: 'Autonomy, battery capacity, critical loads, and night coverage.',
@@ -47,6 +49,7 @@ export const SCENARIO_DEFINITIONS = {
   },
   'agricultural-irrigation': {
     key: 'agricultural-irrigation',
+    i18nKey: 'scenarios.agriculturalIrrigation',
     label: 'Agricultural Irrigation',
     shortLabel: 'Irrigation',
     description: 'Seasonal pump loads, daytime solar match, and rural operating cost reduction.',
@@ -70,6 +73,7 @@ export const SCENARIO_DEFINITIONS = {
   },
   'heat-pump': {
     key: 'heat-pump',
+    i18nKey: 'scenarios.heatPump',
     label: 'Heat Pump',
     shortLabel: 'Heat pump',
     description: 'Heating/cooling electrification, SPF assumptions, and solar offset.',
@@ -91,6 +95,7 @@ export const SCENARIO_DEFINITIONS = {
   },
   'flexible-mobile': {
     key: 'flexible-mobile',
+    i18nKey: 'scenarios.flexibleMobile',
     label: 'Flexible Panel / Caravan / Boat',
     shortLabel: 'Mobile',
     description: 'Portable loads, compact off-grid use, and simplified client-facing guidance.',
@@ -113,6 +118,7 @@ export const SCENARIO_DEFINITIONS = {
   },
   'ev-charging': {
     key: 'ev-charging',
+    i18nKey: 'scenarios.evCharging',
     label: 'EV Charging Station',
     shortLabel: 'EV charging',
     description: 'Charging demand, daytime solar synergy, and commercial electricity offset.',
@@ -142,6 +148,26 @@ export function getScenarioDefinition(key = DEFAULT_SCENARIO_KEY) {
 
 export function listScenarioDefinitions() {
   return Object.values(SCENARIO_DEFINITIONS);
+}
+
+export function localizeScenarioDefinition(scenarioOrKey = DEFAULT_SCENARIO_KEY, translate = key => key) {
+  const scenario = typeof scenarioOrKey === 'string' ? getScenarioDefinition(scenarioOrKey) : scenarioOrKey;
+  const baseKey = scenario.i18nKey || `scenarios.${scenario.key}`;
+  const pick = (field, fallback) => {
+    const key = `${baseKey}.${field}`;
+    const value = translate(key);
+    return value && value !== key ? value : fallback;
+  };
+  return {
+    ...scenario,
+    label: pick('label', scenario.label),
+    shortLabel: pick('shortLabel', scenario.shortLabel),
+    description: pick('description', scenario.description),
+    workflowLabel: pick('workflowLabel', scenario.workflowLabel),
+    resultFrame: pick('resultFrame', scenario.resultFrame),
+    nextAction: pick('nextAction', scenario.nextAction),
+    confidenceHint: pick('confidenceHint', scenario.confidenceHint)
+  };
 }
 
 export function applyScenarioDefaults(state = {}, key = DEFAULT_SCENARIO_KEY) {

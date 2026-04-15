@@ -10,6 +10,16 @@ from backend.models.engine_contracts import EngineRequest
 PVLIB_REQUESTED = {"auto", "python-backend", "pvlib-service", "pvlib-backed"}
 
 
+def _coordinate_blocker(request: EngineRequest) -> str | None:
+    if request.site.lat is None or request.site.lon is None:
+        return "site coordinates missing"
+    lat = float(request.site.lat)
+    lon = float(request.site.lon)
+    if lat < -90 or lat > 90 or lon < -180 or lon > 180:
+        return "site coordinates outside valid latitude/longitude bounds"
+    return None
+
+
 def calculate_backend_production(request: EngineRequest) -> dict[str, Any]:
     fallback_reason = None
     if request.requestedEngine in PVLIB_REQUESTED:
@@ -21,7 +31,11 @@ def calculate_backend_production(request: EngineRequest) -> dict[str, Any]:
             except Exception as exc:
                 fallback_reason = f"pvlib backend path failed: {exc}"
         else:
-            fallback_reason = "pvlib backend path unavailable: pvlib missing, site coordinates missing, or installed capacity is zero."
+            coordinate_reason = _coordinate_blocker(request)
+            if coordinate_reason:
+                fallback_reason = f"pvlib backend path unavailable: {coordinate_reason}."
+            else:
+                fallback_reason = "pvlib backend path unavailable: pvlib missing or installed capacity is zero."
 
     deterministic = calculate_production(request)
     return {

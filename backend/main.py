@@ -5,7 +5,7 @@ from backend.api.routes import router
 
 
 app = FastAPI(
-    title="GunesHesap Engineering Backend",
+    title="Solar Rota Engineering Backend",
     version="0.1.0",
     description="Local-first Python calculation service for pvlib-ready solar proposal workflows.",
 )

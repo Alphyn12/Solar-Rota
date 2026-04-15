@@ -4,6 +4,7 @@ import {
   buildProposalGovernance,
   calculateBomCommercials,
   calculateFinancingModel,
+  createApprovalBasisHash,
   createProposalRevision,
   diffProposalRevisions,
   isGridChecklistComplete
@@ -90,5 +91,76 @@ const governance = buildProposalGovernance(
 assert.equal(governance.gridChecklistComplete, true);
 assert.equal(governance.approval.state, 'approved');
 assert.ok(governance.confidence.score >= 85);
+assert.ok(governance.approval.approvalRecord.basisHash);
+
+const completeChecklist = {
+  bill: { done: true }, titleOrLease: { done: true }, connectionOpinion: { done: true },
+  singleLine: { done: true }, staticReview: { done: true }, layout: { done: true },
+  inverterDocs: { done: true }, metering: { done: true }
+};
+const approvedBasisState = {
+  cityName: 'Ankara',
+  lat: 39.9,
+  lon: 32.8,
+  roofArea: 100,
+  roofGeometry: { areaM2: 100 },
+  panelType: 'mono',
+  inverterType: 'string',
+  tariffType: 'commercial',
+  tariffMode: 'auto',
+  tariffRegime: 'pst',
+  tariff: 8,
+  exportTariff: 2,
+  exportSettlementMode: 'monthly',
+  evidence: {
+    customerBill: { status: 'verified', ref: 'bill-001' },
+    supplierQuote: { status: 'verified', ref: 'sq-001' },
+    tariffSource: { status: 'verified', ref: 'epdk' }
+  },
+  monthlyConsumption: new Array(12).fill(1000),
+  quoteInputsVerified: true,
+  userIdentity: { name: 'qa', role: 'approver' },
+  bomSelection: { panel: 'panel-a' },
+  bomCommercials: { supplierQuoteState: 'received', supplierQuoteRef: 'sq-001' },
+  gridApplicationChecklist: completeChecklist,
+  results: {
+    usedFallback: false,
+    panelCount: 100,
+    systemPower: 43,
+    annualEnergy: 60000,
+    totalCost: 1200000,
+    annualSavings: 300000,
+    npvTotal: 900000,
+    roi: '120.0',
+    calculationWarnings: [],
+    tariffModel: { effectiveRegime: 'pst', exportCompensationPolicy: { interval: 'monthly' } },
+    costBreakdown: { subtotal: 1000000, kdv: 200000, total: 1200000, bom: { subtotal: 1000000 } }
+  },
+  proposalApproval: { state: 'approved', approvedBy: 'qa' }
+};
+const initialApproval = buildApprovalWorkflow(approvedBasisState, { score: 90 });
+assert.equal(initialApproval.state, 'approved');
+assert.equal(initialApproval.approvalRecord.basisHash, createApprovalBasisHash(approvedBasisState));
+
+for (const mutate of [
+  state => { state.roofArea = 120; state.results.systemPower = 50; },
+  state => { state.tariff = 9; state.exportSettlementMode = 'hourly'; },
+  state => { state.bomSelection = { panel: 'panel-b' }; state.bomCommercials.supplierQuoteRef = 'sq-002'; },
+  state => { state.evidence.customerBill.ref = 'bill-002'; },
+  state => { state.results.annualEnergy = 65000; state.results.totalCost = 1300000; }
+]) {
+  const changed = structuredClone(approvedBasisState);
+  changed.proposalApproval = {
+    state: 'approved',
+    approvedBy: 'qa',
+    approvalRecord: initialApproval.approvalRecord
+  };
+  mutate(changed);
+  const invalidated = buildApprovalWorkflow(changed, { score: 90 });
+  assert.equal(invalidated.state, 'finance-review');
+  assert.equal(invalidated.approvalRecord, null);
+  assert.equal(invalidated.invalidatedApproval, true);
+  assert.ok(invalidated.blockers.some(blocker => blocker.includes('ticari temeli')));
+}
 
 console.log('proposal governance tests passed');

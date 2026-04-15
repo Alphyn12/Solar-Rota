@@ -1,7 +1,7 @@
 // Local persistence layer. State metadata is stored in localStorage; evidence
 // file blobs are stored in IndexedDB so proposal evidence survives reloads.
 
-import { sanitizeSharedState } from './security.js';
+import { sanitizeLocalState } from './security.js';
 
 export const STORAGE_VERSION = 'GH-STORAGE-2026.04-v1';
 export const PROPOSAL_STATE_STORAGE_KEY = 'guneshesap_proposal_state_v1';
@@ -89,7 +89,7 @@ export function loadProposalState() {
     return {
       schema: parsed.schema || 'unknown',
       savedAt: parsed.savedAt || null,
-      state: sanitizeSharedState(parsed.state)
+      state: sanitizeLocalState(parsed.state)
     };
   } catch {
     return null;

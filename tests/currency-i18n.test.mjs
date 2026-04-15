@@ -56,14 +56,27 @@ assert.equal(persistLanguage('fr', langStorage), 'tr');
 
 const titleEl = { textContent: '' };
 const placeholderEl = { placeholder: '' };
+const iconPreservingButton = {
+  childNodes: [
+    { nodeType: 1, tagName: 'svg' },
+    { nodeType: 3, nodeValue: ' Use My Location ' }
+  ],
+  querySelector: () => null,
+  getAttribute: () => null,
+  textContent: ''
+};
 applyTextTranslations([
   { el: titleEl, key: 'step1.title' },
-  { el: placeholderEl, key: 'step1.search', attr: 'placeholder' }
+  { el: placeholderEl, key: 'step1.search', attr: 'placeholder' },
+  { el: iconPreservingButton, key: 'step2.geoBtn' }
 ], key => ({
   'step1.title': 'Select Your Location',
-  'step1.search': 'Search for a city...'
+  'step1.search': 'Search for a city...',
+  'step2.geoBtn': 'Use My Location'
 }[key] || key));
 assert.equal(titleEl.textContent, 'Select Your Location');
 assert.equal(placeholderEl.placeholder, 'Search for a city...');
+assert.equal(iconPreservingButton.childNodes[0].tagName, 'svg');
+assert.equal(iconPreservingButton.childNodes[1].nodeValue, ' Use My Location ');
 
 console.log('currency and i18n tests passed');

@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // EV CHARGING — Elektrikli Araç Şarj Entegrasyonu (Faz C2)
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 import { EV_MODELS } from './data.js';
 

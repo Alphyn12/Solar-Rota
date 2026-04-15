@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import {
   buildTariffModel,
   computeFinancialTable,
+  normalizeMonthlyProductionToAnnual,
   normalizeProfile,
+  resolveTaxTreatment,
   simulateBatteryOnHourlySummary,
   simulateHourlyEnergy
 } from '../js/calc-core.js';
@@ -16,6 +18,10 @@ const normalized = normalizeProfile([0, 2, 2]);
 nearly(normalized.reduce((a, b) => a + b, 0), 1);
 nearly(normalized[1], 0.5);
 
+const normalizedMonthlyProduction = normalizeMonthlyProductionToAnnual(new Array(12).fill(100), 1234);
+assert.equal(normalizedMonthlyProduction.reduce((sum, value) => sum + value, 0), 1234);
+assert.equal(normalizedMonthlyProduction.length, 12);
+
 const hourly = simulateHourlyEnergy(
   new Array(12).fill(100),
   new Array(12).fill(80),
@@ -25,6 +31,7 @@ nearly(hourly.annualProduction, 1200);
 nearly(hourly.annualLoad, 960);
 assert.ok(hourly.selfConsumption <= hourly.annualProduction);
 assert.ok(hourly.gridExport >= 0);
+assert.equal(hourly.exportPolicy.interval, 'monthly');
 
 const battery = simulateBatteryOnHourlySummary(hourly, { capacity: 10, dod: 0.9, efficiency: 0.9 });
 assert.ok(battery.totalSelfConsumption >= hourly.selfConsumption);
@@ -108,5 +115,24 @@ const chronologicalBattery = simulateBatteryOnHourlySummary(cappedExport, { capa
 assert.equal(chronologicalBattery.batteryExportPaid, 0);
 assert.ok(chronologicalBattery.remainingExport <= cappedExport.gridExport);
 assert.ok(chronologicalBattery.remainingImport <= cappedExport.gridImport);
+
+const recoverableVatTreatment = resolveTaxTreatment({
+  grossTotalCost: 120000,
+  solarKdv: 20000,
+  taxEnabled: true,
+  tax: { kdvRecovery: true }
+});
+assert.equal(recoverableVatTreatment.recoverableKdv, 20000);
+assert.equal(recoverableVatTreatment.financialCostBasis, 100000);
+assert.equal(recoverableVatTreatment.vatTreatment, 'recoverable-kdv-excluded-from-financial-cost-basis');
+
+const noVatRecoveryTreatment = resolveTaxTreatment({
+  grossTotalCost: 120000,
+  solarKdv: 20000,
+  taxEnabled: true,
+  tax: { kdvRecovery: false }
+});
+assert.equal(noVatRecoveryTreatment.recoverableKdv, 0);
+assert.equal(noVatRecoveryTreatment.financialCostBasis, 120000);
 
 console.log('calc-core tests passed');

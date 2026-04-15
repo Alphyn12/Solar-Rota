@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // STRUCTURAL — Rüzgar & Kar Yükü Kontrolü (Faz C1)
-// GüneşHesap v2.0 — TS EN 1991-1-3 / TS EN 1991-1-4
+// Solar Rota v2.0 — TS EN 1991-1-3 / TS EN 1991-1-4
 // ═══════════════════════════════════════════════════════════
 import { SNOW_ZONES, WIND_ZONES } from './data.js';
 

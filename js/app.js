@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // APP.JS — Ana Orkestratör
-// GüneşHesap v2.0 — Modüler Mimari
+// Solar Rota v2.0 — Modüler Mimari
 // ═══════════════════════════════════════════════════════════
 import {
   TURKISH_CITIES, PANEL_TYPES, BATTERY_MODELS, COMPASS_DIRS,
@@ -32,12 +32,13 @@ import { initBomBuilder, selectBomItem } from './bom.js';
 import { initExchangeRateService, refreshExchangeRate, setManualUsdTryRate, convertTry } from './exchange-rate.js';
 import { appendAuditEntry } from './audit-log.js';
 import { attachEvidenceFile } from './evidence-files.js';
+import { SCENARIO_ICONS, SCENARIO_COLORS } from './scenario-icons.js';
 import { normalizeUserIdentity } from './identity.js';
 import { buildApprovalWorkflow } from './proposal-governance.js';
 import { currentDateIso } from './evidence-governance.js';
 import { TARIFF_DATA_LIFECYCLE, TURKEY_REGULATORY_VERSION } from './turkey-regulation.js';
 import { isLocationInTurkey } from './location-validation.js';
-import { applyScenarioDefaults, getScenarioDefinition, listScenarioDefinitions, DEFAULT_SCENARIO_KEY } from './scenario-workflows.js';
+import { applyScenarioDefaults, getScenarioDefinition, listScenarioDefinitions, localizeScenarioDefinition, DEFAULT_SCENARIO_KEY } from './scenario-workflows.js';
 import { createSolarProposalMark } from './solar-art.js';
 import { loadProposalState, saveProposalState } from './storage.js';
 
@@ -358,6 +359,40 @@ function getGHIColor(ghi) {
   return '#EF4444';
 }
 
+function geolocationIconSvg() {
+  return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>';
+}
+
+function ghiIconSvg() {
+  return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+}
+
+function setGeolocationButton(loading = false) {
+  const btn = document.getElementById('geolocation-btn');
+  if (!btn) return;
+  btn.disabled = !!loading;
+  const label = loading ? i18n.t('step2.geoLoading') : i18n.t('step2.geoBtn');
+  btn.innerHTML = `${geolocationIconSvg()} <span class="step2-geo-label">${label}</span>`;
+}
+
+function setLocationBottomCard(cityName, lat, lon, ghi) {
+  const card = document.getElementById('location-bottom-card');
+  if (!card) return;
+  const cityEl = document.getElementById('loc-bottom-city');
+  const coordsEl = document.getElementById('loc-bottom-coords');
+  const ghiEl = document.getElementById('loc-bottom-ghi');
+  if (cityEl) cityEl.textContent = cityName || i18n.t('step2.locationSelected');
+  if (coordsEl && Number.isFinite(Number(lat)) && Number.isFinite(Number(lon))) {
+    coordsEl.textContent = `${Number(lat).toFixed(4)}°K, ${Number(lon).toFixed(4)}°D`;
+  }
+  if (ghiEl && !document.getElementById('loc-bottom-ghi-val')) {
+    ghiEl.innerHTML = `${ghiIconSvg()} <span id="loc-bottom-ghi-val">— kWh/m²/yıl</span>`;
+  }
+  const ghiVal = document.getElementById('loc-bottom-ghi-val');
+  if (ghiVal) ghiVal.textContent = `${ghi ?? '—'} kWh/m²/yıl`;
+  card.classList.add('visible');
+}
+
 function selectLocationFromLatLon(lat, lon, checkBounds) {
   if (checkBounds && !isInTurkey(lat, lon)) {
     document.getElementById('location-warning').style.display = 'block';
@@ -380,6 +415,7 @@ function selectLocationFromLatLon(lat, lon, checkBounds) {
     document.getElementById('city-search').value = nearest.name;
     document.getElementById('selected-loc-text').textContent =
       `${nearest.name} — ${lat.toFixed(4)}°K, ${lon.toFixed(4)}°D (GHI: ${nearest.ghi})`;
+    setLocationBottomCard(nearest.name, lat, lon, nearest.ghi);
   } else {
     document.getElementById('selected-loc-text').textContent =
       `${lat.toFixed(4)}°K, ${lon.toFixed(4)}°D`;
@@ -448,9 +484,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  document.querySelectorAll('#step-2 input[type=number]').forEach(el => {
+  document.querySelectorAll('#step-3 input[type=number]').forEach(el => {
     el.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); validateStep2(); }
+      if (e.key === 'Enter') { e.preventDefault(); validateStep3(); }
     });
   });
 
@@ -479,11 +515,11 @@ function selectCity(city) {
     `${city.name} — ${city.lat.toFixed(4)}°K, ${city.lon.toFixed(4)}°D (GHI: ${city.ghi})`;
   map.setView([city.lat, city.lon], 9, { animate: true });
   marker.setLatLng([city.lat, city.lon]);
+  setLocationBottomCard(city.name, city.lat, city.lon, city.ghi);
 }
 
 function initScenarioExperience() {
-  const artMount = document.getElementById('solar-art-mount');
-  if (artMount && !artMount.querySelector('img')) artMount.appendChild(createSolarProposalMark({ alt: 'GüneşHesap solar proposal platform artwork' }));
+  // Not: solar-art-mount yeni tasarımda kaldırıldı (proposal-hero section silindi)
   renderScenarioCards();
   updateScenarioUI();
 }
@@ -491,20 +527,27 @@ function initScenarioExperience() {
 function renderScenarioCards() {
   const wrap = document.getElementById('scenario-card-grid');
   if (!wrap) return;
-  wrap.innerHTML = listScenarioDefinitions().map(scenario => `
-    <button type="button" class="scenario-choice-card${window.state.scenarioKey === scenario.key ? ' selected' : ''}" data-scenario-key="${scenario.key}">
+  wrap.innerHTML = listScenarioDefinitions().map(rawScenario => {
+    const scenario = localizeScenarioDefinition(rawScenario, key => i18n.t(key));
+    const icon = SCENARIO_ICONS?.[scenario.key] || '';
+    const color = SCENARIO_COLORS?.[scenario.key] || 'var(--primary)';
+    return `
+    <button type="button" class="scenario-choice-card${window.state.scenarioKey === scenario.key ? ' selected' : ''}"
+            data-scenario-key="${scenario.key}"
+            style="--card-color:${color}">
+      <div class="scenario-card-icon">${icon}</div>
       <span class="scenario-choice-kicker">${scenario.workflowLabel}</span>
       <strong>${scenario.label}</strong>
-      <span>${scenario.description}</span>
-    </button>
-  `).join('');
+      <span class="scenario-card-desc">${scenario.description}</span>
+    </button>`;
+  }).join('');
   wrap.querySelectorAll('[data-scenario-key]').forEach(btn => {
     btn.addEventListener('click', () => selectScenario(btn.dataset.scenarioKey));
   });
 }
 
 function updateScenarioUI() {
-  const scenario = getScenarioDefinition(window.state.scenarioKey);
+  const scenario = localizeScenarioDefinition(getScenarioDefinition(window.state.scenarioKey), key => i18n.t(key));
   window.state.scenarioContext = {
     ...(window.state.scenarioContext || {}),
     key: scenario.key,
@@ -531,8 +574,8 @@ function updateScenarioUI() {
   if (stepLabel) stepLabel.textContent = scenario.workflowLabel;
   const resultFrame = document.getElementById('result-scenario-frame');
   if (resultFrame && window.state.results) {
-    const backendSource = window.state.results.backendEngineSource || window.state.results.backendEngineResponse?.engineSource;
-    resultFrame.textContent = `${scenario.resultFrame} · ${backendSource?.source || window.state.results.engineSource?.source || window.state.results.calculationMode || 'PVGIS/JS'}`;
+    const authoritativeSource = window.state.results.authoritativeEngineSource || window.state.results.engineSource;
+    resultFrame.textContent = `${scenario.resultFrame} · ${authoritativeSource?.source || window.state.results.calculationMode || 'PVGIS/JS'}`;
   }
   const hint = document.getElementById('scenario-guidance-panel');
   if (hint) {
@@ -590,27 +633,28 @@ function selectScenario(key) {
   updateScenarioUI();
   syncScenarioControls();
   persistState();
-  showToast(`${window.state.scenarioContext?.label || 'Senaryo'} akışı seçildi.`, 'success');
+  showToast(`${window.state.scenarioContext?.label || i18n.t('scenario.fallbackLabel')} ${i18n.t('scenario.selectedToast')}`, 'success');
+  // Adım 1'de "Devam Et" butonunu göster
+  const continueBtn = document.getElementById('step1-continue-btn');
+  if (continueBtn) continueBtn.style.display = 'flex';
 }
 
 function useGeolocation() {
-  if (!navigator.geolocation) { showToast('Tarayıcınız konum belirlemeyi desteklemiyor.', 'error'); return; }
-  const btn = document.getElementById('geolocation-btn');
-  btn.disabled = true; btn.textContent = 'Konum alınıyor...';
+  if (!navigator.geolocation) { showToast(i18n.t('step2.geoUnsupported'), 'error'); return; }
+  setGeolocationButton(true);
   navigator.geolocation.getCurrentPosition(pos => {
-    btn.disabled = false; btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> Konumumu Kullan`;
+    setGeolocationButton(false);
     const { latitude, longitude } = pos.coords;
     if (!isInTurkey(latitude, longitude)) {
-      showToast('Konumunuz Türkiye sınırları dışında.', 'error');
+      showToast(i18n.t('step2.geoOutside'), 'error');
       document.getElementById('location-warning').style.display = 'block';
       return;
     }
     selectLocationFromLatLon(latitude, longitude, false);
     map.setView([latitude, longitude], 10, { animate: true });
   }, err => {
-    btn.disabled = false;
-    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg> Konumumu Kullan`;
-    showToast('Konum erişimi reddedildi.', 'error');
+    setGeolocationButton(false);
+    showToast(i18n.t('step2.geoDenied'), 'error');
   });
 }
 
@@ -1179,9 +1223,24 @@ function updatePanelPreview() {
 // ═══════════════════════════════════════════════════════════
 // STEP NAVIGATION
 // ═══════════════════════════════════════════════════════════
+// ── DOM-MOVE HARİTASI: tek Leaflet instance adımlar arasında taşınır ──
+function repositionMap(n) {
+  const mapCard = document.getElementById('map-card');
+  if (!mapCard || !map) return;
+  const step2Slot = document.getElementById('step2-map-slot');
+  const step3Slot = document.getElementById('step3-map-slot');
+  if (n === 2 && step2Slot && !step2Slot.contains(mapCard)) {
+    step2Slot.appendChild(mapCard);
+    requestAnimationFrame(() => { map.invalidateSize(); setTimeout(() => map.invalidateSize(), 400); });
+  } else if (n === 3 && step3Slot && !step3Slot.contains(mapCard)) {
+    step3Slot.appendChild(mapCard);
+    requestAnimationFrame(() => { map.invalidateSize(); setTimeout(() => map.invalidateSize(), 400); });
+  }
+}
+
 function goToStep(n) {
   const state = window.state;
-  if (n < 1 || n > 5) return;
+  if (n < 1 || n > 7) return;
   if (n === state.step) return;
   const fromEl = document.getElementById(`step-${state.step}`);
   const toEl = document.getElementById(`step-${n}`);
@@ -1190,14 +1249,9 @@ function goToStep(n) {
   state.step = n;
   if (n === 1) {
     resetConfetti();
-    if (map) {
-      requestAnimationFrame(() => {
-        map.invalidateSize();
-        setTimeout(() => map.invalidateSize(), 300);
-      });
-    }
   }
-  if (n === 5) {
+  repositionMap(n);
+  if (n === 7) {
     setTimeout(() => {
       if (window.renderHourlyProfile) window.renderHourlyProfile();
       if (window.renderSunPath) window.renderSunPath();
@@ -1218,13 +1272,22 @@ function updateProgressBar() {
     if (s === state.step) el.classList.add('active');
     else if (s < state.step) el.classList.add('done');
   });
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 6; i++) {
     const conn = document.getElementById(`conn-${i}-${i+1}`);
     if (conn) conn.classList.toggle('filled', i < state.step);
   }
 }
 
+// ADIM 1: Senaryo seçimi doğrula → Adım 2
 function validateStep1() {
+  if (!window.state.scenarioKey) {
+    showToast('Lütfen bir sistem senaryosu seçin.', 'error'); return;
+  }
+  goToStep(2);
+}
+
+// ADIM 2: Konum doğrula → Adım 3
+function validateStep2() {
   const state = window.state;
   if (!state.lat || !state.lon) {
     showToast('Lütfen bir konum seçin.', 'error'); return;
@@ -1232,10 +1295,13 @@ function validateStep1() {
   if (!isInTurkey(state.lat, state.lon)) {
     showToast('Lütfen Türkiye sınırları içinde bir konum seçin.', 'error'); return;
   }
-  goToStep(2);
+  // Lokasyon bottom card'ı gizle (adım 2'den ayrılıyoruz)
+  document.getElementById('location-bottom-card')?.classList.remove('visible');
+  goToStep(3);
 }
 
-function validateStep2() {
+// ADIM 3: Çatı alanı doğrula → Adım 4
+function validateStep3() {
   const state = window.state;
   const area = parseFloat(document.getElementById('roof-area').value);
   if (!area || area < 10 || area > 2000) {
@@ -1261,18 +1327,23 @@ function validateStep2() {
     }
   }
 
-  goToStep(3);
+  goToStep(4);
   updatePanelPreview();
   buildInverterCards();
 }
 
-function validateStep3() {
-  // Tarife güncellemesi
+// ADIM 4: Ekipman — passthrough → Adım 5
+function validateStep4() {
+  goToStep(5);
+}
+
+// ADIM 5: Finansal doğrula → Adım 6 + hesaplama
+function validateStep5() {
   const tariffInput = document.getElementById('tariff-input');
   if (tariffInput) window.state.tariff = parseFloat(tariffInput.value) || 7.16;
   updateTariffAssumptions();
   updateCostOverrides();
-  goToStep(4);
+  goToStep(6);
   runCalculation().catch(e => window.showToast?.(`Hesaplama hatası: ${e.message}`, 'error'));
 }
 
@@ -1562,6 +1633,9 @@ window.goToStep = goToStep;
 window.validateStep1 = validateStep1;
 window.validateStep2 = validateStep2;
 window.validateStep3 = validateStep3;
+window.validateStep4 = validateStep4;
+window.validateStep5 = validateStep5;
+window.repositionMap = repositionMap;
 window.updateTilt = updateTilt;
 window.updateShading = updateShading;
 window.updateSoiling = updateSoiling;
@@ -1601,6 +1675,8 @@ window.toggleCostOverridesBlock = toggleCostOverridesBlock;
 window.onCostOverridesToggle = onCostOverridesToggle;
 window.updateCostOverrides = updateCostOverrides;
 window.selectScenario = selectScenario;
+window.renderScenarioCards = renderScenarioCards;
+window.updateScenarioUI = updateScenarioUI;
 window.updateScenarioUI = updateScenarioUI;
 window.selectCity = selectCity;
 window.useGeolocation = useGeolocation;

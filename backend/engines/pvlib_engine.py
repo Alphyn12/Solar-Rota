@@ -4,7 +4,14 @@ from datetime import datetime, timezone
 from importlib.util import find_spec
 from typing import Any
 
-from backend.engines.simple_engine import INVERTER_EFF, PANEL_AREA_M2, PANEL_WATT, _annual_ghi_to_psh
+from backend.engines.simple_engine import (
+    _annual_ghi_to_psh,
+    bifacial_gain,
+    cable_loss_factor,
+    inverter_efficiency,
+    panel_area_m2,
+    panel_watt_peak,
+)
 from backend.models.engine_contracts import EngineRequest, EngineSource
 
 
@@ -19,14 +26,25 @@ def _system_power_kwp(request: EngineRequest) -> tuple[float, int]:
     explicit_kwp = getattr(request.system, "targetPowerKwp", None)
     if explicit_kwp:
         kwp = max(0, float(explicit_kwp))
-        panel_watt = PANEL_WATT.get(request.system.panelType, PANEL_WATT["mono"])
+        panel_watt = panel_watt_peak(request)
         return kwp, max(1, round((kwp * 1000) / panel_watt))
 
-    panel_watt = PANEL_WATT.get(request.system.panelType, PANEL_WATT["mono"])
-    panel_area = PANEL_AREA_M2.get(request.system.panelType, PANEL_AREA_M2["mono"])
+    panel_watt = panel_watt_peak(request)
+    panel_area = panel_area_m2(request)
     usable_area = max(0, request.roof.areaM2) * 0.75
     panel_count = int(usable_area // panel_area)
     return panel_count * panel_watt / 1000, panel_count
+
+
+def _has_valid_site_coordinates(request: EngineRequest) -> bool:
+    lat = request.site.lat
+    lon = request.site.lon
+    return (
+        lat is not None
+        and lon is not None
+        and -90 <= float(lat) <= 90
+        and -180 <= float(lon) <= 180
+    )
 
 
 def _representative_year() -> int:
@@ -48,6 +66,7 @@ def engine_source(mode: str = "auto", fallback_reason: str | None = None) -> Eng
             fallbackUsed=False,
             notes=[
                 "pvlib solar position, clear-sky irradiance, POA transposition, cell temperature, and PVWatts DC model are active.",
+                "Panel wattage, panel area, inverter efficiency, bifacial gain, and cable loss are read from the shared frontend/backend request contract when present.",
                 "Weather is still normalized from the request GHI when no measured or PVGIS time series is provided.",
                 "Inverter clipping, AOI losses, and dispatch remain simplified in this MVP pass.",
             ],
@@ -114,8 +133,7 @@ def pvlib_status() -> dict[str, Any]:
 def can_use_pvlib(request: EngineRequest) -> bool:
     return (
         PVLIB_AVAILABLE
-        and request.site.lat is not None
-        and request.site.lon is not None
+        and _has_valid_site_coordinates(request)
         and _system_power_kwp(request)[0] > 0
     )
 
@@ -142,7 +160,7 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
         latitude=float(request.site.lat),
         longitude=float(request.site.lon),
         tz=tz,
-        name=request.site.cityName or "GunesHesap site",
+        name=request.site.cityName or "Solar Rota site",
     )
     solar_position = location.get_solarposition(times)
     clearsky = location.get_clearsky(times, model="ineichen")
@@ -171,8 +189,8 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
 
     shading_factor = 1 - _clamp(float(request.roof.shadingPct or 0), 0, 80) / 100
     soiling_factor = 1 - _clamp(float(request.roof.soilingPct or 0), 0, 50) / 100
-    wiring_mismatch_factor = 0.97
-    bifacial_factor = 1.05 if request.system.panelType == "bifacial" else 1.0
+    wiring_mismatch_factor = cable_loss_factor(request)
+    bifacial_factor = 1 + bifacial_gain(request)
     poa_effective = poa_global * shading_factor * soiling_factor * wiring_mismatch_factor * bifacial_factor
 
     day_of_year = pd.Series(times.dayofyear, index=times)
@@ -190,7 +208,7 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
         temp_ref=25,
     ).clip(lower=0)
 
-    inverter_eff = INVERTER_EFF.get(request.system.inverterType, INVERTER_EFF["string"])
+    inverter_eff = inverter_efficiency(request)
     inverter_ac_limit_w = pdc0_w * 0.96
     ac_w = (pdc_w * inverter_eff).clip(upper=inverter_ac_limit_w).fillna(0)
     clipped_w = (pdc_w * inverter_eff - ac_w).clip(lower=0).fillna(0)
@@ -211,6 +229,10 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
         "shadingPct": float(request.roof.shadingPct or 0),
         "soilingPct": float(request.roof.soilingPct or 0),
         "wiringMismatchPct": round((1 - wiring_mismatch_factor) * 100, 2),
+        "wiringLossPct": round((1 - wiring_mismatch_factor) * 100, 2),
+        "contractPanelWattPeak": round(panel_watt_peak(request), 3),
+        "contractPanelAreaM2": round(panel_area_m2(request), 4),
+        "contractInverterEfficiency": round(inverter_eff, 4),
         "temperatureModel": "pvlib.sapm_cell.open_rack_glass_glass",
         "dcModel": "pvlib.pvsystem.pvwatts_dc",
         "transpositionModel": "pvlib.irradiance.haydavies",
@@ -258,6 +280,10 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
             "confidence_level": "high",
             "sourceNotes": engine_source("pvlib").notes,
             "source_notes": engine_source("pvlib").notes,
+            "parityNotes": [
+                "System sizing is aligned to the frontend panel catalog through the request contract.",
+                "Production may intentionally differ from browser PVGIS/JS because pvlib uses hourly solar position, transposition and temperature modeling.",
+            ],
             "fallbackUsed": False,
             "fallback_flags": [],
             "simulationYear": year,

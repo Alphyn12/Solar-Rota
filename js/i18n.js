@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // i18n — Çok Dil Desteği (Faz F)
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 
 const STORAGE_KEY = 'guneshesap_lang';
@@ -13,43 +13,37 @@ const STATIC_BINDINGS = [
   ['.step-dot[data-step="3"] .step-dot-label', 'nav.step3'],
   ['.step-dot[data-step="4"] .step-dot-label', 'nav.step4'],
   ['.step-dot[data-step="5"] .step-dot-label', 'nav.step5'],
-  ['#step-1 .step-heading-title', 'step1.title'],
-  ['#step-1 .step-heading-sub', 'step1.subtitle'],
-  ['#city-search', 'step1.search', 'placeholder'],
-  ['#geolocation-btn', 'step1.geoBtn'],
-  ['#step-1 .two-col > div:first-child .card-title', 'step1.locationCard'],
-  ['#step-1 .nav-btns .btn-primary', 'step1.next'],
-  ['#step-2 .step-heading-title', 'step2.title'],
-  ['#step-2 .step-heading-sub', 'step2.subtitle'],
-  ['#step-2 .two-col > div:first-child .card-title', 'step2.roofInfo'],
-  ['#step-2 .two-col > div:nth-child(2) .card-title', 'step2.roofOrientation'],
-  ['#step-2 .nav-btns .btn-secondary', 'common.back'],
-  ['#step-2 .nav-btns .btn-primary', 'step2.next'],
-  ['#step-3 .step-heading-title', 'step3.title'],
-  ['#step-3 .step-heading-sub', 'step3.subtitle'],
-  ['#step-3 .nav-btns .btn-secondary', 'common.back'],
-  ['#step-3 .nav-btns .btn-primary', 'step3.calculate'],
-  ['#step-4 .loading-msg', 'step4.subtitle'],
+  ['.step-dot[data-step="6"] .step-dot-label', 'nav.step6'],
+  ['.step-dot[data-step="7"] .step-dot-label', 'nav.step7'],
+  ['.hero-eyebrow', 'hero.eyebrow'],
+  ['.hero-sub', 'hero.subtitle'],
+  ['.scenario-grid-label', 'scenario.gridLabel'],
+  ['#step1-continue-btn', 'common.continue'],
+  ['#city-search', 'step2.search', 'placeholder'],
+  ['#geolocation-btn .step2-geo-label', 'step2.geoBtn'],
+  ['#step2-back-btn', 'common.back'],
+  ['#step2-continue-btn .step2-continue-label', 'common.continue'],
+  ['#location-warning', 'step2.outOfTurkey'],
+  ['#map-layer-label', 'step2.satellite'],
+  ['#step-4 .step-heading-eyebrow', 'step4.eyebrow'],
+  ['#step-4 .step-heading-title', 'step4.title'],
+  ['#step-4 .step-heading-sub', 'step4.subtitle'],
+  ['#step-5 .step-heading-eyebrow', 'step5.eyebrow'],
   ['#step-5 .step-heading-title', 'step5.title'],
   ['#step-5 .step-heading-sub', 'step5.subtitle'],
-  ['#step-5 .kpi-card:nth-child(1) .kpi-unit', 'units.kwhPerYear'],
-  ['#step-5 .kpi-card:nth-child(1) .kpi-label', 'step5.annualEnergy'],
-  ['#step-5 .kpi-card:nth-child(2) .kpi-label', 'step5.annualSavings'],
-  ['#step-5 .kpi-card:nth-child(3) .kpi-unit', 'units.kwpInstalled'],
-  ['#step-5 .kpi-card:nth-child(3) .kpi-label', 'step5.systemPower'],
-  ['#step-5 .kpi-card:nth-child(4) .kpi-unit', 'units.tonsCo2PerYear'],
-  ['#step-5 .kpi-card:nth-child(4) .kpi-label', 'step5.co2'],
-  ['#step-5 .fin-box .card-title', 'finance.analysis'],
-  ['#step-5 .fin-box .fin-row:nth-of-type(2) .fin-label', 'step5.totalCost'],
-  ['#step-5 .fin-box .fin-row:nth-of-type(3) .fin-label', 'finance.simplePayback'],
-  ['#step-5 .fin-box .fin-row:nth-of-type(4) .fin-label', 'finance.discountedPayback'],
-  ['#step-5 .fin-box .fin-row:nth-of-type(5) .fin-label', 'finance.npv'],
-  ['#step-5 .fin-box .fin-row:nth-of-type(6) .fin-label', 'finance.roi'],
-  ['#step-5 .fin-box .fin-row:nth-of-type(7) .fin-label', 'finance.irr'],
-  ['#step-5 .fin-box .fin-row:nth-of-type(8) .fin-label', 'finance.lcoe'],
-  ['#step-5 .fin-box .fin-row:nth-of-type(9) .fin-label', 'finance.om'],
-  ['#step-5 .fin-box .fin-row:nth-of-type(10) .fin-label', 'finance.inverterReplace'],
-  ['#fin-cost', 'common.pending'],
+  ['#step-6 .loading-headline', 'step6.title'],
+  ['#step-6 .loading-msg', 'step6.subtitle'],
+  ['#step-7 .step-heading-eyebrow', 'step7.eyebrow'],
+  ['#step-7 .step-heading-title', 'step7.title'],
+  ['#step-7 .step-heading-sub', 'step7.subtitle'],
+  ['#step-7 .kpi-card:nth-child(1) .kpi-unit', 'units.kwhPerYear'],
+  ['#step-7 .kpi-card:nth-child(1) .kpi-label', 'step7.annualEnergy'],
+  ['#step-7 .kpi-card:nth-child(2) .kpi-label', 'step7.annualSavings'],
+  ['#step-7 .kpi-card:nth-child(3) .kpi-unit', 'units.kwpInstalled'],
+  ['#step-7 .kpi-card:nth-child(3) .kpi-label', 'step7.systemPower'],
+  ['#step-7 .kpi-card:nth-child(4) .kpi-unit', 'units.tonsCo2PerYear'],
+  ['#step-7 .kpi-card:nth-child(4) .kpi-label', 'step7.co2'],
+  ['#step-7 .fin-box .card-title', 'finance.analysis'],
   ['#dashboard-btn', 'dashboard.saved'],
   ['#tariff-desc', 'finance.tariffDesc'],
   ['#exchange-rate-status', 'finance.exchangeLoading'],
@@ -74,13 +68,39 @@ export function persistLanguage(lang, storage = globalThis.localStorage) {
   return safe;
 }
 
+function setTranslatedText(el, value) {
+  const targetSelector = el.getAttribute?.('data-i18n-target');
+  const target = targetSelector ? el.querySelector?.(targetSelector) : null;
+  if (target) {
+    target.textContent = value;
+    return;
+  }
+
+  const explicit = el.querySelector?.('[data-i18n-text]');
+  if (explicit) {
+    explicit.textContent = value;
+    return;
+  }
+
+  const childNodes = Array.from(el.childNodes || []);
+  const textNode = childNodes.find(node => node.nodeType === 3 && String(node.nodeValue || '').trim());
+  if (textNode) {
+    const leading = /^\s/.test(textNode.nodeValue || '') ? ' ' : '';
+    const trailing = /\s$/.test(textNode.nodeValue || '') ? ' ' : '';
+    textNode.nodeValue = `${leading}${value}${trailing}`;
+    return;
+  }
+
+  el.textContent = value;
+}
+
 export function applyTextTranslations(elements, translate) {
   elements.forEach(item => {
     const val = translate(item.key);
     if (!val || val === item.key) return;
     if (item.attr === 'placeholder') item.el.placeholder = val;
     else if (item.attr === 'title') item.el.title = val;
-    else item.el.textContent = val;
+    else setTranslatedText(item.el, val);
   });
 }
 
@@ -119,7 +139,7 @@ export const i18n = {
     document.querySelectorAll('[data-i18n]').forEach(el => {
       const key = el.getAttribute('data-i18n');
       const val = this.t(key);
-      if (val !== key) el.textContent = val;
+      if (val !== key) setTranslatedText(el, val);
     });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
       const key = el.getAttribute('data-i18n-placeholder');
@@ -145,6 +165,8 @@ export const i18n = {
   afterLanguageChange() {
     window.renderExchangeRateStatus?.();
     window.updateDashboard?.();
+    window.renderScenarioCards?.();
+    window.updateScenarioUI?.();
     if (window.state?.results) {
       window.renderResults?.();
       window.renderEngReport?.();

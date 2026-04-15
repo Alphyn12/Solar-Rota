@@ -16,7 +16,9 @@
       "Bash(find C:\\\\Users\\\\Monster\\\\Desktop\\\\GüneşHesap:*)",
       "Bash(npm test:*)",
       "Bash(dir \"C:\\\\Users\\\\Monster\\\\Desktop\\\\GüneşHesap\")",
-      "Bash(node_modules/.bin/node --version)"
+      "Bash(node_modules/.bin/node --version)",
+      "Bash(grep -E \"\\\\.js$\")",
+      "Bash(grep -n \"daily-consumption-input\" /c/Users/Monster/Desktop/GüneşHesap/js/*.js)"
     ]
   }
 }

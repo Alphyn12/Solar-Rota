@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // HOURLY PROFILE — Saatlik Üretim Profili (Faz B1)
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 import { HOURLY_SOLAR_PROFILE } from './data.js';
 import { getLoadProfile, normalizeProfile } from './calc-core.js';

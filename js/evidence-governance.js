@@ -1,5 +1,7 @@
 // Evidence/source governance helpers for quote-ready proposal workflow.
 import { hasMeaningfulConsumptionEvidence } from './consumption-evidence.js';
+import { i18n } from './i18n.js';
+import { localizeMessageList, statusLabel } from './output-i18n.js';
 
 export const EVIDENCE_GOVERNANCE_VERSION = 'GH-EVID-2026.04-v1';
 
@@ -201,9 +203,27 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       }))
     }
   ]));
+  const quoteBlockers = results.quoteReadiness?.blockers || [];
+  const evidenceBlockers = results.evidenceGovernance?.validation?.blockers || [];
+  const evidenceWarnings = results.evidenceGovernance?.validation?.warnings || [];
+  const approvalBlockers = gov.approval?.blockers || [];
   return {
     schema: 'guneshesap.proposal-handoff.v2',
     exportedAt: new Date().toISOString(),
+    display: {
+      language: i18n.locale || 'tr',
+      productName: i18n.t('app.title'),
+      title: i18n.t('export.proposalSummaryTitle'),
+      userFacing: i18n.t('export.userFacing'),
+      quoteReadiness: statusLabel(results.quoteReadiness?.status || null),
+      approvalState: statusLabel(gov.approval?.state || null),
+      confidenceLevel: statusLabel(gov.confidence?.level || results.confidenceLevel || null),
+      blockersLabel: i18n.t('export.blockersLabel'),
+      blockers: localizeMessageList(quoteBlockers),
+      approvalBlockers: localizeMessageList(approvalBlockers),
+      evidenceBlockers: localizeMessageList(evidenceBlockers),
+      evidenceWarnings: localizeMessageList(evidenceWarnings)
+    },
     customer: {
       cityName: state.cityName || null,
       lat: state.lat || null,
@@ -216,8 +236,15 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       authoritativeEngineSource: results.authoritativeEngineSource || results.engineSource || null,
       authoritativeEngineMode: results.authoritativeEngineMode || results.calculationMode || null,
       authoritativeEngineFallbackReason: results.authoritativeEngineFallbackReason || null,
-      authoritativeProduction: results.authoritativeEngineResponse?.production || null,
+      authoritativeProduction: results.authoritativeProduction || results.authoritativeEngineResponse?.production || {
+        annualEnergyKwh: results.annualEnergy || null,
+        monthlyEnergyKwh: results.monthlyData || null,
+        systemPowerKwp: results.systemPower || null,
+        panelCount: results.panelCount || null,
+        source: results.authoritativeEngineSource?.source || results.engineSource?.source || results.calculationMode || null
+      },
       authoritativeLosses: results.authoritativeEngineResponse?.losses || null,
+      productionParity: results.engineParity || null,
       panelType: state.panelType || null,
       inverterType: state.inverterType || null,
       systemPowerKwp: results.systemPower || null,
@@ -266,6 +293,6 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
     evidenceSummary,
     ledger: gov.ledger || null,
     revision: gov.revision || null,
-    blockers: results.quoteReadiness?.blockers || []
+    blockers: quoteBlockers
   };
 }

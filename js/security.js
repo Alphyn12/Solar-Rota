@@ -25,7 +25,10 @@ const NUMBER_LIMITS = {
   usdToTry: [0.0001, 10000],
   omRate: [0, 20],
   insuranceRate: [0, 20],
-  step: [1, 5]
+  targetSystemPowerKwp: [0, 100000],
+  systemPowerKwp: [0, 100000],
+  previewSystemPower: [0, 100000],
+  step: [1, 7]
 };
 
 const STRING_LIMITS = {
@@ -40,6 +43,7 @@ const STRING_LIMITS = {
   displayCurrency: 3,
   inverterType: 40,
   tariffSourceDate: 20,
+  tariffSourceCheckedAt: 40,
   scenarioKey: 40,
   scenarioSelectedAt: 40,
   enginePreference: 40
@@ -49,14 +53,16 @@ const BOOLEAN_KEYS = new Set([
   'batteryEnabled', 'netMeteringEnabled', 'omEnabled', 'costOverridesEnabled',
   'billAnalysisEnabled', 'evEnabled', 'heatPumpEnabled', 'taxEnabled',
   'cableLossEnabled', 'osmShadowEnabled', 'hasBilateralContract',
-  'hasSignedCustomerBillData', 'quoteInputsVerified', 'quoteReadyApproved'
+  'hasSignedCustomerBillData', 'quoteInputsVerified', 'quoteReadyApproved',
+  'multiRoof', 'tariffIncludesTax', 'satelliteEnhancementEnabled'
 ]);
 
 const OBJECT_KEYS = new Set([
   'battery', 'ev', 'heatPump', 'tax', 'costOverrides', 'cableLoss',
   'roofGeometry', 'osmShadow', 'bomSelection', 'bomCommercials', 'financing',
   'maintenanceContract', 'gridApplicationChecklist', 'proposalApproval', 'evidence',
-  'userIdentity', 'scenarioContext', 'engineContext'
+  'userIdentity', 'scenarioContext', 'engineContext', 'exchangeRate',
+  'satelliteEnhancement'
 ]);
 
 const ARRAY_KEYS = new Set([
@@ -149,6 +155,14 @@ function sanitizeArray(key, value) {
 }
 
 export function sanitizeSharedState(input) {
+  return sanitizeState(input, { trustedLocal: false });
+}
+
+export function sanitizeLocalState(input) {
+  return sanitizeState(input, { trustedLocal: true });
+}
+
+function sanitizeState(input, { trustedLocal = false } = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
   const out = {};
   for (const [key, value] of Object.entries(input)) {

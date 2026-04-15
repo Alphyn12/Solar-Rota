@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createShareStateSnapshot, escapeHtml, sanitizeSharedState } from '../js/security.js';
+import { createShareStateSnapshot, escapeHtml, sanitizeLocalState, sanitizeSharedState } from '../js/security.js';
 
 assert.equal(escapeHtml('<img src=x onerror=alert(1)>'), '&lt;img src=x onerror=alert(1)&gt;');
 
@@ -34,6 +34,9 @@ assert.equal('results' in sanitized, false);
 assert.equal({}.polluted, undefined);
 assert.equal(sanitized.tax.hasIncentiveCert, true);
 assert.equal(sanitized.tax.investmentContribution, '<script>x</script>');
+assert.equal(sanitizeSharedState({ step: 7 }).step, 7);
+assert.equal(sanitizeSharedState({ multiRoof: true, tariffIncludesTax: false }).multiRoof, true);
+assert.equal(sanitizeSharedState({ multiRoof: true, tariffIncludesTax: false }).tariffIncludesTax, false);
 
 const snapshot = createShareStateSnapshot({
   cityName: 'Izmir',
@@ -43,5 +46,18 @@ const snapshot = createShareStateSnapshot({
 assert.equal(snapshot.cityName, 'Izmir');
 assert.equal('results' in snapshot, false);
 assert.equal(snapshot.roofSections[0].tilt, 90);
+
+const local = sanitizeLocalState({
+  multiRoof: true,
+  tariffIncludesTax: false,
+  tariffSourceCheckedAt: '2026-04-14T12:00:00Z',
+  exchangeRate: { source: 'manual/fallback', fetchedAt: '2026-04-14T12:00:00Z' },
+  previewSystemPower: 12.34
+});
+assert.equal(local.multiRoof, true);
+assert.equal(local.tariffIncludesTax, false);
+assert.equal(local.tariffSourceCheckedAt, '2026-04-14T12:00:00Z');
+assert.equal(local.exchangeRate.source, 'manual/fallback');
+assert.equal(local.previewSystemPower, 12.34);
 
 console.log('security state tests passed');

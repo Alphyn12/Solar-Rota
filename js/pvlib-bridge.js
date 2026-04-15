@@ -1,4 +1,4 @@
-import { buildPvEngineRequest, normalizePvEngineResponse } from './pv-engine-contracts.js';
+import { buildPvEngineRequest, getPvEngineRequestIssues, normalizePvEngineResponse } from './pv-engine-contracts.js';
 import { BACKEND_CONFIG, buildBackendUrl } from './backend-config.js';
 
 export const PVLIB_BRIDGE_STATUS = 'python-pvlib-mvp-ready';
@@ -29,6 +29,10 @@ export async function checkBackendHealth({ endpoint = buildBackendUrl(BACKEND_CO
 export async function callPythonEngineeringBackend(state = {}, { endpoint = buildBackendUrl(BACKEND_CONFIG.pvCalculatePath), fetchImpl = globalThis.fetch, timeoutMs = BACKEND_CONFIG.connectTimeoutMs } = {}) {
   const request = buildPvEngineRequest(state);
   if (typeof fetchImpl !== 'function') throw new Error('fetch unavailable');
+  const requestIssues = getPvEngineRequestIssues(request);
+  if (requestIssues.length) {
+    throw new Error(`backend request blocked: ${requestIssues.join(', ')}`);
+  }
 
   // TODO(pvlib): deepen the backend MVP model chain:
   // - pvlib irradiance transposition and AOI losses

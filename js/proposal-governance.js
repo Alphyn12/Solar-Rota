@@ -19,6 +19,94 @@ function pct(value, fallback = 0) {
   return Math.max(-1, Math.min(5, finiteNumber(value, fallback)));
 }
 
+function stableNormalize(value) {
+  if (Array.isArray(value)) return value.map(stableNormalize);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value).sort().map(key => [key, stableNormalize(value[key])])
+    );
+  }
+  if (typeof value === 'number') return Number.isFinite(value) ? Number(value.toFixed(6)) : null;
+  if (value === undefined) return null;
+  return value;
+}
+
+function stableStringify(value) {
+  return JSON.stringify(stableNormalize(value));
+}
+
+function hashString(value) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+export function createApprovalBasisSnapshot(state = {}) {
+  const results = state.results || {};
+  return {
+    version: PROPOSAL_GOVERNANCE_VERSION,
+    design: {
+      cityName: state.cityName || null,
+      lat: state.lat ?? null,
+      lon: state.lon ?? null,
+      roofArea: state.roofArea ?? null,
+      roofSections: state.roofSections || null,
+      roofGeometry: state.roofGeometry || null,
+      panelType: state.panelType || null,
+      inverterType: state.inverterType || null,
+      targetSystemPowerKwp: state.targetSystemPowerKwp ?? state.systemPowerKwp ?? null,
+      batteryEnabled: !!state.batteryEnabled,
+      battery: state.battery || null
+    },
+    tariff: {
+      tariffType: state.tariffType || null,
+      tariffMode: state.tariffMode || null,
+      tariffRegime: state.tariffRegime || null,
+      tariff: state.tariff ?? null,
+      exportTariff: state.exportTariff ?? null,
+      exportSettlementMode: state.exportSettlementMode || null,
+      settlementDate: state.settlementDate || null,
+      previousYearConsumptionKwh: state.previousYearConsumptionKwh ?? null,
+      currentYearConsumptionKwh: state.currentYearConsumptionKwh ?? null,
+      sellableExportCapKwh: state.sellableExportCapKwh ?? null,
+      tariffSourceDate: state.tariffSourceDate || null,
+      tariffSourceCheckedAt: state.tariffSourceCheckedAt || null
+    },
+    commercial: {
+      costOverridesEnabled: !!state.costOverridesEnabled,
+      costOverrides: state.costOverrides || null,
+      bomSelection: state.bomSelection || null,
+      bomCommercials: state.bomCommercials || null,
+      displayCurrency: state.displayCurrency || 'TRY',
+      usdToTry: state.usdToTry ?? null
+    },
+    evidence: state.evidence || null,
+    result: {
+      panelCount: results.panelCount ?? null,
+      systemPower: results.systemPower ?? null,
+      annualEnergy: results.annualEnergy ?? null,
+      totalCost: results.totalCost ?? null,
+      financialCostBasis: results.financialCostBasis ?? null,
+      annualSavings: results.annualSavings ?? null,
+      npvTotal: results.npvTotal ?? null,
+      roi: results.roi ?? null,
+      usedFallback: !!results.usedFallback,
+      calculationMode: results.calculationMode || null,
+      tariffEffectiveRegime: results.tariffModel?.effectiveRegime || null,
+      exportPolicy: results.hourlySummary?.exportPolicy || results.tariffModel?.exportCompensationPolicy || null,
+      bomSubtotal: results.costBreakdown?.bom?.subtotal ?? null,
+      kdv: results.costBreakdown?.kdv ?? null
+    }
+  };
+}
+
+export function createApprovalBasisHash(state = {}) {
+  return hashString(stableStringify(createApprovalBasisSnapshot(state)));
+}
+
 export function createAssumptionLedger(state = {}, results = {}) {
   const tariff = results.tariffModel || {};
   const exchange = state.exchangeRate || {};
@@ -114,11 +202,15 @@ export function buildApprovalWorkflow(state = {}, confidence = null) {
   const current = state.proposalApproval || {};
   const user = normalizeUserIdentity(state.userIdentity || { name: current.updatedBy || current.approvedBy || 'local-user', role: 'sales' });
   const existingRecord = current.approvalRecord || null;
+  const basisHash = createApprovalBasisHash(state);
+  const approvalBasisChanged = !!(existingRecord?.basisHash && existingRecord.basisHash !== basisHash);
+  const legacyApprovalWithoutBasis = !!(existingRecord && !existingRecord.basisHash);
   const requestedState = current.state || 'draft';
   const safeState = APPROVAL_STATES.has(requestedState) ? requestedState : 'draft';
   const blockers = [];
   if (safeState === 'approved') {
     if (!canApproveProposal(user) && !existingRecord) blockers.push('Yalnızca approver/admin rolü proposal onayı verebilir.');
+    if (legacyApprovalWithoutBasis || approvalBasisChanged) blockers.push('Proposal ticari temeli değişti; mevcut onay geçersiz, yeni revizyon/onay gerekli.');
     if (state.results?.usedFallback) blockers.push('PVGIS canlı veri yok; fallback üretim quote-ready kabul edilmez.');
     if (!state.roofGeometry) blockers.push('Çatı geometrisi harita/saha çizimiyle doğrulanmadı.');
     if (!state.quoteInputsVerified) blockers.push('Teklif varsayımları doğrulanmadan onay verilemez.');
@@ -137,7 +229,8 @@ export function buildApprovalWorkflow(state = {}, confidence = null) {
     }
   }
   const effectiveState = blockers.length && safeState === 'approved' ? 'finance-review' : safeState;
-  const approvalRecord = existingRecord || (effectiveState === 'approved'
+  const reusableExistingRecord = (approvalBasisChanged || legacyApprovalWithoutBasis) ? null : existingRecord;
+  const approvalRecord = reusableExistingRecord || (effectiveState === 'approved'
     ? {
       id: `approval-${Date.now()}`,
       state: 'approved',
@@ -145,7 +238,9 @@ export function buildApprovalWorkflow(state = {}, confidence = null) {
       approvedAt: current.approvedAt || nowIso(),
       user,
       immutable: true,
-      version: PROPOSAL_GOVERNANCE_VERSION
+      version: PROPOSAL_GOVERNANCE_VERSION,
+      basisHash,
+      basisVersion: PROPOSAL_GOVERNANCE_VERSION
     }
     : null);
   return {
@@ -155,6 +250,9 @@ export function buildApprovalWorkflow(state = {}, confidence = null) {
     approvedBy: approvalRecord?.approvedBy || (effectiveState === 'approved' ? current.approvedBy || describeApprover(user) : null),
     approvedAt: approvalRecord?.approvedAt || (effectiveState === 'approved' ? current.approvedAt || nowIso() : null),
     approvalRecord,
+    basisHash,
+    invalidatedApproval: !!(existingRecord && !reusableExistingRecord),
+    invalidatedApprovalRecord: existingRecord && !reusableExistingRecord ? existingRecord : null,
     authorizedRole: canApproveProposal(user),
     history: Array.isArray(current.history) ? current.history.slice(-20) : []
   };

@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // CABLE LOSS — Kablo Kayıp Hesabı (Faz B4)
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 
 import { calculateSystemLayout } from './calc-core.js';

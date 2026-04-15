@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // DATA — Tüm sabitler ve referans verileri
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 
 export const TURKISH_CITIES = [

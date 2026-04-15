@@ -1,6 +1,6 @@
-# GunesHesap Python Backend
+# Solar Rota Python Backend
 
-Local-first FastAPI service for the hybrid GunesHesap architecture.
+Local-first FastAPI service for the hybrid Solar Rota architecture.
 
 Install dependencies:
 

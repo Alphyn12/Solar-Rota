@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // DASHBOARD — Karşılaştırmalı Dashboard (Faz E2)
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 
 import { clampNumber, escapeHtml } from './security.js';
@@ -255,7 +255,7 @@ export function exportSavedRecords() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'guneshesap-kayitlar.json';
+  a.download = 'solar-rota-kayitlar.json';
   a.click();
   URL.revokeObjectURL(url);
 }

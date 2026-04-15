@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // SCENARIOS — Enflasyon & Döviz Kuru Senaryoları (Faz D1-D2)
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 
 import { buildTariffModel, calcIRR, computeFinancialTable } from './calc-core.js';

@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // UI CHARTS — Gauge, Confetti, Toast, AnimateCounter
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 
 export function showToast(msg, type = 'info') {

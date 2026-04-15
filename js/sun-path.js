@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // SUN PATH — Güneş Yolu Diyagramı (Faz C4)
-// GüneşHesap v2.0 — Solar Position Algorithm (SPA)
+// Solar Rota v2.0 — Solar Position Algorithm (SPA)
 // ═══════════════════════════════════════════════════════════
 
 function toRad(deg) { return deg * Math.PI / 180; }

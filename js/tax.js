@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // TAX — Vergi Avantajı Hesabı (Faz D3)
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 
 export function toggleTaxBlock() {

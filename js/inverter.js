@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // INVERTER — Çoklu İnverter Seçimi (Faz B3)
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 import { INVERTER_TYPES } from './data.js';
 import { convertTry } from './exchange-rate.js';

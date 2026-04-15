@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <style>
+      .sun-pulse { animation: pulse 2.5s ease-in-out infinite alternate; }
+      .dc-flow { stroke-dasharray: 4 6; animation: flowMove 1s linear infinite; }
+      .water-flow { stroke-dasharray: 6 8; animation: flowMove 0.8s linear infinite; }
+      .water-spray { stroke-dasharray: 2 6; animation: flowMove 0.6s linear infinite; }
+      .pump-spin { transform-origin: 10px 0px; animation: spin 0.4s linear infinite; }
+      .drive-blink { animation: blink 1.5s step-end infinite; }
+      .glass-shine { animation: shine 4s ease-in-out infinite alternate; }
+      
+      @keyframes pulse { 0% { transform: scale(0.95); opacity: 0.7; } 100% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 8px #F59E0B); } }
+      @keyframes flowMove { to { stroke-dashoffset: -14; } }
+      @keyframes spin { 100% { transform: rotate(360deg); } }
+      @keyframes blink { 0%, 100% { fill: #10B981; filter: drop-shadow(0 0 4px #10B981); } 50% { fill: #064E3B; filter: none; } }
+      @keyframes shine { 0% { opacity: 0.1; } 100% { opacity: 0.3; } }
+    </style>
+
+    <linearGradient id="panelCells" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#020617" />
+      <stop offset="50%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#1E3A8A" />
+    </linearGradient>
+    <linearGradient id="sunGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(35, 35)" class="sun-pulse">
+    <circle cx="0" cy="0" r="14" fill="url(#sunGrad)" />
+    <path d="M 0 -19 L 0 -24 M 0 19 L 0 24 M -19 0 L -24 0 M 19 0 L 24 0 M -13.5 -13.5 L -17 -17 M 13.5 13.5 L 17 17 M -13.5 13.5 L -17 17 M 13.5 -13.5 L 17 -17" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <path d="M 85 110 Q 85 150, 95 150" fill="none" stroke="#F59E0B" stroke-width="3" stroke-linecap="round" class="dc-flow"/>
+  
+  <path d="M 125 150 Q 165 150, 165 110 L 165 80" fill="none" stroke="#38BDF8" stroke-width="3" stroke-linecap="round" class="water-flow"/>
+
+  <g transform="translate(165, 75)">
+    <path d="M -25 15 L 0 0 L 25 15 L 0 30 Z" fill="#020617" stroke="#064E3B" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M -15 9 L -5 15 M -5 3 L 5 9 M 5 -3 L 15 3" stroke="#10B981" stroke-width="1.5" opacity="0.4"/>
+    
+    <path d="M -15 15 Q -18 5, -15 0 Q -12 5, -15 15" fill="#10B981"/>
+    <path d="M 0 22 Q -3 12, 0 7 Q 3 12, 0 22" fill="#10B981"/>
+    <path d="M 15 15 Q 12 5, 15 0 Q 18 5, 15 15" fill="#10B981"/>
+
+    <path d="M 0 15 L 0 -10" stroke="#64748B" stroke-width="3" stroke-linecap="round"/>
+    <polygon points="-4,-10 4,-10 0,-15" fill="#38BDF8"/>
+    
+    <g stroke="#38BDF8" stroke-width="2" stroke-linecap="round" class="water-spray" fill="none">
+      <path d="M -2 -14 Q -20 -25, -25 -5" />
+      <path d="M 0 -16 Q 0 -35, 0 -20" />
+      <path d="M 2 -14 Q 20 -25, 25 -5" />
+    </g>
+  </g>
+
+  <g transform="translate(110, 150)">
+    <rect x="-24" y="-16" width="48" height="32" rx="4" fill="#0F172A"/>
+    
+    <rect x="-22" y="-12" width="24" height="24" rx="3" fill="#1E293B" stroke="#475569" stroke-width="2"/>
+    <path d="M -17 -12 L -17 12 M -13 -12 L -13 12 M -9 -12 L -9 12 M -5 -12 L -5 12" stroke="#334155" stroke-width="2"/>
+    
+    <rect x="-18" y="-18" width="16" height="6" rx="1.5" fill="#020617" stroke="#475569" stroke-width="1"/>
+    <circle cx="-14" cy="-15" r="1.5" class="drive-blink"/>
+    <circle cx="-6" cy="-15" r="1.5" fill="#F59E0B"/>
+    
+    <circle cx="10" cy="0" r="14" fill="#020617" stroke="#38BDF8" stroke-width="2"/>
+    <circle cx="10" cy="0" r="5" fill="#1E293B" stroke="#38BDF8" stroke-width="1"/>
+    
+    <g class="pump-spin">
+      <path d="M 10 0 L 10 -10" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 10 0 L 18.6 5" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 10 0 L 1.4 5" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
+    </g>
+
+    <rect x="5" y="-18" width="10" height="4" fill="#334155"/>
+  </g>
+
+  <g transform="translate(70, 95) scale(0.9) rotate(-30) skewX(25)">
+    <rect x="-38" y="-38" width="76" height="76" rx="4" fill="#64748B" transform="translate(2, 2)"/>
+    <rect x="-40" y="-40" width="80" height="80" rx="4" fill="#CBD5E1" stroke="#94A3B8" stroke-width="1.5"/>
+    <rect x="-36" y="-36" width="72" height="72" rx="2" fill="url(#panelCells)"/>
+    
+    <g stroke="#3B82F6" stroke-width="0.75" opacity="0.6">
+      <line x1="-12" y1="-36" x2="-12" y2="36" />
+      <line x1="12" y1="-36" x2="12" y2="36" />
+      <line x1="-36" y1="-12" x2="36" y2="-12" />
+      <line x1="-36" y1="12" x2="36" y2="12" />
+    </g>
+
+    <g stroke="#94A3B8" stroke-width="0.3" opacity="0.8">
+      <line x1="-24" y1="-36" x2="-24" y2="36" />
+      <line x1="0" y1="-36" x2="0" y2="36" />
+      <line x1="24" y1="-36" x2="24" y2="36" />
+    </g>
+
+    <polygon points="-36,-36 10,-36 -36,10" fill="#ffffff" class="glass-shine"/>
+  </g>
+</svg>

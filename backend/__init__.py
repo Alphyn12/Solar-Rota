@@ -1,1 +1,1 @@
-"""GunesHesap backend package."""
+"""Solar Rota backend package."""

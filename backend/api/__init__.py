@@ -1,1 +1,1 @@
-"""API routes for the GunesHesap backend."""
+"""API routes for the Solar Rota backend."""

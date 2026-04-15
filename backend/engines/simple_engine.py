@@ -8,21 +8,21 @@ from backend.models.engine_contracts import EngineRequest
 MONTH_WEIGHTS = [0.055, 0.062, 0.085, 0.095, 0.105, 0.115, 0.112, 0.108, 0.090, 0.075, 0.055, 0.043]
 
 PANEL_WATT = {
-    "mono": 550,
-    "poly": 450,
-    "bifacial": 580,
+    "mono": 430,
+    "poly": 370,
+    "bifacial": 470,
 }
 
 PANEL_AREA_M2 = {
-    "mono": 2.05,
-    "poly": 2.0,
-    "bifacial": 2.20,
+    "mono": 1.134 * 1.762,
+    "poly": 1.134 * 1.762,
+    "bifacial": 1.134 * 1.762,
 }
 
 INVERTER_EFF = {
     "string": 0.97,
-    "micro": 0.96,
-    "optimizer": 0.965,
+    "micro": 0.965,
+    "optimizer": 0.985,
 }
 
 
@@ -65,10 +65,43 @@ def _azimuth_factor(azimuth: float) -> float:
     return _clamp(1 - delta * 0.0017, 0.55, 1.0)
 
 
+def panel_watt_peak(request: EngineRequest) -> float:
+    explicit = getattr(request.system, "panelWattPeak", None)
+    if explicit and float(explicit) > 0:
+        return float(explicit)
+    return float(PANEL_WATT.get(request.system.panelType, PANEL_WATT["mono"]))
+
+
+def panel_area_m2(request: EngineRequest) -> float:
+    explicit = getattr(request.system, "panelAreaM2", None)
+    if explicit and float(explicit) > 0:
+        return float(explicit)
+    return float(PANEL_AREA_M2.get(request.system.panelType, PANEL_AREA_M2["mono"]))
+
+
+def inverter_efficiency(request: EngineRequest) -> float:
+    explicit = getattr(request.system, "inverterEfficiency", None)
+    if explicit and 0 < float(explicit) <= 1:
+        return float(explicit)
+    return float(INVERTER_EFF.get(request.system.inverterType, INVERTER_EFF["string"]))
+
+
+def bifacial_gain(request: EngineRequest) -> float:
+    explicit = getattr(request.system, "bifacialGain", None)
+    if explicit is not None:
+        return max(0.0, float(explicit))
+    return 0.10 if request.system.panelType == "bifacial" else 0.0
+
+
+def cable_loss_factor(request: EngineRequest) -> float:
+    loss_pct = getattr(request.system, "cableLossPct", 0) or getattr(request.system, "wiringMismatchPct", 0) or 0
+    return 1 - _clamp(float(loss_pct), 0, 50) / 100
+
+
 def calculate_production(request: EngineRequest) -> Dict[str, object]:
     panel_type = request.system.panelType
-    panel_watt = PANEL_WATT.get(panel_type, PANEL_WATT["mono"])
-    panel_area = PANEL_AREA_M2.get(panel_type, PANEL_AREA_M2["mono"])
+    panel_watt = panel_watt_peak(request)
+    panel_area = panel_area_m2(request)
     usable_area = max(0, request.roof.areaM2) * 0.75
     panel_count = int(usable_area // panel_area)
     system_power_kwp = panel_count * panel_watt / 1000
@@ -77,11 +110,12 @@ def calculate_production(request: EngineRequest) -> Dict[str, object]:
     base_energy = system_power_kwp * psh * 365
     shading_factor = 1 - _clamp(request.roof.shadingPct, 0, 80) / 100
     soiling_factor = 1 - _clamp(request.roof.soilingPct, 0, 50) / 100
-    inverter_factor = INVERTER_EFF.get(request.system.inverterType, INVERTER_EFF["string"])
+    inverter_factor = inverter_efficiency(request)
     orientation_factor = _tilt_factor(request.roof.tiltDeg) * _azimuth_factor(request.roof.azimuthDeg)
-    bifacial_factor = 1.08 if panel_type == "bifacial" else 1.0
+    bifacial_factor = 1 + bifacial_gain(request)
+    wiring_factor = cable_loss_factor(request)
 
-    annual_energy = base_energy * shading_factor * soiling_factor * inverter_factor * orientation_factor * bifacial_factor
+    annual_energy = base_energy * shading_factor * soiling_factor * inverter_factor * orientation_factor * bifacial_factor * wiring_factor
     monthly = [round(annual_energy * weight) for weight in MONTH_WEIGHTS]
 
     losses = {
@@ -91,7 +125,12 @@ def calculate_production(request: EngineRequest) -> Dict[str, object]:
         "soilingPct": request.roof.soilingPct,
         "inverterEfficiency": inverter_factor,
         "bifacialFactor": bifacial_factor,
-        "modelCompleteness": "first-phase deterministic backend; pvlib hourly model chain pending",
+        "wiringLossPct": round((1 - wiring_factor) * 100, 3),
+        "modelCompleteness": "deterministic backend fallback aligned to frontend panel/inverter contract; pvlib hourly model chain preferred when available",
+        "parityNotes": [
+            "Panel wattage, panel area, inverter efficiency, bifacial gain, and cable loss are read from the shared request contract when present.",
+            "This fallback still uses a deterministic GHI/PSH orientation model, so it is not expected to numerically match pvlib-backed or browser PVGIS output exactly.",
+        ],
     }
     return {
         "production": {

@@ -144,17 +144,47 @@ function proratePaidExport(monthly, paidTotal) {
   });
 }
 
+function aggregateHourlyCompensation(hourlyRows, annualCap) {
+  const hourly = Array.isArray(hourlyRows) ? hourlyRows : [];
+  const compensatedHourly = hourly.map(row => {
+    const rawExport = Math.max(0, Number(row.gridExport) || 0);
+    const load = Math.max(0, Number(row.load) || 0);
+    const paidBeforeAnnualCap = Math.min(rawExport, load);
+    return {
+      month: Math.max(0, Math.min(11, Number(row.month) || 0)),
+      paidBeforeAnnualCap,
+      rawExport
+    };
+  });
+  const paidBeforeCap = compensatedHourly.reduce((s, row) => s + row.paidBeforeAnnualCap, 0);
+  const annualScale = paidBeforeCap > annualCap ? annualCap / paidBeforeCap : 1;
+  const monthly = new Array(12).fill(0).map(() => ({ paidGridExport: 0, unpaidGridExport: 0 }));
+  compensatedHourly.forEach(row => {
+    const paidGridExport = row.paidBeforeAnnualCap * annualScale;
+    monthly[row.month].paidGridExport += paidGridExport;
+    monthly[row.month].unpaidGridExport += Math.max(0, row.rawExport - paidGridExport);
+  });
+  return monthly;
+}
+
 export function applyExportCompensation(monthly, policy = {}) {
   const rows = Array.isArray(monthly) ? monthly : [];
   const interval = policy.interval || 'monthly';
+  const { hourlyRows: _hourlyRows, ...publicPolicy } = policy;
   const annualCap = Number.isFinite(Number(policy.annualSellableExportCapKwh))
     ? Math.max(0, Number(policy.annualSellableExportCapKwh))
     : Infinity;
 
   let compensated;
   if (interval === 'hourly') {
-    const totalExport = rows.reduce((s, m) => s + Math.max(0, Number(m.gridExport) || 0), 0);
-    compensated = proratePaidExport(rows, Math.min(totalExport, annualCap));
+    if (Array.isArray(policy.hourlyRows) && policy.hourlyRows.length >= 8760) {
+      compensated = aggregateHourlyCompensation(policy.hourlyRows.slice(0, 8760), annualCap);
+    } else {
+      compensated = rows.map(m => {
+        const rawExport = Math.max(0, Number(m.gridExport) || 0);
+        return { paidGridExport: 0, unpaidGridExport: rawExport };
+      });
+    }
   } else {
     compensated = rows.map(m => {
       const rawExport = Math.max(0, Number(m.gridExport) || 0);
@@ -174,8 +204,11 @@ export function applyExportCompensation(monthly, policy = {}) {
     unpaidGridExport: compensated.reduce((s, m) => s + m.unpaidGridExport, 0),
     monthly: compensated,
     policy: {
-      ...policy,
-      interval,
+      ...publicPolicy,
+      interval: interval === 'hourly' && !(Array.isArray(policy.hourlyRows) && policy.hourlyRows.length >= 8760)
+        ? 'monthly-aggregate-no-hourly-settlement'
+        : interval,
+      requestedInterval: interval,
       annualSellableExportCapKwh: Number.isFinite(annualCap) ? annualCap : null
     }
   };

@@ -24,17 +24,36 @@ export function normalizeBomItems(rawItems = []) {
   })).filter(item => item.category && item.name && item.unitCost >= 0);
 }
 
-export function selectBomItems(items, selection = {}) {
+const BASE_BOM_CATEGORIES = new Set(['panel', 'inverter', 'mounting', 'cable', 'labor', 'other']);
+
+export function getActiveBomCategories(state = {}) {
+  const categories = new Set(BASE_BOM_CATEGORIES);
+  if (state.batteryEnabled) categories.add('battery');
+  if (state.monitoringEnabled || state.bomCommercials?.includeMonitoringHardware === true) categories.add('monitoring');
+  if (Array.isArray(state.enabledBomCategories)) {
+    state.enabledBomCategories.forEach(category => {
+      if (category) categories.add(String(category));
+    });
+  }
+  return categories;
+}
+
+export function selectBomItems(items, selection = {}, options = {}) {
+  const activeCategories = options.activeCategories
+    ? new Set([...options.activeCategories].map(String))
+    : null;
   const grouped = {};
   normalizeBomItems(items).forEach(item => {
+    if (activeCategories && !activeCategories.has(item.category)) return;
     if (!grouped[item.category]) grouped[item.category] = [];
     grouped[item.category].push(item);
   });
   return Object.fromEntries(Object.entries(grouped).map(([category, list]) => {
     const selectedId = selection[category];
+    if (selectedId === false || selectedId === null || selectedId === '__disabled__') return [category, null];
     const found = list.find(item => item.id === selectedId) || list[0];
     return [category, found];
-  }));
+  }).filter(([, item]) => item));
 }
 
 export function calculateBomTotal(selectedItems, quantities) {
@@ -63,7 +82,7 @@ export async function loadBomFixture(url = DEFAULT_BOM_FIXTURE) {
 }
 
 function quantitiesFromState(state) {
-  const power = Math.max(0, Number(state.results?.systemPower ?? state.previewSystemPower ?? 0));
+  const power = Math.max(0, Number(state.previewSystemPower ?? state.systemPowerKwp ?? state.targetSystemPowerKwp ?? 0));
   return {
     wp: power * 1000,
     kwp: power,
@@ -114,7 +133,8 @@ function renderBom(filter = '') {
 
   const categories = [...new Set(items.map(item => item.category))];
   const selection = state.bomSelection || {};
-  const selected = selectBomItems(items, selection);
+  const activeCategories = getActiveBomCategories(state);
+  const selected = selectBomItems(items, selection, { activeCategories });
   const totals = calculateBomTotal(selected, quantitiesFromState(state));
   state.bomTotals = totals;
   state.costOverridesEnabled = true;
@@ -180,7 +200,7 @@ function renderBom(filter = '') {
       </tbody>
     </table>
     <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px">
-      ${items.length} ürün · ${categories.length} kategori · <code>fixtures/bom-suppliers.json</code>
+      ${items.length} ürün · ${categories.length} kategori · aktif toplam ${activeCategories.size} kategori · <code>fixtures/bom-suppliers.json</code>
     </div>
   `;
 
@@ -239,5 +259,5 @@ export function selectBomItem(category, itemId) {
 if (typeof window !== 'undefined') {
   window.initBomBuilder = initBomBuilder;
   window.selectBomItem = selectBomItem;
-  window.bomMath = { normalizeBomItems, selectBomItems, calculateBomTotal };
+  window.bomMath = { normalizeBomItems, selectBomItems, calculateBomTotal, getActiveBomCategories };
 }

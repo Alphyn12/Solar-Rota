@@ -1,6 +1,6 @@
 {
-  "name": "GüneşHesap",
-  "short_name": "GüneşHesap",
+  "name": "Solar Rota",
+  "short_name": "Solar Rota",
   "description": "Türkiye güneş paneli hesaplama platformu — PVGIS tabanlı gerçek veri ile sistem boyutlandırma ve ROI analizi",
   "start_url": "/",
   "display": "standalone",

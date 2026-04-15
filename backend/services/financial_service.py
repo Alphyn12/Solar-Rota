@@ -32,7 +32,8 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
     paid_export = export_kwh if net_metering else 0
     annual_savings = self_consumed * import_rate + paid_export * export_rate
 
-    rough_capex = max(1, float(production.get("systemPowerKwp") or 0) * 26000)
+    system_power_kwp = max(0, float(production.get("systemPowerKwp") or 0))
+    rough_capex = _frontend_default_capex(request, system_power_kwp)
     if request.system.batteryEnabled and request.system.battery:
         rough_capex += max(0, float(request.system.battery.get("capacity", 0) or 0)) * 8000
 
@@ -63,6 +64,7 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
         "paidGridExportKwh": round(paid_export),
         "annualSavingsTry": round(annual_savings),
         "roughCapexTry": round(rough_capex),
+        "capexModel": "frontend-default-cost-basis",
         "simplePaybackYears": round(simple_payback, 2) if simple_payback else None,
         "npv25Try": round(project_npv),
         "roiPct": round(roi, 1),
@@ -75,6 +77,37 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
         "nextAction": "Attach evidence and run full proposal governance before approval." if blockers else "Review proposal governance and customer-facing output.",
     }
     return {"financial": financial, "proposal": proposal}
+
+
+def _frontend_default_capex(request: EngineRequest, system_power_kwp: float) -> float:
+    """Mirror the browser's default solar CapEx basis when no BOM is supplied.
+
+    The frontend may still override this with itemized BOM/commercial inputs.
+    Backend proposal financials are therefore labelled as a default-cost-basis
+    estimate, not a replacement for browser governance/BOM totals.
+    """
+    panel_price_per_watt = {
+        "mono": 20.0,
+        "poly": 15.5,
+        "bifacial": 25.0,
+    }.get(request.system.panelType, 20.0)
+    inverter_price = {
+        "string": (7500, 6500, 5500),
+        "micro": (12000, 11000, 10000),
+        "optimizer": (9500, 8500, 7500),
+    }.get(request.system.inverterType, (7500, 6500, 5500))
+    inverter_per_kwp = inverter_price[0] if system_power_kwp < 10 else inverter_price[1] if system_power_kwp < 50 else inverter_price[2]
+    permit_cost = 8000 if system_power_kwp < 5 else 6000 if system_power_kwp < 10 else 5000 if system_power_kwp < 20 else 4000
+    subtotal = (
+        system_power_kwp * 1000 * panel_price_per_watt
+        + system_power_kwp * inverter_per_kwp
+        + system_power_kwp * 2200
+        + system_power_kwp * 600
+        + system_power_kwp * 900
+        + system_power_kwp * 1800
+        + permit_cost
+    )
+    return max(1, subtotal * 1.20)
 
 
 def calculate_financial_proposal(request: EngineRequest) -> EngineResponse:

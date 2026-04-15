@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // CALC CORE — Saf hesap yardımcıları
-// GüneşHesap v2.1
+// Solar Rota v2.1
 // ═══════════════════════════════════════════════════════════
 import {
   PANEL_TYPES, HOURLY_SOLAR_PROFILE, RESIDENTIAL_LOAD, COMMERCIAL_LOAD,
@@ -106,6 +106,24 @@ export function sumMonthlyArrays(...arrays) {
   return new Array(12).fill(0).map((_, i) =>
     arrays.reduce((sum, arr) => sum + (Array.isArray(arr) ? Math.max(0, Number(arr[i]) || 0) : 0), 0)
   );
+}
+
+export function normalizeMonthlyProductionToAnnual(monthlyProduction, annualEnergy) {
+  const annual = Math.max(0, Number(annualEnergy) || 0);
+  const source = Array.isArray(monthlyProduction) && monthlyProduction.length === 12
+    ? monthlyProduction.map(v => Math.max(0, Number(v) || 0))
+    : MONTH_WEIGHTS.map(weight => annual * weight);
+  const sourceSum = source.reduce((sum, value) => sum + value, 0);
+  const scaled = sourceSum > 0
+    ? source.map(value => value * annual / sourceSum)
+    : MONTH_WEIGHTS.map(weight => annual * weight);
+  const rounded = scaled.map(value => Math.round(value));
+  const delta = Math.round(annual) - rounded.reduce((sum, value) => sum + value, 0);
+  if (rounded.length === 12 && delta !== 0) {
+    const maxIndex = rounded.reduce((best, value, index) => value > rounded[best] ? index : best, 0);
+    rounded[maxIndex] += delta;
+  }
+  return rounded;
 }
 
 export function buildBaseHourlyLoad8760(monthlyLoad, tariffType = 'residential') {
@@ -254,7 +272,7 @@ export function simulateHourlyEnergy(monthlyProduction, monthlyLoad, options = {
     currentYearConsumptionKwh: options.currentYearConsumptionKwh,
     sellableExportCapKwh: options.sellableExportCapKwh
   });
-  const capped = applyExportCompensation(monthly, exportPolicy);
+  const capped = applyExportCompensation(monthly, { ...exportPolicy, hourlyRows: hourly8760 });
 
   return {
     annualProduction,
@@ -270,7 +288,8 @@ export function simulateHourlyEnergy(monthlyProduction, monthlyLoad, options = {
       ...m,
       paidGridExport: capped.monthly[i].paidGridExport,
       unpaidGridExport: capped.monthly[i].unpaidGridExport
-    }))
+    })),
+    exportPolicy: capped.policy
   };
 }
 
@@ -348,7 +367,7 @@ export function simulateBatteryOnHourlySummary(hourlySummary, battery, options =
   });
 
   const totalSelf = hourlySummary.selfConsumption + batteryDischarge;
-  const capped = applyExportCompensation(monthly, options.exportPolicy || { interval: 'monthly' });
+  const capped = applyExportCompensation(monthly, { ...(options.exportPolicy || { interval: 'monthly' }), hourlyRows: hourly8760 });
   const cyclesPerYear = usableCapacity > 0 ? batteryDischarge / usableCapacity : 0;
 
   return {
@@ -373,7 +392,25 @@ export function simulateBatteryOnHourlySummary(hourlySummary, battery, options =
       paidGridExport: capped.monthly[i].paidGridExport,
       unpaidGridExport: capped.monthly[i].unpaidGridExport
     })),
+    exportPolicy: capped.policy,
     hourly8760
+  };
+}
+
+export function resolveTaxTreatment({ grossTotalCost = 0, solarKdv = 0, taxEnabled = false, tax = null } = {}) {
+  const gross = Math.max(0, Number(grossTotalCost) || 0);
+  const recoverableKdv = taxEnabled && tax?.kdvRecovery
+    ? Math.min(gross, Math.max(0, Number(solarKdv) || 0))
+    : 0;
+  const financialCostBasis = Math.max(0, gross - recoverableKdv);
+  return {
+    grossTotalCost: gross,
+    recoverableKdv,
+    financialCostBasis,
+    depreciableBase: financialCostBasis,
+    vatTreatment: recoverableKdv > 0
+      ? 'recoverable-kdv-excluded-from-financial-cost-basis'
+      : 'kdv-included-in-financial-cost-basis'
   };
 }
 

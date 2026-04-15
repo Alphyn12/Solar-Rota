@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // HEAT PUMP — Isı Pompası Entegrasyonu (Faz C3)
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 import { HEAT_PUMP_DATA } from './data.js';
 

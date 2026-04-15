@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // BILL ANALYSIS — Elektrik Fatura Analizi (Faz B2)
-// GüneşHesap v2.0
+// Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 import { MONTHS } from './data.js';
 import { COMMON_YEAR_MONTH_DAYS } from './calc-core.js';

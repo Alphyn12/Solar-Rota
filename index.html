@@ -3,13 +3,15 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>GüneşHesap – Türkiye Güneş Paneli Hesaplayıcı</title>
-<meta name="description" content="Türkiye'nin en kapsamlı güneş paneli enerji ve yatırım hesaplama aracı."/>
+<title>Solar Rota – Türkiye Güneş Paneli Hesaplayıcı</title>
+<meta name="description" content="Solar Rota ile Türkiye için senaryo bazlı güneş paneli enerji ve yatırım hesaplaması yapın."/>
 <link rel="manifest" href="/manifest.json"/>
 <meta name="theme-color" content="#F59E0B"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" integrity="sha384-NZLkVuBRMEeB4VeZz27WwTRvlhec30biQ8Xx7zG7JJnkvEKRg5qi6BNbEXo9ydwv" crossorigin="anonymous"/>
 <link rel="stylesheet" href="css/components.css"/>
+<link rel="stylesheet" href="css/redesign.css"/>
+<link rel="stylesheet" href="css/mobile.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <!-- TODO(csp): migrate remaining inline event handlers/styles to JS modules, then remove 'unsafe-inline' from CSP. -->
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
@@ -28,17 +30,21 @@
   --text:#F1F5F9;--text-muted:#94A3B8;
   --success:#10B981;--danger:#EF4444;
   --border:#475569;--border-subtle:rgba(255,255,255,0.08);
-  --radius:14px;--radius-lg:20px;
+  --radius:14px;--radius-lg:20px;--radius-xl:28px;--radius-2xl:40px;
   --transition:0.3s ease;--transition-bounce:0.4s cubic-bezier(0.34,1.56,0.64,1);
-  /* Typography */
   --font-display:'Space Grotesk','Inter',sans-serif;
   --font-body:'Inter',sans-serif;
-  /* Shadows */
   --shadow-sm:0 1px 3px rgba(0,0,0,0.3),0 1px 2px rgba(0,0,0,0.2);
   --shadow-md:0 4px 16px rgba(0,0,0,0.4),0 2px 8px rgba(0,0,0,0.3);
   --shadow-glow-primary:0 0 24px rgba(245,158,11,0.3),0 4px 16px rgba(0,0,0,0.4);
   --shadow-glow-accent:0 0 24px rgba(6,182,212,0.25),0 4px 16px rgba(0,0,0,0.4);
   --shadow-card:0 1px 0 rgba(255,255,255,0.05) inset,0 8px 32px rgba(0,0,0,0.4),0 2px 8px rgba(0,0,0,0.3);
+  /* Scenario colors */
+  --scenario-ongrid:#F59E0B;--scenario-offgrid:#8B5CF6;--scenario-irrigation:#10B981;
+  --scenario-heatpump:#EC4899;--scenario-mobile:#06B6D4;--scenario-ev:#3B82F6;
+  /* Hero */
+  --hero-gradient:linear-gradient(135deg,#0F172A 0%,#1E2D4A 50%,#0F172A 100%);
+  --header-h:88px;
 }
 html{scroll-behavior:smooth}
 body{
@@ -50,11 +56,7 @@ body{
   animation:bgDrift 18s ease-in-out infinite alternate;
 }
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-@keyframes bgDrift{
-  0%  {background-position:0% 0%}
-  50% {background-position:2% 2%}
-  100%{background-position:-1% 1%}
-}
+@keyframes bgDrift{0%{background-position:0% 0%}50%{background-position:2% 2%}100%{background-position:-1% 1%}}
 body::before{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.022;
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -62,7 +64,6 @@ body::before{
 }
 body>*{position:relative;z-index:1}
 body>main{z-index:auto}
-/* ── SCROLLBAR ── */
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-track{background:var(--secondary)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
@@ -70,8 +71,7 @@ body>main{z-index:auto}
 /* ── HEADER ── */
 #app-header{
   background:rgba(15,23,42,0.85);
-  backdrop-filter:blur(20px) saturate(1.6);
-  -webkit-backdrop-filter:blur(20px) saturate(1.6);
+  backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);
   border-bottom:1px solid var(--border-subtle);
   box-shadow:0 1px 0 rgba(255,255,255,0.04) inset,0 4px 24px rgba(0,0,0,0.4);
   position:sticky;top:0;z-index:100;padding:14px 24px;
@@ -79,50 +79,26 @@ body>main{z-index:auto}
 .header-inner{max-width:1200px;margin:0 auto}
 .header-top{display:flex;align-items:center;gap:16px;margin-bottom:14px}
 .logo{display:flex;align-items:center;gap:10px}
-.logo-icon{
-  width:40px;height:40px;
-  filter:drop-shadow(0 0 8px rgba(245,158,11,0.5));
-  animation:logoGlow 3s ease-in-out infinite alternate;
-}
-@keyframes logoGlow{
-  0% {filter:drop-shadow(0 0 6px rgba(245,158,11,0.4))}
-  100%{filter:drop-shadow(0 0 16px rgba(245,158,11,0.75))}
-}
+.logo-icon{width:40px;height:40px;filter:drop-shadow(0 0 8px rgba(245,158,11,0.5));animation:logoGlow 3s ease-in-out infinite alternate;}
+@keyframes logoGlow{0%{filter:drop-shadow(0 0 6px rgba(245,158,11,0.4))}100%{filter:drop-shadow(0 0 16px rgba(245,158,11,0.75))}}
 .logo-icon g{animation:sunRaysSpin 14s linear infinite;transform-origin:18px 18px}
 @keyframes sunRaysSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-.logo-text{
-  font-family:var(--font-display);font-size:1.6rem;font-weight:800;letter-spacing:-0.03em;
-  background:linear-gradient(135deg,var(--primary) 0%,#FCD34D 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
+.logo-text{font-family:var(--font-display);font-size:1.6rem;font-weight:800;letter-spacing:-0.03em;background:linear-gradient(135deg,var(--primary) 0%,#FCD34D 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 .logo-tagline{font-size:0.7rem;color:var(--text-muted);margin-left:2px;letter-spacing:0.02em}
 
 /* ── STEP DOTS ── */
 .step-dots-wrap{flex:1}
 .step-dots{display:flex;align-items:center;justify-content:center}
 .step-dot{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;user-select:none}
-.step-dot-num{
-  width:32px;height:32px;border-radius:50%;
-  background:var(--surface-light);border:2px solid var(--border);
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--font-display);font-size:0.8rem;font-weight:700;color:var(--text-muted);
-  transition:all var(--transition);
-}
-.step-dot.active .step-dot-num{
-  background:var(--primary);border-color:var(--primary);color:#000;
-  box-shadow:0 0 16px rgba(245,158,11,0.55);
-}
+.step-dot-num{width:32px;height:32px;border-radius:50%;background:var(--surface-light);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:0.8rem;font-weight:700;color:var(--text-muted);transition:all var(--transition);}
+.step-dot.active .step-dot-num{background:var(--primary);border-color:var(--primary);color:#000;box-shadow:0 0 16px rgba(245,158,11,0.55);}
 .step-dot.done .step-dot-num{background:var(--success);border-color:var(--success);color:#fff}
 .step-dot-label{font-size:0.62rem;color:var(--text-muted);font-weight:500;white-space:nowrap;transition:color var(--transition)}
 .step-dot.active .step-dot-label{color:var(--primary);font-weight:700}
 .step-dot.done .step-dot-label{color:var(--success)}
-.step-connector{height:2px;width:44px;background:var(--border);transition:background 0.5s ease;margin:0 3px;margin-bottom:18px}
+.step-connector{height:2px;width:32px;background:var(--border);transition:background 0.5s ease;margin:0 2px;margin-bottom:18px}
 .step-connector.filled{background:var(--success)}
-@media(max-width:620px){
-  .step-connector{width:20px}
-  .step-dot-label{display:none}
-  .step-dot-num{width:28px;height:28px;font-size:0.72rem}
-}
+@media(max-width:620px){.step-connector{width:12px}.step-dot-label{display:none}.step-dot-num{width:26px;height:26px;font-size:0.7rem}}
 
 /* ── MAIN ── */
 #main-content{max-width:1200px;margin:0 auto;padding:24px 16px 80px}
@@ -131,38 +107,17 @@ body>main{z-index:auto}
 .step-pane{display:none}
 .step-pane.active{display:block;animation:stepFadeIn 0.32s ease forwards}
 @keyframes stepFadeIn{from{opacity:0}to{opacity:1}}
-/* ── STEP HEADING ── */
 .step-heading{margin-bottom:28px;padding-top:4px}
 .step-heading-eyebrow{font-size:0.72rem;font-weight:600;color:var(--primary);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px}
-.step-heading-title{
-  font-family:var(--font-display);font-size:2rem;font-weight:800;letter-spacing:-0.03em;line-height:1.1;margin-bottom:8px;
-  background:linear-gradient(135deg,#F1F5F9 0%,#94A3B8 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
+.step-heading-title{font-family:var(--font-display);font-size:2rem;font-weight:800;letter-spacing:-0.03em;line-height:1.1;margin-bottom:8px;background:linear-gradient(135deg,#F1F5F9 0%,#94A3B8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 .step-heading-sub{font-size:0.9rem;color:var(--text-muted);line-height:1.55;max-width:560px}
 @media(max-width:600px){.step-heading-title{font-size:1.5rem}}
 
 /* ── GLASS CARD ── */
-.card{
-  background:var(--surface-glass);
-  backdrop-filter:blur(12px) saturate(1.4);
-  -webkit-backdrop-filter:blur(12px) saturate(1.4);
-  border:1px solid var(--border-subtle);
-  border-radius:var(--radius);padding:24px;
-  box-shadow:var(--shadow-card);position:relative;
-  transition:transform var(--transition),box-shadow var(--transition);
-}
-.card::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent);
-  pointer-events:none;
-}
+.card{background:var(--surface-glass);backdrop-filter:blur(12px) saturate(1.4);-webkit-backdrop-filter:blur(12px) saturate(1.4);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-card);position:relative;transition:transform var(--transition),box-shadow var(--transition);}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent);pointer-events:none;}
 .card:hover{transform:translateY(-2px);box-shadow:0 1px 0 rgba(255,255,255,0.07) inset,0 14px 44px rgba(0,0,0,0.5),0 4px 12px rgba(0,0,0,0.4)}
-/* ── MAP CARD OVERRIDES — Leaflet uyumluluğu için ── */
-#map-card{
-  backdrop-filter:none;-webkit-backdrop-filter:none;
-  position:relative;
-}
+#map-card{backdrop-filter:none;-webkit-backdrop-filter:none;position:relative;}
 #map-card::before{display:none}
 .card-title{font-family:var(--font-display);font-size:1rem;font-weight:700;letter-spacing:-0.01em;color:var(--primary);margin-bottom:18px;display:flex;align-items:center;gap:8px}
 
@@ -174,165 +129,70 @@ body>main{z-index:auto}
 .form-group{margin-bottom:16px}
 label{display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;font-weight:500}
 .input-wrap{position:relative}
-input[type=text],input[type=number],select{
-  width:100%;background:var(--surface-light);border:1px solid var(--border);
-  border-radius:8px;color:var(--text);font-size:1rem;padding:10px 12px;
-  font-family:inherit;outline:none;transition:border-color var(--transition);
-  touch-action:manipulation;
-}
+input[type=text],input[type=number],select{width:100%;background:var(--surface-light);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:1rem;padding:10px 12px;font-family:inherit;outline:none;transition:border-color var(--transition);touch-action:manipulation;}
 input[type=text]:focus,input[type=number]:focus,select:focus{border-color:var(--primary)}
 input.error{border-color:var(--danger)!important}
 .error-msg{font-size:0.75rem;color:var(--danger);margin-top:4px}
-input[type=range]{
-  -webkit-appearance:none;appearance:none;
-  width:100%;height:6px;border-radius:3px;
-  background:var(--surface-light);cursor:pointer;outline:none;
-}
-input[type=range].range-filled{
-  background:linear-gradient(90deg,var(--primary) var(--range-pct,0%),var(--surface-light) var(--range-pct,0%));
-}
-input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;appearance:none;
-  width:20px;height:20px;border-radius:50%;
-  background:var(--primary);border:2px solid rgba(255,255,255,0.2);
-  cursor:pointer;box-shadow:0 0 10px rgba(245,158,11,0.45);
-  transition:transform var(--transition),box-shadow var(--transition);
-}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:var(--surface-light);cursor:pointer;outline:none;}
+input[type=range].range-filled{background:linear-gradient(90deg,var(--primary) var(--range-pct,0%),var(--surface-light) var(--range-pct,0%));}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:var(--primary);border:2px solid rgba(255,255,255,0.2);cursor:pointer;box-shadow:0 0 10px rgba(245,158,11,0.45);transition:transform var(--transition),box-shadow var(--transition);}
 input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.18);box-shadow:0 0 18px rgba(245,158,11,0.7)}
-input[type=range]::-moz-range-thumb{
-  width:20px;height:20px;border-radius:50%;
-  background:var(--primary);border:2px solid rgba(255,255,255,0.2);
-  cursor:pointer;box-shadow:0 0 10px rgba(245,158,11,0.45);
-}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--primary);border:2px solid rgba(255,255,255,0.2);cursor:pointer;box-shadow:0 0 10px rgba(245,158,11,0.45);}
 .range-wrap{position:relative;padding-bottom:20px}
-.range-labels{
-  display:flex;justify-content:space-between;font-size:0.7rem;
-  color:var(--text-muted);margin-top:4px;
-}
-.range-value{
-  position:absolute;top:-28px;left:50%;transform:translateX(-50%);
-  background:var(--primary);color:#000;font-size:0.75rem;font-weight:700;
-  padding:2px 7px;border-radius:4px;pointer-events:none;white-space:nowrap;
-}
+.range-labels{display:flex;justify-content:space-between;font-size:0.7rem;color:var(--text-muted);margin-top:4px;}
+.range-value{position:absolute;top:-28px;left:50%;transform:translateX(-50%);background:var(--primary);color:#000;font-size:0.75rem;font-weight:700;padding:2px 7px;border-radius:4px;pointer-events:none;white-space:nowrap;}
 
 /* ── AUTOCOMPLETE ── */
-.autocomplete-list{
-  position:absolute;top:100%;left:0;right:0;background:var(--surface);
-  border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;
-  max-height:200px;overflow-y:auto;z-index:50;display:none;
-}
+.autocomplete-list{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;z-index:50;display:none;}
 .autocomplete-list.open{display:block}
-.autocomplete-item{
-  padding:8px 12px;cursor:pointer;font-size:0.85rem;
-  transition:background var(--transition);display:flex;justify-content:space-between;
-}
+.autocomplete-item{padding:8px 12px;cursor:pointer;font-size:0.85rem;transition:background var(--transition);display:flex;justify-content:space-between;}
 .autocomplete-item:hover,.autocomplete-item.selected{background:var(--surface-light)}
 .autocomplete-ghi{font-size:0.72rem;color:var(--text-muted)}
 
-/* ── LOCATION ── */
-#selected-location{
-  background:var(--surface-light);border-radius:8px;padding:10px 12px;
-  font-size:0.85rem;display:flex;align-items:center;gap:8px;margin-top:8px;
-}
+/* ── LOCATION (hidden helper) ── */
+#selected-location{background:var(--surface-light);border-radius:8px;padding:10px 12px;font-size:0.85rem;display:none;align-items:center;gap:8px;margin-top:8px;}
 .loc-dot{width:10px;height:10px;border-radius:50%;background:var(--success);flex-shrink:0}
 
 /* ── MAP ── */
-#map{height:480px;border-radius:0;border:none;background:#1E293B}
-#map-card{border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);padding:0!important}
-#map-card:hover{transform:none;box-shadow:var(--shadow-card)}
-/* Leaflet draw toolbar iyileştirmeleri */
+#map{height:100%;border-radius:0;border:none;background:#1E293B;min-height:300px;}
+#map-card{border-radius:0;overflow:hidden;border:none;padding:0!important}
+#map-card:hover{transform:none;box-shadow:none}
 .leaflet-draw-toolbar a{background-color:#1E293B!important;color:#F1F5F9!important;border-color:#475569!important}
 .leaflet-draw-toolbar a:hover{background-color:#334155!important;color:#F59E0B!important}
 .leaflet-draw-toolbar .leaflet-draw-draw-polygon{background-image:none!important;font-size:18px!important;display:flex!important;align-items:center!important;justify-content:center!important}
 .leaflet-draw-toolbar .leaflet-draw-draw-polygon::after{content:'⬡';font-size:16px}
 .leaflet-draw-tooltip{background:#1E293B;color:#F59E0B;border:1px solid #F59E0B;font-family:'Inter',sans-serif;font-size:0.78rem;padding:4px 8px;border-radius:6px}
 .leaflet-draw-guide-dash{border-color:#F59E0B!important}
-/* Layer control */
 .leaflet-control-layers{background:#1E293B!important;border:1px solid #475569!important;border-radius:8px!important;color:#F1F5F9!important}
 .leaflet-control-layers-toggle{background-color:#1E293B!important}
 .leaflet-control-layers label{color:#F1F5F9!important;font-family:'Inter',sans-serif;font-size:0.8rem}
-/* Çizim modu overlay */
-#map-draw-hint{
-  position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
-  background:rgba(15,23,42,0.92);color:#F59E0B;
-  font-family:'Inter',sans-serif;font-size:0.8rem;font-weight:600;
-  padding:8px 16px;border-radius:8px;border:1px solid rgba(245,158,11,0.4);
-  z-index:1000;pointer-events:none;display:none;white-space:nowrap;
-  box-shadow:0 4px 16px rgba(0,0,0,0.5);
-}
-/* Çatı özet badge */
-#roof-area-badge{
-  display:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);
-  border-radius:8px;padding:8px 14px;font-size:0.82rem;color:var(--primary);
-  margin-top:10px;
-}
-/* Uydu mod butonu */
-.map-layer-btn{
-  position:absolute;top:10px;right:50px;z-index:999;
-  background:#1E293B;border:1px solid #475569;border-radius:8px;
-  color:#F1F5F9;font-size:0.75rem;font-weight:600;cursor:pointer;
-  padding:6px 12px;font-family:'Inter',sans-serif;
-  transition:all 0.2s;display:flex;align-items:center;gap:6px;
-}
+#map-draw-hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.92);color:#F59E0B;font-family:'Inter',sans-serif;font-size:0.8rem;font-weight:600;padding:8px 16px;border-radius:8px;border:1px solid rgba(245,158,11,0.4);z-index:1000;pointer-events:none;display:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
+#roof-area-badge{display:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:8px;padding:8px 14px;font-size:0.82rem;color:var(--primary);margin-top:10px;}
+.map-layer-btn{position:absolute;top:10px;right:50px;z-index:999;background:#1E293B;border:1px solid #475569;border-radius:8px;color:#F1F5F9;font-size:0.75rem;font-weight:600;cursor:pointer;padding:6px 12px;font-family:'Inter',sans-serif;transition:all 0.2s;display:flex;align-items:center;gap:6px;}
 .map-layer-btn:hover{background:#334155;border-color:#F59E0B;color:#F59E0B}
 .map-layer-btn.active{background:rgba(245,158,11,0.15);border-color:#F59E0B;color:#F59E0B}
-/* Roof vertex icon */
 .roof-vertex-icon{background:#F59E0B!important;border:2px solid #fff!important;border-radius:50%!important;width:10px!important;height:10px!important}
-@media(max-width:1024px){#map{height:360px}}
-@media(max-width:768px){#map{height:280px}}
 
 /* ── BTN ── */
-.btn{
-  display:inline-flex;align-items:center;gap:8px;padding:11px 22px;
-  border-radius:10px;font-family:var(--font-display);font-size:0.875rem;
-  font-weight:600;cursor:pointer;border:none;
-  transition:all var(--transition);position:relative;overflow:hidden;
-  letter-spacing:0.01em;
-}
-.btn::before{
-  content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);
-  transform:skewX(-20deg);transition:left 0.5s ease;pointer-events:none;
-}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:10px;font-family:var(--font-display);font-size:0.875rem;font-weight:600;cursor:pointer;border:none;transition:all var(--transition);position:relative;overflow:hidden;letter-spacing:0.01em;}
+.btn::before{content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);transform:skewX(-20deg);transition:left 0.5s ease;pointer-events:none;}
 .btn:hover::before{left:140%}
 .btn:active{transform:scale(0.97)!important}
 .btn:disabled{opacity:0.45;cursor:not-allowed;transform:none!important}
-.btn-primary{
-  background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);
-  color:#000;font-weight:700;
-  box-shadow:var(--shadow-md);
-}
-.btn-primary:hover{
-  background:linear-gradient(135deg,#FCD34D 0%,var(--primary) 100%);
-  box-shadow:var(--shadow-glow-primary);transform:translateY(-1px);
-}
-.btn-secondary{
-  background:rgba(255,255,255,0.04);color:var(--text);
-  border:1px solid var(--border-subtle);backdrop-filter:blur(8px);
-}
+.btn-primary{background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);color:#000;font-weight:700;box-shadow:var(--shadow-md);}
+.btn-primary:hover{background:linear-gradient(135deg,#FCD34D 0%,var(--primary) 100%);box-shadow:var(--shadow-glow-primary);transform:translateY(-1px);}
+.btn-secondary{background:rgba(255,255,255,0.04);color:var(--text);border:1px solid var(--border-subtle);backdrop-filter:blur(8px);}
 .btn-secondary:hover{background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.15);transform:translateY(-1px)}
 .btn-outline{background:transparent;color:var(--primary);border:1px solid rgba(245,158,11,0.4)}
 .btn-outline:hover{background:rgba(245,158,11,0.08);border-color:var(--primary);box-shadow:0 0 16px rgba(245,158,11,0.18)}
 .btn-success{background:linear-gradient(135deg,var(--success) 0%,#059669 100%);color:#fff;font-weight:700}
 .btn-full{width:100%;justify-content:center}
 .nav-btns{display:flex;gap:12px;justify-content:flex-end;margin-top:24px}
-@media(max-width:768px){
-  .sticky-nav{
-    position:fixed;bottom:0;left:0;right:0;padding:12px 16px;
-    background:rgba(15,23,42,0.95);backdrop-filter:blur(16px);
-    border-top:1px solid var(--border-subtle);
-    box-shadow:0 -4px 24px rgba(0,0,0,0.4);z-index:90;
-  }
-  .sticky-nav .btn{min-height:48px;font-size:1rem}
-  .btn{min-height:44px}
-}
+@media(max-width:768px){.sticky-nav{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;background:rgba(15,23,42,0.95);backdrop-filter:blur(16px);border-top:1px solid var(--border-subtle);box-shadow:0 -4px 24px rgba(0,0,0,0.4);z-index:90;}.sticky-nav .btn{min-height:48px;font-size:1rem}.btn{min-height:44px}}
 
 /* ── TILT SVG ── */
 #tilt-diagram-wrap{background:var(--surface-light);border-radius:8px;padding:12px;margin-top:8px}
-#tilt-info{
-  font-size:0.8rem;margin-top:6px;text-align:center;font-weight:600;
-  padding:4px 10px;border-radius:6px;display:inline-block;
-}
+#tilt-info{font-size:0.8rem;margin-top:6px;text-align:center;font-weight:600;padding:4px 10px;border-radius:6px;display:inline-block;}
 .tilt-good{background:rgba(16,185,129,0.15);color:var(--success)}
 .tilt-warn{background:rgba(234,179,8,0.15);color:#EAB308}
 .tilt-bad{background:rgba(239,68,68,0.15);color:var(--danger)}
@@ -343,457 +203,128 @@ input[type=range]::-moz-range-thumb{
 .compass-dir-btn{cursor:pointer;transition:opacity 0.2s}
 .compass-dir-btn:hover{opacity:0.8}
 #azimuth-info{font-size:0.8rem;color:var(--text-muted);text-align:center}
-.optimal-badge{
-  background:rgba(245,158,11,0.15);color:var(--primary);
-  font-size:0.7rem;font-weight:700;padding:2px 6px;border-radius:4px;
-  border:1px solid rgba(245,158,11,0.3);
-}
+.optimal-badge{background:rgba(245,158,11,0.15);color:var(--primary);font-size:0.7rem;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid rgba(245,158,11,0.3);}
 
 /* ── PANEL CARDS ── */
 .panel-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 @media(max-width:768px){.panel-cards{grid-template-columns:1fr}}
-.panel-card{
-  background:var(--surface-glass);backdrop-filter:blur(8px);
-  border:2px solid var(--border-subtle);
-  border-radius:var(--radius);padding:20px;cursor:pointer;
-  transition:all var(--transition-bounce);position:relative;overflow:hidden;/* ::before shimmer clip için gerekli */
-}
-.panel-card::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
-}
+.panel-card{background:var(--surface-glass);backdrop-filter:blur(8px);border:2px solid var(--border-subtle);border-radius:var(--radius);padding:20px;cursor:pointer;transition:all var(--transition-bounce);position:relative;overflow:hidden;}
+.panel-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);}
 .panel-card:hover{border-color:rgba(245,158,11,0.4);transform:translateY(-3px);box-shadow:var(--shadow-glow-primary)}
 .panel-card.selected{border-color:var(--primary);background:rgba(245,158,11,0.05);box-shadow:var(--shadow-glow-primary)}
 .panel-card-title{font-family:var(--font-display);font-weight:700;font-size:0.9rem;margin-bottom:8px}
-.panel-card-eff{
-  font-family:var(--font-display);font-size:2.2rem;font-weight:800;
-  color:var(--primary);line-height:1;letter-spacing:-0.03em;
-}
+.panel-card-eff{font-family:var(--font-display);font-size:2.2rem;font-weight:800;color:var(--primary);line-height:1;letter-spacing:-0.03em;}
 .panel-card-stats{margin-top:12px;display:flex;flex-direction:column;gap:5px}
 .panel-stat{display:flex;justify-content:space-between;font-size:0.78rem}
 .panel-stat-label{color:var(--text-muted)}
-.panel-check{
-  position:absolute;top:8px;right:8px;background:var(--primary);
-  border-radius:50%;width:22px;height:22px;display:none;
-  align-items:center;justify-content:center;font-size:12px;color:#000;
-  box-shadow:0 0 10px rgba(245,158,11,0.5);
-}
+.panel-check{position:absolute;top:8px;right:8px;background:var(--primary);border-radius:50%;width:22px;height:22px;display:none;align-items:center;justify-content:center;font-size:12px;color:#000;box-shadow:0 0 10px rgba(245,158,11,0.5);}
 .panel-card.selected .panel-check{display:flex}
-.panel-preview{
-  background:var(--surface);border-radius:8px;padding:14px;margin-top:16px;
-  display:flex;gap:20px;flex-wrap:wrap;
-}
+.panel-preview{background:var(--surface);border-radius:8px;padding:14px;margin-top:16px;display:flex;gap:20px;flex-wrap:wrap;}
 .panel-preview-stat{text-align:center}
 .panel-preview-val{font-size:1.5rem;font-weight:700;color:var(--primary)}
 .panel-preview-label{font-size:0.72rem;color:var(--text-muted);margin-top:2px}
 
-/* ── LOADING legacy ── */
+/* ── LOADING ── */
 @keyframes spinSun{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 
 /* ── KPI CARDS ── */
 .kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
 @media(max-width:600px){.kpi-grid{grid-template-columns:1fr}}
-.kpi-card{
-  background:var(--surface-glass);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  border:1px solid var(--border-subtle);
-  border-left:3px solid var(--kpi-color,var(--primary));
-  border-radius:var(--radius);padding:24px;
-  position:relative;overflow:hidden;/* ::after glow clip için gerekli */
-  box-shadow:var(--shadow-card);
-  transition:transform var(--transition),box-shadow var(--transition);
-}
-.kpi-card::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
-}
-.kpi-card::after{
-  content:'';position:absolute;top:-40%;right:-15%;
-  width:140px;height:140px;border-radius:50%;
-  background:radial-gradient(circle,var(--kpi-color,var(--primary)) 0%,transparent 70%);
-  opacity:0.07;pointer-events:none;
-}
-.kpi-card:hover{transform:translateY(-3px);box-shadow:0 14px 44px rgba(0,0,0,0.5),0 2px 8px rgba(0,0,0,0.4)}
-.kpi-icon-wrap{
-  width:46px;height:46px;border-radius:12px;
-  display:flex;align-items:center;justify-content:center;
-  margin-bottom:16px;
-  background:rgba(255,255,255,0.05);
-  border:1px solid rgba(255,255,255,0.08);
-  color:var(--kpi-color,var(--primary));
-}
-.kpi-value{
-  font-family:var(--font-display);font-size:2.6rem;font-weight:800;line-height:1;
-  letter-spacing:-0.03em;color:var(--kpi-color,var(--primary));
-}
-.kpi-unit{font-size:0.72rem;color:var(--text-muted);font-weight:500;margin-top:3px;text-transform:uppercase;letter-spacing:0.04em}
-.kpi-label{font-size:0.85rem;color:var(--text);font-weight:600;margin-top:10px}
-.kpi-sub{font-size:0.74rem;color:var(--text-muted);margin-top:4px}
+.kpi-card{background:var(--surface-glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:24px;position:relative;overflow:hidden;transition:transform var(--transition);box-shadow:var(--shadow-card);}
+.kpi-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--kpi-color,var(--primary));opacity:0.6}
+.kpi-card:hover{transform:translateY(-3px)}
+.kpi-icon-wrap{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:center;margin-bottom:14px;color:var(--kpi-color,var(--primary));}
+.kpi-value{font-family:var(--font-display);font-size:2.4rem;font-weight:800;letter-spacing:-0.04em;color:var(--kpi-color,var(--primary));line-height:1;margin-bottom:4px;}
+.kpi-unit{font-size:0.75rem;color:var(--text-muted);margin-bottom:6px}
+.kpi-label{font-size:0.8rem;color:var(--text-muted);font-weight:500}
+.kpi-sub{font-size:0.7rem;color:var(--text-muted);margin-top:4px}
 
-/* ── FINANCIAL BOX ── */
-.fin-box{
-  background:var(--surface-glass);backdrop-filter:blur(12px);
-  border:1px solid var(--border-subtle);
-  border-radius:var(--radius);padding:24px;margin-top:16px;
-  box-shadow:var(--shadow-card);position:relative;overflow:hidden;/* ::before için gerekli */
-}
-.fin-box::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
-}
-.fin-row{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:10px 0;border-bottom:1px solid rgba(71,85,105,0.4);
-}
+/* ── FIN BOX ── */
+.fin-box{background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:24px;margin-top:16px;box-shadow:var(--shadow-card);}
+.fin-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-subtle);}
 .fin-row:last-child{border-bottom:none}
 .fin-label{font-size:0.85rem;color:var(--text-muted)}
-.fin-val{font-size:0.95rem;font-weight:700}
+.fin-val{font-family:var(--font-display);font-size:1rem;font-weight:700}
+.fin-val.highlight{color:var(--primary);font-size:1.2rem}
 .fin-val.positive{color:var(--success)}
 .fin-val.negative{color:var(--danger)}
-.fin-val.highlight{color:var(--primary)}
-.payback-bar-wrap{
-  background:var(--surface-light);border-radius:99px;height:8px;
-  flex:1;margin:0 12px;
-}
-.payback-bar-fill{
-  height:8px;border-radius:99px;
-  background:linear-gradient(90deg,var(--success),var(--primary));
-  transition:width 0.8s ease;
-}
+.payback-bar-wrap{flex:1;height:6px;background:var(--surface-light);border-radius:3px;margin-right:12px;overflow:hidden;}
+.payback-bar-fill{height:100%;background:linear-gradient(90deg,var(--success),var(--primary));border-radius:3px;transition:width 1s ease;}
 
-/* ── CHART ── */
-.chart-wrap{
-  background:var(--surface-glass);backdrop-filter:blur(12px);
-  border:1px solid var(--border-subtle);border-radius:var(--radius);
-  padding:24px;margin-top:16px;box-shadow:var(--shadow-card);
-}
-.chart-title{font-family:var(--font-display);font-size:0.92rem;font-weight:600;color:var(--text);margin-bottom:14px;letter-spacing:-0.01em}
-#monthly-chart-canvas{max-height:300px}
-
-/* ── TECH TABLE ── */
-.tech-table{width:100%;border-collapse:collapse;font-size:0.82rem;margin-top:8px}
-.tech-table th{text-align:left;color:var(--text-muted);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--border)}
-.tech-table td{padding:8px 10px;border-bottom:1px solid rgba(71,85,105,0.2)}
-.tech-table tr:last-child td{border-bottom:none}
-.tech-table td:last-child{text-align:right;font-weight:600;color:var(--primary)}
-
-/* ── TÜRKIYE SVG MAP ── */
-#turkey-map-wrap{margin-top:16px;text-align:center}
-#turkey-svg-map{max-width:400px;width:100%}
-
-/* ── TOAST ── */
-#toast-container{
-  position:fixed;bottom:24px;right:24px;z-index:999;
-  display:flex;flex-direction:column;gap:8px;
-}
-.toast{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:8px;padding:10px 16px;font-size:0.85rem;
-  box-shadow:0 4px 20px rgba(0,0,0,0.3);min-width:200px;
-  animation:toastIn 0.3s ease;
-}
-.toast.success{border-left:3px solid var(--success)}
-.toast.error{border-left:3px solid var(--danger)}
-.toast.info{border-left:3px solid var(--primary)}
-@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
-@keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateX(20px)}}
-
-/* ── TOOLTIP ── */
-.tooltip-wrap{display:inline-flex;align-items:center;margin-left:5px;position:relative}
-.tooltip-icon{
-  width:16px;height:16px;border-radius:50%;background:var(--surface-light);
-  border:1px solid var(--border);font-size:10px;cursor:help;
-  display:inline-flex;align-items:center;justify-content:center;color:var(--text-muted);
-}
-.tooltip-box{
-  display:none;position:absolute;bottom:125%;left:50%;transform:translateX(-50%);
-  background:rgba(30,41,59,0.97);border:1px solid var(--border);
-  border-radius:8px;padding:8px 12px;font-size:0.75rem;
-  width:max-content;max-width:min(220px,80vw);
-  color:var(--text);z-index:200;pointer-events:none;line-height:1.5;
-  box-shadow:0 4px 20px rgba(0,0,0,0.4);white-space:normal;
-}
-.tooltip-wrap:hover .tooltip-box{display:block}
-
-/* ── FALLBACK BANNER ── */
-#fallback-banner{
-  background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);
-  border-radius:8px;padding:10px 14px;font-size:0.82rem;color:var(--primary);
-  margin-top:10px;display:none;
-}
-
-/* ── CONFETTI ── */
-.confetti-piece{
-  position:fixed;width:8px;height:8px;border-radius:2px;
-  animation:confettiFall 3s ease forwards;pointer-events:none;z-index:9999;
-}
-@keyframes confettiFall{
-  0%{transform:translateY(-20px) rotate(0deg);opacity:1}
-  100%{transform:translateY(100vh) rotate(720deg);opacity:0}
-}
-
-/* ── GHI LEGEND ── */
-.ghi-legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.ghi-leg-item{display:flex;align-items:center;gap:4px;font-size:0.7rem;color:var(--text-muted)}
-.ghi-leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-
-/* ── LOCATION WARN ── */
-#location-warning{
-  background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);
-  color:var(--danger);border-radius:8px;padding:10px;font-size:0.82rem;
-  margin-top:8px;display:none;
-}
-
-/* ── RESULTS ACTION BTNS ── */
-.action-btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
-/* ── RESULTS HERO GLOW ── */
-.results-hero{position:relative;height:0;overflow:visible}
-.results-glow{
-  position:absolute;top:-60px;left:50%;transform:translateX(-50%);
-  width:400px;height:200px;pointer-events:none;
-  background:radial-gradient(ellipse,rgba(245,158,11,0.14) 0%,transparent 70%);
-  animation:glowPulse 3s ease-in-out infinite alternate;
-}
-@keyframes glowPulse{
-  0%{opacity:0.6;transform:translateX(-50%) scale(1)}
-  100%{opacity:1;transform:translateX(-50%) scale(1.12)}
-}
-/* ── PR GAUGE ── */
-.pr-gauge-wrap{text-align:center}
-/* ── UTILITY ── */
-.text-gradient{
-  background:linear-gradient(135deg,var(--primary) 0%,#FCD34D 50%,var(--accent) 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
-.text-gradient-warm{
-  background:linear-gradient(135deg,var(--primary-dark) 0%,var(--primary) 60%,#FCD34D 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-}
-.text-display{font-family:var(--font-display);font-weight:700;letter-spacing:-0.02em}
-/* ── LOADING (new) ── */
-#loading-pane{
-  text-align:center;padding:40px 20px 80px;
-  min-height:72vh;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:18px;position:relative;
-}
-.loading-ring-wrap{filter:drop-shadow(0 0 20px rgba(245,158,11,0.4))}
-.loading-headline{font-family:var(--font-display);font-size:1.9rem;font-weight:800;letter-spacing:-0.03em}
-.loading-msg{font-size:0.95rem;color:var(--text-muted);max-width:380px;line-height:1.55}
-.loading-steps{display:flex;flex-direction:column;gap:8px;margin-top:4px;text-align:left}
-.loading-step{
-  display:flex;align-items:center;gap:10px;font-size:0.82rem;
-  color:var(--text-muted);transition:color var(--transition);
-  padding:4px 8px;border-radius:6px;
-}
-.loading-step.active{color:var(--primary)}
-.loading-step.done{color:var(--success)}
-.loading-step-dot{
-  width:8px;height:8px;border-radius:50%;background:var(--border);
-  flex-shrink:0;transition:all var(--transition);
-}
-.loading-step.active .loading-step-dot{
-  background:var(--primary);box-shadow:0 0 8px var(--primary-glow);
-  animation:dotPulse 1s ease-in-out infinite;
-}
-.loading-step.done .loading-step-dot{background:var(--success)}
-@keyframes dotPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.5);opacity:0.7}}
-.loading-particles{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-.lp{position:absolute;border-radius:50%;animation:lpFloat linear infinite;opacity:0}
-@keyframes lpFloat{
-  0%{transform:translateY(100%) scale(0);opacity:0}
-  10%{opacity:0.6}90%{opacity:0.3}
-  100%{transform:translateY(-120%) scale(1.4);opacity:0}
-}
-/* ── MOBILE AUTOCOMPLETE ── */
-@media(max-width:600px){
-  .autocomplete-list{max-height:240px}
-  .autocomplete-item{padding:12px 14px;min-height:48px}
-}
-@keyframes blobFloat1{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,30px) scale(1.08)}}
-@keyframes blobFloat2{0%{transform:translate(0,0) scale(1)}100%{transform:translate(-30px,-40px) scale(1.05)}}
-
-/* ── ENGINEER REPORT ── */
-.eng-report-wrap{
-  margin-top:16px;border:1px solid var(--border);border-radius:var(--radius);
-  background:rgba(30,41,59,0.7);overflow:hidden;
-}
-.eng-report-header{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:14px 20px;cursor:pointer;user-select:none;
-  background:rgba(51,65,85,0.4);border-bottom:1px solid transparent;
-  transition:background var(--transition);
-}
-.eng-report-header:hover{background:rgba(51,65,85,0.7)}
-.eng-report-header.open{border-bottom:1px solid var(--border)}
-.eng-report-title{font-weight:700;font-size:0.95rem;color:var(--primary);display:flex;align-items:center;gap:8px}
-.eng-chevron{transition:transform 0.3s ease;color:var(--text-muted)}
-.eng-chevron.open{transform:rotate(180deg)}
-.eng-report-body{display:none;padding:20px}
-.eng-report-body.open{display:block}
-.eng-section-header{
-  font-size:0.82rem;font-weight:700;color:var(--primary);
-  text-transform:uppercase;letter-spacing:0.05em;
-  margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid rgba(245,158,11,0.3);
-  display:flex;align-items:center;gap:6px;
-}
-.eng-section-header:first-child{margin-top:0}
-.formula-card{
-  background:rgba(15,23,42,0.6);border:1px solid var(--border);
-  border-radius:8px;padding:14px 16px;margin-bottom:12px;
-}
-.formula-title{font-size:0.8rem;font-weight:600;color:var(--text);margin-bottom:8px}
-.formula-body{
-  font-family:'Courier New',monospace;font-size:0.78rem;color:#93C5FD;
-  background:rgba(30,41,59,0.8);border-radius:6px;padding:10px 12px;
-  margin:6px 0;white-space:pre-wrap;line-height:1.6;
-}
-.formula-result{margin-top:8px;font-size:0.82rem;color:var(--success);font-weight:600}
-.formula-note{margin-top:6px;font-size:0.74rem;color:var(--text-muted);line-height:1.5}
-.loss-waterfall{margin:8px 0}
-.loss-row{
-  display:flex;align-items:center;gap:10px;padding:8px 0;
-  border-bottom:1px solid rgba(71,85,105,0.2);font-size:0.8rem;
-}
-.loss-row:last-child{border-bottom:none}
-.loss-label{flex:1;color:var(--text-muted)}
-.loss-bar-wrap{flex:2;background:var(--surface-light);border-radius:4px;height:8px;overflow:hidden}
-.loss-bar-fill{height:8px;border-radius:4px;transition:width 0.6s ease}
-.loss-bar-fill.positive{background:var(--success)}
-.loss-bar-fill.negative{background:var(--danger)}
-.loss-bar-fill.neutral{background:var(--primary)}
-.loss-val{min-width:90px;text-align:right;font-weight:600;font-size:0.8rem}
-.loss-val.positive{color:var(--success)}
-.loss-val.negative{color:var(--danger)}
-.loss-val.neutral{color:var(--primary)}
-.cost-breakdown-table{width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:8px}
-.cost-breakdown-table th{text-align:left;color:var(--text-muted);font-weight:500;padding:7px 10px;border-bottom:1px solid var(--border)}
-.cost-breakdown-table td{padding:7px 10px;border-bottom:1px solid rgba(71,85,105,0.2)}
-.cost-breakdown-table td:last-child{text-align:right;font-weight:600}
-.cost-breakdown-table .total-row td{border-top:2px solid var(--border);color:var(--primary);font-weight:700}
-.year-table-wrap{max-height:340px;overflow-y:auto;border-radius:8px;border:1px solid var(--border)}
-.year-table{width:100%;border-collapse:collapse;font-size:0.77rem}
-.year-table th{
-  position:sticky;top:0;background:var(--surface);
-  text-align:right;color:var(--text-muted);font-weight:500;
-  padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap;
-}
-.year-table th:first-child{text-align:left}
-.year-table td{padding:7px 10px;border-bottom:1px solid rgba(71,85,105,0.15);text-align:right}
-.year-table td:first-child{text-align:left;color:var(--text-muted)}
-.year-table tr:nth-child(even){background:rgba(51,65,85,0.2)}
-.year-table tr.payback-row td{color:var(--success);background:rgba(16,185,129,0.08)}
-.perf-badges{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px}
-.perf-badge{
-  background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);
-  border-radius:8px;padding:10px 14px;text-align:center;flex:1;min-width:90px;
-}
-.perf-badge-val{font-size:1.25rem;font-weight:700;color:var(--primary)}
-.perf-badge-label{font-size:0.68rem;color:var(--text-muted);margin-top:3px;line-height:1.3}
-
-/* ── TOGGLE SWITCH ── */
-.toggle-switch{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0}
-.toggle-switch input{opacity:0;width:0;height:0;position:absolute}
-.toggle-slider{position:absolute;cursor:pointer;inset:0;background:#334155;border-radius:26px;transition:0.3s}
-.toggle-slider:before{content:'';position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:0.3s}
-.toggle-switch input:checked~.toggle-slider{background:var(--primary)}
-.toggle-switch input:checked~.toggle-slider:before{transform:translateX(20px)}
-
-/* ── ADVANCED FEATURE BLOCK ── */
-.advanced-feature-block{border:1px solid var(--border-subtle);border-radius:var(--radius);overflow:hidden;margin-top:12px}
-.feature-toggle-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:rgba(30,41,59,0.6);cursor:pointer;transition:background var(--transition)}
-.feature-toggle-header:hover{background:rgba(30,41,59,0.9)}
-.feature-toggle-title{display:flex;align-items:center;gap:8px;font-weight:600;font-size:0.9rem}
-.feature-badge{font-size:0.65rem;background:rgba(245,158,11,0.15);color:var(--primary);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:2px 7px;font-weight:500}
-.feature-toggle-body{padding:16px;border-top:1px solid var(--border-subtle)}
-
-/* ── BATTERY MODEL BUTTONS ── */
-.bat-models{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
-@media(max-width:600px){.bat-models{grid-template-columns:1fr}}
-.bat-model-btn{background:var(--surface-glass);border:2px solid var(--border-subtle);border-radius:10px;padding:12px;cursor:pointer;transition:all var(--transition);text-align:left;color:var(--text);width:100%}
-.bat-model-btn:hover{border-color:rgba(245,158,11,0.4)}
-.bat-model-btn.selected{border-color:var(--primary);background:rgba(245,158,11,0.05);box-shadow:0 0 0 1px rgba(245,158,11,0.2)}
-.bat-model-name{font-weight:700;font-size:0.85rem;margin-bottom:3px}
-.bat-model-spec{font-size:0.75rem;color:var(--text-muted)}
-
-/* ── BESS RESULT CARDS ── */
-.bess-result-wrap{background:var(--surface-glass);border:1px solid var(--border-subtle);border-left:3px solid #8B5CF6;border-radius:var(--radius);padding:20px;margin-top:16px}
-.bess-result-title{font-family:var(--font-display);font-weight:700;font-size:0.95rem;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.bess-metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-@media(max-width:480px){.bess-metrics{grid-template-columns:1fr}}
-.bess-metric{text-align:center;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);border-radius:10px;padding:16px}
-.bess-metric-val{font-family:var(--font-display);font-size:2rem;font-weight:800;color:#8B5CF6}
+/* BESS / NM result wrappers */
+.bess-result-wrap,.nm-result-wrap{background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:20px;margin-top:16px;}
+.bess-result-title,.nm-result-title{font-family:var(--font-display);font-size:0.95rem;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.bess-metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bess-metric{text-align:center;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);border-radius:10px;padding:14px;}
+.bess-metric-val{font-family:var(--font-display);font-size:1.6rem;font-weight:800;color:#8B5CF6}
 .bess-metric-label{font-size:0.72rem;color:var(--text-muted);margin-top:3px}
+.nm-badge{font-size:0.72rem;background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3);border-radius:4px;padding:2px 8px;font-weight:500}
 
-/* ── NET METERING RESULT ── */
-.nm-result-wrap{background:var(--surface-glass);border:1px solid var(--border-subtle);border-left:3px solid #10B981;border-radius:var(--radius);padding:20px;margin-top:16px}
-.nm-result-title{font-family:var(--font-display);font-weight:700;font-size:0.95rem;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.nm-badge{font-size:0.72rem;padding:3px 9px;border-radius:12px;font-weight:600}
-.nm-badge.license-free{background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)}
-.nm-badge.settlement{background:rgba(6,182,212,0.15);color:#06B6D4;border:1px solid rgba(6,182,212,0.3)}
+/* section breakdown */
+.section-table{width:100%;border-collapse:collapse;font-size:0.82rem}
+.section-table th{padding:8px;border-bottom:1px solid var(--border);color:var(--text-muted);font-weight:600;text-align:left}
+.section-table td{padding:8px;border-bottom:1px solid var(--border-subtle);color:var(--text)}
 
-/* ── ROOF SECTION FORM ── */
-.roof-section-form{background:rgba(30,41,59,0.6);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:16px;margin-bottom:12px;position:relative}
-.roof-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;font-weight:700;font-size:0.9rem}
-.roof-section-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media(max-width:600px){.roof-section-grid{grid-template-columns:1fr}}
-.remove-section-btn{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:4px 10px;cursor:pointer;color:#EF4444;font-size:0.75rem;transition:all var(--transition)}
-.remove-section-btn:hover{background:rgba(239,68,68,0.2)}
+/* chart */
+.chart-wrap{background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:24px;margin-top:16px;box-shadow:var(--shadow-card);}
+.chart-title{font-family:var(--font-display);font-size:1rem;font-weight:700;color:var(--primary);margin-bottom:18px}
 
-/* ── MULTI-ROOF SECTION RESULTS TABLE ── */
-.section-table{width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:12px}
-.section-table th{text-align:left;color:var(--text-muted);font-weight:500;padding:7px 10px;border-bottom:1px solid var(--border)}
-.section-table td{padding:7px 10px;border-bottom:1px solid rgba(71,85,105,0.2)}
-.section-table td:not(:first-child){text-align:right}
-.section-table tr.section-total-row td{border-top:2px solid var(--border);font-weight:700;color:var(--primary);border-bottom:none}
+/* pr gauge */
+.pr-gauge-wrap{text-align:center}
 
-/* ── SCENARIO-FIRST COMMERCIAL PROPOSAL UI ── */
-.proposal-hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(260px,.65fr);gap:22px;align-items:center;margin-bottom:22px;padding:24px;border:1px solid rgba(245,158,11,.24);border-radius:8px;background:linear-gradient(135deg,rgba(15,23,42,.96),rgba(30,41,59,.82));box-shadow:var(--shadow-card)}
-.proposal-hero-copy{display:grid;gap:14px}
-.proposal-hero-kicker{font-size:.78rem;letter-spacing:0;text-transform:uppercase;color:var(--primary);font-weight:800}
-.proposal-hero-title{font-family:var(--font-display);font-size:3rem;line-height:1.02;color:var(--text);max-width:760px}
-.proposal-hero-title span{color:var(--primary)}
-.proposal-hero-sub{font-size:1rem;color:var(--text-muted);line-height:1.7;max-width:760px}
-.proposal-proof-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:4px}
-.proposal-proof{border:1px solid var(--border-subtle);border-radius:8px;padding:11px 12px;background:rgba(255,255,255,.04);min-height:76px}
-.proposal-proof strong{display:block;color:var(--text);font-size:.9rem;margin-bottom:4px}
-.proposal-proof span{display:block;color:var(--text-muted);font-size:.76rem;line-height:1.45}
-.solar-art-panel{display:grid;place-items:center;min-height:270px;border-radius:8px;background:radial-gradient(circle at 50% 25%,rgba(245,158,11,.2),transparent 58%),rgba(2,6,23,.36);border:1px solid rgba(255,255,255,.08);overflow:hidden}
-.solar-art-mark{width:min(280px,80%);height:auto;filter:drop-shadow(0 18px 32px rgba(0,0,0,.38));transition:transform .35s ease}
-.solar-art-panel:hover .solar-art-mark{transform:translateY(-4px) scale(1.02)}
-.scenario-card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
-.scenario-choice-card{border:1px solid var(--border-subtle);border-radius:8px;padding:16px;background:rgba(15,23,42,.72);color:var(--text);text-align:left;display:grid;gap:8px;cursor:pointer;min-height:160px;transition:border-color .2s ease,transform .2s ease,background .2s ease}
-.scenario-choice-card:hover{transform:translateY(-2px);border-color:rgba(245,158,11,.45);background:rgba(30,41,59,.9)}
-.scenario-choice-card.selected{border-color:var(--primary);background:rgba(245,158,11,.1);box-shadow:0 0 0 1px rgba(245,158,11,.25)}
-.scenario-choice-card strong{font-family:var(--font-display);font-size:1rem;color:var(--text)}
-.scenario-choice-card span{font-size:.78rem;color:var(--text-muted);line-height:1.45}
-.scenario-choice-kicker{font-size:.68rem!important;color:var(--primary)!important;text-transform:uppercase;font-weight:800;letter-spacing:0}
-.scenario-summary{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;border:1px solid rgba(6,182,212,.25);border-radius:8px;padding:12px 14px;background:rgba(6,182,212,.07);margin-bottom:18px}
-.scenario-summary strong{color:var(--accent);display:block;margin-bottom:3px}
-.scenario-summary span,.scenario-summary em{display:block;color:var(--text-muted);font-size:.8rem;line-height:1.45;font-style:normal}
-.scenario-guidance{display:grid;gap:5px;border:1px solid rgba(245,158,11,.22);border-radius:8px;padding:12px 14px;background:rgba(245,158,11,.06);font-size:.8rem;color:var(--text-muted);margin-bottom:14px}
-.scenario-guidance strong{color:var(--primary)}
-.result-context-strip{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;border:1px solid rgba(16,185,129,.24);border-radius:8px;background:rgba(16,185,129,.07);padding:12px 14px;margin-bottom:16px;color:var(--text-muted);font-size:.84rem}
-.result-context-strip strong{color:#A7F3D0}
-.compact-governance{opacity:.82}
-@media(max-width:960px){.proposal-hero{grid-template-columns:1fr}.scenario-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.proposal-proof-row{grid-template-columns:1fr}.solar-art-panel{min-height:220px}}
-@media(max-width:640px){.proposal-hero{padding:18px}.scenario-card-grid{grid-template-columns:1fr}.proposal-hero-title{font-size:2rem}}
+/* tech table */
+.tech-table{width:100%;border-collapse:collapse;font-size:0.82rem}
+.tech-table th{padding:8px;border-bottom:1px solid var(--border);color:var(--text-muted);font-weight:600;text-align:left}
+.tech-table td{padding:8px;border-bottom:1px solid var(--border-subtle);color:var(--text)}
+
+/* turkey map */
+#turkey-map-wrap{margin-top:16px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border-subtle);}
+
+/* eng report */
+.eng-report-wrap{background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:var(--radius);margin-top:16px;overflow:hidden}
+.eng-report-header{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;cursor:pointer;border-bottom:1px solid var(--border-subtle);}
+.eng-report-title{display:flex;align-items:center;gap:8px;font-family:var(--font-display);font-size:0.95rem;font-weight:700}
+.eng-chevron{transition:transform 0.3s ease}
+.eng-report-body{padding:20px 24px}
+
+/* action-btns */
+.action-btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+
+/* season-btn */
+.season-btn{background:rgba(255,255,255,0.04);border:1px solid var(--border-subtle);border-radius:8px;padding:6px 14px;cursor:pointer;color:var(--text-muted);font-size:0.82rem;font-family:var(--font-body);transition:all 0.2s}
+.season-btn.active{background:rgba(245,158,11,0.12);border-color:var(--primary);color:var(--primary)}
+
+/* result extras */
+.results-hero{position:relative;height:4px;margin-bottom:20px;overflow:hidden;border-radius:2px;background:linear-gradient(90deg,var(--primary),var(--accent))}
+.results-glow{position:absolute;inset:-20px;background:radial-gradient(ellipse at 50% 50%,rgba(245,158,11,0.3),transparent 70%)}
+.result-context-strip{background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:10px;padding:10px 16px;display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;font-size:0.8rem}
+.result-metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:12px}
+
+/* tooltip */
+.tooltip-wrap{position:relative;display:inline-block}
+.tooltip-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.3);font-size:0.7rem;color:var(--text-muted);cursor:help;margin-left:4px}
+.tooltip-box{visibility:hidden;opacity:0;position:absolute;z-index:200;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1E293B;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:0.76rem;line-height:1.5;color:var(--text-muted);width:260px;white-space:normal;box-shadow:var(--shadow-md);transition:opacity 0.2s}
+.tooltip-wrap:hover .tooltip-box{visibility:visible;opacity:1}
+
+/* ghi-legend */
+.ghi-legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+.ghi-leg-item{display:flex;align-items:center;gap:4px;font-size:0.72rem;color:var(--text-muted)}
+.ghi-leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* location warning */
+#location-warning{display:none;color:var(--danger);font-size:0.8rem;margin-top:6px;padding:8px 12px;background:rgba(239,68,68,0.08);border-radius:6px;border:1px solid rgba(239,68,68,0.2)}
 </style>
 </head>
 <body>
 
-<!-- AMBIENT GLOW BLOBS -->
-<div aria-hidden="true" style="position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden">
-  <div style="position:absolute;top:-15%;left:-10%;width:700px;height:700px;background:radial-gradient(circle,rgba(245,158,11,0.07) 0%,transparent 70%);border-radius:50%;animation:blobFloat1 20s ease-in-out infinite alternate"></div>
-  <div style="position:absolute;bottom:-20%;right:-10%;width:800px;height:800px;background:radial-gradient(circle,rgba(6,182,212,0.05) 0%,transparent 70%);border-radius:50%;animation:blobFloat2 25s ease-in-out infinite alternate"></div>
-</div>
 <!-- HEADER -->
 <header id="app-header">
   <div class="header-inner">
     <div class="header-top">
       <div class="logo">
-        <svg class="logo-icon" viewBox="0 0 36 36" fill="none">
-          <circle cx="18" cy="18" r="8" fill="#F59E0B"/>
-          <g stroke="#F59E0B" stroke-width="2" stroke-linecap="round">
+        <svg class="logo-icon" width="40" height="40" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="18" cy="18" r="10" fill="#F59E0B" opacity="0.9"/>
+          <g stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round">
             <line x1="18" y1="2" x2="18" y2="6"/>
             <line x1="18" y1="30" x2="18" y2="34"/>
             <line x1="2" y1="18" x2="6" y2="18"/>
@@ -805,11 +336,11 @@ input[type=range]::-moz-range-thumb{
           </g>
         </svg>
         <div>
-          <div class="logo-text">GüneşHesap</div>
+          <div class="logo-text">Solar Rota</div>
           <div class="logo-tagline">Türkiye Güneş Paneli Hesaplayıcı</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+      <div class="header-utility-bar" style="display:flex;align-items:center;gap:8px;margin-left:auto">
         <div class="currency-switcher" id="header-currency-switcher">
           <button class="currency-btn active" data-currency="TRY" onclick="switchCurrency('TRY')">₺ TL</button>
           <button class="currency-btn" data-currency="USD" onclick="switchCurrency('USD')">$ USD</button>
@@ -827,30 +358,41 @@ input[type=range]::-moz-range-thumb{
           Kayıtlı Hesaplar
         </button>
       </div>
+      <!-- 7-STEP PROGRESS -->
       <div class="step-dots-wrap">
         <div class="step-dots">
           <div class="step-dot active" data-step="1" onclick="goToStep(1)">
             <span class="step-dot-num">1</span>
-            <span class="step-dot-label">Konum</span>
+            <span class="step-dot-label">Senaryo</span>
           </div>
           <div class="step-connector" id="conn-1-2"></div>
           <div class="step-dot" data-step="2" onclick="goToStep(2)">
             <span class="step-dot-num">2</span>
-            <span class="step-dot-label">Çatı</span>
+            <span class="step-dot-label">Konum</span>
           </div>
           <div class="step-connector" id="conn-2-3"></div>
           <div class="step-dot" data-step="3" onclick="goToStep(3)">
             <span class="step-dot-num">3</span>
-            <span class="step-dot-label">Panel</span>
+            <span class="step-dot-label">Çatı</span>
           </div>
           <div class="step-connector" id="conn-3-4"></div>
           <div class="step-dot" data-step="4" onclick="goToStep(4)">
             <span class="step-dot-num">4</span>
-            <span class="step-dot-label">Hesapla</span>
+            <span class="step-dot-label">Ekipman</span>
           </div>
           <div class="step-connector" id="conn-4-5"></div>
           <div class="step-dot" data-step="5" onclick="goToStep(5)">
             <span class="step-dot-num">5</span>
+            <span class="step-dot-label">Finansal</span>
+          </div>
+          <div class="step-connector" id="conn-5-6"></div>
+          <div class="step-dot" data-step="6" onclick="goToStep(6)">
+            <span class="step-dot-num">6</span>
+            <span class="step-dot-label">Hesapla</span>
+          </div>
+          <div class="step-connector" id="conn-6-7"></div>
+          <div class="step-dot" data-step="7" onclick="goToStep(7)">
+            <span class="step-dot-num">7</span>
             <span class="step-dot-label">Sonuçlar</span>
           </div>
         </div>
@@ -862,137 +404,199 @@ input[type=range]::-moz-range-thumb{
 <!-- MAIN -->
 <main id="main-content">
 
-<!-- ═══════════════ STEP 1: KONUM ═══════════════ -->
-<div class="step-pane active" id="step-1">
-  <div class="step-heading">
-    <div class="step-heading-eyebrow">Adım 1 / 5</div>
-    <h1 class="step-heading-title">Konumunuzu Seçin</h1>
-    <p class="step-heading-sub">Türkiye'deki güneş potansiyelinizi keşfetmek için şehrinizi işaretleyin veya haritada bir nokta seçin.</p>
-  </div>
-  <section class="proposal-hero" aria-labelledby="proposal-hero-title">
-    <div class="proposal-hero-copy">
-      <div class="proposal-hero-kicker" data-i18n="hero.kicker">Solar proposal platform</div>
-      <h2 class="proposal-hero-title" id="proposal-hero-title" data-i18n="hero.title">Saha, üretim, finans ve onay akışını tek <span>teklif merkezinde</span> birleştirin.</h2>
-      <p class="proposal-hero-sub" data-i18n="hero.subtitle">Senaryoyu seçin; GüneşHesap varsayımları, görünür modülleri, kanıt kontrollerini ve teklif dilini buna göre ayarlasın.</p>
-      <div class="proposal-proof-row" aria-label="Platform güven göstergeleri">
-        <div class="proposal-proof"><strong data-i18n="hero.proof.engineering">Engineering-grade path</strong><span data-i18n="hero.proof.engineeringText">PVGIS/JS with a Python backend pilot and pvlib-ready contract.</span></div>
-        <div class="proposal-proof"><strong data-i18n="hero.proof.governance">Quote governance</strong><span data-i18n="hero.proof.governanceText">Evidence, approval, source freshness, and audit controls stay active.</span></div>
-        <div class="proposal-proof"><strong data-i18n="hero.proof.client">Client-facing output</strong><span data-i18n="hero.proof.clientText">Savings, ROI, confidence, and next actions are framed for decisions.</span></div>
-      </div>
-    </div>
-    <div class="solar-art-panel" id="solar-art-mount" aria-hidden="true"></div>
-  </section>
+<!-- ═══════════════ STEP 1: SENARYO SEÇİMİ (HERO) ═══════════════ -->
+<div class="step-pane active step-hero" id="step-1">
 
-  <section aria-labelledby="scenario-title">
-    <div class="step-heading" style="margin-bottom:14px">
-      <div class="step-heading-eyebrow" id="scenario-step-label">Grid-connected proposal workflow</div>
-      <h2 class="step-heading-title" id="scenario-title" style="font-size:1.65rem" data-i18n="scenario.title">Önce çözüm senaryosunu seçin</h2>
-      <p class="step-heading-sub" data-i18n="scenario.subtitle">Seçim; varsayımları, görünür modülleri, sonuç dilini ve önerilen sonraki adımları değiştirir.</p>
+  <!-- Off-screen map preload slot: Leaflet'in gerçek boyutla başlatılması için -->
+  <div id="map-preload-slot" style="position:absolute;left:-9999px;top:-9999px;width:400px;height:300px;z-index:-1">
+    <div class="card" id="map-card" style="width:100%;height:100%">
+      <div id="map" style="width:100%;height:100%"></div>
+      <div id="map-draw-hint">Çatı köşelerine tıklayın · Çift tıklayarak tamamlayın · ESC = iptal</div>
+      <button class="map-layer-btn" id="map-satellite-btn" onclick="toggleMapLayer()" title="Harita görünümünü değiştir">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
+        <span id="map-layer-label">Uydu</span>
+      </button>
     </div>
+  </div>
+
+  <!-- Floating background panel SVGs -->
+  <div class="hero-float-panels" aria-hidden="true">
+    <svg class="hero-panel-svg hero-panel-1" width="120" height="80" viewBox="0 0 120 80" fill="none">
+      <rect width="120" height="80" rx="6" fill="rgba(6,182,212,0.08)" stroke="rgba(6,182,212,0.2)" stroke-width="1"/>
+      <line x1="0" y1="27" x2="120" y2="27" stroke="rgba(6,182,212,0.15)" stroke-width="0.5"/>
+      <line x1="0" y1="54" x2="120" y2="54" stroke="rgba(6,182,212,0.15)" stroke-width="0.5"/>
+      <line x1="40" y1="0" x2="40" y2="80" stroke="rgba(6,182,212,0.15)" stroke-width="0.5"/>
+      <line x1="80" y1="0" x2="80" y2="80" stroke="rgba(6,182,212,0.15)" stroke-width="0.5"/>
+    </svg>
+    <svg class="hero-panel-svg hero-panel-2" width="100" height="68" viewBox="0 0 100 68" fill="none">
+      <rect width="100" height="68" rx="5" fill="rgba(245,158,11,0.07)" stroke="rgba(245,158,11,0.2)" stroke-width="1"/>
+      <line x1="0" y1="23" x2="100" y2="23" stroke="rgba(245,158,11,0.15)" stroke-width="0.5"/>
+      <line x1="0" y1="46" x2="100" y2="46" stroke="rgba(245,158,11,0.15)" stroke-width="0.5"/>
+      <line x1="33" y1="0" x2="33" y2="68" stroke="rgba(245,158,11,0.15)" stroke-width="0.5"/>
+      <line x1="67" y1="0" x2="67" y2="68" stroke="rgba(245,158,11,0.15)" stroke-width="0.5"/>
+    </svg>
+    <svg class="hero-panel-svg hero-panel-3" width="140" height="95" viewBox="0 0 140 95" fill="none">
+      <rect width="140" height="95" rx="7" fill="rgba(139,92,246,0.06)" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+      <line x1="0" y1="32" x2="140" y2="32" stroke="rgba(139,92,246,0.12)" stroke-width="0.5"/>
+      <line x1="0" y1="64" x2="140" y2="64" stroke="rgba(139,92,246,0.12)" stroke-width="0.5"/>
+      <line x1="47" y1="0" x2="47" y2="95" stroke="rgba(139,92,246,0.12)" stroke-width="0.5"/>
+      <line x1="94" y1="0" x2="94" y2="95" stroke="rgba(139,92,246,0.12)" stroke-width="0.5"/>
+    </svg>
+    <svg class="hero-panel-svg hero-panel-4" width="90" height="60" viewBox="0 0 90 60" fill="none">
+      <rect width="90" height="60" rx="5" fill="rgba(16,185,129,0.06)" stroke="rgba(16,185,129,0.18)" stroke-width="1"/>
+      <line x1="0" y1="20" x2="90" y2="20" stroke="rgba(16,185,129,0.12)" stroke-width="0.5"/>
+      <line x1="0" y1="40" x2="90" y2="40" stroke="rgba(16,185,129,0.12)" stroke-width="0.5"/>
+      <line x1="30" y1="0" x2="30" y2="60" stroke="rgba(16,185,129,0.12)" stroke-width="0.5"/>
+      <line x1="60" y1="0" x2="60" y2="60" stroke="rgba(16,185,129,0.12)" stroke-width="0.5"/>
+    </svg>
+  </div>
+
+  <!-- Glow orbs -->
+  <div class="hero-glow-orb hero-glow-1" aria-hidden="true"></div>
+  <div class="hero-glow-orb hero-glow-2" aria-hidden="true"></div>
+
+  <!-- Hero content -->
+  <div class="hero-content">
+    <div class="hero-eyebrow" data-i18n="hero.eyebrow">Türkiye'nin en kapsamlı güneş enerji hesaplayıcısı</div>
+    <h1 class="hero-title"><span data-i18n="hero.titlePrefix">Güneş enerji sisteminizi</span> <span class="hero-title-highlight" data-i18n="hero.titleHighlight">tasarlayın</span></h1>
+    <p class="hero-sub" data-i18n="hero.subtitle">Senaryo seçin · Konum belirleyin · Doğru hesap alın</p>
+  </div>
+
+  <!-- Scenario grid -->
+  <div class="scenario-grid-wrap">
+    <div class="scenario-grid-label" data-i18n="scenario.gridLabel">Sistem senaryonuzu seçin</div>
     <div class="scenario-card-grid" id="scenario-card-grid"></div>
     <div class="scenario-summary" id="scenario-selected-summary" aria-live="polite"></div>
-  </section>
-  <div class="two-col">
-    <div>
-      <div class="card">
-        <div class="card-title">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          Konum Seçin
-        </div>
-        <div class="form-group">
-          <label>Şehir Arama
-            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Hesap için kullanılacak coğrafi koordinatı belirler. Doğru konum, güneş açısı ve güneşlenme süresi hesabını doğrudan etkiler. Türkiye'de kuzey-güney farkı yıllık üretimi %10-15 oranında etkileyebilir. İl adını yazmaya başlayın, listeden seçin veya haritaya tıklayın.</span></span>
-          </label>
-          <div class="input-wrap">
-            <input type="text" id="city-search" placeholder="Şehir adı yazın..." autocomplete="off"
-              role="combobox" aria-autocomplete="list" aria-expanded="false" aria-owns="autocomplete-list"/>
-            <div class="autocomplete-list" id="autocomplete-list" role="listbox"></div>
-          </div>
-        </div>
-        <button class="btn btn-secondary btn-full" id="geolocation-btn" onclick="useGeolocation()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-          Konumumu Kullan
-        </button>
-        <div id="location-warning">⚠ Lütfen Türkiye sınırları içinde bir konum seçin.</div>
-        <div id="selected-location">
-          <span class="loc-dot"></span>
-          <span id="selected-loc-text">Henüz konum seçilmedi</span>
-        </div>
-        <div class="ghi-legend" style="margin-top:14px">
-          <span style="font-size:0.75rem;color:var(--text-muted);width:100%;margin-bottom:2px">GHI Güneşlenme Endeksi (kWh/m²/yıl):</span>
-          <span class="ghi-leg-item"><span class="ghi-leg-dot" style="background:#6B7280"></span>&lt;1300</span>
-          <span class="ghi-leg-item"><span class="ghi-leg-dot" style="background:#3B82F6"></span>1300-1450</span>
-          <span class="ghi-leg-item"><span class="ghi-leg-dot" style="background:#22C55E"></span>1450-1600</span>
-          <span class="ghi-leg-item"><span class="ghi-leg-dot" style="background:#EAB308"></span>1600-1700</span>
-          <span class="ghi-leg-item"><span class="ghi-leg-dot" style="background:#F97316"></span>1700-1800</span>
-          <span class="ghi-leg-item"><span class="ghi-leg-dot" style="background:#EF4444"></span>&gt;1800</span>
-        </div>
-      </div>
-    </div>
-    <div>
-      <div class="card" id="map-card">
-        <div id="map"></div>
-        <div id="map-draw-hint">Çatı köşelerine tıklayın · Çift tıklayarak tamamlayın · ESC = iptal</div>
-        <button class="map-layer-btn" id="map-satellite-btn" onclick="toggleMapLayer()" title="Harita görünümünü değiştir">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
-          <span id="map-layer-label">Uydu</span>
-        </button>
-      </div>
-      <div class="card" style="margin-top:16px">
-        <div class="card-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-          Harita Tabanlı Çatı Alanı Seçimi
-        </div>
-        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:10px;line-height:1.6">
-          <strong style="color:var(--primary)">Nasıl kullanılır:</strong>
-          Haritada <strong>uydu görünümüne</strong> geçin → sol üstteki <strong>çokgen aracına</strong> tıklayın → çatı köşelerine tıklayarak çizin → çift tıklayarak tamamlayın.
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-          <button class="btn btn-secondary" style="font-size:0.8rem;padding:7px 14px" onclick="toggleMapLayer()" title="Uydu görünümüne geç">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
-            Uydu Görünümü
-          </button>
-          <button class="btn btn-secondary" style="font-size:0.8rem;padding:7px 14px" onclick="clearRoofDrawing()" title="Tüm çizimleri temizle" id="clear-roof-btn" style="display:none">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-            Çizimleri Temizle
-          </button>
-        </div>
-        <div id="roof-area-badge">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>
-          <span id="roof-badge-text">—</span>
-        </div>
-        <div id="roof-geometry-summary" style="font-size:0.82rem;color:var(--text-muted);display:grid;gap:4px;margin-top:8px">Haritada bir veya daha fazla çatı poligonu çizin.</div>
-      </div>
-    </div>
   </div>
-  <div class="nav-btns"><button class="btn btn-primary" onclick="validateStep1()">Devam Et →</button></div>
+
+  <!-- Continue button -->
+  <div class="hero-cta-wrap">
+    <button class="btn btn-primary hero-cta-btn" id="step1-continue-btn" onclick="validateStep1()" style="display:none">
+      <span data-i18n-text>Devam Et</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
+  </div>
 </div>
 
-<!-- ═══════════════ STEP 2: ÇATI ═══════════════ -->
+<!-- ═══════════════ STEP 2: KONUM (TAM EKRAN HARİTA) ═══════════════ -->
 <div class="step-pane" id="step-2">
-  <div class="step-heading">
-    <div class="step-heading-eyebrow">Adım 2 / 5</div>
-    <h1 class="step-heading-title">Çatı Konfigürasyonu</h1>
-    <p class="step-heading-sub">Eğim ve cephe yönü enerji üretimini %30'a kadar etkiler. Doğru girin, doğru hesaplayın.</p>
+  <!-- Top bar: search + geolocate -->
+  <div class="step2-topbar">
+    <div class="step2-search-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--text-muted)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <div class="input-wrap" style="flex:1">
+        <input type="text" id="city-search" placeholder="Şehir adı yazın..." autocomplete="off"
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-owns="autocomplete-list"
+          style="background:transparent;border:none;padding:0;font-size:0.95rem"/>
+        <div class="autocomplete-list" id="autocomplete-list" role="listbox"></div>
+      </div>
+    </div>
+    <button class="btn btn-secondary step2-geo-btn" id="geolocation-btn" onclick="useGeolocation()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      <span class="step2-geo-label">Konumumu Kullan</span>
+    </button>
+    <div id="location-warning" data-i18n="step2.outOfTurkey" style="display:none;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:6px 12px;font-size:0.8rem;color:#EF4444">
+      ⚠ Türkiye sınırları içinde bir konum seçin.
+    </div>
+    <!-- Hidden for JS compatibility -->
+    <div id="selected-location" style="display:none">
+      <span class="loc-dot"></span>
+      <span id="selected-loc-text">Henüz konum seçilmedi</span>
+    </div>
+    <!-- GHI legend compact -->
+    <div class="ghi-legend" style="margin-left:auto;flex-wrap:nowrap">
+      <span style="font-size:0.68rem;color:var(--text-muted);white-space:nowrap">GHI:</span>
+      <span class="ghi-leg-item"><span class="ghi-leg-dot" style="background:#6B7280"></span>&lt;1300</span>
+      <span class="ghi-leg-item"><span class="ghi-leg-dot" style="background:#3B82F6"></span>1450</span>
+      <span class="ghi-leg-item"><span class="ghi-leg-dot" style="background:#22C55E"></span>1600</span>
+      <span class="ghi-leg-item"><span class="ghi-leg-dot" style="background:#EAB308"></span>1700</span>
+      <span class="ghi-leg-item"><span class="ghi-leg-dot" style="background:#F97316"></span>1800</span>
+      <span class="ghi-leg-item"><span class="ghi-leg-dot" style="background:#EF4444"></span>&gt;1800</span>
+    </div>
   </div>
-  <div class="two-col">
-    <div>
-      <div class="card">
-        <div class="card-title">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-          Çatı Bilgileri
+
+  <!-- Full-screen map slot -->
+  <div id="step2-map-slot"></div>
+
+  <!-- Slide-up location card -->
+  <div class="location-bottom-card" id="location-bottom-card">
+    <div class="loc-bottom-left">
+      <div class="loc-bottom-pin">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      </div>
+      <div>
+        <div class="loc-bottom-city" id="loc-bottom-city">Konum seçildi</div>
+        <div class="loc-bottom-coords" id="loc-bottom-coords"></div>
+      </div>
+    </div>
+    <div class="loc-bottom-center">
+      <div class="loc-bottom-ghi" id="loc-bottom-ghi">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <span id="loc-bottom-ghi-val">— kWh/m²/yıl</span>
+      </div>
+    </div>
+    <div class="loc-bottom-right">
+      <button class="btn btn-secondary" id="step2-back-btn" onclick="goToStep(1)" style="padding:9px 16px;font-size:0.82rem">← Geri</button>
+      <button class="btn btn-primary" id="step2-continue-btn" onclick="validateStep2()" style="padding:9px 20px">
+        <span class="step2-continue-label">Devam Et</span> →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 3: ÇATI (SPLIT VIEW) ═══════════════ -->
+<div class="step-pane" id="step-3">
+  <div class="step3-split">
+    <!-- LEFT: sticky map col -->
+    <div class="step3-map-col">
+      <div id="step3-map-slot" style="width:100%;height:100%"></div>
+      <!-- Roof tools overlay -->
+      <div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:999">
+        <button class="btn btn-secondary" style="font-size:0.8rem;padding:7px 14px" onclick="toggleMapLayer()" title="Uydu görünümüne geç">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
+          Uydu
+        </button>
+        <button class="btn btn-secondary" style="font-size:0.8rem;padding:7px 14px" onclick="clearRoofDrawing()" id="clear-roof-btn" title="Çizimleri temizle">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+          Temizle
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT: config col -->
+    <div class="step3-config-col">
+      <div class="step3-section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        Çatı Konfigürasyonu
+      </div>
+
+      <!-- Roof area -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title" style="font-size:0.9rem;margin-bottom:14px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Çatı Alanı
         </div>
-        <div class="form-group">
-          <label>Çatı Alanı (m²)
-            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Güneş paneli kurulacak kullanılabilir çatı alanı. Paneller genellikle toplam alanın %75'ine sığar — çatı kenarları, bacalar ve havalandırma boşlukları için pay bırakılır. 1 kWp sistem için yaklaşık 6-7 m² alan gerekir. Tipik konut: 80-150 m².</span></span>
+        <div class="form-group" style="margin-bottom:8px">
+          <label>Kullanılabilir Alan (m²)
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Güneş paneli kurulacak kullanılabilir çatı alanı. 1 kWp sistem için yaklaşık 6-7 m² alan gerekir.</span></span>
           </label>
           <input type="number" id="roof-area" placeholder="Örn: 80" min="10" max="2000" oninput="updatePanelPreview()"/>
           <div class="error-msg" id="roof-area-err" style="display:none">Lütfen 10-2000 m² arası değer girin.</div>
           <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px" id="panel-count-preview"></div>
         </div>
+        <div id="roof-area-badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="roof-badge-text">—</span>
+        </div>
+        <div id="roof-geometry-summary" style="font-size:0.82rem;color:var(--text-muted);margin-top:8px">Haritada bir veya daha fazla çatı poligonu çizin.</div>
+      </div>
+
+      <!-- Tilt -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title" style="font-size:0.9rem;margin-bottom:14px">Eğim & Yön</div>
         <div class="form-group">
           <label>Çatı Eğimi (°)
-            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Panelin yatay düzlemle yaptığı açı. Türkiye için optimum değer 30-35°'dir. Çok düz açılarda (0-10°) toz ve yağmur suyu birikmesi artar; 45°'yi aşınca yaz üretimi düşer. Mevcut çatı eğimine uymak montaj maliyetini önemli ölçüde azaltır.</span></span>
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Panelin yatay düzlemle yaptığı açı. Türkiye için optimum 30-35°.</span></span>
           </label>
           <div class="range-wrap">
             <span class="range-value" id="tilt-val">33°</span>
@@ -1001,23 +605,17 @@ input[type=range]::-moz-range-thumb{
           </div>
           <div id="tilt-diagram-wrap">
             <svg id="tilt-svg" width="100%" height="180" viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
-              <!-- Gökyüzü gradyanı -->
               <defs>
                 <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stop-color="#0F172A"/>
                   <stop offset="100%" stop-color="#1E293B"/>
                 </linearGradient>
-                <!-- Optimal bölge rengi (25-40°) -->
               </defs>
               <rect width="400" height="180" fill="url(#skyGrad)" rx="8"/>
-              <!-- Zemin çizgisi -->
               <rect x="0" y="145" width="400" height="35" fill="#1E3A5F" rx="0"/>
               <line x1="0" y1="145" x2="400" y2="145" stroke="#334155" stroke-width="1.5"/>
-              <!-- Bina silüeti (basit dikdörtgen) -->
               <rect x="30" y="105" width="55" height="40" fill="#0F172A" stroke="#334155" stroke-width="1"/>
-              <!-- Çatı üçgeni -->
               <polygon points="25,105 57,75 90,105" fill="#0F172A" stroke="#334155" stroke-width="1"/>
-              <!-- Güneş ışınları (arka planda, solda) -->
               <g id="sun-rays-group" opacity="0.6">
                 <circle id="sun-circle" cx="340" cy="40" r="16" fill="#FCD34D" opacity="0.9"/>
                 <line x1="340" y1="15" x2="340" y2="7" stroke="#FCD34D" stroke-width="1.5" stroke-linecap="round"/>
@@ -1026,22 +624,16 @@ input[type=range]::-moz-range-thumb{
                 <line x1="322" y1="22" x2="316" y2="16" stroke="#FCD34D" stroke-width="1.5" stroke-linecap="round"/>
                 <line x1="315" y1="40" x2="307" y2="40" stroke="#FCD34D" stroke-width="1.5" stroke-linecap="round"/>
               </g>
-              <!-- Panel dikdörtgeni (JS tarafından transform güncellenir) -->
               <g id="panel-group" transform="rotate(-33, 155, 145)">
                 <rect x="105" y="130" width="100" height="15" fill="rgba(6,182,212,0.25)" stroke="#06B6D4" stroke-width="2" rx="2"/>
-                <!-- Panel hücreleri -->
                 <line x1="138" y1="130" x2="138" y2="145" stroke="rgba(6,182,212,0.4)" stroke-width="0.5"/>
                 <line x1="171" y1="130" x2="171" y2="145" stroke="rgba(6,182,212,0.4)" stroke-width="0.5"/>
                 <line x1="105" y1="137" x2="205" y2="137" stroke="rgba(6,182,212,0.4)" stroke-width="0.5"/>
               </g>
-              <!-- Açı yayı -->
               <path id="tilt-arc" d="M175,145 A25,25 0 0,0 195,128" fill="none" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="3,2"/>
-              <!-- Açı text -->
               <text id="tilt-angle-text" x="200" y="122" fill="#F59E0B" font-size="13" font-family="Space Grotesk,Inter" font-weight="700">33°</text>
-              <!-- Optimal bölge etiketi -->
               <rect id="opt-badge" x="10" y="10" width="130" height="18" rx="4" fill="rgba(16,185,129,0.15)" stroke="rgba(16,185,129,0.4)" stroke-width="1"/>
               <text id="opt-badge-text" x="75" y="22" text-anchor="middle" fill="#10B981" font-size="10" font-family="Space Grotesk,Inter" font-weight="600">Optimal aralık (25°–40°) ✓</text>
-              <!-- Verim katsayısı -->
               <text id="tilt-coeff-text" x="390" y="20" text-anchor="end" fill="rgba(148,163,184,0.8)" font-size="9" font-family="Inter">Verim: ×1.00</text>
             </svg>
             <div style="text-align:center;margin-top:4px">
@@ -1049,22 +641,17 @@ input[type=range]::-moz-range-thumb{
             </div>
           </div>
         </div>
-      </div>
-    </div>
-    <div>
-      <div class="card">
-        <div class="card-title">Çatı Yönü ve Gölgelenme</div>
-        <div class="form-group">
+
+        <!-- Compass -->
+        <div class="form-group" style="margin-top:16px">
           <label>Çatı Yönü
-            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Panelin baktığı yön (azimut). 180° = tam güney — en yüksek yıllık üretimi sağlar. Güneydoğu (135°) veya güneybatı (225°) en fazla %5 kayıpla kabul edilebilir. Doğu (90°) veya batı (270°) yönü yaklaşık %15-20 verim kaybına yol açar.</span></span>
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Panelin baktığı yön (azimut). 180° = tam güney — en yüksek yıllık üretim.</span></span>
           </label>
           <div id="compass-wrap">
             <svg id="compass-svg" width="200" height="200" viewBox="0 0 200 200" class="compass-svg-container">
               <circle cx="100" cy="100" r="95" fill="rgba(30,41,59,0.8)" stroke="#475569" stroke-width="1.5"/>
               <circle cx="100" cy="100" r="6" fill="#475569"/>
-              <!-- Direction wedges -->
               <g id="compass-dirs"></g>
-              <!-- Labels -->
               <text x="100" y="18" text-anchor="middle" font-size="13" font-family="Inter" font-weight="700" fill="#94A3B8">K</text>
               <text x="100" y="192" text-anchor="middle" font-size="13" font-family="Inter" font-weight="700" fill="#F59E0B">G</text>
               <text x="188" y="105" text-anchor="middle" font-size="13" font-family="Inter" font-weight="700" fill="#94A3B8">D</text>
@@ -1077,9 +664,14 @@ input[type=range]::-moz-range-thumb{
             <div id="azimuth-info">Seçili: <strong id="dir-name">Güney</strong> — Katsayı: <strong id="dir-coeff">1.00</strong> <span class="optimal-badge">OPTİMAL ✓</span></div>
           </div>
         </div>
-        <div class="form-group" style="margin-top:16px">
+      </div>
+
+      <!-- Shading & Soiling -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title" style="font-size:0.9rem;margin-bottom:14px">Kayıp Faktörleri</div>
+        <div class="form-group">
           <label>Gölgelenme Faktörü (%)
-            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Komşu binalar, ağaçlar, bacalar veya çatı ekipmanlarından kaynaklanan gölge kayıp yüzdesi. Açık arazi: 0-5%, şehir içi: 10-20%, yoğun yapılaşma: 25%+. OSM Bina Gölgesi aracını kullanarak otomatik tahmin edebilirsiniz.</span></span>
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Komşu binalar, ağaçlar veya bacalardan kaynaklanan gölge kayıp yüzdesi.</span></span>
           </label>
           <div class="range-wrap">
             <span class="range-value" id="shading-val">10%</span>
@@ -1090,7 +682,7 @@ input[type=range]::-moz-range-thumb{
         </div>
         <div class="form-group" style="margin-top:16px">
           <label>Kirlenme Faktörü (%)
-            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Toz, kum, kuş dışkısı ve kirlilik nedeniyle oluşan enerji kaybı yüzdesi. İç Anadolu/kurak bölgeler: 5-10%, kıyılar: 3-5%, sanayi bölgeleri: 10-15%. 6 ayda bir panel yüzeyi temizliği bu kaybı minimize eder. Türkiye'de %2-5 arası tipiktir.</span></span>
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Toz, kum ve kirlilik nedeniyle oluşan enerji kaybı yüzdesi.</span></span>
           </label>
           <div class="range-wrap">
             <span class="range-value" id="soiling-val">3%</span>
@@ -1100,110 +692,202 @@ input[type=range]::-moz-range-thumb{
           <div style="font-size:0.78rem;color:var(--text-muted)" id="soiling-desc">Orta düzey kirlenme (Türkiye ortalaması)</div>
         </div>
       </div>
-    </div>
-  </div>
-  <!-- ÇOKLU ÇATI YÜZEYI -->
-  <div class="card" style="margin-top:16px">
-    <div class="card-title">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-      OSM Çevre Bina Gölge Analizi
-    </div>
-    <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px;line-height:1.6">
-      OpenStreetMap verisiyle çevredeki binaların panel üretimine etkisini hesaplar. Binalar haritada renklendirilerek gösterilir.
-    </div>
-    <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;color:var(--text-muted);cursor:pointer;margin-bottom:10px">
-      <input type="checkbox" id="osm-shadow-toggle" onchange="toggleOSMShadow(this.checked)" style="width:auto;accent-color:var(--primary)">
-      <span>OSM bina yüksekliği gölge analizini etkinleştir</span>
-    </label>
-    <button class="btn btn-secondary" style="font-size:0.8rem;padding:7px 14px" onclick="refreshOSMShadowAnalysis()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-      Analizi Yenile
-    </button>
-    <div id="osm-shadow-summary" style="font-size:0.82rem;color:var(--text-muted);margin-top:12px">OSM gölge analizi kapalı. Etkinleştirmek için kutuyu işaretleyin.</div>
-  </div>
-  <div class="card" style="margin-top:16px">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-      <div>
-        <div class="card-title" style="margin-bottom:4px">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg>
-          Birden Fazla Çatı Yüzeyi
-        </div>
-        <div style="font-size:0.78rem;color:var(--text-muted)">Farklı yönlerde 2 veya 3 çatı bölümü için ayrı hesaplama ekleyin</div>
-      </div>
-      <label class="toggle-switch">
-        <input type="checkbox" id="multi-roof-toggle" onchange="toggleMultiRoof(this.checked)">
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
-    <div id="roof-sections-extra" style="display:none;margin-top:16px">
-      <div id="roof-sections-list"></div>
-      <button class="btn btn-outline" onclick="addRoofSection()" id="add-roof-btn" style="width:100%;margin-top:4px">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Yüzey Ekle (maks. 3)
-      </button>
-    </div>
-  </div>
 
-  <div class="nav-btns">
-    <button class="btn btn-secondary" onclick="goToStep(1)">← Geri</button>
-    <button class="btn btn-primary" onclick="validateStep2()">Devam Et →</button>
+      <!-- OSM Shadow -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title" style="font-size:0.9rem;margin-bottom:10px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+          OSM Çevre Bina Gölge Analizi
+        </div>
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px;line-height:1.6">
+          OpenStreetMap verisiyle çevredeki binaların panel üretimine etkisini hesaplar.
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;color:var(--text-muted);cursor:pointer;margin-bottom:10px">
+          <input type="checkbox" id="osm-shadow-toggle" onchange="toggleOSMShadow(this.checked)" style="width:auto;accent-color:var(--primary)">
+          <span>OSM bina yüksekliği gölge analizini etkinleştir</span>
+        </label>
+        <button class="btn btn-secondary" style="font-size:0.8rem;padding:7px 14px" onclick="refreshOSMShadowAnalysis()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+          Analizi Yenile
+        </button>
+        <div id="osm-shadow-summary" style="font-size:0.82rem;color:var(--text-muted);margin-top:12px">OSM gölge analizi kapalı.</div>
+      </div>
+
+      <!-- Multi-roof -->
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div>
+            <div class="card-title" style="margin-bottom:4px;font-size:0.9rem">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg>
+              Birden Fazla Çatı Yüzeyi
+            </div>
+            <div style="font-size:0.78rem;color:var(--text-muted)">Farklı yönlerde 2 veya 3 çatı bölümü ekleyin</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="multi-roof-toggle" onchange="toggleMultiRoof(this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="roof-sections-extra" style="display:none;margin-top:16px">
+          <div id="roof-sections-list"></div>
+          <button class="btn btn-outline" onclick="addRoofSection()" id="add-roof-btn" style="width:100%;margin-top:4px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Yüzey Ekle (maks. 3)
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3 nav -->
+      <div class="step3-nav-sticky">
+        <button class="btn btn-secondary" onclick="goToStep(2)">← Geri</button>
+        <button class="btn btn-primary" onclick="validateStep3()">Ekipman Seçimine Git →</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- ═══════════════ STEP 3: PANEL ═══════════════ -->
-<div class="step-pane" id="step-3">
+<!-- ═══════════════ STEP 4: EKİPMAN ═══════════════ -->
+<div class="step-pane" id="step-4">
   <div class="step-heading">
-    <div class="step-heading-eyebrow">Adım 3 / 5</div>
-    <h1 class="step-heading-title">Panel Teknolojisi</h1>
-    <p class="step-heading-sub">Sisteminize en uygun panel tipini seçin. Her teknolojinin güç, verimlilik ve maliyet profili farklıdır.</p>
+    <div class="step-heading-eyebrow">Adım 4 / 7</div>
+    <h1 class="step-heading-title">Ekipman Seçimi</h1>
+    <p class="step-heading-sub">Sisteminize en uygun panel, inverter ve batarya tipini seçin.</p>
   </div>
+
+  <div class="equipment-layout">
+    <div class="equipment-main">
+      <!-- Panel selection -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <span data-i18n="step4.panelType">Panel Tipi Seçin</span>
+        </div>
+        <div class="panel-cards" id="panel-cards-wrap"></div>
+        <div class="panel-preview" id="panel-preview-wrap">
+          <div class="panel-preview-stat">
+            <div class="panel-preview-val" id="prev-count">-</div>
+            <div class="panel-preview-label">Panel Sayısı</div>
+          </div>
+          <div class="panel-preview-stat">
+            <div class="panel-preview-val" id="prev-power">-</div>
+            <div class="panel-preview-label">Sistem Gücü (kWp)</div>
+          </div>
+          <div class="panel-preview-stat">
+            <div class="panel-preview-val" id="prev-area">-</div>
+            <div class="panel-preview-label">Panel Alanı (m²)</div>
+          </div>
+          <div class="panel-preview-stat">
+            <div class="panel-preview-val" id="prev-cost">-</div>
+            <div class="panel-preview-label" id="prev-cost-label">Tahmini Maliyet (₺)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inverter selection -->
+      <div class="card" style="margin-bottom:16px" id="inverter-section">
+        <div class="card-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg>
+          <span data-i18n="step4.inverterType">İnverter Tipi</span>
+        </div>
+        <div id="inverter-cards-wrap" class="inverter-cards"></div>
+        <div id="inverter-info" style="margin-top:12px;font-size:0.82rem;color:var(--text-muted)"></div>
+      </div>
+
+      <!-- Battery block — moved here from financial step -->
+      <div class="advanced-feature-block" id="battery-block">
+        <div class="feature-toggle-header" onclick="toggleBatteryBlock()">
+          <div class="feature-toggle-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2M12 12v4"/><line x1="8" y1="14" x2="8" y2="14"/></svg>
+            <span data-i18n="step4.batteryStorage">Batarya Depolama (BESS)</span>
+            <span class="feature-badge">YENİ</span>
+          </div>
+          <label class="toggle-switch" onclick="event.stopPropagation()">
+            <input type="checkbox" id="battery-toggle" onchange="onBatteryToggle(this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="feature-toggle-body" id="battery-inputs" style="display:none">
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">Popüler ev tipi batarya modellerinden seçin veya özel kapasite girin</div>
+          <div class="bat-models" id="bat-models-wrap"></div>
+          <div id="bat-custom-inputs" style="display:none;margin-bottom:16px">
+            <div class="roof-section-grid">
+              <div class="form-group" style="margin:0">
+                <label style="font-size:0.8rem">Kapasite (kWh)</label>
+                <input type="number" id="bat-capacity" min="1" max="50" value="5" step="0.1"
+                  style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
+                  oninput="updateBatteryCustom()"/>
+              </div>
+              <div class="form-group" style="margin:0">
+                <label style="font-size:0.8rem">Deşarj Derinliği DoD (%)</label>
+                <input type="number" id="bat-dod" min="50" max="100" value="80" step="5"
+                  style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
+                  oninput="updateBatteryCustom()"/>
+              </div>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:0.8rem">Round-trip Verimlilik (%)
+              <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Şarj edilen enerjinin ne kadarı deşarjda geri alınır. LFP: %92–95, NMC: %90–93.</span></span>
+            </label>
+            <div class="range-wrap">
+              <span class="range-value" id="bat-eff-val">92%</span>
+              <input type="range" id="bat-eff" min="75" max="97" value="92" oninput="updateBatEff(this.value)"/>
+              <div class="range-labels"><span>75%</span><span>86%</span><span>97%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sticky summary card -->
+    <div class="equipment-summary-card">
+      <div class="card-title" style="font-size:0.9rem" data-i18n="step4.systemSummary">Sistem Özeti</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem">
+          <span style="color:var(--text-muted)">Sistem Gücü</span>
+          <span id="equip-summary-power" style="font-weight:700;color:var(--primary)">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem">
+          <span style="color:var(--text-muted)">Panel Sayısı</span>
+          <span id="equip-summary-panels" style="font-weight:700">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.85rem">
+          <span style="color:var(--text-muted)">Tahmini Maliyet</span>
+          <span id="equip-summary-cost" style="font-weight:700;color:var(--success)">—</span>
+        </div>
+      </div>
+      <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-secondary btn-full" onclick="goToStep(3)" style="font-size:0.82rem">← Geri</button>
+        <button class="btn btn-primary btn-full" onclick="validateStep4()" data-i18n="step4.next">Finansal Ayarlar →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-btns" style="display:none">
+    <button class="btn btn-secondary" onclick="goToStep(3)">← Geri</button>
+    <button class="btn btn-primary" onclick="validateStep4()">Devam Et →</button>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 5: FİNANSAL ═══════════════ -->
+<div class="step-pane" id="step-5">
+  <div class="step-heading">
+    <div class="step-heading-eyebrow">Adım 5 / 7</div>
+    <h1 class="step-heading-title">Finansal Parametreler</h1>
+    <p class="step-heading-sub">Tarife, tüketim ve gelişmiş finansal seçenekleri belirleyin.</p>
+  </div>
+
   <div class="card">
-    <div class="card-title">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-      Panel Tipi Seçin
-    </div>
-    <div class="panel-cards" id="panel-cards-wrap"></div>
-    <div class="panel-preview" id="panel-preview-wrap">
-      <div class="panel-preview-stat">
-        <div class="panel-preview-val" id="prev-count">-</div>
-        <div class="panel-preview-label">Panel Sayısı</div>
-      </div>
-      <div class="panel-preview-stat">
-        <div class="panel-preview-val" id="prev-power">-</div>
-        <div class="panel-preview-label">Sistem Gücü (kWp)</div>
-      </div>
-      <div class="panel-preview-stat">
-        <div class="panel-preview-val" id="prev-area">-</div>
-        <div class="panel-preview-label">Panel Alanı (m²)</div>
-      </div>
-      <div class="panel-preview-stat">
-        <div class="panel-preview-val" id="prev-cost">-</div>
-        <div class="panel-preview-label" id="prev-cost-label">Tahmini Maliyet (₺)</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- İNVERTER SEÇİMİ -->
-  <div class="card" style="margin-top:16px" id="inverter-section">
-    <div class="card-title">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg>
-      İnverter Tipi
-    </div>
-    <div id="inverter-cards-wrap" class="inverter-cards"></div>
-    <div id="inverter-info" style="margin-top:12px;font-size:0.82rem;color:var(--text-muted)"></div>
-  </div>
-
-  <!-- GÜNLÜK TÜKETİM & BESS & NET METERING -->
-  <div class="card" style="margin-top:16px">
+    <!-- Tariff tabs -->
     <div class="card-title" style="margin-bottom:16px">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-      Gelişmiş Seçenekler
+      <span data-i18n="step5.advancedOptions">Gelişmiş Seçenekler</span>
     </div>
 
-    <!-- Elektrik Tarifesi -->
+    <!-- Electricity Tariff -->
     <div class="form-group" style="margin-bottom:18px">
       <label>Elektrik Tarifesi
-        <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Elektrik faturanızdaki birim fiyat ve abone tipi. Konut, ticari ve sanayi tarifeleri farklı birim fiyat ve KDV oranlarına sahiptir; yanlış seçim geri ödeme hesabını önemli ölçüde etkiler. Faturanızın arka sayfasından güncel değeri kontrol edebilirsiniz.</span></span>
+        <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Elektrik faturanızdaki birim fiyat ve abone tipi. Konut, ticari ve sanayi tarifeleri farklı birim fiyat ve KDV oranlarına sahiptir.</span></span>
       </label>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
         <div>
@@ -1229,7 +913,7 @@ input[type=range]::-moz-range-thumb{
           </select>
         </div>
         <div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">PST / Baz Fiyat (TL/kWh) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Perakende Satış Tarifesi — elektrik dağıtım şirketinden kWh başına ödediğiniz fiyat. Güncel değeri faturanızın arka sayfasında veya EPDK web sitesinde bulabilirsiniz.</span></span></div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">PST / Baz Fiyat (TL/kWh) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Perakende Satış Tarifesi — elektrik dağıtım şirketinden kWh başına ödediğiniz fiyat.</span></span></div>
           <input type="number" id="tariff-input" value="7.16" min="0.5" step="0.01"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:120px;font-size:0.9rem"
             oninput="updateTariffAssumptions()"/>
@@ -1253,7 +937,7 @@ input[type=range]::-moz-range-thumb{
             oninput="updateTariffAssumptions()"/>
         </div>
         <div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">İhracat / Mahsup Fiyatı (TL/kWh) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Üretip şebekeye sattığınız ya da mahsup ettiğiniz fazla enerji için alınan birim fiyat. Türkiye'de genellikle 2-4 TL/kWh arasındadır. Sıfır girilirse yalnızca öz-tüketim tasarrufu hesaplanır.</span></span></div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">İhracat / Mahsup Fiyatı (TL/kWh) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Üretip şebekeye sattığınız ya da mahsup ettiğiniz fazla enerji için alınan birim fiyat.</span></span></div>
           <input type="number" id="export-tariff-input" value="0" min="0" step="0.01"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:150px;font-size:0.9rem"
             oninput="updateTariffAssumptions()"/>
@@ -1286,7 +970,7 @@ input[type=range]::-moz-range-thumb{
             oninput="updateTariffAssumptions()"/>
         </div>
         <div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Yıllık Fiyat Artışı (%) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Elektrik tarifesinin yılda kaç yüzde artacağı tahmini. Son 10 yıl ortalaması %25-40'tır; ileriye dönük muhafazakâr tahmin için %15-20 önerilir. Yüksek artış tahmini geri ödeme süresini kısaltır.</span></span></div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Yıllık Fiyat Artışı (%) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Elektrik tarifesinin yılda kaç yüzde artacağı tahmini.</span></span></div>
           <input type="number" id="price-increase-input" value="12" min="-50" max="200" step="1"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:135px;font-size:0.9rem"
             oninput="updateTariffAssumptions()"/>
@@ -1298,7 +982,7 @@ input[type=range]::-moz-range-thumb{
             oninput="updateTariffAssumptions()"/>
         </div>
         <div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">İskonto Oranı (%) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Paranın zaman değerini yansıtan oran; NPV hesabında kullanılır. Alternatif yatırım getirinize veya hedef enflasyon oranınıza yakın seçin. Türkiye koşulları için %12-20 makul bir aralıktır.</span></span></div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">İskonto Oranı (%) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Paranın zaman değerini yansıtan oran; NPV hesabında kullanılır.</span></span></div>
           <input type="number" id="discount-rate-input" value="18" min="0" max="100" step="1"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:120px;font-size:0.9rem"
             oninput="updateTariffAssumptions()"/>
@@ -1352,7 +1036,7 @@ input[type=range]::-moz-range-thumb{
           </select>
         </div>
         <div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">USD/TRY Kuru <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Panel ve inverter birim fiyatları TL bazlıdır. Sonuç Para Birimi olarak USD seçildiğinde tüm tutarlar bu kur üzerinden dönüştürülür. Otomatik canlı kur günde bir kez güncellenir; "Canlı Kur" butonuyla manuel olarak da güncelleyebilirsiniz.</span></span></div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">USD/TRY Kuru <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Sonuç Para Birimi olarak USD seçildiğinde tüm tutarlar bu kur üzerinden dönüştürülür.</span></span></div>
           <input type="number" id="usd-try-input" value="38.5" min="1" step="0.5"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:120px;font-size:0.9rem"
             oninput="setManualUsdTryRate(this.value); updateTariffAssumptions(); if (state.results) renderResults()"/>
@@ -1365,7 +1049,7 @@ input[type=range]::-moz-range-thumb{
       </label>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px">
         <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-muted);cursor:pointer">
-          <input type="checkbox" id="quote-bill-verified" onchange="updateTariffAssumptions()"> Fatura/tüketim verisi doğrulandı
+          <input type="checkbox" id="quote-bill-verified" onchange="updateTariffAssumptions()"> <span data-i18n="governance.billVerified">Fatura/tüketim verisi doğrulandı</span>
         </label>
         <input type="text" id="bill-evidence-ref" placeholder="Fatura kanıt ref / dosya adı" oninput="updateTariffAssumptions()"
           style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);width:190px;font-size:0.8rem"/>
@@ -1381,20 +1065,21 @@ input[type=range]::-moz-range-thumb{
           onchange="attachEvidenceFromInput('customerBill', this)"
           style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);width:220px;font-size:0.78rem"/>
         <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-muted);cursor:pointer">
-          <input type="checkbox" id="quote-inputs-verified" onchange="updateTariffAssumptions()"> Teklif varsayımları doğrulandı
+          <input type="checkbox" id="quote-inputs-verified" onchange="updateTariffAssumptions()"> <span data-i18n="governance.inputsVerified">Teklif varsayımları doğrulandı</span>
         </label>
         <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-muted);cursor:pointer">
-          <input type="checkbox" id="quote-ready-approved" onchange="updateTariffAssumptions()"> Quote-ready onayı verildi
+          <input type="checkbox" id="quote-ready-approved" onchange="updateTariffAssumptions()"> <span data-i18n="governance.quoteReadyApproved">Quote-ready onayı verildi</span>
         </label>
       </div>
       <div id="evidence-file-status" style="font-size:0.74rem;color:var(--text-muted);margin-top:6px">customerBill: dosya yok | supplierQuote: dosya yok | tariffSource: dosya yok</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px" id="tariff-desc">2026 tarife seçimi: mesken yıllık 4.000 kWh, mesken dışı 15.000 kWh SKTT eşiğiyle değerlendirilir. Birim fiyatları faturanızdan doğrulayın.</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px" id="tariff-desc">2026 tarife seçimi: mesken yıllık 4.000 kWh, mesken dışı 15.000 kWh SKTT eşiğiyle değerlendirilir.</div>
     </div>
 
     <div class="scenario-guidance" id="scenario-guidance-panel"></div>
 
+    <!-- Proposal Governance -->
     <div class="advanced-feature-block" id="proposal-governance-block" style="margin-bottom:18px">
-      <div class="feature-toggle-head">
+      <div class="feature-toggle-header">
         <div>
           <div style="font-weight:700;color:var(--text);font-size:0.9rem" data-i18n="governance.title">Proposal Governance</div>
           <div style="font-size:0.74rem;color:var(--text-muted)" data-i18n="governance.subtitle">Onay, marj, finansman ve bakım varsayımları</div>
@@ -1417,7 +1102,7 @@ input[type=range]::-moz-range-thumb{
               <option value="admin">Admin</option>
             </select>
           </div>
-          <div style="font-size:0.74rem;color:var(--text-muted);max-width:520px">Onay yalnızca approver/admin rolüyle verilir. Onay kaydı oluşturulduktan sonra sessizce değiştirilemez; yeni revizyon süreci gerekir.</div>
+          <div style="font-size:0.74rem;color:var(--text-muted);max-width:520px">Onay yalnızca approver/admin rolüyle verilir. Onay kaydı oluşturulduktan sonra sessizce değiştirilemez.</div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
           <div>
@@ -1503,10 +1188,10 @@ input[type=range]::-moz-range-thumb{
       </div>
     </div>
 
-    <!-- Günlük tüketim -->
+    <!-- Daily consumption -->
     <div class="form-group">
       <label>Günlük Elektrik Tüketiminiz (kWh/gün)
-        <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Hanenizdeki ortalama günlük elektrik tüketimi. Batarya ve şebeke satış hesapları için kullanılır. Faturanızdaki aylık kWh ÷ 30 ≈ günlük tüketim.</span></span>
+        <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Hanenizdeki ortalama günlük elektrik tüketimi. Faturanızdaki aylık kWh ÷ 30 ≈ günlük tüketim.</span></span>
       </label>
       <div class="range-wrap">
         <span class="range-value" id="consumption-val">10 kWh/gün</span>
@@ -1534,53 +1219,7 @@ input[type=range]::-moz-range-thumb{
       </div>
     </div>
 
-    <!-- BESS Batarya -->
-    <div class="advanced-feature-block" id="battery-block">
-      <div class="feature-toggle-header" onclick="toggleBatteryBlock()">
-        <div class="feature-toggle-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2M12 12v4"/><line x1="8" y1="14" x2="8" y2="14"/></svg>
-          Batarya Depolama (BESS)
-          <span class="feature-badge">YENİ</span>
-        </div>
-        <label class="toggle-switch" onclick="event.stopPropagation()">
-          <input type="checkbox" id="battery-toggle" onchange="onBatteryToggle(this.checked)">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      <div class="feature-toggle-body" id="battery-inputs" style="display:none">
-        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">Popüler ev tipi batarya modellerinden seçin veya özel kapasite girin</div>
-        <div class="bat-models" id="bat-models-wrap"></div>
-        <!-- Özel kapasite (sadece "custom" seçiliyken gösterilir) -->
-        <div id="bat-custom-inputs" style="display:none;margin-bottom:16px">
-          <div class="roof-section-grid">
-            <div class="form-group" style="margin:0">
-              <label style="font-size:0.8rem">Kapasite (kWh)</label>
-              <input type="number" id="bat-capacity" min="1" max="50" value="5" step="0.1"
-                style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
-                oninput="updateBatteryCustom()"/>
-            </div>
-            <div class="form-group" style="margin:0">
-              <label style="font-size:0.8rem">Deşarj Derinliği DoD (%)</label>
-              <input type="number" id="bat-dod" min="50" max="100" value="80" step="5"
-                style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
-                oninput="updateBatteryCustom()"/>
-            </div>
-          </div>
-        </div>
-        <div class="form-group" style="margin-bottom:0">
-          <label style="font-size:0.8rem">Round-trip Verimlilik (%)
-            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Şarj edilen enerjinin ne kadarı deşarjda geri alınır. LFP: %92–95, NMC: %90–93.</span></span>
-          </label>
-          <div class="range-wrap">
-            <span class="range-value" id="bat-eff-val">92%</span>
-            <input type="range" id="bat-eff" min="75" max="97" value="92" oninput="updateBatEff(this.value)"/>
-            <div class="range-labels"><span>75%</span><span>86%</span><span>97%</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Saatlik mahsuplaşma -->
+    <!-- Net metering block -->
     <div class="advanced-feature-block" id="nm-block">
       <div class="feature-toggle-header" onclick="toggleNMBlock()">
         <div class="feature-toggle-title">
@@ -1595,12 +1234,12 @@ input[type=range]::-moz-range-thumb{
       </div>
       <div class="feature-toggle-body" id="nm-inputs" style="display:none">
         <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:0.8rem">
-          <strong style="color:#10B981">2026 Lisanssız Üretim:</strong> Fazla üretim saatlik mahsuplaşma ve tüketim bazlı ihracat sınırıyla değerlendirilir. Ücretlendirilemeyen fazla üretim gelir hesabına alınmaz.<br>
+          <strong style="color:#10B981">2026 Lisanssız Üretim:</strong> Fazla üretim saatlik mahsuplaşma ve tüketim bazlı ihracat sınırıyla değerlendirilir.<br>
           <strong style="color:#06B6D4;margin-top:6px;display:block">Not:</strong> Sözleşme, bağlantı görüşü, tüketim limiti ve depolama kuralları proje bazında doğrulanmalıdır.
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label style="font-size:0.8rem">USD/TRY Kuru
-            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Para birimi dönüşümü için kullanılır. İhracat geliri TL/kWh alanından hesaplanır.</span></span>
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Para birimi dönüşümü için kullanılır.</span></span>
           </label>
           <input type="number" id="usd-try-input-nm" value="38.5" min="1" step="0.5"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:140px;font-size:0.9rem"
@@ -1609,7 +1248,7 @@ input[type=range]::-moz-range-thumb{
       </div>
     </div>
 
-    <!-- Fatura Analizi -->
+    <!-- Bill analysis block -->
     <div class="advanced-feature-block" id="bill-analysis-block">
       <div class="feature-toggle-header" onclick="toggleBillBlock()">
         <div class="feature-toggle-title">
@@ -1628,7 +1267,7 @@ input[type=range]::-moz-range-thumb{
       </div>
     </div>
 
-    <!-- Kablo Kayıp Hesabı -->
+    <!-- Cable loss block -->
     <div class="advanced-feature-block" id="cable-analysis-block">
       <div class="feature-toggle-header" onclick="toggleCableLossBlock()">
         <div class="feature-toggle-title">
@@ -1701,7 +1340,7 @@ input[type=range]::-moz-range-thumb{
       </div>
     </div>
 
-    <!-- EV Şarj -->
+    <!-- EV block -->
     <div class="advanced-feature-block" id="ev-analysis-block">
       <div class="feature-toggle-header" onclick="toggleEVBlock()">
         <div class="feature-toggle-title">
@@ -1766,7 +1405,7 @@ input[type=range]::-moz-range-thumb{
       </div>
     </div>
 
-    <!-- Isı Pompası -->
+    <!-- Heat pump block -->
     <div class="advanced-feature-block" id="hp-analysis-block">
       <div class="feature-toggle-header" onclick="toggleHeatPumpBlock()">
         <div class="feature-toggle-title">
@@ -1819,7 +1458,7 @@ input[type=range]::-moz-range-thumb{
       </div>
     </div>
 
-    <!-- Vergi Avantajı -->
+    <!-- Tax block -->
     <div class="advanced-feature-block" id="tax-analysis-block">
       <div class="feature-toggle-header" onclick="toggleTaxBlock()">
         <div class="feature-toggle-title">
@@ -1868,7 +1507,7 @@ input[type=range]::-moz-range-thumb{
       </div>
     </div>
 
-    <!-- Bakım & İşletme Giderleri -->
+    <!-- O&M block -->
     <div class="advanced-feature-block" id="om-block">
       <div class="feature-toggle-header" onclick="toggleOMBlock()">
         <div class="feature-toggle-title">
@@ -1896,7 +1535,7 @@ input[type=range]::-moz-range-thumb{
           </div>
           <div class="form-group" style="margin:0">
             <label style="font-size:0.8rem">Yıllık Sigorta Oranı (%)
-              <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Sistem sigortası yıllık maliyeti. İsteğe bağlıdır, %0 yaparak devre dışı bırakabilirsiniz.</span></span>
+              <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Sistem sigortası yıllık maliyeti. %0 yaparak devre dışı bırakabilirsiniz.</span></span>
             </label>
             <input type="number" id="insurance-rate" value="0.5" min="0" max="3" step="0.1"
               style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
@@ -1909,7 +1548,7 @@ input[type=range]::-moz-range-thumb{
       </div>
     </div>
 
-    <!-- Maliyet Kalemi Editörü -->
+    <!-- Cost overrides -->
     <div class="advanced-feature-block" id="cost-overrides-wrapper">
       <div class="feature-toggle-header" onclick="toggleCostOverridesBlock()">
         <div class="feature-toggle-title">
@@ -1936,6 +1575,8 @@ input[type=range]::-moz-range-thumb{
         </div>
       </div>
     </div>
+
+    <!-- BOM builder -->
     <div class="advanced-feature-block" id="bom-builder-wrapper">
       <div class="feature-toggle-header" onclick="initBomBuilder()">
         <div class="feature-toggle-title">
@@ -1950,16 +1591,58 @@ input[type=range]::-moz-range-thumb{
     </div>
   </div>
 
-  <div class="nav-btns">
-    <button class="btn btn-secondary" onclick="goToStep(2)">← Geri</button>
-    <button class="btn btn-primary" onclick="validateStep3()">Hesapla →</button>
+  <!-- Big CTA button -->
+  <div style="margin-top:28px;text-align:center">
+    <button class="btn btn-primary calc-cta-btn" onclick="validateStep5()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      Hesapla ☀
+    </button>
+  </div>
+
+  <div class="nav-btns" style="justify-content:flex-start;margin-top:12px">
+    <button class="btn btn-secondary" onclick="goToStep(4)">← Geri</button>
   </div>
 </div>
 
-<!-- ═══════════════ STEP 4: HESAPLAMA ═══════════════ -->
-<div class="step-pane" id="step-4">
+<!-- ═══════════════ STEP 6: HESAPLANIYOR (SİNEMATİK) ═══════════════ -->
+<div class="step-pane" id="step-6">
   <div id="loading-pane">
     <div class="loading-particles" id="loading-particles" aria-hidden="true"></div>
+
+    <!-- Sun rise animation -->
+    <div class="loading-sun-wrap" aria-hidden="true">
+      <svg viewBox="0 0 200 140" width="200" height="140" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="horizGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0F172A"/>
+            <stop offset="100%" stop-color="#1E3A5F"/>
+          </linearGradient>
+          <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#FCD34D" stop-opacity="0.6"/>
+            <stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <!-- Horizon -->
+        <rect x="0" y="100" width="200" height="40" fill="url(#horizGrad)"/>
+        <line x1="0" y1="100" x2="200" y2="100" stroke="rgba(6,182,212,0.3)" stroke-width="1"/>
+        <!-- Glow -->
+        <ellipse cx="100" cy="100" rx="80" ry="30" fill="url(#sunGlow)" opacity="0.5" style="animation:horizonGlow 2s ease-in-out infinite alternate"/>
+        <!-- Sun -->
+        <circle cx="100" cy="72" r="22" fill="#FCD34D" style="animation:sunGlowPulse 2s ease-in-out infinite alternate"/>
+        <!-- Rays -->
+        <g stroke="#F59E0B" stroke-width="2" stroke-linecap="round" style="animation:spinSun 8s linear infinite;transform-origin:100px 72px">
+          <line x1="100" y1="44" x2="100" y2="38"/>
+          <line x1="100" y1="100" x2="100" y2="106"/>
+          <line x1="72" y1="72" x2="66" y2="72"/>
+          <line x1="128" y1="72" x2="134" y2="72"/>
+          <line x1="80.2" y1="52.2" x2="76" y2="48"/>
+          <line x1="119.8" y1="91.8" x2="124" y2="96"/>
+          <line x1="119.8" y1="52.2" x2="124" y2="48"/>
+          <line x1="80.2" y1="91.8" x2="76" y2="96"/>
+        </g>
+      </svg>
+    </div>
+
     <div class="loading-ring-wrap">
       <svg viewBox="0 0 120 120" width="140" height="140">
         <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(71,85,105,0.3)" stroke-width="7"/>
@@ -1991,23 +1674,26 @@ input[type=range]::-moz-range-thumb{
     <div class="loading-headline text-gradient">Hesaplanıyor...</div>
     <div class="loading-msg" id="loading-msg">PVGIS'ten güneş ışınım verisi alınıyor...</div>
     <div class="loading-steps">
-      <div class="loading-step active" id="lstep-1"><span class="loading-step-dot"></span><span>Güneş ışınım verisi alınıyor</span></div>
-      <div class="loading-step" id="lstep-2"><span class="loading-step-dot"></span><span>Hava durumu analizi</span></div>
-      <div class="loading-step" id="lstep-3"><span class="loading-step-dot"></span><span>Enerji üretimi hesaplanıyor</span></div>
-      <div class="loading-step" id="lstep-4"><span class="loading-step-dot"></span><span>Finansal analiz tamamlanıyor</span></div>
+      <div class="loading-step active" id="lstep-1"><span class="loading-step-dot"></span><span data-i18n="step6.loading1">Güneş ışınım verisi alınıyor</span></div>
+      <div class="loading-step" id="lstep-2"><span class="loading-step-dot"></span><span data-i18n="step6.loading2">Hava durumu analizi</span></div>
+      <div class="loading-step" id="lstep-3"><span class="loading-step-dot"></span><span data-i18n="step6.loading3">Enerji üretimi hesaplanıyor</span></div>
+      <div class="loading-step" id="lstep-4"><span class="loading-step-dot"></span><span data-i18n="step6.loading4">Finansal analiz tamamlanıyor</span></div>
     </div>
-    <!-- Hidden for null-safety (referenced in old JS path) -->
     <div id="loading-progress-fill" style="display:none"></div>
+
+    <!-- Loading quote -->
+    <div class="loading-quote" data-i18n="step6.quote">
+      "Güneş enerjisi; sonsuz, temiz ve özgür — en büyük yatırım bugün yapılan."
+    </div>
   </div>
-  <div id="fallback-banner">⚠ PVGIS API'sine ulaşılamadı. Yerel güneşlenme verileriyle hesaplama yapılıyor.</div>
-  <!-- Hesaplama tamamlandığında ortaya çıkar -->
+  <div id="fallback-banner" data-i18n="engine.pvgisFallbackBanner">⚠ PVGIS API'sine ulaşılamadı. Yerel güneşlenme verileriyle hesaplama yapılıyor.</div>
   <div id="eng-calc-panel" style="display:none;max-width:700px;width:100%;margin:0 auto"></div>
 </div>
 
-<!-- ═══════════════ STEP 5: SONUÇLAR ═══════════════ -->
-<div class="step-pane" id="step-5">
+<!-- ═══════════════ STEP 7: SONUÇLAR ═══════════════ -->
+<div class="step-pane" id="step-7">
   <div class="step-heading">
-    <div class="step-heading-eyebrow">Adım 5 / 5</div>
+    <div class="step-heading-eyebrow">Adım 7 / 7</div>
     <h1 class="step-heading-title">Sonuçlarınız Hazır</h1>
     <p class="step-heading-sub">25 yıllık enerji üretimi ve finansal projeksiyon. Tüm hesaplar aşağıda şeffaf biçimde gösterilmektedir.</p>
   </div>
@@ -2016,14 +1702,14 @@ input[type=range]::-moz-range-thumb{
     <div id="result-engine-source">Engine: PVGIS hybrid JS</div>
   </div>
   <div class="results-hero" aria-hidden="true"><div class="results-glow"></div></div>
-  <div class="kpi-grid">
+  <div id="kpi-grid" class="kpi-grid">
     <div class="kpi-card" style="--kpi-color:var(--primary)">
       <div class="kpi-icon-wrap">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
       </div>
       <div class="kpi-value"><span id="kpi-energy">0</span></div>
       <div class="kpi-unit">kWh / yıl</div>
-      <div class="kpi-label">Yıllık Enerji Üretimi <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">PVGIS uydu veri tabanından alınan güneşlenme değerleri temel alınarak; gölge, kirlenme, sıcaklık ve inverter verimlilikleri uygulanarak hesaplanan yıllık net elektrik üretimi.</span></span></div>
+      <div class="kpi-label">Yıllık Enerji Üretimi <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">PVGIS uydu veri tabanından alınan güneşlenme değerleri temel alınarak hesaplanan yıllık net elektrik üretimi.</span></span></div>
     </div>
     <div class="kpi-card" style="--kpi-color:#10B981">
       <div class="kpi-icon-wrap">
@@ -2031,7 +1717,7 @@ input[type=range]::-moz-range-thumb{
       </div>
       <div class="kpi-value" style="color:#10B981"><span id="kpi-savings">0</span></div>
       <div class="kpi-unit">TL / yıl</div>
-      <div class="kpi-label">Yıllık Tasarruf <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Üretilen enerjinin şebekeden çekilmeyerek (öz-tüketim) ve fazla üretimin şebekeye satılarak sağladığı yıllık toplam maliyet tasarrufu.</span></span></div>
+      <div class="kpi-label">Yıllık Tasarruf <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Üretilen enerjinin öz-tüketim ve şebeke satışından sağladığı yıllık toplam maliyet tasarrufu.</span></span></div>
     </div>
     <div class="kpi-card" style="--kpi-color:#06B6D4">
       <div class="kpi-icon-wrap">
@@ -2060,18 +1746,18 @@ input[type=range]::-moz-range-thumb{
       <span class="fin-val highlight" id="fin-cost">-</span>
     </div>
     <div class="fin-row" style="flex-wrap:wrap;gap:8px">
-      <span class="fin-label">Basit Geri Ödeme Süresi <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Toplam Maliyet ÷ Yıllık Tasarruf. Paranın zaman değerini dikkate almaz; hızlı bir ön gösterge olarak kullanılır.</span></span></span>
+      <span class="fin-label">Basit Geri Ödeme Süresi <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Toplam Maliyet ÷ Yıllık Tasarruf. Paranın zaman değerini dikkate almaz.</span></span></span>
       <div style="display:flex;align-items:center;flex:1;min-width:200px">
         <div class="payback-bar-wrap"><div class="payback-bar-fill" id="payback-bar" style="width:0%"></div></div>
         <span class="fin-val" id="fin-payback" style="white-space:nowrap">-</span>
       </div>
     </div>
     <div class="fin-row">
-      <span class="fin-label">İskontolu Geri Ödeme Süresi <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">İskonto oranını hesaba katan gerçekçi geri ödeme süresi. Paranın zaman değeri nedeniyle basit süreden daha uzundur; finansal karar için daha güvenilir göstergedir.</span></span></span>
+      <span class="fin-label">İskontolu Geri Ödeme Süresi <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">İskonto oranını hesaba katan gerçekçi geri ödeme süresi.</span></span></span>
       <span class="fin-val" id="fin-discounted-payback">-</span>
     </div>
     <div class="fin-row">
-      <span class="fin-label">Proje NPV <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Net Bugünkü Değer — 25 yıllık tüm nakit akışlarının bugünkü değere indirgenmesiyle hesaplanan net kazanç. Pozitif NPV = karlı yatırım. Ne kadar yüksekse yatırım o kadar değerlidir.</span></span></span>
+      <span class="fin-label">Proje NPV <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Net Bugünkü Değer — 25 yıllık tüm nakit akışlarının bugünkü değere indirgenmesiyle hesaplanan net kazanç.</span></span></span>
       <span class="fin-val positive" id="fin-total">-</span>
     </div>
     <div class="fin-row">
@@ -2079,11 +1765,11 @@ input[type=range]::-moz-range-thumb{
       <span class="fin-val positive" id="fin-roi">-</span>
     </div>
     <div class="fin-row">
-      <span class="fin-label">İç Getiri Oranı (IRR) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Yatırımın yüzde cinsinden iç getiri oranı. IRR > iskonto oranı ise yatırım mantıklıdır. %12 üzeri Türkiye koşulları için güçlü getiridir.</span></span></span>
+      <span class="fin-label">İç Getiri Oranı (IRR) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Yatırımın yüzde cinsinden iç getiri oranı. IRR > iskonto oranı ise yatırım mantıklıdır.</span></span></span>
       <span class="fin-val positive" id="fin-irr">-</span>
     </div>
     <div class="fin-row">
-      <span class="fin-label">Normalleştirilmiş Maliyet (LCOE) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Levelized Cost of Energy — 25 yıl boyunca üretilen her kWh'in tüm giderler dahil toplam maliyeti. Şebeke tarifesiyle kıyaslayın: LCOE &lt; tarife ise sistem ekonomiktir.</span></span></span>
+      <span class="fin-label">Normalleştirilmiş Maliyet (LCOE) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Levelized Cost of Energy — 25 yıl boyunca üretilen her kWh'in toplam maliyeti.</span></span></span>
       <span class="fin-val" id="fin-lcoe">-</span>
     </div>
     <div class="fin-row" id="fin-om-row">
@@ -2096,7 +1782,7 @@ input[type=range]::-moz-range-thumb{
     </div>
   </div>
 
-  <!-- BESS SONUÇLARI -->
+  <!-- BESS results -->
   <div class="bess-result-wrap" id="bess-result-section" style="display:none">
     <div class="bess-result-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2"/></svg>
@@ -2116,7 +1802,7 @@ input[type=range]::-moz-range-thumb{
     <div style="margin-top:12px;font-size:0.78rem;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:12px" id="bess-detail-row"></div>
   </div>
 
-  <!-- NET METERING SONUÇLARI -->
+  <!-- Net metering results -->
   <div class="nm-result-wrap" id="nm-result-section" style="display:none">
     <div class="nm-result-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/></svg>
@@ -2139,7 +1825,7 @@ input[type=range]::-moz-range-thumb{
     </div>
   </div>
 
-  <!-- ÇOKLU ÇATI YÜZEYLERI TABLOSU -->
+  <!-- Section breakdown -->
   <div class="card" id="section-breakdown-card" style="display:none;margin-top:16px">
     <div class="card-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
@@ -2158,9 +1844,9 @@ input[type=range]::-moz-range-thumb{
     <canvas id="monthly-chart-canvas"></canvas>
   </div>
 
-  <!-- PR GAUGE -->
+  <!-- PR gauge -->
   <div class="pr-gauge-wrap card" style="margin-top:16px;padding:28px">
-    <div class="card-title" style="justify-content:center;margin-bottom:20px">Performans Oranı (PR) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.7rem;padding:1px 6px">?</span><span class="tooltip-box">Gerçek üretimin teorik ideale oranı (%). %75-85 iyi, %85+ mükemmel. Gölge, sıcaklık, kirlenme ve kablo kayıpları bu oranı düşürür. Yüksek PR = sisteminiz çok verimli çalışıyor.</span></span></div>
+    <div class="card-title" style="justify-content:center;margin-bottom:20px">Performans Oranı (PR) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.7rem;padding:1px 6px">?</span><span class="tooltip-box">Gerçek üretimin teorik ideale oranı (%). %75-85 iyi, %85+ mükemmel.</span></span></div>
     <svg id="pr-gauge-svg" viewBox="0 0 200 120" width="200" height="120" style="overflow:visible;display:block;margin:0 auto">
       <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(71,85,105,0.3)" stroke-width="12" stroke-linecap="round"/>
       <path id="pr-arc-fill" d="M 20 100 A 80 80 0 0 1 180 100" fill="none"
@@ -2196,13 +1882,10 @@ input[type=range]::-moz-range-thumb{
   </div>
 
   <div id="turkey-map-wrap">
-    <!-- Türkiye basit SVG outline haritası — lat/lon → SVG koordinat dönüşümü JS ile yapılır -->
     <svg id="turkey-svg-map" viewBox="0 0 800 360" xmlns="http://www.w3.org/2000/svg">
       <rect width="800" height="360" fill="#0F172A" rx="12"/>
-      <!-- Grid çizgileri -->
       <line x1="0" y1="180" x2="800" y2="180" stroke="rgba(71,85,105,0.15)" stroke-width="0.5"/>
       <line x1="400" y1="0" x2="400" y2="360" stroke="rgba(71,85,105,0.15)" stroke-width="0.5"/>
-      <!-- Türkiye outline (basitleştirilmiş) -->
       <path id="turkey-outline" fill="rgba(30,58,138,0.25)" stroke="rgba(59,130,246,0.6)" stroke-width="1.5" stroke-linejoin="round"
         d="M 105,145 L 120,135 L 145,130 L 165,125 L 185,120 L 210,118 L 235,115 L 260,112 L 285,110
            L 310,108 L 340,106 L 365,105 L 390,104 L 415,104 L 440,105 L 465,107 L 490,110
@@ -2212,7 +1895,6 @@ input[type=range]::-moz-range-thumb{
            L 520,228 L 500,222 L 480,218 L 460,215 L 440,215 L 420,218 L 400,222 L 380,228
            L 360,235 L 340,240 L 315,242 L 290,238 L 265,230 L 245,220 L 225,210 L 205,200
            L 185,195 L 165,195 L 145,198 L 125,200 L 108,195 L 98,180 L 100,162 L 105,145 Z"/>
-      <!-- Şehir dot (JS ile güncellenir) -->
       <circle id="city-pulse-dot" cx="400" cy="175" r="5" fill="#F59E0B" opacity="0">
         <animate attributeName="r" values="5;12;5" dur="1.8s" repeatCount="indefinite"/>
         <animate attributeName="opacity" values="0.9;0.2;0.9" dur="1.8s" repeatCount="indefinite"/>
@@ -2220,7 +1902,6 @@ input[type=range]::-moz-range-thumb{
       <circle id="city-dot-inner" cx="400" cy="175" r="4" fill="#F59E0B" opacity="0"/>
       <text id="city-dot-label" x="400" y="158" text-anchor="middle" font-size="11" font-weight="600"
         fill="#F59E0B" font-family="Space Grotesk, Inter" opacity="0"></text>
-      <!-- Koordinat etiketleri -->
       <text x="14" y="18" font-size="9" fill="rgba(100,116,139,0.6)" font-family="Inter">26°D</text>
       <text x="770" y="18" font-size="9" fill="rgba(100,116,139,0.6)" font-family="Inter">45°D</text>
       <text x="14" y="352" font-size="9" fill="rgba(100,116,139,0.6)" font-family="Inter">36°K</text>
@@ -2229,7 +1910,7 @@ input[type=range]::-moz-range-thumb{
     </svg>
   </div>
 
-  <!-- ENGINEER REPORT -->
+  <!-- Engineer report -->
   <div class="eng-report-wrap">
     <div class="eng-report-header" id="eng-report-toggle" onclick="toggleEngReport()">
       <div class="eng-report-title">
@@ -2239,9 +1920,7 @@ input[type=range]::-moz-range-thumb{
       </div>
       <svg class="eng-chevron" id="eng-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
     </div>
-    <div class="eng-report-body" id="eng-report-body">
-      <!-- renderEngReport() tarafından doldurulur -->
-    </div>
+    <div class="eng-report-body" id="eng-report-body"></div>
   </div>
 
   <div class="action-btns">
@@ -2279,7 +1958,7 @@ input[type=range]::-moz-range-thumb{
     </button>
   </div>
 
-  <!-- SAATLIK ÜRETİM PROFİLİ -->
+  <!-- Hourly profile card -->
   <div class="card" id="hourly-profile-card" style="display:none;margin-top:16px">
     <div class="card-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -2295,7 +1974,7 @@ input[type=range]::-moz-range-thumb{
     <div id="hourly-stats" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px"></div>
   </div>
 
-  <!-- GÜNEŞ YOLU DİYAGRAMI -->
+  <!-- Sun path card -->
   <div class="card" id="sun-path-card" style="display:none;margin-top:16px">
     <div class="card-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -2307,7 +1986,7 @@ input[type=range]::-moz-range-thumb{
     <div id="sun-path-info" style="font-size:0.8rem;color:var(--text-muted);text-align:center;margin-top:10px"></div>
   </div>
 
-  <!-- TÜRKİYE ÜRETİM HEATMAP -->
+  <!-- Heatmap card -->
   <div class="card" id="heatmap-card" style="display:none;margin-top:16px">
     <div class="card-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/></svg>
@@ -2334,7 +2013,7 @@ input[type=range]::-moz-range-thumb{
     </div>
   </div>
 
-  <!-- SENARYO ANALİZİ -->
+  <!-- Scenario analysis card -->
   <div class="card" id="scenario-card" style="display:none;margin-top:16px">
     <div class="card-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -2352,7 +2031,7 @@ input[type=range]::-moz-range-thumb{
     <canvas id="scenario-chart-canvas" style="max-height:300px"></canvas>
   </div>
 
-  <!-- FX PROJEKSİYONU -->
+  <!-- FX projection card -->
   <div class="card" id="fx-projection-card" style="display:none;margin-top:16px">
     <div class="card-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
@@ -2368,7 +2047,7 @@ input[type=range]::-moz-range-thumb{
     <canvas id="fx-chart-canvas" style="max-height:280px"></canvas>
   </div>
 
-  <!-- EV SONUÇLARI -->
+  <!-- EV result card -->
   <div class="card" id="ev-result-card" style="display:none;margin-top:16px;border-left:3px solid #3B82F6">
     <div class="card-title" style="color:#3B82F6">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
@@ -2377,7 +2056,7 @@ input[type=range]::-moz-range-thumb{
     <div id="ev-result-body" class="result-metrics-grid"></div>
   </div>
 
-  <!-- ISI POMPASI SONUÇLARI -->
+  <!-- Heat pump result card -->
   <div class="card" id="heatpump-result-card" style="display:none;margin-top:16px;border-left:3px solid #EC4899">
     <div class="card-title" style="color:#EC4899">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EC4899" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"/></svg>
@@ -2386,7 +2065,7 @@ input[type=range]::-moz-range-thumb{
     <div id="heatpump-result-body" class="result-metrics-grid"></div>
   </div>
 
-  <!-- YAPISAL ANALİZ SONUÇLARI -->
+  <!-- Structural result card -->
   <div class="card" id="structural-result-card" style="display:none;margin-top:16px;border-left:3px solid #F59E0B">
     <div class="card-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
@@ -2395,7 +2074,7 @@ input[type=range]::-moz-range-thumb{
     <div id="structural-result-body"></div>
   </div>
 
-  <!-- VERGİ AVANTAJI SONUÇLARI -->
+  <!-- Tax result card -->
   <div class="card" id="tax-result-card" style="display:none;margin-top:16px;border-left:3px solid #10B981">
     <div class="card-title" style="color:#10B981">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -2419,7 +2098,7 @@ input[type=range]::-moz-range-thumb{
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:8px"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         Teklif Karşılaştırma
       </h2>
-      <button onclick="closeComparison()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.4rem;padding:4px 8px">✕</button>
+      <button onclick="closeComparison()" aria-label="Kapat" title="Kapat" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.4rem;padding:4px 8px">✕</button>
     </div>
     <div style="padding:24px">
       <div id="comparison-scenarios" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:20px"></div>
@@ -2439,7 +2118,7 @@ input[type=range]::-moz-range-thumb{
       <div style="display:flex;gap:10px;align-items:center">
         <button onclick="compareDashboardSelected()" class="btn btn-outline" style="font-size:0.78rem;padding:6px 12px">Seçilenleri Karşılaştır</button>
         <button onclick="clearAllSaved()" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#EF4444;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:0.78rem">Tümünü Sil</button>
-        <button onclick="closeDashboard()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.4rem;padding:4px 8px">✕</button>
+        <button onclick="closeDashboard()" aria-label="Kapat" title="Kapat" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.4rem;padding:4px 8px">✕</button>
       </div>
     </div>
     <div id="dashboard-body" style="padding:24px"></div>

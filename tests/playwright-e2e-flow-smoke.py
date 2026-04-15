@@ -1,0 +1,222 @@
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from threading import Thread
+from time import sleep
+from urllib.request import urlopen
+
+from playwright.sync_api import sync_playwright
+
+
+class QuietHandler(SimpleHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
+
+PVGIS_MONTHLY = [850, 950, 1250, 1450, 1700, 1850, 1900, 1800, 1500, 1200, 900, 750]
+
+
+def pvgis_payload():
+    return {
+        "outputs": {
+            "totals": {"fixed": {"E_y": sum(PVGIS_MONTHLY), "H(i)_y": 1780}},
+            "monthly": {"fixed": [{"E_m": value} for value in PVGIS_MONTHLY]},
+        }
+    }
+
+
+def backend_payload():
+    backend_monthly = [1200, 1300, 1500, 1700, 1900, 2050, 2100, 2000, 1750, 1450, 1250, 1100]
+    return {
+        "schema": "GH-PV-ENGINE-CONTRACT-2026.04-v1",
+        "engineSource": {
+            "engine": "python-backend",
+            "provider": "python-pvlib",
+            "source": "pvlib-backed",
+            "confidence": "high",
+            "engineQuality": "engineering-mvp",
+            "pvlibReady": True,
+            "pvlibBacked": True,
+            "fallbackUsed": False,
+            "notes": ["E2E smoke backend fixture"],
+        },
+        "production": {
+            "engine_used": "pvlib-backed",
+            "engine_quality": "engineering-mvp",
+            "annualEnergyKwh": sum(backend_monthly),
+            "monthlyEnergyKwh": backend_monthly,
+            "systemPowerKwp": 12.9,
+            "panelCount": 30,
+        },
+        "losses": {
+            "transpositionModel": "fixture",
+            "temperatureModel": "fixture",
+            "fallbackReason": None,
+        },
+        "financial": {"annualSavingsTry": 120000},
+        "proposal": {"quoteReadiness": "backend-engineering-estimate"},
+        "raw": {"engineUsed": "pvlib-backed", "engineQuality": "engineering-mvp", "fallbackUsed": False},
+    }
+
+
+def assert_no_overflow(page, label):
+    sizes = page.evaluate(
+        """() => ({
+            width: window.innerWidth,
+            doc: document.documentElement.scrollWidth,
+            body: document.body.scrollWidth
+        })"""
+    )
+    assert sizes["doc"] <= sizes["width"] + 2, (label, sizes)
+
+
+def install_common_routes(page):
+    page.route("**/PVcalc**", lambda route: route.fulfill(
+        status=200,
+        headers={"content-type": "application/json", "access-control-allow-origin": "*"},
+        json=pvgis_payload(),
+    ))
+
+
+def install_backend_routes(page):
+    page.route("http://127.0.0.1:8000/health", lambda route: route.fulfill(
+        status=200,
+        headers={"content-type": "application/json", "access-control-allow-origin": "*"},
+        json={"status": "ok", "pvlibAvailable": True, "pvlibBackedEngineAvailable": True, "fallbackEngine": "python-deterministic-fallback"},
+    ))
+    page.route("http://127.0.0.1:8000/api/pv/calculate", lambda route: route.fulfill(
+        status=200,
+        headers={"content-type": "application/json", "access-control-allow-origin": "*"},
+        json=backend_payload(),
+    ))
+
+
+def select_ankara_with_search(page):
+    page.fill("#city-search", "Ankara")
+    page.wait_for_selector(".autocomplete-item")
+    page.locator(".autocomplete-item").first.click()
+    page.wait_for_timeout(250)
+    assert page.locator("#loc-bottom-ghi-val").count() == 1
+    assert "kWh/m²/yıl" in page.locator("#loc-bottom-ghi-val").inner_text()
+
+
+def run_click_flow_to_results(page):
+    page.click('.scenario-choice-card[data-scenario-key="on-grid"]')
+    page.click("#step1-continue-btn")
+    page.wait_for_function("window.state.step === 2")
+    select_ankara_with_search(page)
+    page.click("#step2-continue-btn")
+    page.wait_for_function("window.state.step === 3")
+    page.fill("#roof-area", "80")
+    page.click(".step3-nav-sticky .btn-primary")
+    page.wait_for_function("window.state.step === 4")
+    assert page.locator(".panel-card").count() >= 3
+    assert page.locator(".inverter-card").count() >= 3
+    page.click(".equipment-summary-card .btn-primary")
+    page.wait_for_function("window.state.step === 5")
+    page.fill("#tariff-input", "8.44")
+    page.click(".calc-cta-btn")
+    page.wait_for_function(
+        "document.getElementById('step-7')?.classList.contains('active') && window.state.results",
+        timeout=30000,
+    )
+    page.wait_for_timeout(800)
+
+
+def desktop_backend_flow(browser, base_url):
+    ctx = browser.new_context(viewport={"width": 1366, "height": 900}, service_workers="block", accept_downloads=True)
+    page = ctx.new_page()
+    page_errors = []
+    page.on("pageerror", lambda exc: page_errors.append(str(exc)))
+    install_common_routes(page)
+    install_backend_routes(page)
+    page.goto(f"{base_url}/index.html", wait_until="networkidle")
+
+    run_click_flow_to_results(page)
+    assert page.evaluate("window.state.step") == 7
+    assert "pvlib-backed" in page.locator("#result-engine-source").inner_text()
+    assert int(page.locator("#kpi-energy").inner_text().replace(".", "").replace(",", "")) > 0
+    assert page.locator("#audit-panel-card").count() == 1
+    assert_no_overflow(page, "desktop results")
+
+    page.evaluate(
+        """() => {
+            Object.defineProperty(navigator, 'clipboard', {
+                value: { writeText: async value => { window.__sharedUrl = value; } },
+                configurable: true
+            });
+            window.jspdf = { jsPDF: function() {
+                return {
+                    setFillColor(){}, rect(){}, setTextColor(){}, setFontSize(){}, setFont(){},
+                    setDrawColor(){}, setLineWidth(){}, line(){}, addPage(){},
+                    text(value){ (window.__pdfText ||= []).push(String(value)); },
+                    splitTextToSize(value){ return String(value).split("\\n"); },
+                    save(name){ window.__pdfSaved = name; }
+                };
+            }};
+        }"""
+    )
+    page.click('button:has-text("PDF Rapor İndir")')
+    assert page.evaluate("window.__pdfSaved").startswith("solar-rota-")
+    page.click('button:has-text("Sonucu Paylaş")')
+    page.wait_for_function("window.__sharedUrl?.includes('#')")
+    with page.expect_download() as proposal_download:
+        page.click('button:has-text("Proposal JSON")')
+    assert proposal_download.value.suggested_filename.startswith("solar-rota-proposal-handoff-")
+    with page.expect_download() as crm_download:
+        page.click('button:has-text("CRM JSON")')
+    assert crm_download.value.suggested_filename.startswith("solar-rota-crm-lead-")
+
+    page.click('button:has-text("Hesabı Kaydet")')
+    page.click("#dashboard-btn")
+    assert page.locator("#dashboard-modal").evaluate("el => getComputedStyle(el).display") == "flex"
+    assert "Ankara" in page.locator("#dashboard-body").inner_text()
+    page.click('#dashboard-modal button[aria-label="Kapat"]')
+    page.click('button:has-text("Teklif Karşılaştır")')
+    assert page.locator("#comparison-modal").evaluate("el => getComputedStyle(el).display") == "flex"
+    assert page.locator("#comparison-result-table").inner_text().count("Senaryo") >= 3
+    assert not page_errors, page_errors
+    ctx.close()
+
+
+def backend_unavailable_fallback_flow(browser, base_url):
+    ctx = browser.new_context(viewport={"width": 430, "height": 844}, is_mobile=True, has_touch=True, service_workers="block")
+    page = ctx.new_page()
+    page_errors = []
+    page.on("pageerror", lambda exc: page_errors.append(str(exc)))
+    install_common_routes(page)
+    page.route("http://127.0.0.1:8000/**", lambda route: route.abort())
+    page.goto(f"{base_url}/index.html", wait_until="networkidle")
+    run_click_flow_to_results(page)
+    assert page.evaluate("window.state.backendEngineAvailable") is False
+    assert "PVGIS-based" in page.locator("#result-engine-source").inner_text()
+    assert_no_overflow(page, "mobile fallback results")
+    assert not page_errors, page_errors
+    ctx.close()
+
+
+def main():
+    root = Path(__file__).resolve().parents[1]
+    server = ThreadingHTTPServer(("127.0.0.1", 0), lambda *args, **kwargs: QuietHandler(*args, directory=str(root), **kwargs))
+    base_url = f"http://127.0.0.1:{server.server_port}"
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    for _ in range(20):
+        try:
+            with urlopen(f"{base_url}/index.html", timeout=1) as response:
+                if response.status == 200:
+                    break
+        except Exception:
+            sleep(0.1)
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            desktop_backend_flow(browser, base_url)
+            backend_unavailable_fallback_flow(browser, base_url)
+            browser.close()
+            print("end-to-end flow smoke passed")
+    finally:
+        server.shutdown()
+
+
+if __name__ == "__main__":
+    main()

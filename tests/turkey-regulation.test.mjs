@@ -38,9 +38,25 @@ const monthly = applyExportCompensation(monthlyRows, { interval: 'monthly', annu
 assert.equal(monthly.paidGridExport, 250);
 assert.equal(monthly.unpaidGridExport, 50);
 
-const hourly = applyExportCompensation(monthlyRows, { interval: 'hourly', annualSellableExportCapKwh: 180 });
+const hourlyRows = new Array(8760).fill(0).map((_, idx) => ({
+  month: idx < 2 ? 0 : 1,
+  gridExport: idx === 0 ? 100 : idx === 1 ? 200 : 0,
+  load: idx === 0 ? 50 : idx === 1 ? 500 : 0
+}));
+const hourly = applyExportCompensation(monthlyRows, {
+  interval: 'hourly',
+  annualSellableExportCapKwh: 180,
+  hourlyRows
+});
 assert.equal(Math.round(hourly.paidGridExport), 180);
 assert.equal(Math.round(hourly.unpaidGridExport), 120);
+assert.equal(hourly.policy.interval, 'hourly');
+
+const mislabeledHourly = applyExportCompensation(monthlyRows, { interval: 'hourly', annualSellableExportCapKwh: 180 });
+assert.equal(mislabeledHourly.paidGridExport, 0);
+assert.equal(mislabeledHourly.unpaidGridExport, 300);
+assert.equal(mislabeledHourly.policy.interval, 'monthly-aggregate-no-hourly-settlement');
+assert.equal(mislabeledHourly.policy.requestedInterval, 'hourly');
 
 const policy = buildExportCompensationPolicy({
   annualConsumptionKwh: 1000,
