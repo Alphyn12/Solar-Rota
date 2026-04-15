@@ -1103,6 +1103,10 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             </select>
           </div>
           <div style="font-size:0.74rem;color:var(--text-muted);max-width:520px">Onay yalnızca approver/admin rolüyle verilir. Onay kaydı oluşturulduktan sonra sessizce değiştirilemez.</div>
+          <!-- FIX-10: Local-only trust signal disclaimer -->
+          <div id="local-auth-warning" style="font-size:0.72rem;color:#F59E0B;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:6px;padding:6px 10px;max-width:520px;margin-top:4px">
+            ⚠ <strong>Yerel Kimlik Doğrulama:</strong> Kullanıcı rolü yalnızca bu tarayıcıda localStorage'da saklanır. Sunucu tarafı kimlik doğrulaması yoktur. Onay kaydı kriptografik olarak imzalanmamıştır ve yerel tarayıcıda değiştirilebilir. Bu aracı gerçek müşteri teklifi için kullanmadan önce kurumsal bir kimlik doğrulama katmanı eklenmelidir.
+          </div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
           <div>

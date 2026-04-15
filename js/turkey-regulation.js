@@ -108,7 +108,11 @@ export function determineSkttRegime(state = {}) {
 
 export function buildExportCompensationPolicy(state = {}) {
   const settlementMode = state.exportSettlementMode || state.netMeteringSettlement || 'auto';
-  const settlementDate = state.settlementDate || new Date().toISOString().slice(0, 10);
+  // FIX-7: Using new Date() here produced non-deterministic results — the same
+  // state object would silently flip from 'monthly' to 'hourly' mahsuplaşma
+  // depending on the calendar date. Null out when no explicit date is stored so
+  // callers can detect the missing value and show a governance blocker instead.
+  const settlementDate = state.settlementDate || null;
   const interval = settlementMode === 'auto'
     ? (settlementDate >= SETTLEMENT_CHANGE_DATE ? 'hourly' : 'monthly')
     : settlementMode;

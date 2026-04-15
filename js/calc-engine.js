@@ -29,6 +29,21 @@ const LOADING_MSGS = [
   "Finansal analiz yapılıyor..."
 ];
 
+// FIX-2: Tilt factor lookup for PSH fallback path.
+// Matches the TILT_COEFFS table in app.js and the backend simple_engine.py _tilt_factor().
+// Optimum is 30–35° (coeff = 1.00); flat roof (0°) loses ~22%, vertical (90°) loses ~38%.
+const _TILT_COEFFS = {0:0.78,10:0.90,15:0.94,20:0.97,25:0.99,30:1.00,33:1.00,35:1.00,40:0.99,45:0.97,50:0.94,60:0.87,75:0.75,90:0.62};
+function _getTiltCoeff(deg) {
+  const keys = Object.keys(_TILT_COEFFS).map(Number).sort((a, b) => a - b);
+  let lo = keys[0], hi = keys[keys.length - 1];
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (deg >= keys[i] && deg <= keys[i + 1]) { lo = keys[i]; hi = keys[i + 1]; break; }
+  }
+  if (lo === hi) return _TILT_COEFFS[lo];
+  const t = (deg - lo) / (hi - lo);
+  return _TILT_COEFFS[lo] + t * (_TILT_COEFFS[hi] - _TILT_COEFFS[lo]);
+}
+
 function spawnLoadingParticles() {
   const container = document.getElementById('loading-particles');
   if (!container) return;
@@ -271,6 +286,7 @@ export async function runCalculation() {
     const adjustedE = rawEnergy
       * (usedFallback ? (1 + tempLoss) : 1.0)
       * (usedFallback ? sec.azimuthCoeff : 1.0)
+      * (usedFallback ? _getTiltCoeff(sec.tilt) : 1.0)   // FIX-2: tilt factor was missing from fallback path
       * (1 - effectiveShadingFactor / 100)
       * (1 - state.soilingFactor / 100)
       * bifacialBonus
@@ -424,7 +440,13 @@ export async function runCalculation() {
   const laborPerKwp = pickOverride('laborPerKwp', 1800);
   const defaultPermit = systemPower < 5 ? 8000 : systemPower < 10 ? 6000 : systemPower < 20 ? 5000 : 4000;
   const permitCost  = pickOverride('permitFixed', defaultPermit);
-  const kdvRate = Number.isFinite(costOverrides.kdvRate) ? costOverrides.kdvRate : 0.20;
+  // FIX-6: KDV/VAT accuracy — Law 7456/2023 (July 2023) reduced KDV on solar PV
+  // panels/modules to 0%. Other components (inverter, mounting, cable, labor,
+  // permit) remain at the standard 20% rate. The override key 'kdvRate' now
+  // sets the non-panel rate; to override the panel rate separately use
+  // 'panelKdvRate'. Backend _frontend_default_capex also updated to match.
+  const nonPanelKdvRate = Number.isFinite(costOverrides.kdvRate) ? costOverrides.kdvRate : 0.20;
+  const panelKdvRate    = Number.isFinite(costOverrides.panelKdvRate) ? costOverrides.panelKdvRate : 0.00;
 
   const panelCost   = systemPower * 1000 * panelPricePerWatt;
   const inverterCost= systemPower * invUnitEffective;
@@ -433,7 +455,9 @@ export async function runCalculation() {
   const acElecCost  = systemPower * acElecPerKwp;
   const laborCost   = systemPower * laborPerKwp;
   const subtotal    = panelCost + inverterCost + mountingCost + dcCableCost + acElecCost + laborCost + permitCost;
-  const kdv         = subtotal * kdvRate;
+  const nonPanelSubtotal = subtotal - panelCost;
+  const kdv         = panelCost * panelKdvRate + nonPanelSubtotal * nonPanelKdvRate;
+  const kdvRate     = subtotal > 0 ? kdv / subtotal : 0; // blended rate, used downstream for display
   let solarCost     = subtotal + kdv;
   const bomTotalsForSystem = Array.isArray(state.bomItems) && state.bomItems.length
     ? calculateBomTotal(selectBomItems(state.bomItems, state.bomSelection || {}, { activeCategories: getActiveBomCategories(state) }), {
@@ -530,7 +554,18 @@ export async function runCalculation() {
   const exportRate = state.netMeteringEnabled
     ? tariffModel.exportRate
     : 0;
-  const annualSavings = nmMetrics.selfConsumedEnergy * tariff + (state.netMeteringEnabled ? nmMetrics.paidGridExport * exportRate : 0);
+
+  // FIX-5: Off-grid replaces generator/diesel, not grid electricity.
+  // Using the grid import tariff as the "savings rate" for an off-grid system
+  // would understate savings by ~2-3×. Use state.offGridCostPerKwh if the user
+  // has configured it; otherwise apply a conservative 2.5× multiplier relative
+  // to the grid tariff as a proxy for diesel/generator fuel cost avoidance.
+  const effectiveSavingsTariff = (state.scenarioKey === 'off-grid')
+    ? (Number(state.offGridCostPerKwh) > 0 ? Number(state.offGridCostPerKwh) : tariff * 2.5)
+    : tariff;
+
+  const annualSavings = nmMetrics.selfConsumedEnergy * effectiveSavingsTariff
+    + (state.netMeteringEnabled ? nmMetrics.paidGridExport * exportRate : 0);
   const co2Savings = adjustedEnergy * 0.442 / 1000;
   const trees = Math.round(co2Savings * 1000 / 21);
 

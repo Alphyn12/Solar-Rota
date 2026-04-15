@@ -68,8 +68,8 @@ export function renderResults() {
   window.animateCounter('kpi-savings', r.annualSavings, v => money(v));
   window.animateCounter('kpi-power', r.systemPower, v => v.toFixed(2));
   window.animateCounter('kpi-co2', parseFloat(r.co2Savings), v => v.toFixed(2));
-  document.getElementById('kpi-panels-sub').textContent = `${r.panelCount} adet panel`;
-  document.getElementById('kpi-tree-sub').textContent = `≈ ${r.trees} ağaç eşdeğeri`;
+  document.getElementById('kpi-panels-sub').textContent = `${r.panelCount} ${i18n.t('units.panelUnit')}`;
+  document.getElementById('kpi-tree-sub').textContent = `≈ ${r.trees} ${i18n.t('units.treeEquivalent')}`;
   const scenarioLabel = document.getElementById('result-scenario-label');
   const scenarioFrame = document.getElementById('result-scenario-frame');
   const engineSource = document.getElementById('result-engine-source');
@@ -110,36 +110,39 @@ export function renderResults() {
   const tbody = document.getElementById('tech-table-body');
   tbody.innerHTML = '';
   const isPvlibAuthoritative = !!r.authoritativeEngineSource?.pvlibBacked;
+  // FIX-9: Replace ~30 hardcoded Turkish strings with i18n.t() calls so the
+  // tech table renders correctly when the user switches to EN or DE.
+  const tt = k => i18n.t(`techTable.${k}`);
   const rows = [
-    ['Panel Sayısı', r.panelCount + ' adet'],
-    ['Panel Tipi', p.name],
-    ['Panel Verimliliği', (p.efficiency*100).toFixed(1) + '%'],
-    ['Sistem Gücü', r.systemPower.toFixed(2) + ' kWp'],
-    ['Çatı Eğimi', state.tilt + '°'],
-    ['Çatı Yönü', state.azimuthName],
-    ['Gölgelenme', state.shadingFactor + '%'],
-    ['Kirlenme', state.soilingFactor + '%'],
-    ['OSM Gölge Etkisi', r.osmShadowFactor ? `${Number(r.osmShadowFactor).toFixed(1)}% ek varsayım` : 'Kapalı / yok'],
-    ['Harita Çatı Alanı', state.roofGeometry ? `${state.roofGeometry.areaM2.toFixed(1)} m² | ${state.roofGeometry.azimuthName} ${Math.round(state.roofGeometry.azimuth)}°` : '—'],
-    ['İnverter Tipi', r.inverterType ? r.inverterType.charAt(0).toUpperCase() + r.inverterType.slice(1) : 'String'],
-    ['İnverter Verimi', (r.inverterEfficiency || '97') + '%'],
-    ['Spesifik Verim <span style="cursor:help;opacity:0.6" title="Kurulu her kWp gücün yılda ürettiği enerji. Türkiyeʼde iyi bir sistem 1.400–1.700 kWh/kWp üretir. Konum, eğim ve gölge kalitesini ölçen en özlü göstergedir.">?</span>', r.ysp + ' kWh/kWp'],
-    ['Kapasite Faktörü <span style="cursor:help;opacity:0.6" title="Sistemin teorik maksimum kapasitesine oranla ne kadar çalıştığı (%). Güneş enerjisinde %15–22 beklenir; yükseldikçe konum ve konfigürasyon kalitesi artar.">?</span>', r.cf + '%'],
-    ['Performans Oranı (PR) <span style="cursor:help;opacity:0.6" title="Gerçek üretimin teorik ideale oranı (%). %75–85 iyi, %85+ mükemmel. Gölge, sıcaklık, kirlenme ve kablo kayıpları bu oranı düşürür.">?</span>', r.pr + '%'],
-    ['CO₂ Tasarrufu', r.co2Savings + ' ton/yıl'],
-    ['Hesap Metodu', `${r.calculationMode || '—'} / ${r.methodologyVersion || '—'}`],
-    ['Senaryo', `${state.scenarioContext?.label || state.scenarioKey || 'On-Grid'} / ${state.scenarioContext?.resultFrame || '—'}`],
-    ['Authoritative Engine', backendEngineText(r, state)],
-    ['Fallback Reason', r.authoritativeEngineFallbackReason || '—'],
-    [isPvlibAuthoritative ? 'pvlib irradiance source' : 'PVGIS loss parametresi', isPvlibAuthoritative ? 'Clear-sky + request GHI scaling' : `${r.pvgisLossParam ?? 0}%`],
-    [isPvlibAuthoritative ? 'pvlib POA reference' : 'PVGIS POA', `${r.pvgisPoa || '—'} kWh/m²/yıl`],
-    ['Tarife', moneyRate(r.tariff, 'kWh')],
-    ['Tarife Rejimi', `${r.tariffModel?.effectiveRegime || '—'} / Sözleşme gücü: ${r.tariffModel?.contractedPowerKw || 0} kW`],
-    ['SKTT Limiti', r.tariffModel?.regulation?.limitKwh ? `${Number(r.tariffModel.regulation.limitKwh).toLocaleString('tr-TR')} kWh/yıl` : '—'],
-    ['İhracat Mahsuplaşma', state.netMeteringEnabled ? `${r.tariffModel?.exportCompensationPolicy?.interval || '—'} / sınır: ${r.tariffModel?.exportCompensationPolicy?.annualSellableExportCapKwh ? Math.round(r.tariffModel.exportCompensationPolicy.annualSellableExportCapKwh).toLocaleString('tr-TR') + ' kWh/yıl' : '—'}` : 'Kapalı / bu senaryoda gelir hesabına alınmadı'],
-    ['Para Birimi', `${state.displayCurrency || 'TRY'} (USD/TRY: ${Number(state.usdToTry || 38.5).toFixed(2)} | ${state.exchangeRate?.source || 'manual/fallback'})`],
-    ['Tarife Kaynak Tarihi', r.tariffModel?.sourceDate || '—'],
-    ['Yıllık Fiyat Artışı', ((r.annualPriceIncrease || 0) * 100).toFixed(1) + '%'],
+    [tt('panelCount'), r.panelCount + ' ' + i18n.t('report.panelCountUnit')],
+    [tt('panelType'), p.name],
+    [tt('panelEfficiency'), (p.efficiency*100).toFixed(1) + '%'],
+    [tt('systemPower'), r.systemPower.toFixed(2) + ' kWp'],
+    [tt('roofTilt'), state.tilt + '°'],
+    [tt('roofAzimuth'), state.azimuthName],
+    [tt('shading'), state.shadingFactor + '%'],
+    [tt('soiling'), state.soilingFactor + '%'],
+    [tt('osmShadow'), r.osmShadowFactor ? `${Number(r.osmShadowFactor).toFixed(1)}% ${i18n.t('units.additionalAssumption')}` : i18n.t('units.offOrNone')],
+    [tt('mapRoofArea'), state.roofGeometry ? `${state.roofGeometry.areaM2.toFixed(1)} m² | ${state.roofGeometry.azimuthName} ${Math.round(state.roofGeometry.azimuth)}°` : '—'],
+    [tt('inverterType'), r.inverterType ? r.inverterType.charAt(0).toUpperCase() + r.inverterType.slice(1) : 'String'],
+    [tt('inverterEfficiency'), (r.inverterEfficiency || '97') + '%'],
+    [tt('specificYield') + ' <span style="cursor:help;opacity:0.6" title="Kurulu her kWp gücün yılda ürettiği enerji. Türkiyeʼde iyi bir sistem 1.400–1.700 kWh/kWp üretir. Konum, eğim ve gölge kalitesini ölçen en özlü göstergedir.">?</span>', r.ysp + ' kWh/kWp'],
+    [tt('capacityFactor') + ' <span style="cursor:help;opacity:0.6" title="Sistemin teorik maksimum kapasitesine oranla ne kadar çalıştığı (%). Güneş enerjisinde %15–22 beklenir; yükseldikçe konum ve konfigürasyon kalitesi artar.">?</span>', r.cf + '%'],
+    [tt('performanceRatio') + ' <span style="cursor:help;opacity:0.6" title="Gerçek üretimin teorik ideale oranı (%). %75–85 iyi, %85+ mükemmel. Gölge, sıcaklık, kirlenme ve kablo kayıpları bu oranı düşürür.">?</span>', r.pr + '%'],
+    [tt('co2Savings'), r.co2Savings + ' ton/yıl'],
+    [tt('calcMethod'), `${r.calculationMode || '—'} / ${r.methodologyVersion || '—'}`],
+    [tt('scenario'), `${state.scenarioContext?.label || state.scenarioKey || 'On-Grid'} / ${state.scenarioContext?.resultFrame || '—'}`],
+    [tt('authoritativeEngine'), backendEngineText(r, state)],
+    [tt('fallbackReason'), r.authoritativeEngineFallbackReason || '—'],
+    [isPvlibAuthoritative ? tt('pvlibIrradianceSource') : tt('pvgisLossParam'), isPvlibAuthoritative ? 'Clear-sky + request GHI scaling' : `${r.pvgisLossParam ?? 0}%`],
+    [isPvlibAuthoritative ? tt('pvlibPoaRef') : tt('pvgisPoa'), `${r.pvgisPoa || '—'} kWh/m²/yıl`],
+    [tt('tariff'), moneyRate(r.tariff, 'kWh')],
+    [tt('tariffRegime'), `${r.tariffModel?.effectiveRegime || '—'} / ${r.tariffModel?.contractedPowerKw || 0} kW`],
+    [tt('skttLimit'), r.tariffModel?.regulation?.limitKwh ? `${Number(r.tariffModel.regulation.limitKwh).toLocaleString('tr-TR')} kWh/${i18n.t('units.year')}` : '—'],
+    [tt('exportSettlement'), state.netMeteringEnabled ? `${r.tariffModel?.exportCompensationPolicy?.interval || '—'} / ${r.tariffModel?.exportCompensationPolicy?.annualSellableExportCapKwh ? Math.round(r.tariffModel.exportCompensationPolicy.annualSellableExportCapKwh).toLocaleString('tr-TR') + ' kWh' : '—'}` : tt('netMeteringOff')],
+    [tt('currency'), `${state.displayCurrency || 'TRY'} (USD/TRY: ${Number(state.usdToTry || 38.5).toFixed(2)} | ${state.exchangeRate?.source || 'manual/fallback'})`],
+    [tt('tariffSourceDate'), r.tariffModel?.sourceDate || '—'],
+    [tt('annualPriceIncrease'), ((r.annualPriceIncrease || 0) * 100).toFixed(1) + '%'],
   ];
   rows.forEach(([k, v]) => {
     const tr = document.createElement('tr');
@@ -160,7 +163,7 @@ export function renderResults() {
       totalE   += sec.annualEnergy;
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${i + 1}. Yüzey</td>
+        <td>${i18n.t('techTable.sectionLabel').replace('{n}', i + 1)}</td>
         <td>${escapeHtml(sec.sectionArea)} m²</td>
         <td>${escapeHtml(sec.sectionAzimuthName)}</td>
         <td>${escapeHtml(sec.sectionTilt)}°</td>
@@ -172,7 +175,7 @@ export function renderResults() {
     const totalRow = document.createElement('tr');
     totalRow.className = 'section-total-row';
     totalRow.innerHTML = `
-      <td>Toplam</td><td>—</td><td>—</td><td>—</td>
+      <td>${i18n.t('techTable.sectionTotal')}</td><td>—</td><td>—</td><td>—</td>
       <td>${totalPC}</td>
       <td>${totalPow.toFixed(2)}</td>
       <td>${Math.round(totalE).toLocaleString('tr-TR')} kWh</td>`;

@@ -1,4 +1,16 @@
 // Local identity and role checks for proposal workflow.
+//
+// ⚠ SECURITY NOTE (FIX-10): This module operates entirely client-side.
+// User roles and identities are stored in window.state / localStorage and are
+// trivially spoofable by any end-user. The "approver" and "admin" roles grant
+// the ability to approve proposals in this browser session only — there is NO
+// server-side authorization, digital signature, or cryptographic identity
+// verification. Before using approval records as legally binding or as a trust
+// signal in external systems, integrate a proper server-side auth layer (e.g.
+// OAuth 2.0 / OIDC, company SSO, or a signed JWT from a backend endpoint).
+//
+// The basisHash in approval records is an FNV-1a hash of local state for
+// change-detection purposes only — it is NOT a cryptographic commitment.
 
 export const IDENTITY_VERSION = 'GH-ID-2026.04-v1';
 

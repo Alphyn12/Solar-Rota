@@ -45,6 +45,10 @@ import { loadProposalState, saveProposalState } from './storage.js';
 // ── Global data referansı ────────────────────────────────────────────────────
 window._appData = { PANEL_TYPES, BATTERY_MODELS, COMPASS_DIRS, INVERTER_TYPES, MONTHS, HEAT_PUMP_DATA, EV_MODELS };
 
+// FIX-4: calculateStructural was imported but never exposed on window, making
+// the structural-check branch in calc-engine.js dead code. Wire it up here.
+window.calculateStructural = calculateStructural;
+
 // BUG-12 fix: Never fall back to currentDateIso() — a missing sourceDate should be null so
 // the governance blocker ("Tarife kaynak kontrol tarihi eksik") fires correctly instead of
 // being silently masked by today's date.
@@ -195,6 +199,9 @@ window.state = {
   // Faz D
   taxEnabled: false,
   tax: null,
+  // Off-grid: effective cost per kWh replaced by solar (diesel/generator proxy).
+  // When null, calc-engine.js uses tariff × 2.5 as a conservative default.
+  offGridCostPerKwh: null,
   hasSignedCustomerBillData: false,
   quoteInputsVerified: false,
   quoteReadyApproved: false

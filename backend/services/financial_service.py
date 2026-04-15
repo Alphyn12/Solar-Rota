@@ -24,10 +24,14 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
         "ev-charging": 0.68,
         "heat-pump": 0.62,
     }.get(scenario_key, 0.58)
-    # Saatlik simülasyon olmadan en sağlam üst sınır: min(üretim, tüketim).
-    # Scenario bazlı self_consumption_target burada senaryo notuna dönüştürülür,
-    # hesap için kullanılmaz — JS tarafı saatlik simülasyonla zaten doğru değeri üretir.
-    self_consumed = min(annual_energy, annual_load)
+    # FIX-3: Apply scenario-appropriate self-consumption target.
+    # The old code always used min(annual_energy, annual_load) — 100% of what the
+    # panel produces up to load — which is physically impossible without hourly
+    # simulation (load doesn't perfectly follow generation).
+    # We now cap self-consumed energy by the scenario-specific target fraction.
+    # This is still an approximation (JS side has a real 8760-hour simulation),
+    # but it avoids systematic over-estimation in the backend proposal estimate.
+    self_consumed = min(annual_energy * self_consumption_target, annual_load)
     export_kwh = max(0, annual_energy - self_consumed)
     paid_export = export_kwh if net_metering else 0
     annual_savings = self_consumed * import_rate + paid_export * export_rate
@@ -40,12 +44,16 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
     simple_payback = rough_capex / annual_savings if annual_savings > 0 else None
     discount_rate = max(0, request.tariff.discountRate or 0.18)
     escalation = max(-0.5, request.tariff.annualPriceIncrease or 0.12)
-    # O&M + sigorta ~%1.7/yıl (JS engine ile tutarlı: omRate=1.2 + insuranceRate=0.5)
-    annual_om_cost = round(rough_capex * 0.017)
+    # O&M + sigorta ~%1.7/yıl base (JS engine ile tutarlı: omRate=1.2 + insuranceRate=0.5).
+    # FIX-3 (O&M escalation): O&M costs escalate with general cost inflation, not
+    # the tariff escalation rate. JS uses state.expenseEscalationRate (default 10%).
+    base_annual_om_cost = rough_capex * 0.017
+    expense_escalation = 0.10  # matches JS default state.expenseEscalationRate
     cashflows = [-rough_capex]
     for year in range(1, 26):
         gross = annual_savings * ((1 + escalation) ** (year - 1))
-        cashflows.append(gross - annual_om_cost)
+        om_this_year = base_annual_om_cost * ((1 + expense_escalation) ** (year - 1))
+        cashflows.append(gross - round(om_this_year))
     project_npv = _npv(cashflows, discount_rate)
     roi = ((sum(cashflows[1:]) - rough_capex) / rough_capex) * 100
 
@@ -98,16 +106,19 @@ def _frontend_default_capex(request: EngineRequest, system_power_kwp: float) -> 
     }.get(request.system.inverterType, (7500, 6500, 5500))
     inverter_per_kwp = inverter_price[0] if system_power_kwp < 10 else inverter_price[1] if system_power_kwp < 50 else inverter_price[2]
     permit_cost = 8000 if system_power_kwp < 5 else 6000 if system_power_kwp < 10 else 5000 if system_power_kwp < 20 else 4000
-    subtotal = (
-        system_power_kwp * 1000 * panel_price_per_watt
-        + system_power_kwp * inverter_per_kwp
+    panel_cost = system_power_kwp * 1000 * panel_price_per_watt
+    non_panel_cost = (
+        system_power_kwp * inverter_per_kwp
         + system_power_kwp * 2200
         + system_power_kwp * 600
         + system_power_kwp * 900
         + system_power_kwp * 1800
         + permit_cost
     )
-    return max(1, subtotal * 1.20)
+    # FIX-6 (backend parity): Law 7456/2023 reduced KDV on solar PV modules to 0%.
+    # Other components remain at 20%. Mirrors the updated frontend calc-engine.js logic.
+    kdv = panel_cost * 0.00 + non_panel_cost * 0.20
+    return max(1, panel_cost + non_panel_cost + kdv)
 
 
 def calculate_financial_proposal(request: EngineRequest) -> EngineResponse:

@@ -18,7 +18,12 @@
       "Bash(dir \"C:\\\\Users\\\\Monster\\\\Desktop\\\\GüneşHesap\")",
       "Bash(node_modules/.bin/node --version)",
       "Bash(grep -E \"\\\\.js$\")",
-      "Bash(grep -n \"daily-consumption-input\" /c/Users/Monster/Desktop/GüneşHesap/js/*.js)"
+      "Bash(grep -n \"daily-consumption-input\" /c/Users/Monster/Desktop/GüneşHesap/js/*.js)",
+      "Bash(wc -l /c/Users/Monster/Desktop/GüneşHesap/tests/*.mjs /c/Users/Monster/Desktop/GüneşHesap/tests/*.py)",
+      "Bash(python -m pytest backend/tests/test_backend_api.py -v)",
+      "Bash(grep -E \"\\\\.\\(mjs|js|py\\)$\")",
+      "Bash(grep -n \"backendFinancialParity\\\\|solar-engine-adapter\" /c/Users/Monster/Desktop/GüneşHesap/js/*.js)",
+      "Bash(grep *)"
     ]
   }
 }

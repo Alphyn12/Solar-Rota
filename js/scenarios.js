@@ -83,18 +83,82 @@ export function renderScenarioAnalysis() {
   if (state.netMeteringEnabled) renderFXProjection(r, state);
 }
 
+function computeSensitivityNpv(r, state, overrides = {}) {
+  // FIX-1: Re-compute NPV via computeFinancialTable so each sensitivity case
+  // uses a correctly scaled 25-year cash-flow model with proper degradation and
+  // escalation — instead of the old heuristic (annualSavings × 0.10 × 8) which
+  // was wrong and produced identical deltas for "Üretim -10%" and "Tarife -10%".
+  const panel = window._appData?.PANEL_TYPES?.[state.panelType] ||
+    { degradation: 0.0045, firstYearDeg: 0.02 };
+  const tariffModel = buildTariffModel({
+    ...state,
+    annualConsumptionKwh: r.hourlySummary?.annualLoad || r.tariffModel?.annualConsumptionKwh,
+    tariff: overrides.tariffMultiplier != null
+      ? (r.tariffModel?.pstRate ?? r.tariff) * overrides.tariffMultiplier
+      : (r.tariffModel?.pstRate ?? r.tariff),
+    skttTariff: overrides.tariffMultiplier != null
+      ? (r.tariffModel?.skttRate ?? r.tariff) * overrides.tariffMultiplier
+      : (r.tariffModel?.skttRate ?? r.tariff),
+    contractedTariff: overrides.tariffMultiplier != null
+      ? (r.tariffModel?.contractedRate ?? r.tariff) * overrides.tariffMultiplier
+      : (r.tariffModel?.contractedRate ?? r.tariff),
+    exportTariff: r.tariffModel?.exportRate ?? r.tariff,
+    annualPriceIncrease: state.annualPriceIncrease ?? 0.12,
+    discountRate: r.discountRate
+  });
+  // When energy is scaled, the hourly summary must be scaled proportionally so
+  // that selfRatio (= selfConsumption / annualEnergy) is preserved and savings
+  // change correctly. Without this, the multiplier cancels out in the formula:
+  //   selfE = annualEnergy × (selfConsumption / annualEnergy) = selfConsumption (unchanged).
+  const em = overrides.energyMultiplier ?? 1;
+  const scaledHourlySummary = em !== 1 && r.hourlySummary ? {
+    ...r.hourlySummary,
+    annualProduction: (r.hourlySummary.annualProduction || 0) * em,
+    selfConsumption:  (r.hourlySummary.selfConsumption  || 0) * em,
+    gridExport:       (r.hourlySummary.gridExport        || 0) * em,
+    paidGridExport:   (r.hourlySummary.paidGridExport    || 0) * em,
+    unpaidGridExport: (r.hourlySummary.unpaidGridExport  || 0) * em
+  } : r.hourlySummary;
+  const scaledBatterySummary = em !== 1 && r.batterySummary ? {
+    ...r.batterySummary,
+    totalSelfConsumption: (r.batterySummary.totalSelfConsumption || 0) * em,
+    paidGridExport:       (r.batterySummary.paidGridExport       || 0) * em
+  } : r.batterySummary;
+
+  const financial = computeFinancialTable({
+    annualEnergy: r.annualEnergy * em,
+    hourlySummary: scaledHourlySummary,
+    batterySummary: scaledBatterySummary,
+    totalCost: overrides.costMultiplier != null
+      ? r.totalCost * overrides.costMultiplier
+      : r.totalCost,
+    tariffModel,
+    panel,
+    annualOMCost: r.annualOMCost,
+    annualInsurance: r.annualInsurance,
+    inverterLifetime: r.inverterLifetime || 12,
+    inverterReplaceCost: r.inverterReplaceCost,
+    netMeteringEnabled: state.netMeteringEnabled,
+    exportRateOverride: state.netMeteringEnabled ? tariffModel.exportRate : 0
+  });
+  return Math.round(financial.projectNPV);
+}
+
 function renderSensitivityTable(r) {
   const el = document.getElementById('sensitivity-table');
   if (!el) return;
+  const state = window.state;
   const baseNpv = Number(r.npvTotal) || 0;
+  // FIX-1: Each case calls computeSensitivityNpv() so Üretim and Tarife produce
+  // different — and correct — NPV deltas based on actual 25-year model.
   const cases = [
-    ['Üretim -10%', baseNpv - (r.annualSavings * 0.10 * 8)],
-    ['Üretim +10%', baseNpv + (r.annualSavings * 0.10 * 8)],
-    ['Maliyet -10%', baseNpv + (r.totalCost * 0.10)],
-    ['Maliyet +10%', baseNpv - (r.totalCost * 0.10)],
-    ['Tarife -10%', baseNpv - (r.annualSavings * 0.10 * 8)],
-    ['Tarife +10%', baseNpv + (r.annualSavings * 0.10 * 8)]
-  ].map(([label, npv]) => ({ label, npv: Math.round(npv), delta: Math.round(npv - baseNpv) }));
+    { label: 'Üretim -10%', npv: computeSensitivityNpv(r, state, { energyMultiplier: 0.90 }) },
+    { label: 'Üretim +10%', npv: computeSensitivityNpv(r, state, { energyMultiplier: 1.10 }) },
+    { label: 'Maliyet -10%', npv: computeSensitivityNpv(r, state, { costMultiplier: 0.90 }) },
+    { label: 'Maliyet +10%', npv: computeSensitivityNpv(r, state, { costMultiplier: 1.10 }) },
+    { label: 'Tarife -10%', npv: computeSensitivityNpv(r, state, { tariffMultiplier: 0.90 }) },
+    { label: 'Tarife +10%', npv: computeSensitivityNpv(r, state, { tariffMultiplier: 1.10 }) },
+  ].map(c => ({ ...c, delta: c.npv - baseNpv }));
 
   el.innerHTML = `
     <div style="font-size:0.9rem;font-weight:700;color:var(--primary);margin:12px 0 8px">Hassasiyet Analizi</div>

@@ -2,7 +2,20 @@ import { runCalculation as runBrowserCalculation } from './calc-engine.js';
 import { createSolarEngineContext, resolveExternalEngine } from './solar-engine-adapter.js';
 import { isAuthoritativeBackendResponse } from './pv-engine-contracts.js';
 
+// FIX-8: Guard against concurrent calculation runs. Without this, rapidly
+// clicking "Calculate" could start two overlapping async chains that both
+// write to window.state.results and to state.authoritativeEngineOverride,
+// producing a mixed/corrupted result set.
+let _calculationInProgress = false;
+let _calculationAbortController = null;
+
 export async function runCalculation() {
+  // Abort any in-flight calculation before starting a new one.
+  if (_calculationInProgress && _calculationAbortController) {
+    _calculationAbortController.abort();
+  }
+  _calculationInProgress = true;
+  _calculationAbortController = new AbortController();
   const state = window.state || {};
   state.engineContext = createSolarEngineContext(state);
   const external = await resolveExternalEngine(state);
@@ -39,6 +52,8 @@ export async function runCalculation() {
     return result;
   } finally {
     state.authoritativeEngineOverride = null;
+    _calculationInProgress = false;
+    _calculationAbortController = null;
   }
 }
 
