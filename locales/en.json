@@ -488,7 +488,101 @@
     "sectionTotal": "Total"
   },
   "dashboard": {
-    "saved": "Saved Calculations"
+    "saved": "Saved Calculations",
+    "noSaved": "No saved calculations yet.",
+    "selectHint": "Select up to 3 calculations to compare:",
+    "compare": "Compare",
+    "export": "Export",
+    "import": "Import",
+    "clearAll": "Clear All",
+    "paybackLabel": "Payback:",
+    "compareTitle": "Comparison Results",
+    "selectAtLeast2": "Select at least 2 calculations.",
+    "calculateFirst": "Run a calculation first.",
+    "saved_success": "Calculation saved!",
+    "importedN": "{n} records imported.",
+    "importError": "Could not read the records file.",
+    "metricCity": "City",
+    "metricSystem": "System (kWp)",
+    "metricAnnualEnergy": "Annual Production (kWh)",
+    "metricTotalCost": "Total Cost",
+    "metricPayback": "Payback (years)",
+    "metricLcoe": "LCOE",
+    "metricRoi": "ROI (%)",
+    "metricNpv": "NPV",
+    "metricTilt": "Tilt",
+    "metricAzimuth": "Azimuth"
+  },
+  "comparison": {
+    "scenarioLabel": "Scenario {letter}",
+    "panelTypeLabel": "Panel Type",
+    "inverterTypeLabel": "Inverter Type",
+    "customPriceLabel": "Custom Price (TL, blank = auto)",
+    "metricLabel": "Metric",
+    "panel": "Panel",
+    "inverter": "Inverter",
+    "systemKwp": "System (kWp)",
+    "annualProduction": "Annual Production",
+    "totalCost": "Total Cost",
+    "payback": "Payback",
+    "projectNpv": "Project NPV",
+    "lcoe": "LCOE",
+    "paybackYears": "{n} yr",
+    "footnote": "* Custom price entered. ✓ Best payback period. Comparison uses the same core financial table and hourly energy summary."
+  },
+  "billAnalysis": {
+    "quickFillLabel": "Quick Fill:",
+    "quickFillBtn": "Distribute",
+    "clearBtn": "Clear",
+    "csv8760Label": "Load 8760-hour CSV (single-column kWh or comma/newline-delimited values)",
+    "csv8760WrongCount": "CSV must contain exactly 8760 hourly values. Found: {n}.",
+    "csv8760ZeroTotal": "CSV consumption profile must have a positive total kWh.",
+    "csv8760Imported": "8760-hour consumption profile imported.",
+    "summaryText": "Total: {total} kWh/year | Average: {daily} kWh/day"
+  },
+  "scenarioAnalysis": {
+    "scenario": "Scenario",
+    "payback": "Payback",
+    "npv25y": "NPV (25y)",
+    "irr": "IRR",
+    "roi": "ROI",
+    "paybackYears": "{n} yr",
+    "paybackOver25": ">25 yr",
+    "sensitivityTitle": "Sensitivity Analysis",
+    "variable": "Variable",
+    "npvImpact": "NPV Impact",
+    "newNpv": "New NPV",
+    "energyMinus10": "Production −10%",
+    "energyPlus10": "Production +10%",
+    "costMinus10": "Cost −10%",
+    "costPlus10": "Cost +10%",
+    "tariffMinus10": "Tariff −10%",
+    "tariffPlus10": "Tariff +10%",
+    "lowInflation": "Low (15%)",
+    "midInflation": "Mid (25%)",
+    "highInflation": "High (40%)",
+    "customScenario": "Custom ({rate}%)",
+    "yearLabel": "Year {n}",
+    "today": "Today",
+    "fxUpperScenario": "Upper scenario (+30%)",
+    "fxBaseScenario": "Base ({rate}% growth)",
+    "fxLowerScenario": "Lower scenario (−30%)"
+  },
+  "offGrid": {
+    "costPerKwhLabel": "Diesel/Alternative Source Cost (₺/kWh)",
+    "costMissingWarn": "No cost entered — using 2.5× grid tariff as default.",
+    "nmBlockedWarn": "Net metering / export revenue cannot be calculated for off-grid systems."
+  },
+  "agriculturalIrrigation": {
+    "seasonWarn": "365-day annual usage assumed. If your irrigation season is shorter, adjust daily consumption accordingly."
+  },
+  "settlementDate": {
+    "label": "System Commissioning Date",
+    "missing": "System commissioning date is required when settlement mode is 'Auto'."
+  },
+  "kdv": {
+    "note": "Panels: 0% VAT (decree 7456/2023) · Other: 20% VAT",
+    "financialBasisLabel": "Financial basis (excl. VAT)"
   },
   "common": {
     "yes": "Yes",

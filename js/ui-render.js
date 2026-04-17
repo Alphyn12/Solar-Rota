@@ -65,6 +65,14 @@ export function renderResults() {
   renderExchangeRateStatus();
 
   window.animateCounter('kpi-energy', r.annualEnergy, v => Math.round(v).toLocaleString('tr-TR'));
+  // Faz-4 Fix-15: P50/P90 confidence band below the annual energy KPI
+  const bandEl = document.getElementById('kpi-energy-band');
+  if (bandEl && r.energyP90 && r.energyP10) {
+    bandEl.textContent = `P90: ${r.energyP90.toLocaleString('tr-TR')} – P10: ${r.energyP10.toLocaleString('tr-TR')} kWh`;
+    bandEl.style.display = '';
+  } else if (bandEl) {
+    bandEl.style.display = 'none';
+  }
   window.animateCounter('kpi-savings', r.annualSavings, v => money(v));
   window.animateCounter('kpi-power', r.systemPower, v => v.toFixed(2));
   window.animateCounter('kpi-co2', parseFloat(r.co2Savings), v => v.toFixed(2));
@@ -81,7 +89,22 @@ export function renderResults() {
   if (savingsUnit) {
     savingsUnit.textContent = (state.displayCurrency === 'USD' ? `USD / ${i18n.t('units.year')}` : `TL / ${i18n.t('units.year')}`);
   }
-  document.getElementById('fin-cost').textContent = money(r.totalCost);
+  // Faz-2 Fix-8: When commercial tax recovery is active, show gross / KDV / net-basis
+  // breakdown so the user understands which cost drives NPV/payback calculations.
+  const finCostEl = document.getElementById('fin-cost');
+  if (finCostEl) {
+    const grossCost  = r.totalCost;
+    const netBasis   = r.financialCostBasis;
+    const kdvAmt     = r.costBreakdown?.kdv ?? 0;
+    const taxActive  = state.taxEnabled && kdvAmt > 0 && netBasis < grossCost;
+    if (taxActive) {
+      finCostEl.innerHTML =
+        `${money(grossCost)}<span style="display:block;font-size:0.72rem;color:var(--text-muted);margin-top:2px">` +
+        `KDV: ${money(kdvAmt)} · ${i18n.t('kdv.financialBasisLabel')}: <strong>${money(netBasis)}</strong></span>`;
+    } else {
+      finCostEl.textContent = money(grossCost);
+    }
+  }
   document.getElementById('fin-payback').textContent = r.simplePaybackYear ? r.simplePaybackYear + ` ${i18n.t('units.year')}` : `>25 ${i18n.t('units.year')}`;
   const discountedPaybackEl = document.getElementById('fin-discounted-payback');
   if (discountedPaybackEl) discountedPaybackEl.textContent = r.discountedPaybackYear ? r.discountedPaybackYear + ` ${i18n.t('units.year')}` : `>25 ${i18n.t('units.year')}`;
@@ -221,11 +244,17 @@ function renderBESSResults(bess) {
   document.getElementById('bess-model-badge').textContent = bess.modelName || 'Batarya';
   document.getElementById('bess-independence').textContent = `${bess.gridIndependence}%`;
   document.getElementById('bess-night').textContent = `${bess.nightCoverage}%`;
+  // Faz-4 Fix-14: Show autonomy metrics when available (off-grid scenario)
+  const autonomyHtml = (bess.autonomousDaysPct != null)
+    ? `<span>Otonom gün oranı: <strong>${bess.autonomousDaysPct}%</strong> (${bess.autonomousDays} gün/yıl)</span>
+    <span>Karşılanamayan yük: <strong>${Number(bess.unmetLoadKwh || 0).toLocaleString('tr-TR')} kWh/yıl</strong></span>`
+    : '';
   document.getElementById('bess-detail-row').innerHTML = `
     <span>Kullanılabilir kapasite: <strong>${bess.usableCapacity} kWh</strong></span>
     <span>Yıllık batarya deşarjı: <strong>${Number(bess.batteryStored || 0).toLocaleString('tr-TR')} kWh</strong></span>
     <span>Tahmini çevrim/yıl: <strong>${bess.cyclesPerYear || '—'}</strong></span>
     <span>Batarya maliyeti: <strong>${money(bess.batteryCost)}</strong></span>
+    ${autonomyHtml}
   `;
 }
 

@@ -488,7 +488,101 @@
     "sectionTotal": "Toplam"
   },
   "dashboard": {
-    "saved": "Kayıtlı Hesaplar"
+    "saved": "Kayıtlı Hesaplar",
+    "noSaved": "Henüz kaydedilmiş hesap yok.",
+    "selectHint": "Karşılaştırmak için max 3 hesap seçin:",
+    "compare": "Karşılaştır",
+    "export": "Dışa Aktar",
+    "import": "İçe Aktar",
+    "clearAll": "Tümünü Sil",
+    "paybackLabel": "Geri ödeme:",
+    "compareTitle": "Karşılaştırma Sonuçları",
+    "selectAtLeast2": "En az 2 hesap seçin.",
+    "calculateFirst": "Önce hesaplama yapın.",
+    "saved_success": "Hesap kaydedildi!",
+    "importedN": "{n} kayıt içe aktarıldı.",
+    "importError": "Kayıt dosyası okunamadı.",
+    "metricCity": "Şehir",
+    "metricSystem": "Sistem (kWp)",
+    "metricAnnualEnergy": "Yıllık Üretim (kWh)",
+    "metricTotalCost": "Toplam Maliyet",
+    "metricPayback": "Geri Ödeme (yıl)",
+    "metricLcoe": "LCOE",
+    "metricRoi": "ROI (%)",
+    "metricNpv": "NPV",
+    "metricTilt": "Eğim",
+    "metricAzimuth": "Yön"
+  },
+  "comparison": {
+    "scenarioLabel": "Senaryo {letter}",
+    "panelTypeLabel": "Panel Tipi",
+    "inverterTypeLabel": "İnverter Tipi",
+    "customPriceLabel": "Özel Fiyat (TL, boş = otomatik)",
+    "metricLabel": "Metrik",
+    "panel": "Panel",
+    "inverter": "İnverter",
+    "systemKwp": "Sistem (kWp)",
+    "annualProduction": "Yıllık Üretim",
+    "totalCost": "Toplam Maliyet",
+    "payback": "Geri Ödeme",
+    "projectNpv": "Proje NPV",
+    "lcoe": "LCOE",
+    "paybackYears": "{n} yıl",
+    "footnote": "* Özel fiyat girilmiş. ✓ En iyi geri ödeme süresi. Karşılaştırma aynı çekirdek finansal tablo ve saatlik tüketim özetiyle hesaplanır."
+  },
+  "billAnalysis": {
+    "quickFillLabel": "Hızlı Doldur:",
+    "quickFillBtn": "Dağıt",
+    "clearBtn": "Temizle",
+    "csv8760Label": "8760 Saat CSV Yükle (tek sütun kWh veya virgüllü/satırlı değerler)",
+    "csv8760WrongCount": "CSV tam 8760 saatlik tüketim değeri içermeli. Bulunan: {n}.",
+    "csv8760ZeroTotal": "CSV tüketim profili sıfırdan büyük toplam kWh içermeli.",
+    "csv8760Imported": "8760 saatlik tüketim profili içe aktarıldı.",
+    "summaryText": "Toplam: {total} kWh/yıl | Ortalama: {daily} kWh/gün"
+  },
+  "scenarioAnalysis": {
+    "scenario": "Senaryo",
+    "payback": "Geri Ödeme",
+    "npv25y": "NPV (25y)",
+    "irr": "IRR",
+    "roi": "ROI",
+    "paybackYears": "{n} yıl",
+    "paybackOver25": ">25 yıl",
+    "sensitivityTitle": "Hassasiyet Analizi",
+    "variable": "Değişken",
+    "npvImpact": "NPV Etkisi",
+    "newNpv": "Yeni NPV",
+    "energyMinus10": "Üretim -10%",
+    "energyPlus10": "Üretim +10%",
+    "costMinus10": "Maliyet -10%",
+    "costPlus10": "Maliyet +10%",
+    "tariffMinus10": "Tarife -10%",
+    "tariffPlus10": "Tarife +10%",
+    "lowInflation": "Düşük (%15)",
+    "midInflation": "Orta (%25)",
+    "highInflation": "Yüksek (%40)",
+    "customScenario": "Özel (%{rate})",
+    "yearLabel": "Yıl {n}",
+    "today": "Bugün",
+    "fxUpperScenario": "Üst Senaryo (+%30)",
+    "fxBaseScenario": "Baz (%{rate} artış)",
+    "fxLowerScenario": "Alt Senaryo (−%30)"
+  },
+  "offGrid": {
+    "costPerKwhLabel": "Dizel/Alternatif Kaynak Maliyeti (₺/kWh)",
+    "costMissingWarn": "Maliyet girilmedi — 2.5× şebeke tarifesi varsayılıyor.",
+    "nmBlockedWarn": "Off-grid senaryoda net ölçüm / ihracat geliri hesaplanamaz."
+  },
+  "agriculturalIrrigation": {
+    "seasonWarn": "Yıllık 365 gün kullanım varsayıldı. Sulama sezonu kısaysa günlük tüketimi sulama süresine göre ayarlayın."
+  },
+  "settlementDate": {
+    "label": "Sistem Devreye Alma Tarihi",
+    "missing": "Mahsuplaşma modu 'Otomatik' seçiliyken sistem tarihi girilmesi zorunludur."
+  },
+  "kdv": {
+    "note": "Panel: %0 KDV (7456/2023) · Diğer: %20 KDV",
+    "financialBasisLabel": "Finansal baz (KDV hariç)"
   },
   "common": {
     "yes": "Evet",

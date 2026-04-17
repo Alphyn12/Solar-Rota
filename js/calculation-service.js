@@ -57,6 +57,11 @@ export async function runCalculation() {
   }
 }
 
+export function isCalculationInProgress() {
+  return _calculationInProgress;
+}
+
 if (typeof window !== 'undefined') {
   window.runCalculationService = runCalculation;
+  window.isCalculationInProgress = isCalculationInProgress;
 }

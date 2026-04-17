@@ -249,7 +249,7 @@ IRR = ${r.irr === 'N/A' ? escapeHtml(report('unableToCalculate')) : r.irr + '%'}
         <tr><td>${escapeHtml(i18n.t('report.labor'))}</td><td>${moneyRate(1800, 'kWp')}</td><td>${r.systemPower.toFixed(2)} kWp</td><td>${money(cb.labor)}</td></tr>
         <tr><td>${escapeHtml(report('gridConnection'))}</td><td>${escapeHtml(report('fixed'))}</td><td>1</td><td>${money(cb.permits)}</td></tr>
         <tr><td colspan="3">${escapeHtml(i18n.t('report.subtotalExVat'))}</td><td>${money(cb.subtotal)}</td></tr>
-        <tr><td colspan="3">KDV (%${Math.round((cb.kdvRate ?? 0.20) * 100)})</td><td>${money(cb.kdv)}</td></tr>
+        <tr><td colspan="3">${escapeHtml(i18n.t('kdv.note'))}</td><td>${money(cb.kdv)}</td></tr>
         <tr class="total-row"><td colspan="3"><strong>${escapeHtml(i18n.t('report.grandTotal'))}</strong></td><td><strong>${money(cb.total)}</strong></td></tr>
         ${r.annualOMCost > 0 ? `<tr style="border-top:2px solid var(--border)"><td colspan="3">${escapeHtml(report('annualMaintenance'))} (O&M) — %${state.omRate}</td><td>${money(r.annualOMCost)}/${escapeHtml(yearUnit)}</td></tr>` : ''}
         ${r.annualInsurance > 0 ? `<tr><td colspan="3">${escapeHtml(report('annualInsurance'))} — %${state.insuranceRate}</td><td>${money(r.annualInsurance)}/${escapeHtml(yearUnit)}</td></tr>` : ''}

@@ -23,7 +23,11 @@
       "Bash(python -m pytest backend/tests/test_backend_api.py -v)",
       "Bash(grep -E \"\\\\.\\(mjs|js|py\\)$\")",
       "Bash(grep -n \"backendFinancialParity\\\\|solar-engine-adapter\" /c/Users/Monster/Desktop/GüneşHesap/js/*.js)",
-      "Bash(grep *)"
+      "Bash(grep *)",
+      "Bash(python -m pytest tests/test_backend_api.py -v)",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(python -m pytest backend/ -v)",
+      "Bash(python -c ' *)"
     ]
   }
 }

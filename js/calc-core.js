@@ -303,12 +303,23 @@ export function simulateBatteryOnHourlySummary(hourlySummary, battery, options =
   const efficiency = Math.max(0, Math.min(1, Number(battery.efficiency) || 0.9));
   const chargeEff = Math.sqrt(Math.max(efficiency, 0.01));
   const dischargeEff = chargeEff;
+  // Faz-4 Fix-14: Off-grid minimum SOC reserve (10% of usable capacity by default).
+  // Prevents full depletion — a real battery management system always keeps a reserve
+  // for unexpected loads and protects cell longevity.
+  const socReservePct = Math.max(0, Math.min(0.5, Number(options.socReservePct) || 0));
+  const socReserveKwh = usableCapacity * socReservePct;
+  const dispatchableCapacity = usableCapacity - socReserveKwh;
   const hourly = Array.isArray(hourlySummary.hourly8760) ? hourlySummary.hourly8760 : [];
-  let soc = Math.max(0, Math.min(usableCapacity, Number(options.initialSocKwh) || 0));
+  let soc = Math.max(socReserveKwh, Math.min(usableCapacity, Number(options.initialSocKwh) || socReserveKwh));
   let batteryDischarge = 0;
   let chargedFromPv = 0;
   let remainingExport = 0;
   let remainingImport = 0;
+  // Faz-4 Fix-14: Track unmet load and autonomy days
+  let unmetLoadKwh = 0;
+  let dailyGridImport = 0;
+  let autonomousDays = 0;
+  let dayOfYear = 0;
   const monthly = new Array(12).fill(0).map(() => ({ load: 0, production: 0, selfConsumption: 0, gridExport: 0, gridImport: 0 }));
   const hourly8760 = [];
 
@@ -331,15 +342,17 @@ export function simulateBatteryOnHourlySummary(hourlySummary, battery, options =
     };
   }
 
-  hourly.forEach(row => {
+  hourly.forEach((row, idx) => {
     const production = Math.max(0, Number(row.production) || 0);
     const load = Math.max(0, Number(row.load) || 0);
     const directSelf = Math.min(production, load);
     const pvSurplus = Math.max(0, production - directSelf);
     const deficit = Math.max(0, load - directSelf);
+    // Faz-4 Fix-14: Charge only up to usableCapacity; discharge only above reserve.
     const chargeFromPv = Math.min(pvSurplus, Math.max(0, usableCapacity - soc) / chargeEff);
     soc += chargeFromPv * chargeEff;
-    const dischargeToLoad = Math.min(deficit, soc * dischargeEff);
+    const availableForDischarge = Math.max(0, soc - socReserveKwh);
+    const dischargeToLoad = Math.min(deficit, availableForDischarge * dischargeEff);
     soc -= dischargeToLoad / dischargeEff;
     const exportAfterBattery = Math.max(0, pvSurplus - chargeFromPv);
     const importAfterBattery = Math.max(0, deficit - dischargeToLoad);
@@ -349,6 +362,16 @@ export function simulateBatteryOnHourlySummary(hourlySummary, battery, options =
     batteryDischarge += dischargeToLoad;
     remainingExport += exportAfterBattery;
     remainingImport += importAfterBattery;
+    unmetLoadKwh += importAfterBattery;  // any remaining import = unmet by solar+battery
+
+    // Autonomy day tracking: at end of each day (hour 23), check if grid import was 0
+    dailyGridImport += importAfterBattery;
+    if (row.hour === 23 || idx === hourly.length - 1) {
+      if (dailyGridImport < 0.001) autonomousDays++;
+      dailyGridImport = 0;
+      dayOfYear++;
+    }
+
     monthly[monthIdx].load += load;
     monthly[monthIdx].production += production;
     monthly[monthIdx].selfConsumption += directSelf + dischargeToLoad;
@@ -380,6 +403,11 @@ export function simulateBatteryOnHourlySummary(hourlySummary, battery, options =
     gridIndependence: hourlySummary.annualLoad > 0 ? Math.min(1, totalSelf / hourlySummary.annualLoad) : 0,
     selfConsumptionRatio: hourlySummary.annualProduction > 0 ? Math.min(1, totalSelf / hourlySummary.annualProduction) : 0,
     cyclesPerYear,
+    // Faz-4 Fix-14: Off-grid quality metrics
+    unmetLoadKwh: Math.round(unmetLoadKwh),
+    autonomousDays,
+    autonomousDaysPct: dayOfYear > 0 ? Math.round(autonomousDays / dayOfYear * 100) : 0,
+    socReserveKwh,
     paidGridExport: capped.paidGridExport,
     unpaidGridExport: capped.unpaidGridExport,
     batteryExportPaid: 0,
@@ -460,7 +488,8 @@ export function buildTariffModel(state) {
 export function computeFinancialTable({
   annualEnergy, hourlySummary, batterySummary, totalCost, tariffModel,
   panel, annualOMCost, annualInsurance, inverterLifetime, inverterReplaceCost,
-  netMeteringEnabled, exportRateOverride, batteryLifetime = 0, batteryReplaceCost = 0
+  netMeteringEnabled, exportRateOverride, batteryLifetime = 0, batteryReplaceCost = 0,
+  annualLoadGrowth = 0
 }) {
   const rows = [];
   let cumulativeNet = 0;
@@ -479,8 +508,14 @@ export function computeFinancialTable({
     const degradedEnergy = annualEnergy * (1 - lidFactor) * Math.pow(1 - panel.degradation, year - 1);
     const electricityPrice = tariffModel.importRate * Math.pow(1 + tariffModel.annualPriceIncrease, year - 1);
     const escalatedExportRate = exportRate * Math.pow(1 + tariffModel.annualPriceIncrease, year - 1);
-    const selfE = degradedEnergy * selfRatio;
-    const exportE = degradedEnergy * exportRatio;
+    // Faz-3 Fix-13: Load growth shifts more solar output into self-consumption each year.
+    // As load grows, the system covers a larger fraction of a larger consumption → selfRatio grows.
+    // Capped at 1.0 (cannot self-consume more than is produced).
+    const loadGrowthFactor = Math.pow(1 + (annualLoadGrowth || 0), year - 1);
+    const yearSelfRatio  = Math.min(1.0, selfRatio  * loadGrowthFactor);
+    const yearExportRatio = Math.max(0,  exportRatio / loadGrowthFactor); // exports shrink as load absorbs more
+    const selfE  = degradedEnergy * yearSelfRatio;
+    const exportE = degradedEnergy * yearExportRatio;
     const yearSavings = selfE * electricityPrice + (netMeteringEnabled ? exportE * escalatedExportRate : 0);
     let yearExpenses = (annualOMCost + annualInsurance) * Math.pow(1 + (tariffModel.expenseEscalationRate || 0), year - 1);
     const invLife = Math.round(Number(inverterLifetime) || 0);

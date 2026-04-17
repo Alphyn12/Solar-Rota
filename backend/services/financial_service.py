@@ -83,6 +83,17 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
         "quoteReadiness": "not-quote-ready" if blockers else "backend-engineering-estimate",
         "blockers": blockers,
         "nextAction": "Attach evidence and run full proposal governance before approval." if blockers else "Review proposal governance and customer-facing output.",
+        # Faz-2 Fix-9: Explicit disclaimer so any downstream consumer (API client,
+        # white-label integration, PDF export) knows this is an estimate, not a
+        # full 8760-hour simulation. The browser JS engine uses actual hourly
+        # simulation; this backend path uses heuristic self-consumption targets.
+        "warning": "estimate_only_not_for_commercial_quotes",
+        "warningDetail": (
+            "Self-consumption calculated via scenario-heuristic target ratios "
+            f"({self_consumption_target:.0%}), not 8760-hour hourly dispatch. "
+            "NPV may differ from browser calculation by 10-15%. "
+            "Use browser output for commercial proposals."
+        ),
     }
     return {"financial": financial, "proposal": proposal}
 

@@ -5,6 +5,8 @@
 import { MONTHS } from './data.js';
 import { COMMON_YEAR_MONTH_DAYS } from './calc-core.js';
 
+const bt = key => window.i18n?.t?.(key) || key;
+
 const SEASON_WEIGHTS = [0.7, 0.75, 0.9, 1.0, 1.1, 1.2, 1.25, 1.2, 1.0, 0.9, 0.75, 0.65];
 
 export function initBillAnalysis() {
@@ -25,15 +27,15 @@ export function initBillAnalysis() {
       `).join('')}
     </div>
     <div style="display:flex;gap:10px;margin-top:12px;align-items:center">
-      <label style="font-size:0.85rem;color:var(--text-muted)">Hızlı Doldur:</label>
+      <label style="font-size:0.85rem;color:var(--text-muted)">${bt('billAnalysis.quickFillLabel')}</label>
       <input type="number" id="bill-avg-input" placeholder="Aylık ort. kWh" min="0" max="5000"
         style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text);width:130px;font-size:0.85rem"/>
-      <button onclick="billQuickFill()" style="background:var(--primary);color:#000;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:0.82rem;font-weight:600">Dağıt</button>
-      <button onclick="billClear()" style="background:var(--surface-light);color:var(--text-muted);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.82rem">Temizle</button>
+      <button onclick="billQuickFill()" style="background:var(--primary);color:#000;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:0.82rem;font-weight:600">${bt('billAnalysis.quickFillBtn')}</button>
+      <button onclick="billClear()" style="background:var(--surface-light);color:var(--text-muted);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.82rem">${bt('billAnalysis.clearBtn')}</button>
     </div>
     <div id="bill-summary" style="margin-top:10px;font-size:0.82rem;color:var(--text-muted)"></div>
     <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
-      <label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:6px">8760 Saat CSV Yükle (tek sütun kWh veya virgüllü/satırlı değerler)</label>
+      <label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:6px">${bt('billAnalysis.csv8760Label')}</label>
       <input type="file" id="load-8760-input" accept=".csv,.txt" onchange="import8760Csv(this.files?.[0])"
         style="font-size:0.8rem;color:var(--text-muted);max-width:100%"/>
     </div>
@@ -52,11 +54,11 @@ export function import8760Csv(file) {
       .map(v => Number(String(v).replace(',', '.')))
       .filter(v => Number.isFinite(v) && v >= 0);
     if (values.length !== 8760) {
-      window.showToast?.(`CSV tam 8760 saatlik tüketim değeri içermeli. Bulunan: ${values.length.toLocaleString('tr-TR')}.`, 'error');
+      window.showToast?.(bt('billAnalysis.csv8760WrongCount').replace('{n}', values.length.toLocaleString('tr-TR')), 'error');
       return;
     }
     if (values.reduce((a, b) => a + b, 0) <= 0) {
-      window.showToast?.('CSV tüketim profili sıfırdan büyük toplam kWh içermeli.', 'error');
+      window.showToast?.(bt('billAnalysis.csv8760ZeroTotal'), 'error');
       return;
     }
     let cursor = 0;
@@ -74,7 +76,7 @@ export function import8760Csv(file) {
       if (el) el.value = monthly[i] || 0;
     });
     onBillInput({ preserveHourly: true });
-    window.showToast?.('8760 saatlik tüketim profili içe aktarıldı.', 'success');
+    window.showToast?.(bt('billAnalysis.csv8760Imported'), 'success');
   };
   reader.readAsText(file);
 }
@@ -95,7 +97,9 @@ export function onBillInput({ preserveHourly = false } = {}) {
 
   const summaryEl = document.getElementById('bill-summary');
   if (summaryEl && total > 0) {
-    summaryEl.textContent = `Toplam: ${total.toLocaleString('tr-TR')} kWh/yıl | Ortalama: ${daily} kWh/gün`;
+    summaryEl.textContent = bt('billAnalysis.summaryText')
+      .replace('{total}', total.toLocaleString('tr-TR'))
+      .replace('{daily}', daily);
     // Günlük tüketimi güncelle
     if (daily > 0) {
       state.dailyConsumption = parseFloat(daily);

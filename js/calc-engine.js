@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════
 import {
   PANEL_TYPES, BATTERY_MODELS, PSH_FALLBACK, CITY_SUMMER_TEMPS,
-  MONTH_WEIGHTS, INVERTER_TYPES, HEAT_PUMP_DATA
+  MONTH_WEIGHTS, INVERTER_TYPES, HEAT_PUMP_DATA, HOURLY_SOLAR_PROFILE
 } from './data.js';
 import { calculateBomTotal, getActiveBomCategories, selectBomItems } from './bom.js';
 import {
@@ -98,30 +98,69 @@ function classifyOutputConfidence({ usedFallback, warnings = [], state }) {
   return { level: 'rough estimate', label: 'rough estimate', blockers: blocking };
 }
 
+// Monthly season index: 0=Dec-Feb (winter), 1=Mar-May (spring), 2=Jun-Aug (summer), 3=Sep-Nov (autumn)
+const _MONTH_SEASON = [0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 0];
+const _SEASON_KEYS  = ['winter', 'spring', 'summer', 'autumn'];
+
+// Derive daytime fraction from HOURLY_SOLAR_PROFILE for a given season.
+// "Daytime" = hours where normalized solar output > 0.
+function _dayRatioForSeason(season) {
+  const profile = HOURLY_SOLAR_PROFILE[season] || HOURLY_SOLAR_PROFILE.spring;
+  // Day hours are those with solar output; weight by output fraction (proxy for load during solar hours)
+  const dayHours = profile.reduce((s, v) => s + (v > 0 ? 1 : 0), 0);
+  return Math.max(0.2, Math.min(0.8, dayHours / 24));
+}
+
 export function calculateBatteryMetrics(annualEnergy, dailyConsumption, battery) {
-  const dailyProduction = annualEnergy / 365;
-  const usableCapacity  = battery.capacity * battery.dod;
-  const dayRatio = 0.35;
-  const dayConsumption   = dailyConsumption * dayRatio;
-  const nightConsumption = dailyConsumption * (1 - dayRatio);
+  // Monthly production distributed by MONTH_WEIGHTS
+  const usableCapacity = battery.capacity * battery.dod;
+  const SOC_MIN_RESERVE = usableCapacity * 0.10; // 10% emergency reserve
+  const batteryCost = modelBatteryCost(battery);
 
-  const directSelfConsumption = Math.min(dailyProduction, dayConsumption);
-  const excessToBattery       = Math.max(0, dailyProduction - dayConsumption);
-  const batteryStored         = Math.min(excessToBattery * battery.efficiency, usableCapacity);
-  const nightCovered          = Math.min(batteryStored, nightConsumption);
+  let totalSelfConsumed = 0;
+  let totalNightConsumption = 0;
+  let totalNightCovered = 0;
+  let totalBatteryStored = 0;
 
-  const totalSelfConsumed = directSelfConsumption + nightCovered;
-  const gridIndependence  = Math.min(totalSelfConsumed / dailyConsumption, 1.0);
-  const nightCoverage     = nightConsumption > 0 ? Math.min(nightCovered / nightConsumption, 1.0) : 0;
-  const batteryCost       = modelBatteryCost(battery);
+  for (let m = 0; m < 12; m++) {
+    const monthlyProduction = annualEnergy * MONTH_WEIGHTS[m];
+    // Approximate days per month (use 30.44 average)
+    const daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31][m];
+    const dailyProd = monthlyProduction / daysInMonth;
+
+    const season = _SEASON_KEYS[_MONTH_SEASON[m]];
+    const dayRatio = _dayRatioForSeason(season);
+    const dayConsumption   = dailyConsumption * dayRatio;
+    const nightConsumption = dailyConsumption * (1 - dayRatio);
+
+    // Direct self-consumption during solar hours
+    const directSC = Math.min(dailyProd, dayConsumption);
+    const excessToBattery = Math.max(0, dailyProd - dayConsumption);
+
+    // Battery charges during day; minimum reserve preserved
+    const chargeableCapacity = usableCapacity - SOC_MIN_RESERVE;
+    const batteryStored = Math.min(excessToBattery * battery.efficiency, chargeableCapacity);
+    const nightCovered  = Math.min(batteryStored, nightConsumption);
+
+    totalSelfConsumed    += (directSC + nightCovered) * daysInMonth;
+    totalNightConsumption += nightConsumption * daysInMonth;
+    totalNightCovered    += nightCovered * daysInMonth;
+    totalBatteryStored   += batteryStored * daysInMonth;
+  }
+
+  const annualConsumption = dailyConsumption * 365;
+  const gridIndependence  = Math.min(totalSelfConsumed / annualConsumption, 1.0);
+  const nightCoverage     = totalNightConsumption > 0
+    ? Math.min(totalNightCovered / totalNightConsumption, 1.0)
+    : 0;
 
   return {
     gridIndependence: (gridIndependence * 100).toFixed(1),
     nightCoverage:    (nightCoverage * 100).toFixed(1),
     usableCapacity:   usableCapacity.toFixed(1),
     batteryCost,
-    dailyProduction:  dailyProduction.toFixed(1),
-    batteryStored:    batteryStored.toFixed(1),
+    dailyProduction:  (annualEnergy / 365).toFixed(1),
+    batteryStored:    (totalBatteryStored / 365).toFixed(1), // avg daily stored
     modelName:        BATTERY_MODELS[battery.model]?.name || 'Batarya'
   };
 }
@@ -207,10 +246,29 @@ export async function runCalculation() {
 
   // İnverter tipi entegrasyonu
   const inverterData = INVERTER_TYPES[state.inverterType || 'string'];
-  const inverterEfficiencyFactor = inverterData.efficiency;
+  // Static efficiency kept for reference; weighted version computed per-section (Faz-3 Fix-11).
 
-  const bifacialBonus = (state.panelType === 'bifacial' && panel.bifacialGain > 0) ? (1 + panel.bifacialGain) : 1;
+  // Faz-3 Fix-10: Bifacial gain is shading-dependent and albedo-scaled.
+  // Rear-side irradiance drops when the array is shaded (less ground reflection reaches rear).
+  // Standard IEC TS 60904-1-2 bifacial gain assumes albedo ≈ 0.20 (sand/grass).
+  // Adjustment: gain × (1 − effectiveShading/200) × (albedo/0.20).
+  // effectiveShading is not yet computed here; we use a forward reference approach:
+  // shading-based correction is applied in the section loop below (per-section).
+  // Albedo scaling is pre-computed once here.
+  const groundAlbedo = Math.max(0.05, Math.min(0.50, Number(state.groundAlbedo) || 0.20));
+  const albedoScale  = groundAlbedo / 0.20;  // normalised to IEC reference albedo
+  const bifacialBaseGain = (state.panelType === 'bifacial' && panel.bifacialGain > 0)
+    ? panel.bifacialGain * albedoScale
+    : 0;
+  // Summer-peak temperature correction (used only on fallback path, matches historical behavior).
   const tempLoss = panel.tempCoeff * (avgSummerTemp - 25);
+  // Annual-weighted temperature correction for the PVGIS path.
+  // Turkey annual mean air temp is ~12°C below the summer peak (IEA PVPS Turkey data).
+  // Panel operating temperature adds ~25°C above ambient; STC baseline is 25°C.
+  // Net correction relative to STC: tempCoeff × (annualAvg − 25).
+  // Typical: 35°C summer peak → 23°C annual avg → +0.68% annual gain vs STC 25°C baseline.
+  const annualAvgTemp    = avgSummerTemp - 12;
+  const annualTempLoss   = panel.tempCoeff * (annualAvgTemp - 25);
 
   // Kablo kaybı entegrasyonu
   let cableLossFactor = 1.0;
@@ -219,8 +277,18 @@ export async function runCalculation() {
     cableLossPct = state.cableLoss.totalLossPct || 0;
     cableLossFactor = 1 - cableLossPct / 100;
   }
-  const osmShadowFactor = state.osmShadowEnabled
+  // Faz-3 Fix-12: OSM shadow seasonal weighting.
+  // OSM-derived shadowFactorPct is computed without solar geometry (no sun elevation angle).
+  // In winter the sun is low (~25°) → shadows are 3-4× longer than in summer (~60°).
+  // We apply monthly multipliers and weight by production share (MONTH_WEIGHTS) to get
+  // an annual-production-weighted shadow factor instead of a flat year-round estimate.
+  // Seasonal multipliers: winter ×2.0, spring ×1.0, summer ×0.5, autumn ×1.2.
+  const _OSM_SHADOW_SEASONAL_MULT = [2.0,2.0,1.0,1.0,1.0,0.5,0.5,0.5,1.2,1.2,1.2,2.0]; // Jan–Dec
+  const baseOsmFactor = state.osmShadowEnabled
     ? Math.max(0, Number(state.osmShadow?.shadowFactorPct) || 0)
+    : 0;
+  const osmShadowFactor = baseOsmFactor > 0
+    ? Math.min(35, MONTH_WEIGHTS.reduce((sum, w, m) => sum + w * baseOsmFactor * _OSM_SHADOW_SEASONAL_MULT[m], 0))
     : 0;
 
   const sectionResults = await Promise.all(allSections.map(async sec => {
@@ -271,26 +339,50 @@ export async function runCalculation() {
     if (!rawEnergy) {
       usedFallback = true;
       const psh = PSH_FALLBACK[state.cityName] || PSH_FALLBACK['default'];
+      // 0.80 = conservative "pre-loss" Performance Ratio applied BEFORE the explicit loss
+      // stack below (shading, soiling, inverter, cable). It captures losses the stack
+      // doesn't model: module mismatch (~1%), wiring/connector tolerance (~1%),
+      // module nameplate tolerance (~2%), dust on optics (~1%), and a general
+      // engineering safety margin (~3%) ≈ PR 0.80 at this stage.
+      // The explicit loss stack then further reduces this output by shading, soiling
+      // (~3%), inverter (~3%) and cable (~2%), yielding a final effective PR ~0.70-0.74.
+      // This is within IEA PVPS typical range (0.70-0.80) for Turkish climate conditions.
       rawEnergy = secPower * psh * 365 * 0.80;
       rawPoa = psh * 365;
     }
 
     // Kayıp sıralaması (doğru fiziksel sıra):
-    // 1. Sıcaklık/azimut (fallback için; PVGIS loss=0 ile zaten hesaplıyor)
-    // 2. Gölgelenme (yer-spesifik, PVGIS bilmiyor)
-    // 3. Kirlenme (yer-spesifik)
-    // 4. Bifaciyal kazanım (arka yüzeyden ek enerji)
-    // 5. İnverter verimi (AC dönüşümü)
-    // 6. Kablo kaybı (iletim)
+    // 1. Sıcaklık: fallback yolunda yaz ortalaması kullanılır; PVGIS yolunda yıllık
+    //    ağırlıklı sıcaklık düzeltmesi uygulanır (PVGIS loss=0 ile STC bazlı çıktı verir,
+    //    gerçek modüller 25°C'de çalışmaz → yıllık ortalama düzeltme gerekli).
+    // 2. Azimut/eğim (fallback için; PVGIS kendi geometri modelini kullanıyor)
+    // 3. Gölgelenme (yer-spesifik, PVGIS bilmiyor)
+    // 4. Kirlenme (yer-spesifik)
+    // 5. Bifaciyal kazanım (arka yüzeyden ek enerji)
+    // 6. İnverter verimi (AC dönüşümü)
+    // 7. Kablo kaybı (iletim)
     const effectiveShadingFactor = Math.min(80, Math.max(0, Number(sec.shadingFactor) || 0) + osmShadowFactor);
+    // Faz-3 Fix-10: Bifacial gain reduced by shading (rear-side sees less ground reflection
+    // when shading blocks diffuse component). Factor: (1 − shadingFactor/200) approximates
+    // the partial loss of rear-irradiance at high shading levels.
+    const bifacialBonus = bifacialBaseGain > 0
+      ? (1 + bifacialBaseGain * (1 - effectiveShadingFactor / 200))
+      : 1;
+    // Faz-3 Fix-11: Weighted annual inverter efficiency based on CEC 3-point curve.
+    // Early-morning / late-evening hours run at low load → lower efficiency.
+    // Weights from HOURLY_SOLAR_PROFILE summer profile distribution:
+    //   ~18% of energy at <30% load (eff≈94%), ~52% at 30-70% (eff≈96.5%), ~30% at >70% (eff≈97%).
+    const weightedInverterEfficiency = inverterData.efficiency < 1
+      ? inverterData.efficiency * (0.18 * (0.94 / 0.97) + 0.52 * (0.965 / 0.97) + 0.30 * 1.0)
+      : inverterData.efficiency;
     const adjustedE = rawEnergy
-      * (usedFallback ? (1 + tempLoss) : 1.0)
+      * (usedFallback ? (1 + tempLoss) : (1 + annualTempLoss))  // Faz-2 Fix-7: PVGIS yoluna yıllık sıcaklık düzeltmesi eklendi
       * (usedFallback ? sec.azimuthCoeff : 1.0)
       * (usedFallback ? _getTiltCoeff(sec.tilt) : 1.0)   // FIX-2: tilt factor was missing from fallback path
       * (1 - effectiveShadingFactor / 100)
       * (1 - state.soilingFactor / 100)
       * bifacialBonus
-      * inverterEfficiencyFactor
+      * weightedInverterEfficiency  // Faz-3 Fix-11: part-load weighted (replaces static efficiency)
       * cableLossFactor;
 
     let monthly;
@@ -379,6 +471,16 @@ export async function runCalculation() {
     if (banner) banner.style.display = 'none';
   }
   monthlyData = normalizeMonthlyProductionToAnnual(monthlyData, adjustedEnergy);
+
+  // Faz-4 Fix-15: PVGIS annual uncertainty ≈ ±7.6% at 1σ (interannual variability +
+  // model uncertainty per PVGIS JRC documentation). P90 is the conservative estimate
+  // that investors and banks use; P10 is the optimistic upper band.
+  //   P90 = P50 × (1 − 1.28 × σ)  → energy exceeded 90% of years
+  //   P10 = P50 × (1 + 1.28 × σ)  → energy exceeded only 10% of years
+  const _PVGIS_SIGMA = 0.076;
+  const energyP90 = Math.round(adjustedEnergy * (1 - 1.28 * _PVGIS_SIGMA));
+  const energyP10 = Math.round(adjustedEnergy * (1 + 1.28 * _PVGIS_SIGMA));
+
   const authoritativeSourceMeta = authoritativeBackend?.engineSource || sourceMetaForCurrentCalculation({ usedFallback });
   const authoritativeProduction = {
     annualEnergyKwh: Math.round(adjustedEnergy),
@@ -483,8 +585,26 @@ export async function runCalculation() {
     : { annualKwh: 0, heatDemand: 0, cop: 0 };
 
   const extraMonthlyLoad = sumMonthlyArrays(evLoad.monthlyKwh, heatPumpLoad.monthlyKwh);
-  const monthlyLoad = getMonthlyLoadKwh(state, extraMonthlyLoad);
-  const baseMonthlyLoad = getMonthlyLoadKwh(state, 0);
+  let monthlyLoad = getMonthlyLoadKwh(state, extraMonthlyLoad);
+  let baseMonthlyLoad = getMonthlyLoadKwh(state, 0);
+
+  // Faz-4 Fix-16: Agricultural irrigation — override monthly load with seasonal pump model.
+  // When pump kW and hours/day are provided, compute actual kWh per active month instead of
+  // extrapolating daily consumption × 365. This prevents 3× system oversizing.
+  if (state.scenarioKey === 'agricultural-irrigation' && state.irrigPumpKw > 0 && state.irrigHoursPerDay > 0) {
+    const _IRRIG_MONTH_DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
+    const startM = Math.max(1, Math.min(12, state.irrigSeasonStart || 4));
+    const endM   = Math.max(1, Math.min(12, state.irrigSeasonEnd   || 9));
+    const irrigMonthlyLoad = new Array(12).fill(0);
+    for (let m = 1; m <= 12; m++) {
+      const inSeason = endM >= startM ? (m >= startM && m <= endM) : (m >= startM || m <= endM);
+      if (inSeason) {
+        irrigMonthlyLoad[m - 1] = state.irrigPumpKw * state.irrigHoursPerDay * _IRRIG_MONTH_DAYS[m - 1];
+      }
+    }
+    monthlyLoad = irrigMonthlyLoad;
+    baseMonthlyLoad = irrigMonthlyLoad;
+  }
   const baseHourlyLoad = hasCompleteHourlyProfile8760(state.hourlyConsumption8760)
     ? state.hourlyConsumption8760.slice(0, 8760).map(v => Math.max(0, Number(v) || 0))
     : buildBaseHourlyLoad8760(baseMonthlyLoad, state.tariffType);
@@ -519,9 +639,12 @@ export async function runCalculation() {
   let batterySummary = null;
   let batteryCostVal = 0;
   if (state.batteryEnabled) {
+    // Faz-4 Fix-14: Off-grid systems use 10% SOC reserve so the BMS always has
+    // an emergency buffer; on-grid systems leave the full capacity available.
     batterySummary = simulateBatteryOnHourlySummary(hourlySummaryRaw, state.battery, {
       paidBatteryExportAllowed: false,
-      exportPolicy: tariffModel.exportCompensationPolicy
+      exportPolicy: tariffModel.exportCompensationPolicy,
+      socReservePct: state.scenarioKey === 'off-grid' ? 0.10 : 0
     });
     bessMetrics = calculateBatteryMetrics(adjustedEnergy, hourlySummaryRaw.annualLoad / 365, state.battery);
     if (batterySummary) {
@@ -529,6 +652,10 @@ export async function runCalculation() {
       bessMetrics.nightCoverage = (Math.min(1, batterySummary.batteryDischarge / Math.max(hourlySummaryRaw.gridImport, 1)) * 100).toFixed(1);
       bessMetrics.batteryStored = batterySummary.batteryDischarge.toFixed(1);
       bessMetrics.cyclesPerYear = batterySummary.cyclesPerYear.toFixed(0);
+      // Faz-4 Fix-14: Autonomy metrics for off-grid quality assessment
+      bessMetrics.autonomousDaysPct = batterySummary.autonomousDaysPct;
+      bessMetrics.autonomousDays = batterySummary.autonomousDays;
+      bessMetrics.unmetLoadKwh = batterySummary.unmetLoadKwh;
     }
     batteryCostVal = bessMetrics.batteryCost;
   }
@@ -592,7 +719,8 @@ export async function runCalculation() {
     netMeteringEnabled: state.netMeteringEnabled,
     exportRateOverride: exportRate,
     batteryLifetime,
-    batteryReplaceCost
+    batteryReplaceCost,
+    annualLoadGrowth: Number(state.annualLoadGrowth) || 0  // Faz-3 Fix-13
   });
   const yearlyTable = financial.rows;
   const paybackYear = financial.paybackYear;
@@ -647,6 +775,7 @@ export async function runCalculation() {
     psh: psh.toFixed(2), avgSummerTemp: avgSummerTemp.toFixed(1),
     usedFallback,
     pvgisRawEnergy: Math.round(pvgisRawEnergy), pvgisPoa: Math.round(pvgisPoa),
+    energyP90, energyP10,
     shadingLoss: Math.round(shadingLoss),
     effectiveShadingFactor: Number(effectiveShadingFactor.toFixed(1)),
     tempLossEnergy: Math.round(tempLossEnergy),

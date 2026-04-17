@@ -488,7 +488,101 @@
     "sectionTotal": "Gesamt"
   },
   "dashboard": {
-    "saved": "Gespeicherte Berechnungen"
+    "saved": "Gespeicherte Berechnungen",
+    "noSaved": "Noch keine gespeicherten Berechnungen.",
+    "selectHint": "Bis zu 3 Berechnungen zum Vergleich auswählen:",
+    "compare": "Vergleichen",
+    "export": "Exportieren",
+    "import": "Importieren",
+    "clearAll": "Alle löschen",
+    "paybackLabel": "Amortisation:",
+    "compareTitle": "Vergleichsergebnisse",
+    "selectAtLeast2": "Mindestens 2 Berechnungen auswählen.",
+    "calculateFirst": "Zuerst eine Berechnung durchführen.",
+    "saved_success": "Berechnung gespeichert!",
+    "importedN": "{n} Datensätze importiert.",
+    "importError": "Datei konnte nicht gelesen werden.",
+    "metricCity": "Stadt",
+    "metricSystem": "System (kWp)",
+    "metricAnnualEnergy": "Jahresproduktion (kWh)",
+    "metricTotalCost": "Gesamtkosten",
+    "metricPayback": "Amortisation (Jahre)",
+    "metricLcoe": "LCOE",
+    "metricRoi": "ROI (%)",
+    "metricNpv": "NPV",
+    "metricTilt": "Neigung",
+    "metricAzimuth": "Ausrichtung"
+  },
+  "comparison": {
+    "scenarioLabel": "Szenario {letter}",
+    "panelTypeLabel": "Modultyp",
+    "inverterTypeLabel": "Wechselrichtertyp",
+    "customPriceLabel": "Benutzerdefinierter Preis (TL, leer = automatisch)",
+    "metricLabel": "Kennzahl",
+    "panel": "Modul",
+    "inverter": "Wechselrichter",
+    "systemKwp": "System (kWp)",
+    "annualProduction": "Jahresproduktion",
+    "totalCost": "Gesamtkosten",
+    "payback": "Amortisation",
+    "projectNpv": "Projekt-NPV",
+    "lcoe": "LCOE",
+    "paybackYears": "{n} J.",
+    "footnote": "* Benutzerdefinierter Preis eingegeben. ✓ Beste Amortisationszeit. Vergleich verwendet dieselbe Finanztabelle und stündliche Energiezusammenfassung."
+  },
+  "billAnalysis": {
+    "quickFillLabel": "Schnelleingabe:",
+    "quickFillBtn": "Verteilen",
+    "clearBtn": "Löschen",
+    "csv8760Label": "8760-Stunden-CSV laden (einspaltiger kWh-Wert oder Komma-/Zeilengetrennt)",
+    "csv8760WrongCount": "CSV muss genau 8760 Stundenwerte enthalten. Gefunden: {n}.",
+    "csv8760ZeroTotal": "Das CSV-Verbrauchsprofil muss eine positive kWh-Gesamtsumme haben.",
+    "csv8760Imported": "8760-Stunden-Verbrauchsprofil importiert.",
+    "summaryText": "Gesamt: {total} kWh/Jahr | Durchschnitt: {daily} kWh/Tag"
+  },
+  "scenarioAnalysis": {
+    "scenario": "Szenario",
+    "payback": "Amortisation",
+    "npv25y": "NPV (25J)",
+    "irr": "IRR",
+    "roi": "ROI",
+    "paybackYears": "{n} J.",
+    "paybackOver25": ">25 J.",
+    "sensitivityTitle": "Sensitivitätsanalyse",
+    "variable": "Variable",
+    "npvImpact": "NPV-Einfluss",
+    "newNpv": "Neuer NPV",
+    "energyMinus10": "Erzeugung −10 %",
+    "energyPlus10": "Erzeugung +10 %",
+    "costMinus10": "Kosten −10 %",
+    "costPlus10": "Kosten +10 %",
+    "tariffMinus10": "Tarif −10 %",
+    "tariffPlus10": "Tarif +10 %",
+    "lowInflation": "Niedrig (15 %)",
+    "midInflation": "Mittel (25 %)",
+    "highInflation": "Hoch (40 %)",
+    "customScenario": "Benutzerdefiniert ({rate} %)",
+    "yearLabel": "Jahr {n}",
+    "today": "Heute",
+    "fxUpperScenario": "Oberes Szenario (+30 %)",
+    "fxBaseScenario": "Basis ({rate} % Wachstum)",
+    "fxLowerScenario": "Unteres Szenario (−30 %)"
+  },
+  "offGrid": {
+    "costPerKwhLabel": "Diesel-/Alternativquellen-Kosten (₺/kWh)",
+    "costMissingWarn": "Kein Kostenwert eingegeben — 2,5× Netztarif wird als Standard verwendet.",
+    "nmBlockedWarn": "Netzeinspeisung / Exporterlöse können für Off-Grid-Systeme nicht berechnet werden."
+  },
+  "agriculturalIrrigation": {
+    "seasonWarn": "365 Tage Jahresverbrauch angenommen. Bei kürzerer Bewässerungssaison den Tagesverbrauch entsprechend anpassen."
+  },
+  "settlementDate": {
+    "label": "Inbetriebnahmedatum",
+    "missing": "Das Inbetriebnahmedatum ist erforderlich, wenn der Verrechnungsmodus 'Automatisch' ist."
+  },
+  "kdv": {
+    "note": "Module: 0 % MwSt. (Dekret 7456/2023) · Sonstiges: 20 % MwSt.",
+    "financialBasisLabel": "Finanzbasis (ohne MwSt.)"
   },
   "common": {
     "yes": "Ja",

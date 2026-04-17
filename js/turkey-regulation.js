@@ -220,6 +220,9 @@ export function applyExportCompensation(monthly, policy = {}) {
 
 export function buildQuoteReadiness({ state = {}, results = {}, tariffModel = null, evidenceGovernance = null } = {}) {
   const blockers = [];
+  if (state.exportSettlementMode === 'auto' && !state.settlementDate) {
+    blockers.push('SETTLEMENT_DATE_MISSING: Mahsuplaşma modu Otomatik seçiliyken sistem devreye alma tarihi girilmesi zorunludur.');
+  }
   if (results.usedFallback) blockers.push('PVGIS canlı veri yok; fallback üretim quote-ready kabul edilmez.');
   if (!state.roofGeometry) blockers.push('Çatı geometrisi harita/saha çizimiyle doğrulanmadı.');
   if (!state.quoteInputsVerified) blockers.push('Teklif varsayımları yetkili kullanıcı tarafından doğrulanmadı.');

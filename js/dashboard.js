@@ -68,7 +68,11 @@ export function sanitizeDashboardRecord(record, fallbackId = Date.now()) {
     usdToTry: cleanNumber(record.usdToTry, 0.0001, 10000, 38.5),
     displayCurrency,
     tilt: cleanNumber(record.tilt, 0, 90, 0),
-    azimuthName: cleanString(record.azimuthName || '', 40)
+    azimuthName: cleanString(record.azimuthName || '', 40),
+    scenarioKey: cleanString(record.scenarioKey || '', 40),
+    batteryEnabled: !!record.batteryEnabled,
+    netMeteringEnabled: !!record.netMeteringEnabled,
+    engineSource: cleanString(record.engineSource || '', 40)
   };
 }
 
@@ -85,8 +89,9 @@ function wireDashboardEvents(body) {
 export function saveCurrentCalculation() {
   const state = window.state;
   const r = state.results;
+  const i18n = window.i18n;
   if (!r) {
-    window.showToast('Önce hesaplama yapın.', 'error');
+    window.showToast(i18n?.t?.('dashboard.calculateFirst') || 'Önce hesaplama yapın.', 'error');
     return;
   }
 
@@ -106,7 +111,11 @@ export function saveCurrentCalculation() {
     usdToTry: state.usdToTry,
     displayCurrency: state.displayCurrency,
     tilt: state.tilt,
-    azimuthName: state.azimuthName
+    azimuthName: state.azimuthName,
+    scenarioKey: state.scenarioKey,
+    batteryEnabled: state.batteryEnabled,
+    netMeteringEnabled: state.netMeteringEnabled,
+    engineSource: r?.engineSource?.engine ?? r?.backendEngineSource?.engine ?? null
   };
 
   // FIFO — max 20
@@ -114,7 +123,7 @@ export function saveCurrentCalculation() {
   if (saved.length > MAX_SAVED) saved.pop();
   setSaved(saved);
 
-  window.showToast('Hesap kaydedildi!', 'success');
+  window.showToast(i18n?.t?.('dashboard.saved_success') || 'Hesap kaydedildi!', 'success');
   renderDashboard();
 }
 
@@ -143,10 +152,12 @@ export function updateDashboard() {
 function renderDashboard() {
   const saved = getSaved();
   const body = document.getElementById('dashboard-body');
+  const i18n = window.i18n;
+  const dt = key => i18n?.t?.(key) || key;
   if (!body) return;
 
   if (saved.length === 0) {
-    body.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:32px">Henüz kaydedilmiş hesap yok.</p>';
+    body.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:32px">${dt('dashboard.noSaved')}</p>`;
     return;
   }
 
@@ -154,13 +165,13 @@ function renderDashboard() {
 
   body.innerHTML = `
     <div style="margin-bottom:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span style="font-size:0.85rem;color:var(--text-muted)">Karşılaştırmak için max 3 hesap seçin:</span>
-      <button data-dashboard-action="compare" style="background:var(--primary);color:#000;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:0.82rem;font-weight:600">Karşılaştır</button>
-      <button data-dashboard-action="export" style="background:var(--surface-light);color:var(--text);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.82rem">Dışa Aktar</button>
+      <span style="font-size:0.85rem;color:var(--text-muted)">${dt('dashboard.selectHint')}</span>
+      <button data-dashboard-action="compare" style="background:var(--primary);color:#000;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:0.82rem;font-weight:600">${dt('dashboard.compare')}</button>
+      <button data-dashboard-action="export" style="background:var(--surface-light);color:var(--text);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.82rem">${dt('dashboard.export')}</button>
       <label style="background:var(--surface-light);color:var(--text);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.82rem">
-        İçe Aktar <input type="file" accept=".json" data-dashboard-import style="display:none"/>
+        ${dt('dashboard.import')} <input type="file" accept=".json" data-dashboard-import style="display:none"/>
       </label>
-      <button data-dashboard-action="clear" style="background:var(--surface-light);color:var(--text-muted);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.82rem">Tümünü Sil</button>
+      <button data-dashboard-action="clear" style="background:var(--surface-light);color:var(--text-muted);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:0.82rem">${dt('dashboard.clearAll')}</button>
     </div>
     <div class="dashboard-list">
       ${saved.map(rec => `
@@ -177,9 +188,9 @@ function renderDashboard() {
             <span>${escapeHtml(rec.systemPower.toFixed(1))} kWp</span>
             <span>${escapeHtml(rec.annualEnergy.toLocaleString('tr-TR'))} kWh/yıl</span>
             <span>${escapeHtml(money(rec.totalCost))}</span>
-            <span>Geri ödeme: ${escapeHtml(rec.paybackYear || '>25')} yıl</span>
+            <span>${dt('dashboard.paybackLabel')} ${escapeHtml(String(rec.paybackYear || '>25'))} yıl</span>
             <span>LCOE: ${escapeHtml(moneyRate(rec.lcoe, 'kWh'))}</span>
-            <span>ROI: ${escapeHtml(rec.roi)}%</span>
+            <span>ROI: ${escapeHtml(String(rec.roi))}%</span>
           </div>
         </div>
       `).join('')}
@@ -193,8 +204,10 @@ function renderDashboard() {
 
 export function compareDashboardSelected() {
   const checkboxes = document.querySelectorAll('[id^="dash-chk-"]:checked');
+  const i18n = window.i18n;
+  const dt = key => i18n?.t?.(key) || key;
   if (checkboxes.length < 2) {
-    window.showToast('En az 2 hesap seçin.', 'error');
+    window.showToast(dt('dashboard.selectAtLeast2'), 'error');
     return;
   }
 
@@ -206,24 +219,24 @@ export function compareDashboardSelected() {
   if (!resultEl) return;
 
   const metrics = [
-    ['Şehir', r => r.cityName],
-    ['Sistem (kWp)', r => r.systemPower?.toFixed(2)],
-    ['Yıllık Üretim (kWh)', r => r.annualEnergy?.toLocaleString('tr-TR')],
-    ['Toplam Maliyet', r => money(r.totalCost)],
-    ['Geri Ödeme (yıl)', r => r.paybackYear || '>25'],
-    ['LCOE', r => moneyRate(r.lcoe, 'kWh')],
-    ['ROI (%)', r => r.roi],
-    ['NPV', r => money(r.npv)],
-    ['Eğim', r => r.tilt + '°'],
-    ['Yön', r => r.azimuthName],
+    [dt('dashboard.metricCity'), r => r.cityName],
+    [dt('dashboard.metricSystem'), r => r.systemPower?.toFixed(2)],
+    [dt('dashboard.metricAnnualEnergy'), r => r.annualEnergy?.toLocaleString('tr-TR')],
+    [dt('dashboard.metricTotalCost'), r => money(r.totalCost)],
+    [dt('dashboard.metricPayback'), r => r.paybackYear || '>25'],
+    [dt('dashboard.metricLcoe'), r => moneyRate(r.lcoe, 'kWh')],
+    [dt('dashboard.metricRoi'), r => r.roi],
+    [dt('dashboard.metricNpv'), r => money(r.npv)],
+    [dt('dashboard.metricTilt'), r => r.tilt + '°'],
+    [dt('dashboard.metricAzimuth'), r => r.azimuthName],
   ];
 
   resultEl.innerHTML = `
-    <h4 style="color:var(--primary);margin-bottom:12px">Karşılaştırma Sonuçları</h4>
+    <h4 style="color:var(--primary);margin-bottom:12px">${dt('dashboard.compareTitle')}</h4>
     <table class="comp-table">
       <thead>
         <tr>
-          <th>Metrik</th>
+          <th>${dt('dashboard.metricCity')}</th>
           ${selected.map((r, i) => `<th>${escapeHtml(r.cityName || 'Hesap ' + (i+1))}</th>`).join('')}
         </tr>
       </thead>
@@ -231,7 +244,7 @@ export function compareDashboardSelected() {
         ${metrics.map(([label, fn]) => `
           <tr>
             <td>${escapeHtml(label)}</td>
-            ${selected.map(r => `<td>${escapeHtml(fn(r) || '—')}</td>`).join('')}
+            ${selected.map(r => `<td>${escapeHtml(String(fn(r) ?? '—'))}</td>`).join('')}
           </tr>
         `).join('')}
       </tbody>
@@ -269,16 +282,19 @@ export function importSavedRecords(file) {
       const incoming = Array.isArray(parsed.records)
         ? parsed.records.slice(0, MAX_IMPORT_RECORDS).map((record, index) => sanitizeDashboardRecord(record, Date.now() + index)).filter(Boolean)
         : [];
+      const i18n = window.i18n;
+      const dt = key => i18n?.t?.(key) || key;
       if (!incoming.length) {
-        window.showToast?.('İçe aktarılacak geçerli kayıt bulunamadı.', 'error');
+        window.showToast?.(dt('dashboard.importError'), 'error');
         return;
       }
       const merged = [...incoming, ...getSaved()].slice(0, MAX_SAVED);
       setSaved(merged);
       renderDashboard();
-      window.showToast?.(`${incoming.length} kayıt içe aktarıldı.`, 'success');
+      window.showToast?.(dt('dashboard.importedN').replace('{n}', incoming.length), 'success');
     } catch {
-      window.showToast?.('Kayıt dosyası okunamadı.', 'error');
+      const i18n = window.i18n;
+      window.showToast?.(i18n?.t?.('dashboard.importError') || 'Kayıt dosyası okunamadı.', 'error');
     }
   };
   reader.readAsText(file);

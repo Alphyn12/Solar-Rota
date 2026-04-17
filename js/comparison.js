@@ -10,11 +10,13 @@ import {
   simulateHourlyEnergy
 } from './calc-core.js';
 
+const SCENARIO_LETTERS = ['A', 'B', 'C'];
 const DEFAULT_SCENARIOS = [
-  { name: 'Senaryo A', panelType: 'mono',    inverterType: 'string',    customPrice: null },
-  { name: 'Senaryo B', panelType: 'bifacial', inverterType: 'optimizer', customPrice: null },
-  { name: 'Senaryo C', panelType: 'poly',    inverterType: 'string',    customPrice: null }
+  { panelType: 'mono',    inverterType: 'string',    customPrice: null },
+  { panelType: 'bifacial', inverterType: 'optimizer', customPrice: null },
+  { panelType: 'poly',    inverterType: 'string',    customPrice: null }
 ];
+const ct = key => window.i18n?.t?.(key) || key;
 
 function money(value) {
   const state = window.state || {};
@@ -53,9 +55,9 @@ function buildComparisonUI() {
 
   wrap.innerHTML = DEFAULT_SCENARIOS.map((sc, idx) => `
     <div class="comparison-scenario" id="comp-sc-${idx}">
-      <h4 style="color:var(--primary);margin-bottom:12px">${sc.name}</h4>
+      <h4 style="color:var(--primary);margin-bottom:12px">${ct('comparison.scenarioLabel').replace('{letter}', SCENARIO_LETTERS[idx])}</h4>
       <div class="form-group">
-        <label>Panel Tipi</label>
+        <label>${ct('comparison.panelTypeLabel')}</label>
         <select id="comp-panel-${idx}" onchange="runComparison()"
           style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%">
           ${Object.entries(PANEL_TYPES).map(([k, p]) => `
@@ -64,7 +66,7 @@ function buildComparisonUI() {
         </select>
       </div>
       <div class="form-group">
-        <label>İnverter Tipi</label>
+        <label>${ct('comparison.inverterTypeLabel')}</label>
         <select id="comp-inv-${idx}" onchange="runComparison()"
           style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%">
           ${Object.entries(INVERTER_TYPES).map(([k, inv]) => `
@@ -73,7 +75,7 @@ function buildComparisonUI() {
         </select>
       </div>
       <div class="form-group">
-        <label>Özel Fiyat (TL, boş = otomatik)</label>
+        <label>${ct('comparison.customPriceLabel')}</label>
         <input type="number" id="comp-price-${idx}" placeholder="Toplam TL"
           oninput="runComparison()"
           style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%"/>
@@ -156,7 +158,7 @@ export function runComparison() {
     const lcoe = lcoeEnergySum > 0 ? (lcoeCostSum / lcoeEnergySum).toFixed(2) : '—';
 
     return {
-      name: `Senaryo ${String.fromCharCode(65 + idx)}`,
+      name: ct('comparison.scenarioLabel').replace('{letter}', SCENARIO_LETTERS[idx]),
       panelName: panel.name,
       invName: inv.name,
       panelCount, systemPower: systemPower.toFixed(2),
@@ -179,22 +181,22 @@ export function runComparison() {
     <table class="comp-table">
       <thead>
         <tr>
-          <th>Metrik</th>
+          <th>${ct('comparison.metricLabel')}</th>
           ${results.map(r => `<th style="color:var(--primary)">${r.name}</th>`).join('')}
         </tr>
       </thead>
       <tbody>
-        <tr><td>Panel</td>${results.map(r => `<td>${r.panelName}</td>`).join('')}</tr>
-        <tr><td>İnverter</td>${results.map(r => `<td>${r.invName}</td>`).join('')}</tr>
-        <tr><td>Sistem (kWp)</td>${results.map(r => `<td>${r.systemPower} kWp</td>`).join('')}</tr>
-        <tr><td>Yıllık Üretim</td>${results.map(r => `<td>${r.annualEnergy} kWh</td>`).join('')}</tr>
-        <tr><td>Toplam Maliyet</td>${results.map(r => `<td>${money(r.totalCost)}${r.isCustom ? ' *' : ''}</td>`).join('')}</tr>
-        <tr><td>Geri Ödeme</td>${results.map(r => `<td style="color:${r.paybackYear === bestPayback ? '#10B981' : 'inherit'};font-weight:${r.paybackYear === bestPayback ? '700' : '400'}">${r.paybackYear} yıl${r.paybackYear === bestPayback ? ' ✓' : ''}</td>`).join('')}</tr>
-        <tr><td>Proje NPV</td>${results.map(r => `<td>${money(r.npv)}</td>`).join('')}</tr>
-        <tr><td>LCOE</td>${results.map(r => `<td>${moneyRate(r.lcoe, 'kWh')}</td>`).join('')}</tr>
+        <tr><td>${ct('comparison.panel')}</td>${results.map(r => `<td>${r.panelName}</td>`).join('')}</tr>
+        <tr><td>${ct('comparison.inverter')}</td>${results.map(r => `<td>${r.invName}</td>`).join('')}</tr>
+        <tr><td>${ct('comparison.systemKwp')}</td>${results.map(r => `<td>${r.systemPower} kWp</td>`).join('')}</tr>
+        <tr><td>${ct('comparison.annualProduction')}</td>${results.map(r => `<td>${r.annualEnergy} kWh</td>`).join('')}</tr>
+        <tr><td>${ct('comparison.totalCost')}</td>${results.map(r => `<td>${money(r.totalCost)}${r.isCustom ? ' *' : ''}</td>`).join('')}</tr>
+        <tr><td>${ct('comparison.payback')}</td>${results.map(r => `<td style="color:${r.paybackYear === bestPayback ? '#10B981' : 'inherit'};font-weight:${r.paybackYear === bestPayback ? '700' : '400'}">${ct('comparison.paybackYears').replace('{n}', r.paybackYear)}${r.paybackYear === bestPayback ? ' ✓' : ''}</td>`).join('')}</tr>
+        <tr><td>${ct('comparison.projectNpv')}</td>${results.map(r => `<td>${money(r.npv)}</td>`).join('')}</tr>
+        <tr><td>${ct('comparison.lcoe')}</td>${results.map(r => `<td>${moneyRate(r.lcoe, 'kWh')}</td>`).join('')}</tr>
       </tbody>
     </table>
-    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px">* Özel fiyat girilmiş. ✓ En iyi geri ödeme süresi. Karşılaştırma aynı çekirdek finansal tablo ve saatlik tüketim özetiyle hesaplanır.</p>
+    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px">${ct('comparison.footnote')}</p>
   `;
 }
 

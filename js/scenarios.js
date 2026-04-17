@@ -8,10 +8,12 @@ import { buildTariffModel, calcIRR, computeFinancialTable } from './calc-core.js
 let scenarioChart = null;
 let fxChart = null;
 
+const t = key => window.i18n?.t?.(key) || key;
+
 const INFLATION_SCENARIOS = {
-  low:    { label: 'Düşük (%15)',  rate: 0.15, color: '#10B981' },
-  mid:    { label: 'Orta (%25)',   rate: 0.25, color: '#F59E0B' },
-  high:   { label: 'Yüksek (%40)',rate: 0.40, color: '#EF4444' }
+  low:    { labelKey: 'scenarioAnalysis.lowInflation',  rate: 0.15, color: '#10B981' },
+  mid:    { labelKey: 'scenarioAnalysis.midInflation',  rate: 0.25, color: '#F59E0B' },
+  high:   { labelKey: 'scenarioAnalysis.highInflation', rate: 0.40, color: '#EF4444' }
 };
 
 function money(value) {
@@ -42,30 +44,31 @@ export function renderScenarioAnalysis() {
   // Metric tablosu
   const tableEl = document.getElementById('scenario-table');
   if (tableEl) {
+    const scenarioVals = Object.values(INFLATION_SCENARIOS);
     tableEl.innerHTML = `
       <table class="scenario-compare-table">
         <thead>
           <tr>
-            <th>Senaryo</th>
-            <th>Geri Ödeme</th>
-            <th>NPV (25y)</th>
-            <th>IRR</th>
-            <th>ROI</th>
+            <th>${t('scenarioAnalysis.scenario')}</th>
+            <th>${t('scenarioAnalysis.payback')}</th>
+            <th>${t('scenarioAnalysis.npv25y')}</th>
+            <th>${t('scenarioAnalysis.irr')}</th>
+            <th>${t('scenarioAnalysis.roi')}</th>
           </tr>
         </thead>
         <tbody>
           ${scenarios.map((sc, i) => `
-            <tr style="border-left:3px solid ${Object.values(INFLATION_SCENARIOS)[i].color}">
-              <td style="color:${Object.values(INFLATION_SCENARIOS)[i].color}">${Object.values(INFLATION_SCENARIOS)[i].label}</td>
-              <td>${sc.paybackYear ? sc.paybackYear + ' yıl' : '>25 yıl'}</td>
+            <tr style="border-left:3px solid ${scenarioVals[i].color}">
+              <td style="color:${scenarioVals[i].color}">${t(scenarioVals[i].labelKey)}</td>
+              <td>${sc.paybackYear ? t('scenarioAnalysis.paybackYears').replace('{n}', sc.paybackYear) : t('scenarioAnalysis.paybackOver25')}</td>
               <td>${money(sc.npv)}</td>
               <td>${sc.irr}%</td>
               <td>${sc.roi}%</td>
             </tr>
           `).join('')}
           <tr style="border-left:3px solid #8B5CF6">
-            <td style="color:#8B5CF6">Özel (%${(customRate*100).toFixed(0)})</td>
-            <td>${customScenario.paybackYear ? customScenario.paybackYear + ' yıl' : '>25 yıl'}</td>
+            <td style="color:#8B5CF6">${t('scenarioAnalysis.customScenario').replace('{rate}', (customRate*100).toFixed(0))}</td>
+            <td>${customScenario.paybackYear ? t('scenarioAnalysis.paybackYears').replace('{n}', customScenario.paybackYear) : t('scenarioAnalysis.paybackOver25')}</td>
             <td>${money(customScenario.npv)}</td>
             <td>${customScenario.irr}%</td>
             <td>${customScenario.roi}%</td>
@@ -103,7 +106,8 @@ function computeSensitivityNpv(r, state, overrides = {}) {
       ? (r.tariffModel?.contractedRate ?? r.tariff) * overrides.tariffMultiplier
       : (r.tariffModel?.contractedRate ?? r.tariff),
     exportTariff: r.tariffModel?.exportRate ?? r.tariff,
-    annualPriceIncrease: state.annualPriceIncrease ?? 0.12,
+    // Faz-4 Fix-17: Monte Carlo can override tariff growth rate per sample
+    annualPriceIncrease: overrides._annualPriceIncrease ?? (state.annualPriceIncrease ?? 0.12),
     discountRate: r.discountRate
   });
   // When energy is scaled, the hourly summary must be scaled proportionally so
@@ -152,18 +156,33 @@ function renderSensitivityTable(r) {
   // FIX-1: Each case calls computeSensitivityNpv() so Üretim and Tarife produce
   // different — and correct — NPV deltas based on actual 25-year model.
   const cases = [
-    { label: 'Üretim -10%', npv: computeSensitivityNpv(r, state, { energyMultiplier: 0.90 }) },
-    { label: 'Üretim +10%', npv: computeSensitivityNpv(r, state, { energyMultiplier: 1.10 }) },
-    { label: 'Maliyet -10%', npv: computeSensitivityNpv(r, state, { costMultiplier: 0.90 }) },
-    { label: 'Maliyet +10%', npv: computeSensitivityNpv(r, state, { costMultiplier: 1.10 }) },
-    { label: 'Tarife -10%', npv: computeSensitivityNpv(r, state, { tariffMultiplier: 0.90 }) },
-    { label: 'Tarife +10%', npv: computeSensitivityNpv(r, state, { tariffMultiplier: 1.10 }) },
+    { label: t('scenarioAnalysis.energyMinus10'), npv: computeSensitivityNpv(r, state, { energyMultiplier: 0.90 }) },
+    { label: t('scenarioAnalysis.energyPlus10'),  npv: computeSensitivityNpv(r, state, { energyMultiplier: 1.10 }) },
+    { label: t('scenarioAnalysis.costMinus10'),   npv: computeSensitivityNpv(r, state, { costMultiplier: 0.90 }) },
+    { label: t('scenarioAnalysis.costPlus10'),    npv: computeSensitivityNpv(r, state, { costMultiplier: 1.10 }) },
+    { label: t('scenarioAnalysis.tariffMinus10'), npv: computeSensitivityNpv(r, state, { tariffMultiplier: 0.90 }) },
+    { label: t('scenarioAnalysis.tariffPlus10'),  npv: computeSensitivityNpv(r, state, { tariffMultiplier: 1.10 }) },
   ].map(c => ({ ...c, delta: c.npv - baseNpv }));
 
+  const mcBands = computeMonteCarloBands(r, state, 500);
+  const mcHtml = mcBands
+    ? `<div style="margin-top:12px;padding:10px 12px;background:rgba(99,102,241,0.08);border-radius:8px;border:1px solid rgba(99,102,241,0.25)">
+        <div style="font-size:0.82rem;font-weight:700;color:#818CF8;margin-bottom:6px">
+          Monte Carlo NPV Güven Bandı (500 iterasyon)
+          <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400"> — üretim ±15%, tarife artışı %10–40%</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">
+          <div><div style="font-size:0.7rem;color:var(--text-muted)">P90 (muhafazakâr)</div><div style="font-size:1rem;font-weight:700;color:#EF4444">${money(mcBands.p90)}</div></div>
+          <div><div style="font-size:0.7rem;color:var(--text-muted)">P50 (medyan)</div><div style="font-size:1rem;font-weight:700;color:#F59E0B">${money(mcBands.p50)}</div></div>
+          <div><div style="font-size:0.7rem;color:var(--text-muted)">P10 (iyimser)</div><div style="font-size:1rem;font-weight:700;color:#10B981">${money(mcBands.p10)}</div></div>
+        </div>
+      </div>`
+    : '';
+
   el.innerHTML = `
-    <div style="font-size:0.9rem;font-weight:700;color:var(--primary);margin:12px 0 8px">Hassasiyet Analizi</div>
+    <div style="font-size:0.9rem;font-weight:700;color:var(--primary);margin:12px 0 8px">${t('scenarioAnalysis.sensitivityTitle')}</div>
     <table class="scenario-compare-table">
-      <thead><tr><th>Değişken</th><th>NPV Etkisi</th><th>Yeni NPV</th></tr></thead>
+      <thead><tr><th>${t('scenarioAnalysis.variable')}</th><th>${t('scenarioAnalysis.npvImpact')}</th><th>${t('scenarioAnalysis.newNpv')}</th></tr></thead>
       <tbody>
         ${cases.map(c => `<tr>
           <td>${c.label}</td>
@@ -172,7 +191,39 @@ function renderSensitivityTable(r) {
         </tr>`).join('')}
       </tbody>
     </table>
+    ${mcHtml}
   `;
+}
+
+// Faz-4 Fix-17: Stochastic sensitivity — Monte Carlo P10/P50/P90 NPV distribution.
+// Samples 500 (production multiplier, annualPriceIncrease) pairs from the
+// realistic uncertainty envelope and runs the full 25-year financial model for each.
+// Production: uniform ±15% around P50 (PVGIS 10-year interannual + model uncertainty).
+// Tariff growth: uniform 10%–40% (Turkish electricity market historical range).
+function computeMonteCarloBands(r, state, iterations = 500) {
+  try {
+    const npvs = [];
+    const rng = () => Math.random(); // uniform [0,1)
+    for (let i = 0; i < iterations; i++) {
+      // Sample from uniform distributions over the uncertainty ranges
+      const energyMult = 0.85 + rng() * 0.30;           // [0.85, 1.15]
+      const tariffGrowth = 0.10 + rng() * 0.30;          // [0.10, 0.40]
+      const npv = computeSensitivityNpv(r, state, {
+        energyMultiplier: energyMult,
+        // Override tariff growth via state-level clone inside the helper
+        _annualPriceIncrease: tariffGrowth
+      });
+      npvs.push(npv);
+    }
+    npvs.sort((a, b) => a - b);
+    const p90idx = Math.floor(iterations * 0.10);   // 10th percentile = P90 exceedance
+    const p50idx = Math.floor(iterations * 0.50);
+    const p10idx = Math.floor(iterations * 0.90);   // 90th percentile = P10 exceedance
+    return { p90: npvs[p90idx], p50: npvs[p50idx], p10: npvs[p10idx] };
+  } catch (e) {
+    console.warn('[MC] Monte Carlo NPV failed:', e);
+    return null;
+  }
 }
 
 function computeScenario(r, inflationRate, state) {
@@ -220,14 +271,15 @@ function renderScenarioChart(r, state, customRate) {
   const ctx = canvas.getContext('2d');
   if (scenarioChart) scenarioChart.destroy();
 
-  const labels = Array.from({length: 25}, (_, i) => 'Yıl ' + (i + 1));
+  const labels = Array.from({length: 25}, (_, i) => t('scenarioAnalysis.yearLabel').replace('{n}', i + 1));
   const allScenarios = [
     ...Object.entries(INFLATION_SCENARIOS).map(([k, sc]) => ({
       ...sc,
+      label: t(sc.labelKey),
       data: computeScenario(r, sc.rate, state).cashFlows.slice(1)
     })),
     {
-      label: `Özel (%${(customRate*100).toFixed(0)})`,
+      label: t('scenarioAnalysis.customScenario').replace('{rate}', (customRate*100).toFixed(0)),
       rate: customRate,
       color: '#8B5CF6',
       data: computeScenario(r, customRate, state).cashFlows.slice(1)
@@ -285,7 +337,7 @@ function renderFXProjection(r, state) {
   const baseRate = state.usdToTry || 38.5;
   const growth = parseFloat(document.getElementById('fx-growth-rate')?.value) / 100 || 0.20;
 
-  const labels = Array.from({length: 11}, (_, i) => i === 0 ? 'Bugün' : 'Yıl ' + i);
+  const labels = Array.from({length: 11}, (_, i) => i === 0 ? t('scenarioAnalysis.today') : t('scenarioAnalysis.yearLabel').replace('{n}', i));
   const centerData = labels.map((_, i) => Math.round(baseRate * Math.pow(1 + growth, i)));
   const upperData = labels.map((_, i) => Math.round(baseRate * Math.pow(1 + growth * 1.3, i)));
   const lowerData = labels.map((_, i) => Math.round(baseRate * Math.pow(1 + growth * 0.7, i)));
@@ -299,7 +351,7 @@ function renderFXProjection(r, state) {
       labels,
       datasets: [
         {
-          label: 'Üst Senaryo (+%30)',
+          label: t('scenarioAnalysis.fxUpperScenario'),
           data: upperData,
           borderColor: '#EF4444',
           borderWidth: 1.5,
@@ -309,7 +361,7 @@ function renderFXProjection(r, state) {
           backgroundColor: 'rgba(239,68,68,0.08)'
         },
         {
-          label: `Baz (%${(growth*100).toFixed(0)} artış)`,
+          label: t('scenarioAnalysis.fxBaseScenario').replace('{rate}', (growth*100).toFixed(0)),
           data: centerData,
           borderColor: '#F59E0B',
           borderWidth: 2.5,
@@ -317,7 +369,7 @@ function renderFXProjection(r, state) {
           fill: false
         },
         {
-          label: 'Alt Senaryo (−%30)',
+          label: t('scenarioAnalysis.fxLowerScenario'),
           data: lowerData,
           borderColor: '#10B981',
           borderWidth: 1.5,
@@ -342,7 +394,7 @@ function renderFXProjection(r, state) {
       },
       scales: {
         x: { ticks: { color: '#94A3B8' }, grid: { color: 'rgba(71,85,105,0.15)' } },
-        y: { ticks: { color: '#94A3B8', callback: v => v + ' TL' }, grid: { color: 'rgba(71,85,105,0.15)' } }
+        y: { ticks: { color: '#94A3B8', callback: v => v + ' TRY' }, grid: { color: 'rgba(71,85,105,0.15)' } }
       }
     }
   });

@@ -10,7 +10,7 @@ import {
 import { showToast, animateCounter, launchConfetti, resetConfetti, renderPRGauge } from './ui-charts.js';
 import { renderResults, renderMonthlyChart, downloadPDF, shareResults, loadFromHash } from './ui-render.js';
 import { toggleEngReport, renderEngReport, renderEngCalcPanel } from './eng-report.js';
-import { runCalculation } from './calculation-service.js';
+import { runCalculation, isCalculationInProgress } from './calculation-service.js';
 import { calculateBatteryMetrics, calculateNMMetrics } from './calc-engine.js';
 import { renderHourlyProfile, setHourlySeason } from './hourly-profile.js';
 import { toggleBillBlock, onBillToggle, onBillInput, billQuickFill, billClear } from './bill-analysis.js';
@@ -202,6 +202,10 @@ window.state = {
   // Off-grid: effective cost per kWh replaced by solar (diesel/generator proxy).
   // When null, calc-engine.js uses tariff × 2.5 as a conservative default.
   offGridCostPerKwh: null,
+  // Faz-3: Ground albedo for bifacial rear-side gain correction (0.20 = default sand/grass).
+  groundAlbedo: 0.20,
+  // Faz-3: Annual load growth rate for self-consumption projection (default 0 = static load).
+  annualLoadGrowth: 0,
   hasSignedCustomerBillData: false,
   quoteInputsVerified: false,
   quoteReadyApproved: false
@@ -608,6 +612,21 @@ function updateScenarioUI() {
 
 function syncScenarioControls() {
   const s = window.state;
+  // Show off-grid cost input only when off-grid scenario is active
+  const offGridWrap = document.getElementById('off-grid-cost-wrap');
+  if (offGridWrap) offGridWrap.style.display = s.scenarioKey === 'off-grid' ? '' : 'none';
+  // Warn when off-grid cost is missing (calc will silently use tariff × 2.5)
+  const offGridWarn = document.getElementById('off-grid-cost-warn');
+  if (offGridWarn) offGridWarn.style.display = (s.scenarioKey === 'off-grid' && !s.offGridCostPerKwh) ? '' : 'none';
+  // Faz-4 Fix-16: Show irrigation pump block for agricultural-irrigation; hide 365-day warning when pump data is entered
+  const irrigWrap = document.getElementById('irrigation-pump-wrap');
+  const irrigWarn = document.getElementById('irrigation-season-warn');
+  const isIrrig = s.scenarioKey === 'agricultural-irrigation';
+  if (irrigWrap) irrigWrap.style.display = isIrrig ? '' : 'none';
+  if (irrigWarn) {
+    const pumpDataEntered = isIrrig && s.irrigPumpKw > 0 && s.irrigHoursPerDay > 0;
+    irrigWarn.style.display = (isIrrig && !pumpDataEntered) ? '' : 'none';
+  }
   const batteryToggle = document.getElementById('battery-toggle');
   if (batteryToggle) batteryToggle.checked = !!s.batteryEnabled;
   const nmToggle = document.getElementById('nm-toggle');
@@ -747,6 +766,11 @@ function updateShading(val) {
   document.getElementById('shading-desc').textContent = desc[idx];
 }
 
+function updateGroundAlbedo(val) {
+  window.state.groundAlbedo = parseFloat(val) || 0.20;
+}
+window.updateGroundAlbedo = updateGroundAlbedo;
+
 function updateSoiling(val) {
   val = Math.max(0, Math.min(50, parseInt(val, 10) || 0));
   window.state.soilingFactor = val;
@@ -795,6 +819,35 @@ function updateTariffAssumptions() {
   s.tariffRegime = document.getElementById('tariff-regime')?.value || s.tariffRegime || 'auto';
   s.tariffMode = s.tariffRegime;
   s.exportSettlementMode = document.getElementById('export-settlement-mode')?.value || s.exportSettlementMode || 'auto';
+  s.settlementDate = document.getElementById('settlement-date')?.value || s.settlementDate || null;
+  s.offGridCostPerKwh = parseFloat(document.getElementById('off-grid-cost-per-kwh')?.value) || null;
+  // Sync off-grid cost warning live as user types
+  const offGridCostWarn = document.getElementById('off-grid-cost-warn');
+  if (offGridCostWarn) offGridCostWarn.style.display = (s.scenarioKey === 'off-grid' && !s.offGridCostPerKwh) ? '' : 'none';
+  // Faz-4 Fix-16: Read irrigation pump inputs
+  if (s.scenarioKey === 'agricultural-irrigation') {
+    s.irrigPumpKw = parseFloat(document.getElementById('irrig-pump-kw')?.value) || 0;
+    s.irrigHoursPerDay = parseFloat(document.getElementById('irrig-hours-per-day')?.value) || 0;
+    s.irrigSeasonStart = parseInt(document.getElementById('irrig-season-start')?.value) || 4;
+    s.irrigSeasonEnd = parseInt(document.getElementById('irrig-season-end')?.value) || 9;
+    // Clamp season months to valid range
+    s.irrigSeasonStart = Math.max(1, Math.min(12, s.irrigSeasonStart));
+    s.irrigSeasonEnd = Math.max(1, Math.min(12, s.irrigSeasonEnd));
+    // Live preview of computed annual load
+    if (s.irrigPumpKw > 0 && s.irrigHoursPerDay > 0) {
+      const endM = s.irrigSeasonEnd >= s.irrigSeasonStart ? s.irrigSeasonEnd : s.irrigSeasonEnd + 12;
+      const MONTH_DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
+      let seasonDays = 0;
+      for (let m = s.irrigSeasonStart; m <= endM; m++) seasonDays += MONTH_DAYS[(m - 1) % 12];
+      const annualKwh = Math.round(s.irrigPumpKw * s.irrigHoursPerDay * seasonDays);
+      const el = document.getElementById('irrig-load-preview');
+      if (el) el.textContent = `Hesaplanan yıllık yük: ${annualKwh.toLocaleString('tr-TR')} kWh (${seasonDays} gün × ${s.irrigHoursPerDay} saat/gün × ${s.irrigPumpKw} kW)`;
+      // Update irrigation-season warn based on pump data completeness
+      const irrigWarn2 = document.getElementById('irrigation-season-warn');
+      if (irrigWarn2) irrigWarn2.style.display = 'none';
+    }
+  }
+  s.annualLoadGrowth = (parseFloat(document.getElementById('annual-load-growth')?.value) || 0) / 100;
   s.contractedPowerKw = readNumber('contracted-power-input', s.contractedPowerKw || 0);
   s.contractedTariff = readNumber('contracted-tariff-input', s.contractedTariff ?? s.tariff);
   s.skttTariff = readNumber('sktt-tariff-input', s.skttTariff ?? s.tariff);
@@ -1187,6 +1240,9 @@ function buildPanelCards() {
       document.querySelectorAll('.panel-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
       updatePanelPreview();
+      // Show albedo selector only for bifacial panels
+      const albedoWrap = document.getElementById('albedo-wrap');
+      if (albedoWrap) albedoWrap.style.display = key === 'bifacial' ? '' : 'none';
     });
     wrap.appendChild(card);
   });
@@ -1351,7 +1407,13 @@ function validateStep5() {
   updateTariffAssumptions();
   updateCostOverrides();
   goToStep(6);
-  runCalculation().catch(e => window.showToast?.(`Hesaplama hatası: ${e.message}`, 'error'));
+  const calcBtn = document.getElementById('calc-btn') || document.querySelector('[onclick*="validateStep5"]');
+  if (calcBtn) { calcBtn.disabled = true; calcBtn.style.opacity = '0.6'; }
+  runCalculation()
+    .catch(e => window.showToast?.(`Hesaplama hatası: ${e.message}`, 'error'))
+    .finally(() => {
+      if (calcBtn) { calcBtn.disabled = false; calcBtn.style.opacity = ''; }
+    });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1576,6 +1638,13 @@ function toggleNMBlock() {
 }
 
 function onNMToggle(checked) {
+  // Off-grid systems cannot export to the grid — block the combination
+  if (checked && window.state.scenarioKey === 'off-grid') {
+    showToast(i18n.t('offGrid.nmBlockedWarn'), 'warning');
+    const tog = document.getElementById('nm-toggle');
+    if (tog) tog.checked = false;
+    return;
+  }
   window.state.netMeteringEnabled = checked;
   const inputs = document.getElementById('nm-inputs');
   if (inputs) inputs.style.display = checked ? 'block' : 'none';

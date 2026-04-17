@@ -691,6 +691,21 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           </div>
           <div style="font-size:0.78rem;color:var(--text-muted)" id="soiling-desc">Orta düzey kirlenme (Türkiye ortalaması)</div>
         </div>
+        <!-- Bifacial ground albedo — only shown when bifacial panel is selected -->
+        <div id="albedo-wrap" style="display:none;margin-top:14px">
+          <label style="font-size:0.85rem;font-weight:600;display:flex;align-items:center;gap:6px">
+            Zemin Yansıtıcılığı (Albedo)
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Bifacial paneller zemin yansımasından ek enerji üretir. Zemin tipine göre değişir: beton %25, kum %20, çimen %20, çakıl %18, toprak %15.</span></span>
+          </label>
+          <select id="ground-albedo-select" onchange="updateGroundAlbedo(this.value)"
+            style="margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:220px;font-size:0.9rem">
+            <option value="0.25">Beton / Taş döşeme (%25)</option>
+            <option value="0.20" selected>Kum / Çimen (%20)</option>
+            <option value="0.18">Çakıl / Granül (%18)</option>
+            <option value="0.15">Toprak / Tarla (%15)</option>
+            <option value="0.10">Koyu zemin (%10)</option>
+          </select>
+        </div>
       </div>
 
       <!-- OSM Shadow -->
@@ -950,6 +965,51 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <option value="hourly">Saatlik</option>
             <option value="monthly">Aylık</option>
           </select>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px" data-i18n="settlementDate.label">Sistem Devreye Alma Tarihi</div>
+          <input type="date" id="settlement-date"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:170px;font-size:0.9rem"
+            oninput="updateTariffAssumptions()"/>
+        </div>
+        <div id="off-grid-cost-wrap" style="display:none">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px" data-i18n="offGrid.costPerKwhLabel">Dizel/Alternatif Kaynak Maliyeti (₺/kWh)</div>
+          <input type="number" id="off-grid-cost-per-kwh" value="" min="0" step="0.01"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:160px;font-size:0.9rem"
+            oninput="updateTariffAssumptions()"/>
+          <div id="off-grid-cost-warn" style="display:none;margin-top:4px;font-size:0.75rem;color:#F59E0B;max-width:260px" data-i18n="offGrid.costMissingWarn">Maliyet girilmedi — 2.5× şebeke tarifesi varsayılıyor.</div>
+        </div>
+        <div id="irrigation-season-warn" style="display:none;margin-top:6px;font-size:0.75rem;color:#F59E0B;max-width:300px" data-i18n="agriculturalIrrigation.seasonWarn">Yıllık 365 gün kullanım varsayıldı. Sulama sezonu kısaysa günlük tüketimi sulama süresine göre ayarlayın.</div>
+        <!-- Faz-4 Fix-16: Irrigation pump inputs — shown only for agricultural-irrigation scenario -->
+        <div id="irrigation-pump-wrap" style="display:none;margin-top:8px;padding:10px 12px;background:rgba(16,185,129,0.07);border-radius:8px;border:1px solid rgba(16,185,129,0.25)">
+          <div style="font-size:0.75rem;font-weight:600;color:#10B981;margin-bottom:8px">Pompa / Sezon Detayı</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px">
+            <div>
+              <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px">Pompa Gücü (kW)</div>
+              <input type="number" id="irrig-pump-kw" value="" min="0.1" max="1000" step="0.1"
+                style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);width:110px;font-size:0.85rem"
+                oninput="updateTariffAssumptions()" placeholder="örn. 15"/>
+            </div>
+            <div>
+              <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px">Günlük Çalışma (saat)</div>
+              <input type="number" id="irrig-hours-per-day" value="" min="0.5" max="24" step="0.5"
+                style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);width:110px;font-size:0.85rem"
+                oninput="updateTariffAssumptions()" placeholder="örn. 6"/>
+            </div>
+            <div>
+              <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px">Sezon Başı (ay 1-12)</div>
+              <input type="number" id="irrig-season-start" value="4" min="1" max="12" step="1"
+                style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);width:95px;font-size:0.85rem"
+                oninput="updateTariffAssumptions()"/>
+            </div>
+            <div>
+              <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px">Sezon Sonu (ay 1-12)</div>
+              <input type="number" id="irrig-season-end" value="9" min="1" max="12" step="1"
+                style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);width:95px;font-size:0.85rem"
+                oninput="updateTariffAssumptions()"/>
+            </div>
+          </div>
+          <div id="irrig-load-preview" style="font-size:0.72rem;color:var(--text-secondary);margin-top:6px"></div>
         </div>
         <div>
           <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Önceki Yıl Tüketim (kWh)</div>
@@ -1546,6 +1606,15 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
               oninput="state.insuranceRate=parseFloat(this.value)||0"/>
           </div>
         </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:0.8rem">Yıllık Yük Artışı (%)
+              <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Her yıl tüketiminizin artış oranı. EV veya ısı pompası ekliyorsanız %5–15 girebilirsiniz. Varsayılan %0 (sabit tüketim).</span></span>
+            </label>
+            <input type="number" id="annual-load-growth" value="0" min="0" max="30" step="0.5"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
+              oninput="updateTariffAssumptions()"/>
+          </div>
+        </div>
         <div style="margin-top:12px;font-size:0.8rem;color:var(--text-muted)">
           <strong>İnverter yenileme:</strong> Yıl 12'de inverter maliyeti kadar ek gider otomatik dahil edilir.
         </div>
@@ -1714,6 +1783,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <div class="kpi-value"><span id="kpi-energy">0</span></div>
       <div class="kpi-unit">kWh / yıl</div>
       <div class="kpi-label">Yıllık Enerji Üretimi <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">PVGIS uydu veri tabanından alınan güneşlenme değerleri temel alınarak hesaplanan yıllık net elektrik üretimi.</span></span></div>
+      <div id="kpi-energy-band" style="font-size:0.68rem;color:var(--text-secondary);margin-top:2px;display:none"></div>
     </div>
     <div class="kpi-card" style="--kpi-color:#10B981">
       <div class="kpi-icon-wrap">
@@ -1765,7 +1835,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <span class="fin-val positive" id="fin-total">-</span>
     </div>
     <div class="fin-row">
-      <span class="fin-label">Yatırım Karlılığı (ROI)</span>
+      <span class="fin-label">25 Yıllık Toplam ROI (İskontosuz) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">25 yıllık toplam net kazancın başlangıç yatırımına oranı — iskontosuz, vergi öncesi. Yıllık getiri için İRR değerini kullanın.</span></span></span>
       <span class="fin-val positive" id="fin-roi">-</span>
     </div>
     <div class="fin-row">
