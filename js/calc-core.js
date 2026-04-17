@@ -126,6 +126,26 @@ export function normalizeMonthlyProductionToAnnual(monthlyProduction, annualEner
   return rounded;
 }
 
+export function resolveProductionTemperatureAdjustment({ source = 'fallback-psh', panelTempCoeff = -0.0037, avgSummerTemp = 25 } = {}) {
+  const coeff = Number.isFinite(Number(panelTempCoeff)) ? Number(panelTempCoeff) : -0.0037;
+  const summerTemp = Number.isFinite(Number(avgSummerTemp)) ? Number(avgSummerTemp) : 25;
+  if (source === 'pvgis-live' || source === 'pvlib-backed') {
+    return {
+      factor: 1,
+      lossRate: 0,
+      applied: false,
+      basis: `${source}-temperature-already-modeled`
+    };
+  }
+  const lossRate = coeff * (summerTemp - 25);
+  return {
+    factor: Math.max(0, 1 + lossRate),
+    lossRate,
+    applied: true,
+    basis: 'fallback-summer-temperature-derate'
+  };
+}
+
 export function buildBaseHourlyLoad8760(monthlyLoad, tariffType = 'residential') {
   const loadProfile = getLoadProfile(tariffType);
   const out = [];
@@ -516,7 +536,8 @@ export function computeFinancialTable({
     const yearExportRatio = Math.max(0,  exportRatio / loadGrowthFactor); // exports shrink as load absorbs more
     const selfE  = degradedEnergy * yearSelfRatio;
     const exportE = degradedEnergy * yearExportRatio;
-    const yearSavings = selfE * electricityPrice + (netMeteringEnabled ? exportE * escalatedExportRate : 0);
+    const paidExportE = netMeteringEnabled ? exportE : 0;
+    const yearSavings = selfE * electricityPrice + paidExportE * escalatedExportRate;
     let yearExpenses = (annualOMCost + annualInsurance) * Math.pow(1 + (tariffModel.expenseEscalationRate || 0), year - 1);
     const invLife = Math.round(Number(inverterLifetime) || 0);
     if (invLife > 0 && year % invLife === 0) yearExpenses += inverterReplaceCost * Math.pow(1 + (tariffModel.expenseEscalationRate || 0), year - 1);
@@ -535,7 +556,7 @@ export function computeFinancialTable({
       rate: electricityPrice.toFixed(2),
       exportRate: escalatedExportRate.toFixed(2),
       selfConsumptionKwh: Math.round(selfE),
-      paidExportKwh: Math.round(exportE),
+      paidExportKwh: Math.round(paidExportE),
       savings: Math.round(yearSavings),
       expenses: Math.round(yearExpenses),
       netCashFlow: Math.round(netCashFlow),
@@ -604,7 +625,7 @@ export function detectCalculationWarnings(results) {
   if (Number(results.cf) > 30) warnings.push('Kapasite faktörü PV için olağan dışı yüksek.');
   if (Number(results.cableLossPct) > 3) warnings.push('Kablo kaybı %3 üzerinde; kesit ve mesafe kontrol edilmeli.');
   if (results.usedFallback) warnings.push('PVGIS verisi alınamadı; fallback PSH hesabı düşük güven seviyesidir.');
-  if (results.nmMetrics?.unpaidGridExport > 0) warnings.push('Üretim fazlasının bir kısmı ödeme hesabına alınmadı; ihracat sınırı uygulanıyor.');
+  if (results.netMeteringEnabled && results.nmMetrics?.unpaidGridExport > 0) warnings.push('Üretim fazlasının bir kısmı ödeme hesabına alınmadı; ihracat sınırı uygulanıyor.');
   if (results.tariffModel?.effectiveRegime === 'sktt' && !results.tariffModel?.skttRate) warnings.push('SKTT seçili ancak SKTT birim fiyatı tanımlı değil.');
   if (results.tariffModel?.exportRate <= 0 && results.netMeteringEnabled) warnings.push('Şebeke ihracatı açık ancak ihracat birim fiyatı 0 TL/kWh.');
   if (results.tariffModel?.regulation?.warnings?.length) warnings.push(...results.tariffModel.regulation.warnings);

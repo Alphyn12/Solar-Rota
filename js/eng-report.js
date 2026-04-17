@@ -62,6 +62,7 @@ export function renderEngReport() {
   const dayUnit = report('days');
   const panelUnit = report('panelCountUnit');
   const statusText = value => statusLabel(value);
+  const financialRate = Number(r.financialSavingsRate || r.tariff || 0);
 
   let html = `
   <div class="eng-section-header">
@@ -266,8 +267,8 @@ IRR = ${r.irr === 'N/A' ? escapeHtml(report('unableToCalculate')) : r.irr + '%'}
   <div class="formula-card">
     <div class="formula-title">${escapeHtml(report('annualFormulaProduction'))}</div>
     <div class="formula-body">Eₜ = E₁ × (1−LID) × (1−δ)ⁿ⁻¹    LID=${r.lidFactor}%, δ=${(p.degradation*100).toFixed(2)}%/${escapeHtml(yearUnit)}
-Pₜ = P₀ × (1 + g)ᵗ⁻¹   g=${(r.annualPriceIncrease*100).toFixed(0)}%/${escapeHtml(yearUnit)}, P₀=${r.tariff} TL/kWh
-${escapeHtml(report('incomeFormula'))}
+Pₜ = P₀ × (1 + g)ᵗ⁻¹   g=${(r.annualPriceIncrease*100).toFixed(0)}%/${escapeHtml(yearUnit)}, P₀=${financialRate} TL/kWh
+${escapeHtml(report(state.scenarioKey === 'off-grid' ? 'incomeFormulaOffGrid' : 'incomeFormula'))}
 ${escapeHtml(report('expenseFormula'))}
 NCFₜ = ${escapeHtml(report('netCashFlow'))}
 NPVₜ = NCFₜ ÷ (1+d)ᵗ    d=${(r.discountRate*100).toFixed(0)}%
@@ -322,6 +323,9 @@ ${escapeHtml(report('tariffSourceAge'))}: ${tariffSource.ageDays ?? '—'} ${esc
   // ── 8. BESS ────────────────────────────────────────────────────────────────
   if (r.bessMetrics) {
     const bm = r.bessMetrics;
+    const offGridMetricNote = state.scenarioKey === 'off-grid'
+      ? `\n\n${escapeHtml(report('offGridMetricNote'))}`
+      : '';
     html += `
   <div class="eng-section-header">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2"/></svg>
@@ -335,7 +339,7 @@ ${escapeHtml(report('usableCapacity'))} = ${state.battery.capacity} kWh × ${(st
 
 ${escapeHtml(report('gridIndependence'))} = ${bm.gridIndependence}%
 ${escapeHtml(report('nightCoverage'))} = ${bm.nightCoverage}%
-${escapeHtml(report('batteryInstalledCost'))}: ${money(bm.batteryCost)}</div>
+${escapeHtml(report('batteryInstalledCost'))}: ${money(bm.batteryCost)}${offGridMetricNote}</div>
     <div class="formula-result">✓ ${escapeHtml(tx('report.batteryResult', { grid: bm.gridIndependence, night: bm.nightCoverage }))}</div>
   </div>`;
   }

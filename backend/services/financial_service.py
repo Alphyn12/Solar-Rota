@@ -14,9 +14,24 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
     annual_load = annual_load_kwh(request)
     import_rate = max(0, request.tariff.importRateTryKwh or 0)
     export_rate = max(0, request.tariff.exportRateTryKwh or 0)
-    net_metering = bool(request.system.netMeteringEnabled)
 
     scenario_key = request.scenario.key
+    net_metering = False if scenario_key == "off-grid" else bool(request.system.netMeteringEnabled)
+    off_grid_cost = max(0, float(getattr(request.tariff, "offGridCostPerKwhTry", 0) or 0))
+    financial_import_rate = (
+        off_grid_cost
+        if scenario_key == "off-grid" and off_grid_cost > 0
+        else import_rate * 2.5
+        if scenario_key == "off-grid"
+        else import_rate
+    )
+    financial_basis = (
+        "off-grid-user-alternative-energy-cost"
+        if scenario_key == "off-grid" and off_grid_cost > 0
+        else "off-grid-grid-tariff-times-2_5-proxy"
+        if scenario_key == "off-grid"
+        else "grid-import-tariff"
+    )
     self_consumption_target = {
         "off-grid": 0.90,
         "flexible-mobile": 0.88,
@@ -34,7 +49,7 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
     self_consumed = min(annual_energy * self_consumption_target, annual_load)
     export_kwh = max(0, annual_energy - self_consumed)
     paid_export = export_kwh if net_metering else 0
-    annual_savings = self_consumed * import_rate + paid_export * export_rate
+    annual_savings = self_consumed * financial_import_rate + paid_export * export_rate
 
     system_power_kwp = max(0, float(production.get("systemPowerKwp") or 0))
     rough_capex = _frontend_default_capex(request, system_power_kwp)
@@ -71,11 +86,20 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
         "gridExportKwh": round(export_kwh),
         "paidGridExportKwh": round(paid_export),
         "annualSavingsTry": round(annual_savings),
+        "financialSavingsRateTryKwh": round(financial_import_rate, 4),
+        "financialBasis": financial_basis,
         "roughCapexTry": round(rough_capex),
         "capexModel": "frontend-default-cost-basis",
         "simplePaybackYears": round(simple_payback, 2) if simple_payback else None,
         "npv25Try": round(project_npv),
         "roiPct": round(roi, 1),
+        "estimateOnly": True,
+        "warning": "estimate_only_not_for_commercial_quotes",
+        "warningDetail": (
+            "Backend financial payload uses heuristic scenario self-consumption targets "
+            "and default capex. It is not the commercial quote source; use the frontend "
+            "8760 financial model, governance, and BOM basis for customer-facing totals."
+        ),
     }
     proposal = {
         "scenarioKey": scenario_key,

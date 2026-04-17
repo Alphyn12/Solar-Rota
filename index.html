@@ -1820,7 +1820,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <span class="fin-val highlight" id="fin-cost">-</span>
     </div>
     <div class="fin-row" style="flex-wrap:wrap;gap:8px">
-      <span class="fin-label">Basit Geri Ödeme Süresi <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Toplam Maliyet ÷ Yıllık Tasarruf. Paranın zaman değerini dikkate almaz.</span></span></span>
+      <span class="fin-label" data-i18n="finance.simplePayback">Kümülatif Net Geri Ödeme Süresi</span>
       <div style="display:flex;align-items:center;flex:1;min-width:200px">
         <div class="payback-bar-wrap"><div class="payback-bar-fill" id="payback-bar" style="width:0%"></div></div>
         <span class="fin-val" id="fin-payback" style="white-space:nowrap">-</span>
@@ -1866,11 +1866,11 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div class="bess-metrics">
       <div class="bess-metric">
         <div class="bess-metric-val" id="bess-independence">--%</div>
-        <div class="bess-metric-label">Şebeke Bağımsızlığı</div>
+        <div class="bess-metric-label" data-i18n="report.gridIndependence">PV ile karşılanan yük oranı (sentetik dispatch)</div>
       </div>
       <div class="bess-metric">
         <div class="bess-metric-val" id="bess-night">--%</div>
-        <div class="bess-metric-label">Gece Kapsamı</div>
+        <div class="bess-metric-label" data-i18n="report.nightCoverage">Batarya ile kapatılan açık oranı (sentetik dispatch)</div>
       </div>
     </div>
     <div style="margin-top:12px;font-size:0.78rem;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:12px" id="bess-detail-row"></div>

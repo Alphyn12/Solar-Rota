@@ -1,6 +1,6 @@
-// v20: Faz-4 audit fixes — hourly battery dispatch SOC reserve + autonomy days,
-//      PVGIS P50/P90 confidence band, irrigation seasonal pump model, Monte Carlo NPV.
-const CACHE_NAME = 'solarRota-v20';
+// v21: Faz-1 calculation correctness fixes — PVGIS temperature parity,
+//      off-grid financial basis, honest payback/off-grid metric wording.
+const CACHE_NAME = 'solarRota-v21';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',

@@ -12,7 +12,8 @@ import {
   calculateEVLoad, calculateHeatPumpLoad, calculateSystemLayout,
   combineHourlyLoads, computeFinancialTable, detectCalculationWarnings,
   getMonthlyLoadKwh, buildBaseHourlyLoad8760, simulateBatteryOnHourlySummary,
-  simulateHourlyEnergy, resolveTaxTreatment, sumMonthlyArrays, normalizeMonthlyProductionToAnnual
+  simulateHourlyEnergy, resolveTaxTreatment, resolveProductionTemperatureAdjustment,
+  sumMonthlyArrays, normalizeMonthlyProductionToAnnual
 } from './calc-core.js';
 import { buildQuoteReadiness } from './turkey-regulation.js';
 import { buildProposalGovernance } from './proposal-governance.js';
@@ -197,8 +198,30 @@ export function calculateNMMetrics(annualEnergy, systemPower, dailyConsumption, 
   };
 }
 
+function suppressGridExportRevenue(nmMetrics, reason = 'Off-grid senaryoda fazla PV finansal gelire dönüşmez.') {
+  if (!nmMetrics) return nmMetrics;
+  return {
+    ...nmMetrics,
+    paidGridExport: 0,
+    unpaidGridExport: Math.round(nmMetrics.annualGridExport || 0),
+    annualExportRevenue: 0,
+    systemType: reason,
+    settlementMode: 'off-grid-no-export-revenue',
+    exportPolicy: {
+      ...(nmMetrics.exportPolicy || {}),
+      interval: 'off-grid-disabled',
+      requestedInterval: 'off-grid-disabled',
+      annualSellableExportCapKwh: 0,
+      paidBatteryExportAllowed: false
+    }
+  };
+}
+
 export async function runCalculation() {
   const state = window.state;
+  if (state.scenarioKey === 'off-grid') {
+    state.netMeteringEnabled = false;
+  }
   const fallbackBanner = document.getElementById('fallback-banner');
   if (fallbackBanner) fallbackBanner.style.display = 'none';
   spawnLoadingParticles();
@@ -260,15 +283,17 @@ export async function runCalculation() {
   const bifacialBaseGain = (state.panelType === 'bifacial' && panel.bifacialGain > 0)
     ? panel.bifacialGain * albedoScale
     : 0;
-  // Summer-peak temperature correction (used only on fallback path, matches historical behavior).
-  const tempLoss = panel.tempCoeff * (avgSummerTemp - 25);
-  // Annual-weighted temperature correction for the PVGIS path.
-  // Turkey annual mean air temp is ~12°C below the summer peak (IEA PVPS Turkey data).
-  // Panel operating temperature adds ~25°C above ambient; STC baseline is 25°C.
-  // Net correction relative to STC: tempCoeff × (annualAvg − 25).
-  // Typical: 35°C summer peak → 23°C annual avg → +0.68% annual gain vs STC 25°C baseline.
-  const annualAvgTemp    = avgSummerTemp - 12;
-  const annualTempLoss   = panel.tempCoeff * (annualAvgTemp - 25);
+  const fallbackTempAdjustment = resolveProductionTemperatureAdjustment({
+    source: 'fallback-psh',
+    panelTempCoeff: panel.tempCoeff,
+    avgSummerTemp
+  });
+  const pvgisTempAdjustment = resolveProductionTemperatureAdjustment({
+    source: 'pvgis-live',
+    panelTempCoeff: panel.tempCoeff,
+    avgSummerTemp
+  });
+  const tempLoss = fallbackTempAdjustment.lossRate;
 
   // Kablo kaybı entegrasyonu
   let cableLossFactor = 1.0;
@@ -376,7 +401,7 @@ export async function runCalculation() {
       ? inverterData.efficiency * (0.18 * (0.94 / 0.97) + 0.52 * (0.965 / 0.97) + 0.30 * 1.0)
       : inverterData.efficiency;
     const adjustedE = rawEnergy
-      * (usedFallback ? (1 + tempLoss) : (1 + annualTempLoss))  // Faz-2 Fix-7: PVGIS yoluna yıllık sıcaklık düzeltmesi eklendi
+      * (usedFallback ? fallbackTempAdjustment.factor : pvgisTempAdjustment.factor)
       * (usedFallback ? sec.azimuthCoeff : 1.0)
       * (usedFallback ? _getTiltCoeff(sec.tilt) : 1.0)   // FIX-2: tilt factor was missing from fallback path
       * (1 - effectiveShadingFactor / 100)
@@ -402,6 +427,7 @@ export async function runCalculation() {
       effectiveShadingFactor,
       osmShadowFactor,
       tempLossEnergy: usedFallback ? rawEnergy * Math.abs(Math.min(tempLoss, 0)) : 0,
+      temperatureAdjustment: usedFallback ? fallbackTempAdjustment : pvgisTempAdjustment,
       azimuthLossEnergy: usedFallback ? rawEnergy * (1 - sec.azimuthCoeff) : 0,
       bifacialGainEnergy: rawEnergy * (bifacialBonus - 1),
       soilingLoss: rawEnergy * (state.soilingFactor / 100),
@@ -505,14 +531,22 @@ export async function runCalculation() {
     notes: authoritativeBackend
       ? [
           'Backend pvlib is authoritative for this run.',
-          'Financials, proposal governance, reports, and exports use the backend annual and monthly production values.',
+          'Backend production is the authoritative energy basis; financials, proposal governance, reports, and exports are still calculated by the frontend 8760 financial model.',
+          'Backend financial payload, if present, is estimate-only and not used as the commercial quote source.',
           'Browser PVGIS/JS production is retained only as a comparison snapshot.'
         ]
       : [
           'Browser PVGIS/JS is authoritative for this run.',
           'Backend output was unavailable, non-authoritative, or fallback-only and is not mixed into downstream financials.'
-        ]
+      ]
   };
+  const authoritativeTempAdjustment = usedFallback
+    ? fallbackTempAdjustment
+    : resolveProductionTemperatureAdjustment({
+        source: authoritativeBackend ? 'pvlib-backed' : 'pvgis-live',
+        panelTempCoeff: panel.tempCoeff,
+        avgSummerTemp
+      });
 
   clearInterval(msgInterval);
   setLoadingProgress(100, 3);
@@ -673,7 +707,9 @@ export async function runCalculation() {
     adjustedEnergy, systemPower, hourlySummaryRaw.annualLoad / 365,
     tariffModel, annualPriceIncrease, state.usdToTry, hourlySummaryRaw, batterySummary
   );
-  if (!state.netMeteringEnabled) {
+  if (state.scenarioKey === 'off-grid') {
+    nmMetrics = suppressGridExportRevenue(nmMetrics);
+  } else if (!state.netMeteringEnabled) {
     nmMetrics = { ...nmMetrics, annualExportRevenue: 0, systemType: 'Şebeke satışı kapalı — fazla üretim geliri 0 TL' };
   }
 
@@ -690,6 +726,16 @@ export async function runCalculation() {
   const effectiveSavingsTariff = (state.scenarioKey === 'off-grid')
     ? (Number(state.offGridCostPerKwh) > 0 ? Number(state.offGridCostPerKwh) : tariff * 2.5)
     : tariff;
+  const financialTariffModel = state.scenarioKey === 'off-grid'
+    ? {
+        ...tariffModel,
+        importRate: effectiveSavingsTariff,
+        exportRate: 0,
+        financialBasis: Number(state.offGridCostPerKwh) > 0
+          ? 'off-grid-user-alternative-energy-cost'
+          : 'off-grid-grid-tariff-times-2_5-proxy'
+      }
+    : tariffModel;
 
   const annualSavings = nmMetrics.selfConsumedEnergy * effectiveSavingsTariff
     + (state.netMeteringEnabled ? nmMetrics.paidGridExport * exportRate : 0);
@@ -710,7 +756,7 @@ export async function runCalculation() {
     hourlySummary: hourlySummaryRaw,
     batterySummary,
     totalCost: financialCostBasis,
-    tariffModel,
+    tariffModel: financialTariffModel,
     panel,
     annualOMCost,
     annualInsurance,
@@ -723,6 +769,9 @@ export async function runCalculation() {
     annualLoadGrowth: Number(state.annualLoadGrowth) || 0  // Faz-3 Fix-13
   });
   const yearlyTable = financial.rows;
+  const displayAnnualSavings = state.scenarioKey === 'off-grid'
+    ? (financial.rows[0]?.savings || annualSavings)
+    : annualSavings;
   const paybackYear = financial.paybackYear;
   const discountedPaybackYear = financial.discountedPaybackYear;
   const totalExpenses25y = financial.totalExpenses25y;
@@ -767,11 +816,12 @@ export async function runCalculation() {
 
   const results = {
     panelCount, systemPower, annualEnergy: Math.round(adjustedEnergy),
-    annualSavings: Math.round(annualSavings), totalCost: Math.round(totalCost),
+    annualSavings: Math.round(displayAnnualSavings), totalCost: Math.round(totalCost),
     paybackYear, simplePaybackYear: financial.simplePaybackYear, discountedPaybackYear,
     npvTotal: Math.round(npvTotal), discountedCashFlow: Math.round(financial.discountedCashFlow), roi: roi.toFixed(1),
     co2Savings: co2Savings.toFixed(2), trees, monthlyData,
     tempLoss: (tempLoss * 100).toFixed(2), pr: (pr * 100).toFixed(1),
+    temperatureAdjustment: authoritativeTempAdjustment,
     psh: psh.toFixed(2), avgSummerTemp: avgSummerTemp.toFixed(1),
     usedFallback,
     pvgisRawEnergy: Math.round(pvgisRawEnergy), pvgisPoa: Math.round(pvgisPoa),
@@ -787,6 +837,9 @@ export async function runCalculation() {
     osmShadowFactor,
     ysp, cf, irr, lcoe,
     tariff, annualPriceIncrease, discountRate, tariffModel,
+    financialSavingsRate: effectiveSavingsTariff,
+    financialSavingsBasis: financialTariffModel.financialBasis || 'grid-import-tariff',
+    financialTariffModel,
     yearlyTable,
     annualOMCost, annualInsurance, inverterReplaceCost, inverterLifetime, batteryReplaceCost, batteryLifetime, totalExpenses25y,
     lidFactor: (lidFactor * 100).toFixed(1),
@@ -817,6 +870,8 @@ export async function runCalculation() {
     pvgisFailReason: usedFallback && !authoritativeBackend ? (window._pvgisLastError || 'unknown') : null,
     authoritativeEngineSource: authoritativeSourceMeta,
     authoritativeEngineResponse: authoritativeBackend || null,
+    authoritativeFinancialBasis: 'frontend-8760-financial-model',
+    backendFinancialEstimateWarning: authoritativeBackend?.financial?.warning || authoritativeBackend?.proposal?.warning || null,
     authoritativeEngineMode: authoritativeBackend ? 'python-pvlib-backed' : usedFallback ? 'local-fallback' : 'browser-pvgis',
     authoritativeEngineFallbackReason: authoritativeBackend ? null : state.authoritativeEngineFallbackReason || (usedFallback ? (window._pvgisLastError || 'PVGIS unavailable; local fallback used.') : null),
     authoritativeProduction,

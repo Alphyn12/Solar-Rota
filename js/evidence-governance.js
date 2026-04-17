@@ -183,6 +183,7 @@ export function buildTariffSourceGovernance(tariffModel = {}, evidenceGovernance
 
 export function buildStructuredProposalExport(state = {}, results = {}) {
   const gov = results.proposalGovernance || {};
+  const isOffGrid = state.scenarioKey === 'off-grid';
   const evidenceRegistry = results.evidenceGovernance?.registry || {};
   const evidenceSummary = Object.fromEntries(Object.entries(evidenceRegistry).map(([key, record]) => [
     key,
@@ -263,13 +264,15 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       approvalState: gov.approval?.state || null
     },
     financialSummary: {
-      simplePaybackYear: results.simplePaybackYear || null,
+      cumulativeNetPaybackYear: results.simplePaybackYear || null,
       discountedPaybackYear: results.discountedPaybackYear || null,
       roi: results.roi || null,
       npvTotal: results.npvTotal || null,
       irr: results.irr || null,
       lcoe: results.lcoe || null,
       annualSavings: results.annualSavings || null,
+      financialSavingsRate: results.financialSavingsRate || results.tariff || null,
+      financialSavingsBasis: results.financialSavingsBasis || (isOffGrid ? 'off-grid-alternative-energy-cost' : 'grid-import-tariff'),
       totalCost: results.totalCost || null,
       financing: gov.financing || null,
       maintenance: gov.maintenance || null,
@@ -278,7 +281,7 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
     tariff: {
       regime: results.tariffModel?.effectiveRegime || null,
       importRate: results.tariffModel?.importRate || null,
-      exportRate: results.tariffModel?.exportRate || null,
+      exportRate: isOffGrid ? 0 : (results.tariffModel?.exportRate || null),
       sourceDate: results.tariffModel?.sourceDate || null,
       sourceLabel: results.tariffModel?.sourceLabel || null
     },

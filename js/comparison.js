@@ -130,7 +130,11 @@ export function runComparison() {
     const annualOMCost = state.omEnabled ? Math.round(totalCost * ((Number(state.omRate) || 0) / 100)) : 0;
     const annualInsurance = state.omEnabled ? Math.round(totalCost * ((Number(state.insuranceRate) || 0) / 100)) : 0;
     const inverterReplaceCost = state.omEnabled ? Math.round((systemPower * invUnit) * 1.1) : 0;
-    const exportRate = state.netMeteringEnabled
+    const isOffGridScenario = state.scenarioKey === 'off-grid';
+    const financialTariffModel = isOffGridScenario && r.financialSavingsRate
+      ? { ...tariffModel, importRate: r.financialSavingsRate, exportRate: 0, financialBasis: r.financialSavingsBasis || 'off-grid-alternative-energy-cost' }
+      : tariffModel;
+    const exportRate = state.netMeteringEnabled && !isOffGridScenario
       ? tariffModel.exportRate
       : 0;
     const financial = computeFinancialTable({
@@ -138,13 +142,13 @@ export function runComparison() {
       hourlySummary,
       batterySummary: null,
       totalCost,
-      tariffModel,
+      tariffModel: financialTariffModel,
       panel,
       annualOMCost,
       annualInsurance,
       inverterLifetime: inv.lifetime || 12,
       inverterReplaceCost,
-      netMeteringEnabled: state.netMeteringEnabled,
+      netMeteringEnabled: state.netMeteringEnabled && !isOffGridScenario,
       exportRateOverride: exportRate
     });
 

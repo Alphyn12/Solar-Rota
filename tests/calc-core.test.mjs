@@ -4,6 +4,7 @@ import {
   computeFinancialTable,
   normalizeMonthlyProductionToAnnual,
   normalizeProfile,
+  resolveProductionTemperatureAdjustment,
   resolveTaxTreatment,
   simulateBatteryOnHourlySummary,
   simulateHourlyEnergy
@@ -21,6 +22,24 @@ nearly(normalized[1], 0.5);
 const normalizedMonthlyProduction = normalizeMonthlyProductionToAnnual(new Array(12).fill(100), 1234);
 assert.equal(normalizedMonthlyProduction.reduce((sum, value) => sum + value, 0), 1234);
 assert.equal(normalizedMonthlyProduction.length, 12);
+
+const pvgisTemperatureAdjustment = resolveProductionTemperatureAdjustment({
+  source: 'pvgis-live',
+  panelTempCoeff: -0.0037,
+  avgSummerTemp: 38
+});
+assert.equal(pvgisTemperatureAdjustment.factor, 1);
+assert.equal(pvgisTemperatureAdjustment.applied, false);
+assert.equal(pvgisTemperatureAdjustment.lossRate, 0);
+
+const fallbackTemperatureAdjustment = resolveProductionTemperatureAdjustment({
+  source: 'fallback-psh',
+  panelTempCoeff: -0.0037,
+  avgSummerTemp: 38
+});
+assert.ok(fallbackTemperatureAdjustment.applied);
+nearly(fallbackTemperatureAdjustment.factor, 1 + (-0.0037 * 13));
+assert.ok(fallbackTemperatureAdjustment.factor < 1);
 
 const hourly = simulateHourlyEnergy(
   new Array(12).fill(100),
@@ -92,6 +111,32 @@ const cappedFinancial = computeFinancialTable({
   exportRateOverride: 2
 });
 assert.equal(cappedFinancial.rows[0].savings, 900);
+
+const offGridRate = 19.5;
+const offGridTariffModel = { ...tariffModel, importRate: offGridRate, exportRate: 0, annualPriceIncrease: 0 };
+const offGridFinancial = computeFinancialTable({
+  annualEnergy: 1000,
+  hourlySummary: {
+    annualProduction: 1000,
+    annualLoad: 1000,
+    selfConsumption: 800,
+    gridExport: 200,
+    paidGridExport: 200,
+    gridImport: 200
+  },
+  batterySummary: null,
+  totalCost: 10000,
+  tariffModel: offGridTariffModel,
+  panel: { firstYearDeg: 0, degradation: 0 },
+  annualOMCost: 0,
+  annualInsurance: 0,
+  inverterLifetime: 12,
+  inverterReplaceCost: 0,
+  netMeteringEnabled: false,
+  exportRateOverride: 0
+});
+assert.equal(offGridFinancial.rows[0].savings, Math.round(800 * offGridRate));
+assert.equal(offGridFinancial.rows[0].paidExportKwh, 0);
 
 const skttTariff = buildTariffModel({
   tariffType: 'residential',

@@ -110,6 +110,9 @@ function computeSensitivityNpv(r, state, overrides = {}) {
     annualPriceIncrease: overrides._annualPriceIncrease ?? (state.annualPriceIncrease ?? 0.12),
     discountRate: r.discountRate
   });
+  const financialTariffModel = state.scenarioKey === 'off-grid' && r.financialSavingsRate
+    ? { ...tariffModel, importRate: r.financialSavingsRate, exportRate: 0, financialBasis: r.financialSavingsBasis || 'off-grid-alternative-energy-cost' }
+    : tariffModel;
   // When energy is scaled, the hourly summary must be scaled proportionally so
   // that selfRatio (= selfConsumption / annualEnergy) is preserved and savings
   // change correctly. Without this, the multiplier cancels out in the formula:
@@ -136,14 +139,14 @@ function computeSensitivityNpv(r, state, overrides = {}) {
     totalCost: overrides.costMultiplier != null
       ? r.totalCost * overrides.costMultiplier
       : r.totalCost,
-    tariffModel,
+    tariffModel: financialTariffModel,
     panel,
     annualOMCost: r.annualOMCost,
     annualInsurance: r.annualInsurance,
     inverterLifetime: r.inverterLifetime || 12,
     inverterReplaceCost: r.inverterReplaceCost,
     netMeteringEnabled: state.netMeteringEnabled,
-    exportRateOverride: state.netMeteringEnabled ? tariffModel.exportRate : 0
+    exportRateOverride: state.netMeteringEnabled && state.scenarioKey !== 'off-grid' ? tariffModel.exportRate : 0
   });
   return Math.round(financial.projectNPV);
 }
@@ -240,19 +243,22 @@ function computeScenario(r, inflationRate, state) {
     annualPriceIncrease: inflationRate,
     discountRate: r.discountRate
   });
+  const financialTariffModel = state.scenarioKey === 'off-grid' && r.financialSavingsRate
+    ? { ...tariffModel, importRate: r.financialSavingsRate, exportRate: 0, financialBasis: r.financialSavingsBasis || 'off-grid-alternative-energy-cost' }
+    : tariffModel;
   const financial = computeFinancialTable({
     annualEnergy: r.annualEnergy,
     hourlySummary: r.hourlySummary,
     batterySummary: r.batterySummary,
     totalCost,
-    tariffModel,
+    tariffModel: financialTariffModel,
     panel,
     annualOMCost: r.annualOMCost,
     annualInsurance: r.annualInsurance,
     inverterLifetime: r.inverterLifetime || 12,
     inverterReplaceCost: r.inverterReplaceCost,
     netMeteringEnabled: state.netMeteringEnabled,
-    exportRateOverride: state.netMeteringEnabled ? tariffModel.exportRate : 0
+    exportRateOverride: state.netMeteringEnabled && state.scenarioKey !== 'off-grid' ? tariffModel.exportRate : 0
   });
   const cashFlows = [-totalCost, ...financial.rows.map(row => row.netCashFlow)];
 

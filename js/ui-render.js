@@ -162,7 +162,7 @@ export function renderResults() {
     [tt('tariff'), moneyRate(r.tariff, 'kWh')],
     [tt('tariffRegime'), `${r.tariffModel?.effectiveRegime || '—'} / ${r.tariffModel?.contractedPowerKw || 0} kW`],
     [tt('skttLimit'), r.tariffModel?.regulation?.limitKwh ? `${Number(r.tariffModel.regulation.limitKwh).toLocaleString('tr-TR')} kWh/${i18n.t('units.year')}` : '—'],
-    [tt('exportSettlement'), state.netMeteringEnabled ? `${r.tariffModel?.exportCompensationPolicy?.interval || '—'} / ${r.tariffModel?.exportCompensationPolicy?.annualSellableExportCapKwh ? Math.round(r.tariffModel.exportCompensationPolicy.annualSellableExportCapKwh).toLocaleString('tr-TR') + ' kWh' : '—'}` : tt('netMeteringOff')],
+    [state.scenarioKey === 'off-grid' ? tt('surplusPvTreatment') : tt('exportSettlement'), state.netMeteringEnabled ? `${r.tariffModel?.exportCompensationPolicy?.interval || '—'} / ${r.tariffModel?.exportCompensationPolicy?.annualSellableExportCapKwh ? Math.round(r.tariffModel.exportCompensationPolicy.annualSellableExportCapKwh).toLocaleString('tr-TR') + ' kWh' : '—'}` : tt('netMeteringOff')],
     [tt('currency'), `${state.displayCurrency || 'TRY'} (USD/TRY: ${Number(state.usdToTry || 38.5).toFixed(2)} | ${state.exchangeRate?.source || 'manual/fallback'})`],
     [tt('tariffSourceDate'), r.tariffModel?.sourceDate || '—'],
     [tt('annualPriceIncrease'), ((r.annualPriceIncrease || 0) * 100).toFixed(1) + '%'],
@@ -240,14 +240,15 @@ function renderBESSResults(bess) {
   const section = document.getElementById('bess-result-section');
   if (!section) return;
   if (!bess) { section.style.display = 'none'; return; }
+  const isOffGrid = window.state?.scenarioKey === 'off-grid';
   section.style.display = 'block';
   document.getElementById('bess-model-badge').textContent = bess.modelName || 'Batarya';
   document.getElementById('bess-independence').textContent = `${bess.gridIndependence}%`;
   document.getElementById('bess-night').textContent = `${bess.nightCoverage}%`;
   // Faz-4 Fix-14: Show autonomy metrics when available (off-grid scenario)
   const autonomyHtml = (bess.autonomousDaysPct != null)
-    ? `<span>Otonom gün oranı: <strong>${bess.autonomousDaysPct}%</strong> (${bess.autonomousDays} gün/yıl)</span>
-    <span>Karşılanamayan yük: <strong>${Number(bess.unmetLoadKwh || 0).toLocaleString('tr-TR')} kWh/yıl</strong></span>`
+    ? `<span>Sentetik otonom gün oranı: <strong>${bess.autonomousDaysPct}%</strong> (${bess.autonomousDays} gün/yıl)</span>
+    <span>Sentetik dispatch karşılanamayan yük: <strong>${Number(bess.unmetLoadKwh || 0).toLocaleString('tr-TR')} kWh/yıl</strong></span>`
     : '';
   document.getElementById('bess-detail-row').innerHTML = `
     <span>Kullanılabilir kapasite: <strong>${bess.usableCapacity} kWh</strong></span>
@@ -255,6 +256,7 @@ function renderBESSResults(bess) {
     <span>Tahmini çevrim/yıl: <strong>${bess.cyclesPerYear || '—'}</strong></span>
     <span>Batarya maliyeti: <strong>${money(bess.batteryCost)}</strong></span>
     ${autonomyHtml}
+    ${isOffGrid ? '<span>Not: Bu metrikler sentetik 8760 dispatch ön değerlendirmesidir; off-grid yeterlilik garantisi değildir.</span>' : ''}
   `;
 }
 
@@ -351,6 +353,17 @@ function renderWarningsAndAudit(state, r) {
   const parityText = parity
     ? `${i18n.t('engine.authoritativeSource')}: ${parity.authoritativeSource || '—'} | ${i18n.t('engine.productionDelta')}: ${Number(parity.deltaKwh || 0).toLocaleString(localeTag())} kWh (${Number(parity.deltaPct || 0).toFixed(2)}%)`
     : '—';
+  const isOffGrid = state.scenarioKey === 'off-grid';
+  const energyBalanceLabel = state.netMeteringEnabled
+    ? i18n.t('audit.selfConsumptionExport')
+    : isOffGrid
+      ? i18n.t('audit.selfConsumptionOffGrid')
+      : i18n.t('audit.selfConsumptionSurplus');
+  const energyBalanceValue = state.netMeteringEnabled
+    ? `${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh / paid ${Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString(localeTag())} kWh / total ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag())} kWh`
+    : isOffGrid
+      ? `${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.unservedLoad')}: ${Math.round(r.bessMetrics?.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.curtailedPv')}: ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag())} kWh`
+      : `${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.exportRevenueDisabled')}`;
 
   audit.innerHTML = `
     <div class="card-title">${escapeHtml(i18n.t('governance.auditPanel'))}</div>
@@ -360,7 +373,7 @@ function renderWarningsAndAudit(state, r) {
         <tr><td>${escapeHtml(i18n.t('audit.location'))}</td><td>${escapeHtml(state.cityName || '—')} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
         <tr><td>${escapeHtml(i18n.t('audit.tariff'))}</td><td>${escapeHtml(r.tariffModel?.type || state.tariffType)} | ${escapeHtml(r.tariffModel?.effectiveRegime || '—')} | ${moneyRate(r.tariff, 'kWh')} | ${escapeHtml(i18n.t('audit.source'))}: ${escapeHtml(r.tariffModel?.sourceDate || '—')}</td></tr>
         <tr><td>${escapeHtml(i18n.t('audit.consumption'))}</td><td>${Math.round(r.hourlySummary?.annualLoad || state.dailyConsumption * 365).toLocaleString(localeTag())} kWh/${escapeHtml(i18n.t('units.year'))}</td></tr>
-        <tr><td>${escapeHtml(state.netMeteringEnabled ? i18n.t('audit.selfConsumptionExport') : i18n.t('audit.selfConsumptionSurplus'))}</td><td>${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh${state.netMeteringEnabled ? ' / paid ' + Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString(localeTag()) + ' kWh / total ' + Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag()) + ' kWh' : ' / export revenue disabled'}</td></tr>
+        <tr><td>${escapeHtml(energyBalanceLabel)}</td><td>${escapeHtml(energyBalanceValue)}</td></tr>
         <tr><td>${escapeHtml(i18n.t('audit.productionConfidenceRange'))}</td><td>${escapeHtml(i18n.t('audit.badYear'))}: ${Math.round(r.annualEnergy * 0.90).toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.baseYear'))}: ${r.annualEnergy.toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.goodYear'))}: ${Math.round(r.annualEnergy * 1.10).toLocaleString(localeTag())} kWh</td></tr>
         <tr><td>${escapeHtml(i18n.t('governance.confidenceLevel'))}</td><td>${escapeHtml(statusLabel(r.confidenceLevel))} (${escapeHtml(r.calculationMode)})</td></tr>
         <tr><td>${escapeHtml(i18n.t('scenario.label'))}</td><td>${escapeHtml(state.scenarioContext?.label || state.scenarioKey || 'On-Grid')} | ${escapeHtml(state.scenarioContext?.nextAction || '—')}</td></tr>

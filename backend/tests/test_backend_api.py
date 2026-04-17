@@ -118,10 +118,30 @@ def test_financial_proposal_contract():
     assert data["proposal"]["quoteReadiness"] == "backend-engineering-estimate"
     assert data["financial"]["simplePaybackYears"] is not None
     assert data["financial"]["capexModel"] == "frontend-default-cost-basis"
+    assert data["financial"]["estimateOnly"] is True
+    assert data["financial"]["warning"] == "estimate_only_not_for_commercial_quotes"
+    assert data["proposal"]["warning"] == "estimate_only_not_for_commercial_quotes"
     # FIX-6 (backend KDV parity): panels at 0% KDV, non-panel components at 20%.
     # 12.9 kWp mono: panel_cost=258_000 (0% KDV) + non_panel=159_800 (20% KDV → +31_960)
     # = 449_760. Old value was 501_360 (20% on full subtotal).
     assert data["financial"]["roughCapexTry"] == 449760
+
+
+def test_backend_offgrid_financial_uses_alternative_cost_and_blocks_export_revenue():
+    request = sample_request()
+    request["scenario"] = {"key": "off-grid", "label": "Off-Grid", "proposalTone": "autonomy"}
+    request["system"]["netMeteringEnabled"] = True
+    request["tariff"]["importRateTryKwh"] = 7.16
+    request["tariff"]["exportRateTryKwh"] = 3.0
+    request["tariff"]["offGridCostPerKwhTry"] = 19.5
+
+    response = client.post("/api/financial/proposal", json=request)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["financial"]["financialBasis"] == "off-grid-user-alternative-energy-cost"
+    assert data["financial"]["financialSavingsRateTryKwh"] == 19.5
+    assert data["financial"]["paidGridExportKwh"] == 0
+    assert abs(data["financial"]["annualSavingsTry"] - round(data["financial"]["selfConsumedEnergyKwh"] * 19.5)) <= 20
 
 
 @pytest.mark.parametrize(

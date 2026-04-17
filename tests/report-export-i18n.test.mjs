@@ -212,6 +212,9 @@ function sampleState() {
 }
 
 await setLocale('en');
+assert.equal(i18n.t('finance.simplePayback'), 'Cumulative Net Payback Period');
+assert.equal(i18n.t('report.simplePayback'), 'Cumulative Net Payback');
+assert.doesNotMatch(i18n.t('finance.simplePayback'), /Simple Payback/);
 window.state = sampleState();
 renderEngReport();
 assert.match(reportBody.innerHTML, /Panel and System Design/);
@@ -225,6 +228,38 @@ assert.doesNotMatch(reportBody.innerHTML, /Maliyet Kırılımı/);
 assert.doesNotMatch(reportBody.innerHTML, /Kullanılabilir çatı alanı/);
 assert.doesNotMatch(reportBody.innerHTML, /İnverter AC çıkış verimi/);
 
+const offGridState = sampleState();
+offGridState.scenarioKey = 'off-grid';
+offGridState.netMeteringEnabled = false;
+offGridState.battery = { capacity: 9.6, dod: 0.9 };
+offGridState.scenarioContext = {
+  label: 'Off-Grid',
+  nextAction: 'Validate autonomy with field evidence.',
+  resultFrame: 'Off-grid pre-feasibility sizing'
+};
+offGridState.results = {
+  ...offGridState.results,
+  financialSavingsRate: 19.5,
+  financialSavingsBasis: 'off-grid-user-alternative-energy-cost',
+  tariffModel: { ...offGridState.results.tariffModel, exportRate: 1.2 },
+  nmMetrics: { ...offGridState.results.nmMetrics, paidGridExport: 0, annualExportRevenue: 0 },
+  bessMetrics: {
+    modelName: 'LFP',
+    dailyProduction: 41.1,
+    usableCapacity: 8.6,
+    gridIndependence: '78.0',
+    nightCoverage: '62.0',
+    batteryCost: 120000
+  }
+};
+window.state = offGridState;
+renderEngReport();
+assert.match(reportBody.innerHTML, /PV-served load share \(synthetic dispatch\)/);
+assert.match(reportBody.innerHTML, /surplus PV is not monetized/);
+assert.match(reportBody.innerHTML, /synthetic 8760 dispatch pre-check/);
+assert.doesNotMatch(reportBody.innerHTML, /Grid Export \/ Settlement/);
+assert.doesNotMatch(reportBody.innerHTML, /Annual export/);
+
 const proposalEn = buildStructuredProposalExport(window.state, window.state.results);
 assert.equal(proposalEn.display.language, 'en');
 assert.equal(proposalEn.display.productName, 'Solar Rota');
@@ -236,6 +271,8 @@ assert.doesNotMatch(proposalEn.display.evidenceBlockers.join(' '), /supplierQuot
 assert.deepEqual(proposalEn.blockers, window.state.results.quoteReadiness.blockers);
 assert.equal(proposalEn.system.authoritativeProduction.annualEnergyKwh, 15000);
 assert.equal(proposalEn.system.productionParity.deltaKwh, 500);
+assert.equal(proposalEn.tariff.exportRate, 0);
+assert.equal(proposalEn.financialSummary.financialSavingsBasis, 'off-grid-user-alternative-energy-cost');
 
 const crmEn = buildCrmLeadExport(window.state, window.state.results);
 assert.equal(crmEn.display.language, 'en');
