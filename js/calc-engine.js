@@ -22,6 +22,7 @@ import { hasCompleteHourlyProfile8760, hasMeaningfulMonthlyConsumption } from '.
 import { buildPvEngineRequest } from './pv-engine-contracts.js';
 import { sourceMetaForCurrentCalculation } from './solar-engine-adapter.js';
 import { scenarioSourceQualityNote } from './scenario-workflows.js';
+import { buildOffgridLoadProfile, runOffgridDispatch, runBadWeatherScenario, buildOffgridResults } from './offgrid-dispatch.js';
 
 const LOADING_MSGS = [
   "PVGIS'ten güneş ışınım verisi alınıyor...",
@@ -673,13 +674,123 @@ export async function runCalculation() {
   let bessMetrics = null;
   let batterySummary = null;
   let batteryCostVal = 0;
-  if (state.batteryEnabled) {
+  let offgridL2Results = null;
+
+  if (state.scenarioKey === 'off-grid' && state.batteryEnabled) {
+    // ── Off-Grid Level 2 Dispatch ─────────────────────────────────────────────
+    // PV saatlik dizisi: hourlySummaryRaw'dan doğrudan al (tutarlılık garantisi)
+    const pvHourly = hourlySummaryRaw.hourly8760.map(h => h.production);
+
+    const batt = state.battery || {};
+    const battCap = Math.max(0, Number(batt.capacity) || 0);
+    const battDod = Math.max(0, Math.min(1, Number(batt.dod) || 0.9));
+    const battEff = Math.max(0.5, Math.min(1, Number(batt.efficiency) || 0.92));
+    const usableCapKwh = battCap * battDod;
+
+    const batteryConfig = {
+      usableCapacityKwh: usableCapKwh,
+      efficiency: battEff,
+      socReserveKwh: usableCapKwh * 0.10,
+      initialSocKwh: usableCapKwh * 0.10
+    };
+
+    const generatorConfig = {
+      enabled: !!(state.offgridGeneratorEnabled),
+      capacityKw: Math.max(0, Number(state.offgridGeneratorKw) || 0),
+      fuelCostPerKwh: Math.max(0, Number(state.offgridGeneratorFuelCostPerKwh) || 0)
+    };
+
+    // Yük profili oluştur (cihaz listesi veya basit mod)
+    const offgridLoadProfile = buildOffgridLoadProfile(
+      Array.isArray(state.offgridDevices) ? state.offgridDevices : [],
+      {
+        fallbackDailyKwh: hourlySummaryRaw.annualLoad / 365,
+        criticalFraction: Math.max(0.1, Math.min(1, Number(state.offgridCriticalFraction) || 0.6)),
+        tariffType: state.tariffType
+      }
+    );
+
+    // Normal dispatch çalıştır
+    const normalDispatch = runOffgridDispatch(
+      pvHourly,
+      offgridLoadProfile.totalHourly8760,
+      offgridLoadProfile.criticalHourly8760,
+      batteryConfig,
+      generatorConfig,
+      {}
+    );
+
+    // Kötü hava senaryosu (kullanıcı seçtiyse)
+    const weatherLevel = state.offgridBadWeatherLevel || '';
+    const badWeatherDispatch = weatherLevel
+      ? runBadWeatherScenario(
+          normalDispatch,
+          pvHourly,
+          offgridLoadProfile.totalHourly8760,
+          offgridLoadProfile.criticalHourly8760,
+          batteryConfig,
+          generatorConfig,
+          weatherLevel
+        )
+      : null;
+
+    // L2 sonuç nesnesi oluştur
+    offgridL2Results = buildOffgridResults(
+      normalDispatch,
+      badWeatherDispatch,
+      offgridLoadProfile,
+      generatorConfig,
+      {
+        alternativeEnergyCostPerKwh: effectiveSavingsTariff,
+        systemCapexTry: solarCost + modelBatteryCost(state.battery || {}),
+        generatorCapexTry: Math.max(0, Number(state.offgridGeneratorCapexTry) || 0)
+      }
+    );
+
+    // batterySummary köprüsü — mevcut finansal tablo + BESS renderer'ı çalışmaya devam etsin
+    batterySummary = {
+      usableCapacity: usableCapKwh,
+      batteryDischarge: normalDispatch.batteryToLoadKwh,
+      chargedFromPv: normalDispatch.chargedFromPvKwh,
+      remainingExport: 0,
+      remainingImport: normalDispatch.unmetLoadKwh,
+      totalSelfConsumption: normalDispatch.directPvToLoadKwh + normalDispatch.batteryToLoadKwh,
+      selfConsumptionRatio: normalDispatch.totalPvGeneratedKwh > 0
+        ? Math.min(1, (normalDispatch.directPvToLoadKwh + normalDispatch.chargedFromPvKwh) / normalDispatch.totalPvGeneratedKwh)
+        : 0,
+      gridIndependence: normalDispatch.totalLoadCoverage,
+      paidGridExport: 0,
+      unpaidGridExport: 0,
+      batteryExportPaid: 0,
+      cyclesPerYear: normalDispatch.cyclesPerYear,
+      unmetLoadKwh: normalDispatch.unmetLoadKwh,
+      autonomousDays: normalDispatch.autonomousDays,
+      autonomousDaysPct: normalDispatch.autonomousDaysPct,
+      socReserveKwh: batteryConfig.socReserveKwh,
+      monthly: [],
+      exportPolicy: { interval: 'off-grid-disabled' },
+      hourly8760: normalDispatch.hourly8760
+    };
+
+    bessMetrics = calculateBatteryMetrics(adjustedEnergy, hourlySummaryRaw.annualLoad / 365, state.battery);
+    bessMetrics.gridIndependence = (normalDispatch.totalLoadCoverage * 100).toFixed(1);
+    bessMetrics.criticalLoadCoverage = (normalDispatch.criticalLoadCoverage * 100).toFixed(1);
+    bessMetrics.nightCoverage = bessMetrics.gridIndependence;
+    bessMetrics.batteryStored = normalDispatch.batteryToLoadKwh.toFixed(1);
+    bessMetrics.cyclesPerYear = normalDispatch.cyclesPerYear.toFixed(0);
+    bessMetrics.autonomousDaysPct = normalDispatch.autonomousDaysPct;
+    bessMetrics.autonomousDays = normalDispatch.autonomousDays;
+    bessMetrics.unmetLoadKwh = Math.round(normalDispatch.unmetLoadKwh);
+    batteryCostVal = bessMetrics.batteryCost;
+
+  } else if (state.batteryEnabled) {
+    // ── On-grid / Hibrit Batarya — DEĞİŞMEDİ ─────────────────────────────────
     // Faz-4 Fix-14: Off-grid systems use 10% SOC reserve so the BMS always has
     // an emergency buffer; on-grid systems leave the full capacity available.
     batterySummary = simulateBatteryOnHourlySummary(hourlySummaryRaw, state.battery, {
       paidBatteryExportAllowed: false,
       exportPolicy: tariffModel.exportCompensationPolicy,
-      socReservePct: state.scenarioKey === 'off-grid' ? 0.10 : 0
+      socReservePct: 0
     });
     bessMetrics = calculateBatteryMetrics(adjustedEnergy, hourlySummaryRaw.annualLoad / 365, state.battery);
     if (batterySummary) {
@@ -687,7 +798,6 @@ export async function runCalculation() {
       bessMetrics.nightCoverage = (Math.min(1, batterySummary.batteryDischarge / Math.max(hourlySummaryRaw.gridImport, 1)) * 100).toFixed(1);
       bessMetrics.batteryStored = batterySummary.batteryDischarge.toFixed(1);
       bessMetrics.cyclesPerYear = batterySummary.cyclesPerYear.toFixed(0);
-      // Faz-4 Fix-14: Autonomy metrics for off-grid quality assessment
       bessMetrics.autonomousDaysPct = batterySummary.autonomousDaysPct;
       bessMetrics.autonomousDays = batterySummary.autonomousDays;
       bessMetrics.unmetLoadKwh = batterySummary.unmetLoadKwh;
@@ -752,6 +862,7 @@ export async function runCalculation() {
   const batteryReplaceCost = state.batteryEnabled ? Math.round(batteryCostVal * 0.85) : 0;
 
   const lidFactor = panel.firstYearDeg || 0;
+  const annualGeneratorCost = offgridL2Results ? (offgridL2Results.generatorFuelCostAnnual || 0) : 0;
   const financial = computeFinancialTable({
     annualEnergy: adjustedEnergy,
     hourlySummary: hourlySummaryRaw,
@@ -767,7 +878,8 @@ export async function runCalculation() {
     exportRateOverride: exportRate,
     batteryLifetime,
     batteryReplaceCost,
-    annualLoadGrowth: Number(state.annualLoadGrowth) || 0  // Faz-3 Fix-13
+    annualLoadGrowth: Number(state.annualLoadGrowth) || 0,  // Faz-3 Fix-13
+    annualGeneratorCost   // Off-grid jeneratör yakıt maliyeti (on-grid'de 0)
   });
   const yearlyTable = financial.rows;
   const displayAnnualSavings = state.scenarioKey === 'off-grid'
@@ -887,6 +999,7 @@ export async function runCalculation() {
     evLoad,
     heatPumpLoad,
     bessMetrics, nmMetrics,
+    offgridL2Results,
     evMetrics, heatPumpMetrics, structuralCheck, taxMetrics, billAnalysis,
     sectionResults: validSections.length > 1 ? validSections : null,
     hourlyProfileSource: state.hourlyProfileSource || (Array.isArray(state.hourlyConsumption8760) && state.hourlyConsumption8760.length >= 8760 ? 'hourly-uploaded' : 'synthetic'),

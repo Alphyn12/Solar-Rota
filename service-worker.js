@@ -15,6 +15,7 @@ const STATIC_ASSETS = [
   '/js/cable-loss.js',
   '/js/calc-core.js',
   '/js/calc-engine.js',
+  '/js/offgrid-dispatch.js',
   '/js/calculation-service.js',
   '/js/comparison.js',
   '/js/consumption-evidence.js',

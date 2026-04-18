@@ -223,7 +223,16 @@ window.state = {
   annualLoadGrowth: 0,
   hasSignedCustomerBillData: false,
   quoteInputsVerified: false,
-  quoteReadyApproved: false
+  quoteReadyApproved: false,
+  // Off-Grid Level 2 ayarları
+  offgridDevices: [],
+  offgridCriticalFraction: 0.6,
+  offgridAutonomyGoal: 'reliability',
+  offgridGeneratorEnabled: false,
+  offgridGeneratorKw: 5,
+  offgridGeneratorFuelCostPerKwh: 8,
+  offgridGeneratorCapexTry: 0,
+  offgridBadWeatherLevel: ''
 };
 
 const persistedProposal = !window.location.hash ? loadProposalState() : null;
@@ -655,6 +664,29 @@ function syncScenarioControls() {
   // Warn when off-grid cost is missing (calc will silently use tariff × 2.5)
   const offGridWarn = document.getElementById('off-grid-cost-warn');
   if (offGridWarn) offGridWarn.style.display = (s.scenarioKey === 'off-grid' && !s.offGridCostPerKwh) ? '' : 'none';
+  // Off-Grid Level 2 panel göster/gizle
+  const offgridL2Wrap = document.getElementById('offgrid-l2-wrap');
+  if (offgridL2Wrap) offgridL2Wrap.style.display = s.scenarioKey === 'off-grid' ? '' : 'none';
+  // Level 2 form alanlarını geri yükle
+  if (s.scenarioKey === 'off-grid') {
+    const fracEl = document.getElementById('offgrid-critical-fraction');
+    const fracValEl = document.getElementById('offgrid-critical-fraction-val');
+    if (fracEl) { fracEl.value = Math.round((Number(s.offgridCriticalFraction) || 0.6) * 100); }
+    if (fracValEl) fracValEl.textContent = (fracEl ? fracEl.value : 60) + '%';
+    const goalEl = document.getElementById('offgrid-autonomy-goal');
+    if (goalEl) goalEl.value = s.offgridAutonomyGoal || 'reliability';
+    const genEnabledEl = document.getElementById('offgrid-generator-enabled');
+    if (genEnabledEl) genEnabledEl.checked = !!s.offgridGeneratorEnabled;
+    const genKwEl = document.getElementById('offgrid-generator-kw');
+    if (genKwEl) genKwEl.value = s.offgridGeneratorKw || 5;
+    const genFuelEl = document.getElementById('offgrid-generator-fuel-cost');
+    if (genFuelEl) genFuelEl.value = s.offgridGeneratorFuelCostPerKwh || 8;
+    const genDetails = document.getElementById('offgrid-generator-details');
+    if (genDetails) genDetails.style.display = s.offgridGeneratorEnabled ? 'flex' : 'none';
+    const bwEl = document.getElementById('offgrid-bad-weather-level');
+    if (bwEl) bwEl.value = s.offgridBadWeatherLevel || '';
+    if (typeof renderOffgridDeviceTable === 'function') renderOffgridDeviceTable();
+  }
   // Faz-4 Fix-16: Show irrigation pump block for agricultural-irrigation; hide 365-day warning when pump data is entered
   const irrigWrap = document.getElementById('irrigation-pump-wrap');
   const irrigWarn = document.getElementById('irrigation-season-warn');
@@ -2087,3 +2119,116 @@ window.initBomBuilder = initBomBuilder;
 window.selectBomItem = selectBomItem;
 window.refreshExchangeRate = refreshExchangeRate;
 window.setManualUsdTryRate = setManualUsdTryRate;
+
+// ═══════════════════════════════════════════════════════════
+// OFF-GRID LEVEL 2 — Durum yönetimi ve cihaz listesi
+// ═══════════════════════════════════════════════════════════
+
+const _escHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function updateOffgridL2Settings() {
+  const s = window.state;
+  const fracEl = document.getElementById('offgrid-critical-fraction');
+  s.offgridCriticalFraction = fracEl ? Number(fracEl.value) / 100 : 0.6;
+  const goalEl = document.getElementById('offgrid-autonomy-goal');
+  s.offgridAutonomyGoal = goalEl ? goalEl.value : 'reliability';
+  const genEnabledEl = document.getElementById('offgrid-generator-enabled');
+  s.offgridGeneratorEnabled = genEnabledEl ? genEnabledEl.checked : false;
+  const genKwEl = document.getElementById('offgrid-generator-kw');
+  s.offgridGeneratorKw = genKwEl ? parseFloat(genKwEl.value) || 5 : 5;
+  const genFuelEl = document.getElementById('offgrid-generator-fuel-cost');
+  s.offgridGeneratorFuelCostPerKwh = genFuelEl ? parseFloat(genFuelEl.value) || 8 : 8;
+  const bwEl = document.getElementById('offgrid-bad-weather-level');
+  s.offgridBadWeatherLevel = bwEl ? bwEl.value : '';
+  // Jeneratör detay alanlarını göster/gizle
+  const genDetails = document.getElementById('offgrid-generator-details');
+  if (genDetails) genDetails.style.display = s.offgridGeneratorEnabled ? 'flex' : 'none';
+  persistState();
+}
+window.updateOffgridL2Settings = updateOffgridL2Settings;
+
+function addOffgridDevice() {
+  const s = window.state;
+  if (!Array.isArray(s.offgridDevices)) s.offgridDevices = [];
+  s.offgridDevices.push({ name: '', category: 'generic', powerW: 100, hoursPerDay: 4, isCritical: false });
+  renderOffgridDeviceTable();
+  persistState();
+}
+window.addOffgridDevice = addOffgridDevice;
+
+function removeOffgridDevice(idx) {
+  const s = window.state;
+  if (!Array.isArray(s.offgridDevices)) return;
+  s.offgridDevices.splice(idx, 1);
+  renderOffgridDeviceTable();
+  persistState();
+}
+window.removeOffgridDevice = removeOffgridDevice;
+
+function updateOffgridDevice(idx, field, value) {
+  const s = window.state;
+  if (!Array.isArray(s.offgridDevices) || !s.offgridDevices[idx]) return;
+  if (field === 'isCritical') {
+    s.offgridDevices[idx][field] = !!value;
+  } else if (field === 'powerW' || field === 'hoursPerDay') {
+    s.offgridDevices[idx][field] = Math.max(0, parseFloat(value) || 0);
+  } else {
+    s.offgridDevices[idx][field] = value;
+  }
+  renderOffgridDeviceTable();
+  persistState();
+}
+window.updateOffgridDevice = updateOffgridDevice;
+
+function renderOffgridDeviceTable() {
+  const s = window.state;
+  const devices = Array.isArray(s.offgridDevices) ? s.offgridDevices : [];
+  const tbody = document.getElementById('offgrid-device-tbody');
+  const tableWrap = document.getElementById('offgrid-device-table-wrap');
+  const emptyMsg = document.getElementById('offgrid-device-empty');
+  const totalEl = document.getElementById('offgrid-device-total-kwh');
+  if (!tbody) return;
+
+  if (devices.length === 0) {
+    if (tableWrap) tableWrap.style.display = 'none';
+    if (emptyMsg) emptyMsg.style.display = '';
+    if (totalEl) totalEl.textContent = '—';
+    return;
+  }
+  if (tableWrap) tableWrap.style.display = '';
+  if (emptyMsg) emptyMsg.style.display = 'none';
+
+  const CATEGORIES = ['lighting','refrigerator','pump','entertainment','generic'];
+  const CATEGORY_LABELS = { lighting:'Aydınlatma', refrigerator:'Buzdolabı', pump:'Pompa', entertainment:'Eğlence', generic:'Genel' };
+  let totalDailyKwh = 0;
+
+  tbody.innerHTML = devices.map((d, i) => {
+    const daily = (Math.max(0, Number(d.powerW) || 0) / 1000) * Math.max(0, Number(d.hoursPerDay) || 0);
+    totalDailyKwh += daily;
+    return `<tr style="border-bottom:1px solid rgba(148,163,184,0.1)">
+      <td style="padding:3px 6px"><input type="text" value="${_escHtml(d.name || '')}" placeholder="Örn. Aydınlatma"
+        style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);width:110px;font-size:0.75rem"
+        oninput="updateOffgridDevice(${i},'name',this.value)"/></td>
+      <td style="padding:3px 6px;text-align:right"><input type="number" value="${Number(d.powerW)||100}" min="1" max="50000"
+        style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);width:70px;font-size:0.75rem;text-align:right"
+        oninput="updateOffgridDevice(${i},'powerW',this.value)"/></td>
+      <td style="padding:3px 6px;text-align:right"><input type="number" value="${Number(d.hoursPerDay)||4}" min="0.1" max="24" step="0.5"
+        style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);width:65px;font-size:0.75rem;text-align:right"
+        oninput="updateOffgridDevice(${i},'hoursPerDay',this.value)"/></td>
+      <td style="padding:3px 6px;text-align:right;font-weight:600;color:var(--text)">${daily.toFixed(2)}</td>
+      <td style="padding:3px 6px;text-align:center"><input type="checkbox" ${d.isCritical ? 'checked' : ''}
+        onchange="updateOffgridDevice(${i},'isCritical',this.checked)"
+        style="accent-color:#EF4444;cursor:pointer"/></td>
+      <td style="padding:3px 6px"><select
+        style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 4px;color:var(--text);font-size:0.72rem"
+        onchange="updateOffgridDevice(${i},'category',this.value)">
+        ${CATEGORIES.map(c => `<option value="${c}" ${(d.category||'generic')===c?'selected':''}>${_escHtml(CATEGORY_LABELS[c]||c)}</option>`).join('')}
+      </select></td>
+      <td style="padding:3px 6px"><button onclick="removeOffgridDevice(${i})"
+        style="background:rgba(239,68,68,0.1);color:#EF4444;border:none;border-radius:4px;padding:2px 8px;font-size:0.72rem;cursor:pointer">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  if (totalEl) totalEl.textContent = totalDailyKwh.toFixed(2) + ' kWh/gün';
+}
+window.renderOffgridDeviceTable = renderOffgridDeviceTable;

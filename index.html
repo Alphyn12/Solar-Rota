@@ -1108,6 +1108,117 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             oninput="updateTariffAssumptions()"/>
           <div id="off-grid-cost-warn" style="display:none;margin-top:4px;font-size:0.75rem;color:#F59E0B;max-width:260px" data-i18n="offGrid.costMissingWarn">Maliyet girilmedi — 2.5× şebeke tarifesi varsayılıyor.</div>
         </div>
+
+        <!-- ═══ OFF-GRID LEVEL 2 GİRİŞ AYARLARI — yalnızca off-grid senaryosunda görünür ═══ -->
+        <div id="offgrid-l2-wrap" style="display:none;margin-top:16px;padding:14px 16px;background:rgba(139,92,246,0.07);border-radius:10px;border:1px solid rgba(139,92,246,0.25)">
+          <div style="font-size:0.8rem;font-weight:700;color:#8B5CF6;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <span data-i18n="offgridL2.sectionTitle">Off-Grid Level 2 Ayarları</span>
+          </div>
+
+          <!-- Otonom Hedef Seçici -->
+          <div style="margin-bottom:14px">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px" data-i18n="offgridL2.autonomyGoalLabel">Otonom Hedef</div>
+            <select id="offgrid-autonomy-goal"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.85rem;width:100%"
+              onchange="updateOffgridL2Settings()">
+              <option value="cost-focus"      data-i18n="offgridL2.goalCostFocus">Maliyet Odaklı (minimum batarya)</option>
+              <option value="reliability"     data-i18n="offgridL2.goalReliability">Güvenilirlik Odaklı (hedef ≥%90 tam kapsama)</option>
+              <option value="critical-safety" data-i18n="offgridL2.goalCriticalSafety">Kritik Yük Güvencesi (kritik %100, toplam makul)</option>
+            </select>
+          </div>
+
+          <!-- Basit Mod: Kritik Yük Oranı -->
+          <div id="offgrid-simple-mode-wrap" style="margin-bottom:14px">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px">
+              <span data-i18n="offgridL2.criticalFractionLabel">Kritik Yük Oranı</span>
+              <span id="offgrid-critical-fraction-val" style="font-weight:700;color:#8B5CF6;margin-left:6px">60%</span>
+            </div>
+            <input type="range" id="offgrid-critical-fraction" min="10" max="100" step="5" value="60"
+              style="width:100%;accent-color:#8B5CF6"
+              oninput="document.getElementById('offgrid-critical-fraction-val').textContent=this.value+'%'; updateOffgridL2Settings()"/>
+            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.criticalFractionHint">
+              Toplam günlük tüketimin yüzde kaçı kritik yük (kesintisiz gerekli)?
+            </div>
+          </div>
+
+          <!-- Cihaz Listesi (Gelişmiş Mod) -->
+          <div id="offgrid-device-section" style="margin-bottom:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="font-size:0.75rem;font-weight:600;color:var(--text)" data-i18n="offgridL2.deviceListTitle">Cihaz Listesi (İsteğe Bağlı)</div>
+              <button onclick="addOffgridDevice()"
+                style="font-size:0.72rem;background:rgba(139,92,246,0.15);color:#8B5CF6;border:1px solid rgba(139,92,246,0.3);border-radius:6px;padding:4px 10px;cursor:pointer"
+                data-i18n="offgridL2.addDevice">+ Cihaz Ekle</button>
+            </div>
+            <div id="offgrid-device-table-wrap" style="display:none;overflow-x:auto">
+              <table style="width:100%;font-size:0.75rem;border-collapse:collapse" id="offgrid-device-table">
+                <thead>
+                  <tr style="color:var(--text-muted);border-bottom:1px solid rgba(148,163,184,0.2)">
+                    <th style="text-align:left;padding:4px 6px" data-i18n="offgridL2.deviceName">Cihaz</th>
+                    <th style="text-align:right;padding:4px 6px" data-i18n="offgridL2.devicePowerW">Güç (W)</th>
+                    <th style="text-align:right;padding:4px 6px" data-i18n="offgridL2.deviceHours">Saat/Gün</th>
+                    <th style="text-align:right;padding:4px 6px" data-i18n="offgridL2.deviceDailyKwh">kWh/Gün</th>
+                    <th style="text-align:center;padding:4px 6px" data-i18n="offgridL2.deviceCritical">Kritik?</th>
+                    <th style="text-align:center;padding:4px 6px" data-i18n="offgridL2.deviceCategory">Kategori</th>
+                    <th style="padding:4px 6px"></th>
+                  </tr>
+                </thead>
+                <tbody id="offgrid-device-tbody"></tbody>
+                <tfoot>
+                  <tr style="border-top:1px solid rgba(148,163,184,0.2);font-weight:600">
+                    <td colspan="3" style="padding:4px 6px;color:var(--text-muted)" data-i18n="offgridL2.deviceTotal">Toplam</td>
+                    <td style="text-align:right;padding:4px 6px" id="offgrid-device-total-kwh">—</td>
+                    <td colspan="3"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div id="offgrid-device-empty" style="font-size:0.72rem;color:var(--text-muted);font-style:italic" data-i18n="offgridL2.deviceListEmpty">
+              Cihaz eklenmedi — basit mod (günlük kWh + kritik oran) kullanılıyor.
+            </div>
+          </div>
+
+          <!-- Jeneratör / Yedek Güç -->
+          <div style="margin-bottom:14px;padding:10px 12px;background:rgba(245,158,11,0.06);border-radius:8px;border:1px solid rgba(245,158,11,0.2)">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              <span style="font-size:0.78rem;font-weight:600;color:#F59E0B" data-i18n="offgridL2.generatorTitle">Jeneratör / Yedek Güç</span>
+              <label style="display:flex;align-items:center;gap:6px;margin-left:auto;cursor:pointer">
+                <input type="checkbox" id="offgrid-generator-enabled" onchange="updateOffgridL2Settings()"/>
+                <span style="font-size:0.72rem;color:var(--text-muted)" data-i18n="offgridL2.generatorEnable">Etkin</span>
+              </label>
+            </div>
+            <div id="offgrid-generator-details" style="display:none;flex-wrap:wrap;gap:10px">
+              <div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px" data-i18n="offgridL2.generatorKw">Kapasite (kW)</div>
+                <input type="number" id="offgrid-generator-kw" value="5" min="0.5" max="500" step="0.5"
+                  style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);width:100px;font-size:0.85rem"
+                  oninput="updateOffgridL2Settings()"/>
+              </div>
+              <div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px" data-i18n="offgridL2.generatorFuelCost">Yakıt Maliyeti (₺/kWh)</div>
+                <input type="number" id="offgrid-generator-fuel-cost" value="8" min="0" max="100" step="0.5"
+                  style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);width:120px;font-size:0.85rem"
+                  oninput="updateOffgridL2Settings()"/>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kötü Hava Dayanıklılık Testi -->
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px" data-i18n="offgridL2.badWeatherLabel">Kötü Hava Dayanıklılık Testi</div>
+            <select id="offgrid-bad-weather-level"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.85rem;width:100%"
+              onchange="updateOffgridL2Settings()">
+              <option value=""         data-i18n="offgridL2.badWeatherNone">Simüle etme</option>
+              <option value="light"    data-i18n="offgridL2.badWeatherLight">Hafif (−%30 PV, 3 bulutlu gün)</option>
+              <option value="moderate" data-i18n="offgridL2.badWeatherModerate">Orta (−%55 PV, 5 ardışık gün)</option>
+              <option value="severe"   data-i18n="offgridL2.badWeatherSevere">Şiddetli (−%75 PV, Karadeniz/Dağ kışı)</option>
+            </select>
+          </div>
+        </div>
+        <!-- ═══ OFF-GRID LEVEL 2 GİRİŞ SONU ═══ -->
+
         <div id="irrigation-season-warn" style="display:none;margin-top:6px;font-size:0.75rem;color:#F59E0B;max-width:300px" data-i18n="agriculturalIrrigation.seasonWarn">Yıllık 365 gün kullanım varsayıldı. Sulama sezonu kısaysa günlük tüketimi sulama süresine göre ayarlayın.</div>
         <!-- Faz-4 Fix-16: Irrigation pump inputs — shown only for agricultural-irrigation scenario -->
         <div id="irrigation-pump-wrap" style="display:none;margin-top:8px;padding:10px 12px;background:rgba(16,185,129,0.07);border-radius:8px;border:1px solid rgba(16,185,129,0.25)">
@@ -2024,6 +2135,64 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     </div>
     <div style="margin-top:12px;font-size:0.78rem;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:12px" id="bess-detail-row"></div>
   </div>
+
+  <!-- ═══ OFF-GRID LEVEL 2 SONUÇ EKRANı — yalnızca off-grid senaryosunda görünür ═══ -->
+  <div id="offgrid-l2-result-section" style="display:none;margin-top:16px">
+
+    <!-- Dispatch Özeti -->
+    <div style="background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.25);border-radius:var(--radius,12px);padding:20px;margin-bottom:12px">
+      <div style="font-family:var(--font-display,inherit);font-size:0.95rem;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;color:#8B5CF6">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <span data-i18n="offgridL2.dispatchSummaryTitle">Dispatch Özeti</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px" id="offgrid-dispatch-grid"></div>
+    </div>
+
+    <!-- Kapsama Metrikleri -->
+    <div style="background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.25);border-radius:var(--radius,12px);padding:20px;margin-bottom:12px">
+      <div style="font-family:var(--font-display,inherit);font-size:0.88rem;font-weight:700;margin-bottom:12px;color:#8B5CF6" data-i18n="offgridL2.coverageTitle">Kapsama Metrikleri</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="text-align:center;background:rgba(139,92,246,0.09);border:1px solid rgba(139,92,246,0.2);border-radius:10px;padding:14px">
+          <div style="font-family:var(--font-display,inherit);font-size:1.8rem;font-weight:800;color:#8B5CF6" id="offgrid-total-coverage">--%</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.totalCoverageLabel">Toplam Yük Kapsama</div>
+        </div>
+        <div style="text-align:center;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:14px">
+          <div style="font-family:var(--font-display,inherit);font-size:1.8rem;font-weight:800;color:#EF4444" id="offgrid-critical-coverage">--%</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.criticalCoverageLabel">Kritik Yük Kapsama</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Jeneratör Analizi (jeneratör etkinse görünür) -->
+    <div id="offgrid-generator-result-wrap" style="display:none;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius,12px);padding:16px;margin-bottom:12px">
+      <div style="font-size:0.8rem;font-weight:600;color:#F59E0B;margin-bottom:8px" data-i18n="offgridL2.generatorResultTitle">Jeneratör Analizi</div>
+      <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:0.78rem" id="offgrid-generator-result-details"></div>
+    </div>
+
+    <!-- Kötü Hava Senaryosu (seçildiyse görünür) -->
+    <div id="offgrid-badweather-result-wrap" style="display:none;background:rgba(100,116,139,0.07);border:1px solid rgba(100,116,139,0.25);border-radius:var(--radius,12px);padding:16px;margin-bottom:12px">
+      <div style="font-size:0.8rem;font-weight:600;color:var(--text-muted);margin-bottom:8px" data-i18n="offgridL2.badWeatherResultTitle">Kötü Hava Senaryosu</div>
+      <div id="offgrid-badweather-result-details" style="font-size:0.78rem;color:var(--text-muted)"></div>
+    </div>
+
+    <!-- Yaşam Döngüsü Maliyeti -->
+    <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:var(--radius,12px);padding:14px;margin-bottom:12px">
+      <div style="font-size:0.78rem;font-weight:600;color:#06B6D4;margin-bottom:6px" data-i18n="offgridL2.lifecycleCostTitle">Yaşam Döngüsü Maliyeti (25 yıl bazlı)</div>
+      <div style="font-size:0.78rem;color:var(--text-muted)" id="offgrid-lifecycle-details"></div>
+    </div>
+
+    <!-- Dürüstlük / Metodoloji Açıklaması -->
+    <div style="background:rgba(100,116,139,0.05);border:1px solid rgba(100,116,139,0.2);border-radius:8px;padding:12px">
+      <div style="font-size:0.72rem;color:var(--text-muted);line-height:1.55">
+        <div style="font-weight:600;margin-bottom:4px" data-i18n="offgridL2.methodologyTitle">Metodoloji Notu</div>
+        <div data-i18n="offgridL2.methodologyBody">Bu sonuçlar sentetik 8760-saat dispatch ön değerlendirmesidir. Kritik yük önceliği ve jeneratör desteği basitleştirilmiş model üzerinden hesaplanmıştır. Gerçek off-grid fizibilite analizi için saha ölçümü, yük ölçeri ve detaylı enerji analizi gereklidir.</div>
+        <div id="offgrid-l2-version" style="margin-top:4px;font-size:0.65rem;opacity:0.5"></div>
+        <div id="offgrid-l2-load-mode" style="margin-top:2px;font-size:0.65rem;opacity:0.5"></div>
+      </div>
+    </div>
+
+  </div>
+  <!-- ═══ OFF-GRID LEVEL 2 SONUÇ SONU ═══ -->
 
   <!-- Net metering results -->
   <div class="nm-result-wrap" id="nm-result-section" style="display:none">

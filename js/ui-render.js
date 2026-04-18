@@ -212,6 +212,7 @@ export function renderResults() {
   window.renderPRGauge(parseFloat(r.pr));
 
   renderBESSResults(r.bessMetrics);
+  renderOffgridL2Results(r.offgridL2Results, state);
   renderNMResults(r.nmMetrics, state.netMeteringEnabled);
   renderOnGridResultLayers(state, r);
   renderWarningsAndAudit(state, r);
@@ -259,6 +260,98 @@ function renderBESSResults(bess) {
     ${autonomyHtml}
     ${isOffGrid ? `<div class="off-grid-honesty-note">${escapeHtml(i18n.t('offGrid.syntheticDispatchNote'))}</div><div class="off-grid-honesty-note off-grid-honesty-warn">${escapeHtml(i18n.t('offGrid.notFeasibilityAnalysis'))}</div>` : ''}
   `;
+}
+
+function renderOffgridL2Results(offgridL2Results, state) {
+  const section = document.getElementById('offgrid-l2-result-section');
+  if (!section) return;
+
+  if (state?.scenarioKey !== 'off-grid' || !offgridL2Results) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+
+  const L = offgridL2Results;
+  const locale = localeTag();
+
+  // Dispatch özeti kartları
+  const dispatchGrid = document.getElementById('offgrid-dispatch-grid');
+  if (dispatchGrid) {
+    const items = [
+      { label: i18n.t('offgridL2.directPvLabel'),  value: `${Math.round(L.directPvKwh).toLocaleString(locale)} kWh`, color: '#F59E0B' },
+      { label: i18n.t('offgridL2.batteryLabel'),   value: `${Math.round(L.batteryKwh).toLocaleString(locale)} kWh`, color: '#8B5CF6' },
+      { label: i18n.t('offgridL2.curtailedLabel'), value: `${Math.round(L.curtailedPvKwh).toLocaleString(locale)} kWh`, color: '#94A3B8' },
+      { label: i18n.t('offgridL2.unmetLabel'),     value: `${Math.round(L.unmetLoadKwh).toLocaleString(locale)} kWh`, color: '#EF4444' },
+    ];
+    if (L.generatorEnabled) {
+      items.splice(2, 0, { label: i18n.t('offgridL2.generatorLabel'), value: `${Math.round(L.generatorKwh).toLocaleString(locale)} kWh`, color: '#F59E0B' });
+    }
+    dispatchGrid.innerHTML = items.map(it => `
+      <div style="text-align:center;background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.15);border-radius:8px;padding:10px">
+        <div style="font-family:var(--font-display,inherit);font-size:1.05rem;font-weight:700;color:${it.color}">${escapeHtml(it.value)}</div>
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px">${escapeHtml(it.label)}</div>
+      </div>`).join('');
+  }
+
+  // Kapsama metrikleri
+  const totalCovEl = document.getElementById('offgrid-total-coverage');
+  const critCovEl = document.getElementById('offgrid-critical-coverage');
+  if (totalCovEl) totalCovEl.textContent = `${(L.totalLoadCoverage * 100).toFixed(1)}%`;
+  if (critCovEl) critCovEl.textContent = `${(L.criticalLoadCoverage * 100).toFixed(1)}%`;
+
+  // Jeneratör analizi
+  const genResultWrap = document.getElementById('offgrid-generator-result-wrap');
+  const genResultDetails = document.getElementById('offgrid-generator-result-details');
+  if (genResultWrap && genResultDetails) {
+    if (L.generatorEnabled) {
+      genResultWrap.style.display = '';
+      genResultDetails.innerHTML = [
+        `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genRunHours'))}: <strong style="color:var(--text)">${Math.round(L.generatorRunHoursPerYear).toLocaleString(locale)} h/yıl</strong></span>`,
+        `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genFuelCost'))}: <strong style="color:var(--text)">${money(L.generatorFuelCostAnnual)} / yıl</strong></span>`,
+        `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genKwh'))}: <strong style="color:var(--text)">${Math.round(L.generatorKwh).toLocaleString(locale)} kWh/yıl</strong></span>`,
+      ].join('');
+    } else {
+      genResultWrap.style.display = 'none';
+    }
+  }
+
+  // Kötü hava senaryosu
+  const bwWrap = document.getElementById('offgrid-badweather-result-wrap');
+  const bwDetails = document.getElementById('offgrid-badweather-result-details');
+  if (bwWrap && bwDetails) {
+    const bw = L.badWeatherScenario;
+    if (bw) {
+      bwWrap.style.display = '';
+      const levelKey = 'offgridL2.badWeather_' + bw.weatherLevel;
+      const addGenPart = bw.additionalGeneratorKwh > 0
+        ? ` &nbsp;|&nbsp; ${escapeHtml(i18n.t('offgridL2.addGenKwh'))}: <strong>${Math.round(bw.additionalGeneratorKwh).toLocaleString(locale)} kWh</strong>`
+        : '';
+      bwDetails.innerHTML = `
+        ${escapeHtml(i18n.t('offgridL2.badWeatherLevel'))}: <strong style="color:var(--text)">${escapeHtml(i18n.t(levelKey))}</strong>
+        &nbsp;|&nbsp; ${escapeHtml(i18n.t('offgridL2.criticalDropLabel'))}: <strong style="color:#EF4444">−${bw.criticalCoverageDropPct.toFixed(1)}%</strong>
+        &nbsp;|&nbsp; ${escapeHtml(i18n.t('offgridL2.totalDropLabel'))}: <strong style="color:#F59E0B">−${bw.totalCoverageDropPct.toFixed(1)}%</strong>
+        ${addGenPart}
+      `;
+    } else {
+      bwWrap.style.display = 'none';
+    }
+  }
+
+  // Yaşam döngüsü maliyeti
+  const lcWrap = document.getElementById('offgrid-lifecycle-details');
+  if (lcWrap) {
+    lcWrap.innerHTML = `${escapeHtml(i18n.t('offgridL2.lifecycleAnnual'))}: <strong>${money(L.lifecycleCostAnnual)} / ${escapeHtml(i18n.t('units.year'))}</strong>`;
+  }
+
+  // Versiyon damgası ve yük modu
+  const versionEl = document.getElementById('offgrid-l2-version');
+  if (versionEl) versionEl.textContent = L.dispatchVersion || '';
+  const loadModeEl = document.getElementById('offgrid-l2-load-mode');
+  if (loadModeEl) {
+    const modeKey = L.loadMode === 'device-list' ? 'offgridL2.loadModeDeviceList' : 'offgridL2.loadModeSimple';
+    loadModeEl.textContent = i18n.t(modeKey);
+  }
 }
 
 function renderNMResults(nm, enabled) {
