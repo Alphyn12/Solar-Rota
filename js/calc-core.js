@@ -25,6 +25,10 @@ export function normalizeProfile(profile) {
 }
 
 export function getLoadProfile(tariffType = 'residential') {
+  if (tariffType === 'daytime-heavy') return normalizeProfile([0.01,0.01,0.01,0.01,0.01,0.02,0.03,0.05,0.07,0.08,0.09,0.10,0.10,0.09,0.08,0.07,0.06,0.04,0.03,0.02,0.01,0.01,0.01,0.01]);
+  if (tariffType === 'balanced') return normalizeProfile([0.03,0.025,0.02,0.02,0.025,0.035,0.045,0.055,0.055,0.05,0.045,0.045,0.045,0.045,0.045,0.05,0.055,0.06,0.06,0.055,0.045,0.04,0.035,0.03]);
+  if (tariffType === 'evening-heavy') return normalizeProfile([0.02,0.015,0.015,0.015,0.02,0.025,0.035,0.04,0.035,0.03,0.03,0.03,0.035,0.035,0.04,0.05,0.065,0.085,0.095,0.09,0.075,0.06,0.045,0.03]);
+  if (tariffType === 'business-hours') return normalizeProfile([0.005,0.005,0.005,0.005,0.005,0.01,0.025,0.055,0.085,0.095,0.10,0.10,0.095,0.095,0.09,0.08,0.06,0.035,0.015,0.01,0.005,0.005,0.005,0.005]);
   if (tariffType === 'commercial') return normalizeProfile(COMMERCIAL_LOAD);
   if (tariffType === 'industrial') return normalizeProfile(INDUSTRIAL_LOAD);
   return normalizeProfile(RESIDENTIAL_LOAD);
@@ -146,8 +150,8 @@ export function resolveProductionTemperatureAdjustment({ source = 'fallback-psh'
   };
 }
 
-export function buildBaseHourlyLoad8760(monthlyLoad, tariffType = 'residential') {
-  const loadProfile = getLoadProfile(tariffType);
+export function buildBaseHourlyLoad8760(monthlyLoad, tariffType = 'residential', loadProfileKey = null) {
+  const loadProfile = getLoadProfile(loadProfileKey || tariffType);
   const out = [];
   COMMON_YEAR_MONTH_DAYS.forEach((days, monthIdx) => {
     const dayLoad = Math.max(0, Number(monthlyLoad[monthIdx]) || 0) / days;
@@ -189,8 +193,9 @@ export function calculateSystemLayout(state, panelType = state.panelType) {
       }))]
     : [primarySection];
 
-  const sectionLayouts = sections.map(sec => {
-    const panelCount = Math.floor(sec.area * 0.75 / panelArea);
+  const usableRatio = Math.max(0.1, Math.min(0.95, Number(state.usableRoofRatio) || 0.75));
+  let sectionLayouts = sections.map(sec => {
+    const panelCount = Math.floor(sec.area * usableRatio / panelArea);
     return {
       ...sec,
       panelCount,
@@ -198,6 +203,40 @@ export function calculateSystemLayout(state, panelType = state.panelType) {
       panelArea
     };
   });
+  const maxPanelCount = sectionLayouts.reduce((sum, sec) => sum + sec.panelCount, 0);
+  const annualTargetKwh = Math.max(0, Number(state.annualConsumptionKwh) || (Number(state.dailyConsumption) || 0) * 365);
+  const targetSpecificYield = Math.max(900, Math.min(1800, (Number(state.ghi) || 1600) * 0.85));
+  const targetPanelCount = Math.max(1, Math.ceil((annualTargetKwh / targetSpecificYield) * 1000 / panel.wattPeak));
+  const shouldCapToBillTarget = state.scenarioKey === 'on-grid'
+    && state.designTarget === 'bill-offset'
+    && annualTargetKwh > 0
+    && maxPanelCount > 0
+    && targetPanelCount < maxPanelCount;
+
+  if (shouldCapToBillTarget) {
+    const target = Math.min(maxPanelCount, targetPanelCount);
+    const allocations = sectionLayouts.map(sec => Math.min(sec.panelCount, Math.floor(target * sec.panelCount / maxPanelCount)));
+    let allocated = allocations.reduce((sum, value) => sum + value, 0);
+    const order = sectionLayouts
+      .map((sec, idx) => ({
+        idx,
+        fraction: (target * sec.panelCount / maxPanelCount) - allocations[idx]
+      }))
+      .sort((a, b) => b.fraction - a.fraction);
+
+    while (allocated < target) {
+      const next = order.find(item => allocations[item.idx] < sectionLayouts[item.idx].panelCount);
+      if (!next) break;
+      allocations[next.idx] += 1;
+      allocated += 1;
+    }
+
+    sectionLayouts = sectionLayouts.map((sec, idx) => ({
+      ...sec,
+      panelCount: allocations[idx],
+      systemPower: allocations[idx] * panel.wattPeak / 1000
+    }));
+  }
 
   return {
     panel,
@@ -205,7 +244,9 @@ export function calculateSystemLayout(state, panelType = state.panelType) {
     sections: sectionLayouts,
     panelCount: sectionLayouts.reduce((s, sec) => s + sec.panelCount, 0),
     systemPower: sectionLayouts.reduce((s, sec) => s + sec.systemPower, 0),
-    usableArea: sections.reduce((s, sec) => s + sec.area * 0.75, 0)
+    usableArea: sections.reduce((s, sec) => s + sec.area * usableRatio, 0),
+    designTargetApplied: shouldCapToBillTarget ? 'bill-offset' : 'fill-roof',
+    targetSystemPowerKwp: shouldCapToBillTarget ? targetPanelCount * panel.wattPeak / 1000 : null
   };
 }
 
@@ -244,7 +285,7 @@ export function simulateHourlyEnergy(monthlyProduction, monthlyLoad, options = {
         const p = dayProduction * solarProfile[h];
         const l = hourlySlice
           ? (hourlySlice[d * 24 + h] || 0)
-          : dayLoad * getLoadProfile(options.tariffType)[h];
+          : dayLoad * getLoadProfile(options.loadProfileKey || options.tariffType)[h];
         const self = Math.min(p, l);
         const exported = Math.max(0, p - l);
         const imported = Math.max(0, l - p);
@@ -500,6 +541,9 @@ export function buildTariffModel(state) {
     sourceLifecycle: TARIFF_DATA_LIFECYCLE,
     skttLimitKwh: meta.skttLimitKwh,
     includesTax: state.tariffIncludesTax ?? true,
+    tariffInputMode: state.tariffInputMode || 'net-plus-fee',
+    distributionFee: state.tariffInputMode === 'gross' ? 0 : Math.max(0, Number(state.distributionFee) || 0),
+    tariffSourceType: state.tariffSourceType || 'manual',
     regulation,
     exportCompensationPolicy
   };

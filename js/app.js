@@ -114,7 +114,22 @@ window.state = {
   exchangeRate: null,
   // Tarife
   tariff: 7.16,
+  importTariffBase: 7.16,
   tariffType: 'residential',
+  subscriberType: 'residential',
+  connectionType: 'trifaze',
+  usageProfile: 'balanced',
+  annualConsumptionKwh: null,
+  onGridInputMode: 'basic',
+  designTarget: 'bill-offset',
+  roofType: 'flat-concrete',
+  usableRoofRatio: 0.75,
+  shadingQuality: 'user-estimate',
+  distributionFee: 0,
+  tariffInputMode: 'net-plus-fee',
+  tariffSourceType: 'manual',
+  costSourceType: 'catalog',
+  hourlyProfileSource: 'synthetic',
   tariffMode: 'auto',
   tariffRegime: 'auto',
   exportSettlementMode: 'auto',
@@ -533,6 +548,7 @@ function initScenarioExperience() {
   // Not: solar-art-mount yeni tasarımda kaldırıldı (proposal-hero section silindi)
   renderScenarioCards();
   updateScenarioUI();
+  syncScenarioControls();
 }
 
 function renderScenarioCards() {
@@ -612,6 +628,27 @@ function updateScenarioUI() {
 
 function syncScenarioControls() {
   const s = window.state;
+  const onGridPanel = document.getElementById('on-grid-flow-panel');
+  if (onGridPanel) onGridPanel.style.display = s.scenarioKey === 'on-grid' ? '' : 'none';
+  const setVal = (id, value) => {
+    const el = document.getElementById(id);
+    if (el && value !== undefined && value !== null) el.value = value;
+  };
+  setVal('on-grid-subscriber-type', s.subscriberType || 'residential');
+  setVal('on-grid-connection-type', s.connectionType || 'trifaze');
+  setVal('on-grid-usage-profile', s.usageProfile || 'balanced');
+  setVal('on-grid-annual-consumption', Math.round(Number(s.annualConsumptionKwh) || Number(s.dailyConsumption || 0) * 365 || 3650));
+  setVal('on-grid-design-target', s.designTarget || 'bill-offset');
+  setVal('on-grid-roof-type', s.roofType || 'flat-concrete');
+  setVal('on-grid-usable-roof-ratio', Math.round((Number(s.usableRoofRatio) || 0.75) * 100));
+  setVal('on-grid-shading-quality', s.shadingQuality || 'user-estimate');
+  setVal('distribution-fee-input', s.distributionFee || 0);
+  setVal('tariff-input-mode', s.tariffInputMode || 'net-plus-fee');
+  setVal('tariff-source-type', s.tariffSourceType || 'manual');
+  setVal('cost-source-type', s.costSourceType || 'catalog');
+  renderOnGridMonthlyInputs();
+  setOnGridInputMode(s.onGridInputMode || 'basic');
+  updateOnGridFlowSummary();
   // Show off-grid cost input only when off-grid scenario is active
   const offGridWrap = document.getElementById('off-grid-cost-wrap');
   if (offGridWrap) offGridWrap.style.display = s.scenarioKey === 'off-grid' ? '' : 'none';
@@ -783,6 +820,7 @@ function updateSoiling(val) {
 
 function updateTariffType(type) {
   window.state.tariffType = type;
+  if (!window.state.subscriberType) window.state.subscriberType = type === 'custom' ? 'other' : type;
   window.state.tariffMode = type === 'custom' ? 'custom' : 'auto';
   const descs = {
     residential: '2026 tarife seçimi: yıllık tüketim 4.000 kWh üstündeyse SKTT seçilebilir. Birim fiyatları faturanızdan doğrulayın.',
@@ -793,6 +831,7 @@ function updateTariffType(type) {
   };
   if (type !== 'custom') {
     window.state.tariff = DEFAULT_TARIFFS[type] || 7.16;
+    window.state.importTariffBase = window.state.tariff;
     document.getElementById('tariff-input').value = window.state.tariff;
     window.state.skttTariff = window.state.tariff;
     window.state.contractedTariff = window.state.tariff;
@@ -807,6 +846,231 @@ function updateTariffType(type) {
   document.getElementById('tariff-desc').textContent = descs[type] || '';
 }
 
+const ONGRID_SUBSCRIBER_TO_TARIFF = {
+  residential: 'residential',
+  commercial: 'commercial',
+  industrial: 'industrial',
+  osb: 'industrial',
+  public: 'commercial',
+  other: 'custom'
+};
+
+function normalizedMonthWeights() {
+  const sum = MONTH_WEIGHTS.reduce((a, b) => a + (Number(b) || 0), 0) || 1;
+  return MONTH_WEIGHTS.map(v => (Number(v) || 0) / sum);
+}
+
+function handleHourlyCsvUpload(event) {
+  const file = event?.target?.files?.[0];
+  const statusEl = document.getElementById('hourly-csv-status');
+  const clearBtn = document.getElementById('hourly-csv-clear');
+  if (!file) return;
+
+  // Show loading state immediately
+  if (statusEl) {
+    statusEl.style.display = '';
+    statusEl.style.color = 'var(--text-muted)';
+    statusEl.textContent = '⏳ Dosya okunuyor...';
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    // Use setTimeout to allow the browser to paint the loading state first
+    setTimeout(() => {
+      try {
+        if (statusEl) statusEl.textContent = '⏳ CSV parse ediliyor...';
+        const text = e.target.result || '';
+        if (!text.trim()) throw new Error('Dosya boş veya okunamadı.');
+        const rows = text.trim().split(/\r?\n/);
+        // Accept single-column CSV or TSV; skip header row if non-numeric
+        const values = [];
+        let skippedHeader = false;
+        let firstBadRow = null;
+        for (let i = 0; i < rows.length; i++) {
+          const cell = rows[i].split(/[,;\t]/)[0].trim();
+          if (!cell) continue;
+          const n = Number(cell);
+          if (!Number.isFinite(n)) {
+            if (!skippedHeader && values.length === 0) { skippedHeader = true; continue; } // skip one header
+            if (firstBadRow === null) firstBadRow = { row: i + 1, value: cell };
+            continue;
+          }
+          if (n < 0) throw new Error(`Satır ${i + 1}: negatif değer kabul edilmez (${cell}).`);
+          values.push(n);
+        }
+        if (firstBadRow && values.length < 8760) {
+          throw new Error(`Satır ${firstBadRow.row}: sayısal olmayan değer "${firstBadRow.value}". Format: tek kolon, 8760 sayı satırı.`);
+        }
+        if (values.length < 8760) {
+          throw new Error(`Yetersiz veri: 8760 satır gerekli, ${values.length} geçerli satır bulundu.${values.length === 0 ? ' Dosya formatını kontrol edin (tek kolon, virgül/noktalı virgül/tab ayrımlı).' : ''}`);
+        }
+        window.state.hourlyConsumption8760 = values.slice(0, 8760);
+        window.state.hourlyProfileSource = 'hourly-uploaded';
+        const annual = Math.round(values.slice(0, 8760).reduce((a, b) => a + b, 0));
+        const peak = Math.max(...values.slice(0, 8760)).toFixed(2);
+        if (statusEl) {
+          statusEl.style.display = '';
+          statusEl.style.color = 'var(--accent, #22c55e)';
+          statusEl.textContent = `✓ ${i18n.t('onGridFlow.hourlyUploadSuccess')} | Yıllık: ${annual.toLocaleString()} kWh | Pik: ${peak} kWh/h`;
+        }
+        if (clearBtn) clearBtn.style.display = '';
+        updateOnGridAssumptions();
+        persistState();
+      } catch (err) {
+        // On error: clear uploaded data, fall back to synthetic
+        window.state.hourlyConsumption8760 = null;
+        window.state.hourlyProfileSource = 'synthetic';
+        if (statusEl) {
+          statusEl.style.display = '';
+          statusEl.style.color = 'var(--danger, #ef4444)';
+          statusEl.textContent = `✗ ${err.message} — Sentetik profile geri dönüldü.`;
+        }
+        if (clearBtn) clearBtn.style.display = 'none';
+        updateOnGridAssumptions();
+      }
+    }, 0);
+  };
+  reader.onerror = () => {
+    if (statusEl) {
+      statusEl.style.display = '';
+      statusEl.style.color = 'var(--danger, #ef4444)';
+      statusEl.textContent = '✗ Dosya okunamadı. Lütfen tekrar deneyin.';
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearHourlyCsvUpload() {
+  window.state.hourlyConsumption8760 = null;
+  window.state.hourlyProfileSource = 'synthetic';
+  const fileInput = document.getElementById('hourly-csv-upload');
+  if (fileInput) fileInput.value = '';
+  const statusEl = document.getElementById('hourly-csv-status');
+  if (statusEl) { statusEl.style.display = 'none'; statusEl.textContent = ''; }
+  const clearBtn = document.getElementById('hourly-csv-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  updateOnGridAssumptions();
+  persistState();
+}
+
+function fillOnGridMonthlyFromAnnual(annualKwh) {
+  const annual = Math.max(0, Number(annualKwh) || 0);
+  if (!annual) return;
+  const weights = normalizedMonthWeights();
+  const monthly = weights.map(w => Math.round(annual * w));
+  const diff = Math.round(annual) - monthly.reduce((a, b) => a + b, 0);
+  monthly[11] += diff;
+  window.state.monthlyConsumption = monthly;
+  window.state.annualConsumptionKwh = monthly.reduce((a, b) => a + b, 0);
+  window.state.dailyConsumption = window.state.annualConsumptionKwh / 365;
+  renderOnGridMonthlyInputs();
+}
+
+function renderOnGridMonthlyInputs() {
+  const wrap = document.getElementById('on-grid-monthly-grid');
+  if (!wrap) return;
+  const monthly = Array.isArray(window.state.monthlyConsumption) && window.state.monthlyConsumption.length === 12
+    ? window.state.monthlyConsumption
+    : normalizedMonthWeights().map(w => Math.round((Number(window.state.annualConsumptionKwh) || Number(window.state.dailyConsumption || 0) * 365 || 3650) * w));
+  wrap.innerHTML = MONTHS.map((month, idx) => `
+    <label class="on-grid-month-input">
+      <span>${month.slice(0, 3)}</span>
+      <input type="number" min="0" step="1" value="${Math.round(monthly[idx] || 0)}" data-on-grid-month="${idx}" oninput="updateOnGridMonthlyConsumption()">
+    </label>
+  `).join('');
+}
+
+function updateOnGridMonthlyConsumption() {
+  const values = Array.from(document.querySelectorAll('[data-on-grid-month]'))
+    .sort((a, b) => Number(a.dataset.onGridMonth) - Number(b.dataset.onGridMonth))
+    .map(input => Math.max(0, Number(input.value) || 0));
+  if (values.length === 12) {
+    window.state.monthlyConsumption = values;
+    window.state.annualConsumptionKwh = Math.round(values.reduce((a, b) => a + b, 0));
+    window.state.dailyConsumption = window.state.annualConsumptionKwh / 365;
+    const annualEl = document.getElementById('on-grid-annual-consumption');
+    if (annualEl) annualEl.value = window.state.annualConsumptionKwh;
+    const slider = document.getElementById('consumption-slider');
+    if (slider) slider.value = Math.max(2, Math.min(100, Math.round(window.state.dailyConsumption)));
+    const val = document.getElementById('consumption-val');
+    if (val) val.textContent = `${window.state.dailyConsumption.toFixed(1)} kWh/gün`;
+  }
+  updateOnGridFlowSummary();
+  persistState();
+}
+
+function setOnGridInputMode(mode = 'basic') {
+  window.state.onGridInputMode = mode === 'advanced' ? 'advanced' : 'basic';
+  document.querySelectorAll('[data-on-grid-mode-btn]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.onGridModeBtn === window.state.onGridInputMode);
+  });
+  const advanced = document.getElementById('on-grid-advanced-fields');
+  if (advanced) advanced.style.display = window.state.onGridInputMode === 'advanced' ? '' : 'none';
+  updateOnGridFlowSummary();
+  persistState();
+}
+
+function updateOnGridFlowSummary() {
+  const s = window.state;
+  const summary = document.getElementById('on-grid-flow-summary');
+  if (!summary) return;
+  const annual = Math.round(Number(s.annualConsumptionKwh) || Number(s.dailyConsumption || 0) * 365 || 0);
+  const profileLabels = {
+    'daytime-heavy': i18n.t('onGridFlow.profileDaytime'),
+    balanced: i18n.t('onGridFlow.profileBalanced'),
+    'evening-heavy': i18n.t('onGridFlow.profileEvening'),
+    'business-hours': i18n.t('onGridFlow.profileBusiness')
+  };
+  const settlement = s.exportSettlementMode === 'auto'
+    ? (s.settlementDate ? `${i18n.t('onGridFlow.settlementAuto')} (${s.settlementDate})` : i18n.t('onGridFlow.settlementAutoMissing'))
+    : s.exportSettlementMode === 'hourly' ? i18n.t('onGridFlow.settlementHourly') : i18n.t('onGridFlow.settlementMonthly');
+  summary.innerHTML = `
+    <div><strong>${annual.toLocaleString('tr-TR')}</strong><span>${i18n.t('onGridFlow.summaryAnnualConsumption')}</span></div>
+    <div><strong>${profileLabels[s.usageProfile] || profileLabels.balanced}</strong><span>${i18n.t('onGridFlow.summaryUsageProfile')}</span></div>
+    <div><strong>${settlement}</strong><span>${i18n.t('onGridFlow.summarySettlement')}</span></div>
+    <div><strong>${Math.round((Number(s.usableRoofRatio) || 0.75) * 100)}%</strong><span>${i18n.t('onGridFlow.summaryUsableRoof')}</span></div>
+  `;
+}
+
+function updateOnGridAssumptions(options = {}) {
+  const s = window.state;
+  s.subscriberType = document.getElementById('on-grid-subscriber-type')?.value || s.subscriberType || 'residential';
+  s.connectionType = document.getElementById('on-grid-connection-type')?.value || s.connectionType || 'trifaze';
+  s.usageProfile = document.getElementById('on-grid-usage-profile')?.value || s.usageProfile || 'balanced';
+  s.designTarget = document.getElementById('on-grid-design-target')?.value || s.designTarget || 'bill-offset';
+  s.roofType = document.getElementById('on-grid-roof-type')?.value || s.roofType || 'flat-concrete';
+  s.shadingQuality = document.getElementById('on-grid-shading-quality')?.value || s.shadingQuality || 'user-estimate';
+  s.usableRoofRatio = Math.max(0.1, Math.min(0.95, (Number(document.getElementById('on-grid-usable-roof-ratio')?.value) || (s.usableRoofRatio * 100) || 75) / 100));
+  s.distributionFee = Math.max(0, Number(document.getElementById('distribution-fee-input')?.value) || 0);
+  // Compute hourlyProfileSource from current state
+  if (Array.isArray(s.hourlyConsumption8760) && s.hourlyConsumption8760.length >= 8760) {
+    s.hourlyProfileSource = 'hourly-uploaded';
+  } else if (Array.isArray(s.monthlyConsumption) && s.monthlyConsumption.some(v => v > 0)) {
+    s.hourlyProfileSource = 'monthly-derived';
+  } else {
+    s.hourlyProfileSource = 'synthetic';
+  }
+  const mappedTariff = ONGRID_SUBSCRIBER_TO_TARIFF[s.subscriberType] || 'custom';
+  if (s.scenarioKey === 'on-grid' && mappedTariff !== s.tariffType) {
+    const tariffTypeEl = document.getElementById('tariff-type');
+    if (tariffTypeEl) tariffTypeEl.value = mappedTariff;
+    updateTariffType(mappedTariff);
+  }
+  const annualInput = Number(document.getElementById('on-grid-annual-consumption')?.value);
+  if (Number.isFinite(annualInput) && annualInput > 0) {
+    s.annualConsumptionKwh = Math.round(annualInput);
+    s.dailyConsumption = s.annualConsumptionKwh / 365;
+    if (options.fillMonthly || !Array.isArray(s.monthlyConsumption)) fillOnGridMonthlyFromAnnual(s.annualConsumptionKwh);
+  }
+  const dailySlider = document.getElementById('consumption-slider');
+  if (dailySlider && s.dailyConsumption) dailySlider.value = Math.max(2, Math.min(100, Math.round(s.dailyConsumption)));
+  const usableHint = document.getElementById('on-grid-usable-roof-hint');
+  if (usableHint) usableHint.textContent = `${Math.round(s.usableRoofRatio * 100)}% net alan: servis boşluğu, parapet, yangın yolu ve bakım koridoru sonrası ön fizibilite varsayımı.`;
+  updatePanelPreview();
+  updateOnGridFlowSummary();
+  persistState();
+}
+
 function updateTariffAssumptions() {
   const s = window.state;
   const readNumber = (id, fallback) => {
@@ -814,8 +1078,26 @@ function updateTariffAssumptions() {
     const n = Number(raw);
     return Number.isFinite(n) ? n : fallback;
   };
-  s.tariff = readNumber('tariff-input', s.tariff || 7.16);
+  let importTariffBase = readNumber('tariff-input', s.importTariffBase || s.tariff || 7.16);
+  s.importTariffBase = importTariffBase;
   s.exportTariff = readNumber('export-tariff-input', s.exportTariff ?? 0);
+  if (s.scenarioKey === 'on-grid') updateOnGridAssumptions();
+  importTariffBase = readNumber('tariff-input', s.importTariffBase || importTariffBase);
+  s.importTariffBase = importTariffBase;
+  s.tariffInputMode = document.getElementById('tariff-input-mode')?.value || s.tariffInputMode || 'net-plus-fee';
+  s.tariffSourceType = document.getElementById('tariff-source-type')?.value || s.tariffSourceType || 'manual';
+  s.costSourceType = document.getElementById('cost-source-type')?.value || s.costSourceType || 'catalog';
+  // Distribution fee: only add when mode is net-plus-fee (separate entry), not gross (already included)
+  const feeToAdd = (s.scenarioKey === 'on-grid' && s.tariffInputMode !== 'gross')
+    ? Math.max(0, Number(s.distributionFee) || 0) : 0;
+  s.tariff = importTariffBase + feeToAdd;
+  // Disable distribution fee field when gross mode to prevent user confusion
+  const distFeeInput = document.getElementById('distribution-fee-input');
+  const distFeeLabel = document.getElementById('distribution-fee-label');
+  if (distFeeInput) {
+    distFeeInput.disabled = (s.tariffInputMode === 'gross');
+    if (distFeeLabel) distFeeLabel.style.opacity = (s.tariffInputMode === 'gross') ? '0.4' : '';
+  }
   s.tariffRegime = document.getElementById('tariff-regime')?.value || s.tariffRegime || 'auto';
   s.tariffMode = s.tariffRegime;
   s.exportSettlementMode = document.getElementById('export-settlement-mode')?.value || s.exportSettlementMode || 'auto';
@@ -1251,16 +1533,24 @@ function buildPanelCards() {
 function updatePanelPreview() {
   const panel = PANEL_TYPES[window.state.panelType];
   const panelArea = panel.width * panel.height;
+  const usableRatio = Math.max(0.1, Math.min(0.95, Number(window.state.usableRoofRatio) || 0.75));
 
   const primaryArea = parseFloat(document.getElementById('roof-area')?.value) || window.state.roofArea || 80;
-  let totalPanelCount = Math.floor(primaryArea * 0.75 / panelArea);
+  let totalPanelCount = Math.floor(primaryArea * usableRatio / panelArea);
 
   if (window.state.multiRoof) {
     window.state.roofSections.forEach(sec => {
       const areaEl = document.getElementById(`sec-area-${sec.id}`);
       const secArea = areaEl ? (parseFloat(areaEl.value) || sec.area) : sec.area;
-      totalPanelCount += Math.floor(secArea * 0.75 / panelArea);
+      totalPanelCount += Math.floor(secArea * usableRatio / panelArea);
     });
+  }
+  const roofCapacityPanelCount = totalPanelCount;
+  const annualTarget = Math.max(0, Number(window.state.annualConsumptionKwh) || (Number(window.state.dailyConsumption) || 0) * 365);
+  if (window.state.scenarioKey === 'on-grid' && window.state.designTarget === 'bill-offset' && annualTarget > 0 && totalPanelCount > 0) {
+    const targetSpecificYield = Math.max(900, Math.min(1800, (Number(window.state.ghi) || 1600) * 0.85));
+    const targetPanelCount = Math.max(1, Math.ceil((annualTarget / targetSpecificYield) * 1000 / panel.wattPeak));
+    totalPanelCount = Math.min(totalPanelCount, targetPanelCount);
   }
 
   const systemPower = (totalPanelCount * panel.wattPeak / 1000).toFixed(2);
@@ -1280,7 +1570,18 @@ function updatePanelPreview() {
   if (costLabel) costLabel.textContent = cur === 'USD' ? 'Tahmini Maliyet ($)' : 'Tahmini Maliyet (₺)';
 
   const preview = document.getElementById('panel-count-preview');
-  if (preview) preview.textContent = totalPanelCount > 0 ? `≈ ${totalPanelCount} panel sığar (${systemPower} kWp)` : '';
+  const isBillTarget = window.state.scenarioKey === 'on-grid' && window.state.designTarget === 'bill-offset';
+  if (preview) {
+    const previewVerb = isBillTarget ? 'seçilir' : 'sığar';
+    preview.textContent = totalPanelCount > 0
+      ? `≈ ${totalPanelCount} panel ${previewVerb} (${systemPower} kWp, çatı sınırı ${roofCapacityPanelCount}, net alan ${Math.round(usableRatio * 100)}%)`
+      : '';
+  }
+  const roofMode = document.getElementById('on-grid-roof-mode-preview');
+  if (roofMode) {
+    const target = isBillTarget ? 'Fatura hedefi kadar boyutlandır' : 'Çatıyı teknik sınıra kadar kullan';
+    roofMode.textContent = `${target} · ${Math.round(usableRatio * 100)}% kullanılabilir alan · ${totalPanelCount}/${roofCapacityPanelCount} panel`;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1410,7 +1711,10 @@ function validateStep5() {
   const calcBtn = document.getElementById('calc-btn') || document.querySelector('[onclick*="validateStep5"]');
   if (calcBtn) { calcBtn.disabled = true; calcBtn.style.opacity = '0.6'; }
   runCalculation()
-    .catch(e => window.showToast?.(`Hesaplama hatası: ${e.message}`, 'error'))
+    .catch(e => {
+      window.state.calculationError = e?.message || String(e);
+      window.showToast?.(`Hesaplama hatası: ${window.state.calculationError}`, 'error');
+    })
     .finally(() => {
       if (calcBtn) { calcBtn.disabled = false; calcBtn.style.opacity = ''; }
     });
@@ -1717,6 +2021,12 @@ window.updateShading = updateShading;
 window.updateSoiling = updateSoiling;
 window.updateTariffType = updateTariffType;
 window.updateTariffAssumptions = updateTariffAssumptions;
+window.updateOnGridAssumptions = updateOnGridAssumptions;
+window.updateOnGridMonthlyConsumption = updateOnGridMonthlyConsumption;
+window.setOnGridInputMode = setOnGridInputMode;
+window.fillOnGridMonthlyFromAnnual = fillOnGridMonthlyFromAnnual;
+window.handleHourlyCsvUpload = handleHourlyCsvUpload;
+window.clearHourlyCsvUpload = clearHourlyCsvUpload;
 window.updateProposalGovernanceInput = updateProposalGovernanceInput;
 window.updateUserIdentityInput = updateUserIdentityInput;
 window.attachEvidenceFromInput = attachEvidenceFromInput;

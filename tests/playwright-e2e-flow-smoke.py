@@ -113,12 +113,55 @@ def run_click_flow_to_results(page):
     assert page.locator(".inverter-card").count() >= 3
     page.click(".equipment-summary-card .btn-primary")
     page.wait_for_function("window.state.step === 5")
-    page.fill("#tariff-input", "8.44")
-    page.click(".calc-cta-btn")
+    assert page.locator("#on-grid-flow-panel").is_visible()
+    assert page.locator("#on-grid-subscriber-type").is_visible()
+    assert page.locator("#on-grid-usage-profile").is_visible()
+    assert page.locator("#on-grid-design-target").is_visible()
+    page.select_option("#on-grid-subscriber-type", "commercial")
+    page.select_option("#on-grid-usage-profile", "business-hours")
+    page.fill("#on-grid-annual-consumption", "18000")
+    page.select_option("#on-grid-design-target", "bill-offset")
+    page.click('[data-on-grid-mode-btn="advanced"]')
+    assert page.locator("#on-grid-advanced-fields").is_visible()
+    # Verify new Turn-1 form fields exist
+    assert page.locator("#tariff-input-mode").count() == 1
+    assert page.locator("#hourly-csv-upload").count() == 1
+    assert page.locator("#tariff-source-type").count() == 1
+    assert page.locator("#cost-source-type").count() == 1
+    # Tariff mode must default to net-plus-fee so distribution fee is added (not gross/double-count)
+    assert page.evaluate("window.state.tariffInputMode") == "net-plus-fee"
+    page.fill("#on-grid-usable-roof-ratio", "70")
+    page.fill("#distribution-fee-input", "0.50")
     page.wait_for_function(
-        "document.getElementById('step-7')?.classList.contains('active') && window.state.results",
-        timeout=30000,
+        "window.state.subscriberType === 'commercial' && window.state.usageProfile === 'business-hours' && window.state.designTarget === 'bill-offset' && Math.round(window.state.usableRoofRatio * 100) === 70"
     )
+    page.fill("#tariff-input", "8.44")
+    page.wait_for_function("Math.abs(window.state.tariff - 8.94) < 0.001")
+    page.click(".calc-cta-btn")
+    try:
+        page.wait_for_function(
+            "document.getElementById('step-7')?.classList.contains('active') && window.state.results",
+            timeout=30000,
+        )
+    except Exception as exc:
+        debug_state = page.evaluate(
+            """() => ({
+                step: window.state?.step,
+                hasResults: Boolean(window.state?.results),
+                scenarioKey: window.state?.scenarioKey,
+                subscriberType: window.state?.subscriberType,
+                usageProfile: window.state?.usageProfile,
+                annualConsumptionKwh: window.state?.annualConsumptionKwh,
+                usableRoofRatio: window.state?.usableRoofRatio,
+                calculationInProgress: window.isCalculationInProgress?.(),
+                calculationError: window.state?.calculationError || null,
+                pvgisLastError: window._pvgisLastError || null,
+                loadingText: document.getElementById('loading-msg')?.innerText || null,
+                loadingPct: document.getElementById('ring-pct-text')?.innerText || null,
+                bodyToast: document.body?.innerText?.match(/Hesaplama hatası[^\\n]*/)?.[0] || null
+            })"""
+        )
+        raise AssertionError(f"calculation did not reach results: {debug_state}") from exc
     page.wait_for_timeout(800)
 
 
@@ -136,6 +179,7 @@ def desktop_backend_flow(browser, base_url):
     assert "pvlib-backed" in page.locator("#result-engine-source").inner_text()
     assert int(page.locator("#kpi-energy").inner_text().replace(".", "").replace(",", "")) > 0
     assert page.locator("#audit-panel-card").count() == 1
+    assert page.locator("#on-grid-result-layers .on-grid-result-card").count() == 4
     assert_no_overflow(page, "desktop results")
 
     page.evaluate(
@@ -189,6 +233,7 @@ def backend_unavailable_fallback_flow(browser, base_url):
     run_click_flow_to_results(page)
     assert page.evaluate("window.state.backendEngineAvailable") is False
     assert "PVGIS-based" in page.locator("#result-engine-source").inner_text()
+    assert page.locator("#on-grid-result-layers .on-grid-result-card").count() == 4
     assert_no_overflow(page, "mobile fallback results")
     assert not page_errors, page_errors
     ctx.close()

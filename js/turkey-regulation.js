@@ -240,6 +240,16 @@ export function buildQuoteReadiness({ state = {}, results = {}, tariffModel = nu
     blockers.push('Şebeke başvuru kontrol listesi oluşturulmadı.');
   }
   if (!tariffModel?.sourceDate || !tariffModel?.sourceLabel) blockers.push('Tarife kaynak tarihi/etiketi eksik.');
+  // Tariff source type check
+  const tariffSourceType = tariffModel?.tariffSourceType || state.tariffSourceType || 'manual';
+  if (tariffSourceType === 'estimate') blockers.push('Tarife tahmini/varsayılan olarak girildi — ticari teklif için resmi kaynak doğrulaması gerekli.');
+  // Shadow quality check
+  const shadowQuality = state.shadingQuality || 'user-estimate';
+  if (shadowQuality === 'unknown') blockers.push('Gölge veri kalitesi bilinmiyor — ticari teklif için mühendislik değerlendirmesi gerekli.');
+  else if (shadowQuality === 'user-estimate') blockers.push('Gölge verisi kullanıcı beyanına dayanıyor — ampirik saha doğrulaması eksik.');
+  // Cost source type check
+  const costSourceType = state.costSourceType || 'catalog';
+  if (costSourceType !== 'bom-verified') blockers.push('Tedarikçi BOM teklifi ile maliyet doğrulanmadı — katalog/manuel fiyat kullanılıyor.');
   if (!isEvidenceComplete(evidenceGovernance)) {
     blockers.push(...(evidenceGovernance?.validation?.blockers || ['Kanıt yönetimi kaydı tamamlanmadı.']));
   }

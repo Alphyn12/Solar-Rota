@@ -84,11 +84,14 @@ export function buildEvidenceRegistry(state = {}, results = {}, { today = curren
     }),
     supplierQuote: normalizeEvidenceRecord(evidence.supplierQuote, {
       type: 'supplierQuote',
-      status: supplier.supplierQuoteState === 'received' ? 'verified' : supplier.supplierQuoteState || 'missing',
+      status: state.costSourceType === 'bom-verified'
+        ? 'verified'
+        : supplier.supplierQuoteState === 'received' ? 'verified' : supplier.supplierQuoteState || 'missing',
       ref: supplier.supplierQuoteRef || '',
       issuedAt: supplier.supplierQuoteDate || null,
       validUntil: supplier.supplierQuoteValidUntil || null,
-      sourceLabel: 'Supplier BOM quote'
+      sourceLabel: 'Supplier BOM quote',
+      notes: state.costSourceType ? `costSourceType: ${state.costSourceType}` : ''
     }),
     tariffSource: normalizeEvidenceRecord(evidence.tariffSource, {
       type: 'tariffSource',
@@ -250,7 +253,14 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       inverterType: state.inverterType || null,
       systemPowerKwp: results.systemPower || null,
       annualEnergyKwh: results.annualEnergy || null,
-      usedFallback: !!results.usedFallback
+      usedFallback: !!results.usedFallback,
+      parityAvailable: results.engineParity?.intentionalDifference === true,
+      parityDeltaPct: results.engineParity?.intentionalDifference === true ? (results.engineParity.deltaPct ?? null) : null,
+      hourlyProfileSource: results.hourlyProfileSource || state.hourlyProfileSource || 'synthetic',
+      shadowQuality: results.shadowQuality || state.shadingQuality || 'user-estimate',
+      tariffInputMode: results.tariffInputMode || state.tariffInputMode || 'net-plus-fee',
+      tariffSourceType: results.tariffSourceType || state.tariffSourceType || 'manual',
+      costSourceType: results.costSourceType || state.costSourceType || 'catalog'
     },
     commercial: {
       totalCost: results.totalCost || null,
@@ -278,6 +288,19 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       maintenance: gov.maintenance || null,
       bomCommercials: gov.bomCommercials || null
     },
+    onGridFlow: state.scenarioKey === 'on-grid' ? {
+      subscriberType: state.subscriberType || null,
+      connectionType: state.connectionType || null,
+      usageProfile: state.usageProfile || null,
+      annualConsumptionKwh: state.annualConsumptionKwh || null,
+      designTarget: state.designTarget || null,
+      roofType: state.roofType || null,
+      usableRoofRatio: state.usableRoofRatio || null,
+      shadingQuality: state.shadingQuality || null,
+      settlementMode: state.exportSettlementMode || null,
+      settlementDate: state.settlementDate || null,
+      authoritativeFinancialBasis: results.authoritativeFinancialBasis || 'frontend-8760-financial-model'
+    } : null,
     tariff: {
       regime: results.tariffModel?.effectiveRegime || null,
       importRate: results.tariffModel?.importRate || null,

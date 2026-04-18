@@ -270,6 +270,9 @@ export async function runCalculation() {
   // İnverter tipi entegrasyonu
   const inverterData = INVERTER_TYPES[state.inverterType || 'string'];
   // Static efficiency kept for reference; weighted version computed per-section (Faz-3 Fix-11).
+  const weightedInverterEfficiency = inverterData.efficiency < 1
+    ? inverterData.efficiency * (0.18 * (0.94 / 0.97) + 0.52 * (0.965 / 0.97) + 0.30 * 1.0)
+    : inverterData.efficiency;
 
   // Faz-3 Fix-10: Bifacial gain is shading-dependent and albedo-scaled.
   // Rear-side irradiance drops when the array is shaded (less ground reflection reaches rear).
@@ -317,8 +320,8 @@ export async function runCalculation() {
     : 0;
 
   const sectionResults = await Promise.all(allSections.map(async sec => {
-    const secPC = Math.floor(sec.area * 0.75 / panelArea);
-    const secPower = secPC * panel.wattPeak / 1000;
+    const secPC = Math.max(0, Number(sec.panelCount) || 0);
+    const secPower = Number(sec.systemPower) || secPC * panel.wattPeak / 1000;
     if (secPower <= 0) return null;
 
     let rawEnergy = null, rawMonthly = null, rawPoa = null, usedFallback = false;
@@ -397,9 +400,6 @@ export async function runCalculation() {
     // Early-morning / late-evening hours run at low load → lower efficiency.
     // Weights from HOURLY_SOLAR_PROFILE summer profile distribution:
     //   ~18% of energy at <30% load (eff≈94%), ~52% at 30-70% (eff≈96.5%), ~30% at >70% (eff≈97%).
-    const weightedInverterEfficiency = inverterData.efficiency < 1
-      ? inverterData.efficiency * (0.18 * (0.94 / 0.97) + 0.52 * (0.965 / 0.97) + 0.30 * 1.0)
-      : inverterData.efficiency;
     const adjustedE = rawEnergy
       * (usedFallback ? fallbackTempAdjustment.factor : pvgisTempAdjustment.factor)
       * (usedFallback ? sec.azimuthCoeff : 1.0)
@@ -641,7 +641,7 @@ export async function runCalculation() {
   }
   const baseHourlyLoad = hasCompleteHourlyProfile8760(state.hourlyConsumption8760)
     ? state.hourlyConsumption8760.slice(0, 8760).map(v => Math.max(0, Number(v) || 0))
-    : buildBaseHourlyLoad8760(baseMonthlyLoad, state.tariffType);
+    : buildBaseHourlyLoad8760(baseMonthlyLoad, state.tariffType, state.usageProfile || state.onGridUsageProfile);
   const hourlyLoad8760 = combineHourlyLoads(baseHourlyLoad, evLoad.hourly8760, heatPumpLoad.hourly8760);
 
   tariffModel = buildTariffModel({
@@ -661,6 +661,7 @@ export async function runCalculation() {
 
   const hourlySummaryRaw = simulateHourlyEnergy(monthlyData, monthlyLoad, {
     tariffType: state.tariffType,
+    loadProfileKey: state.usageProfile || state.onGridUsageProfile,
     hourlyLoad8760,
     exportPolicy: tariffModel.exportCompensationPolicy,
     previousYearConsumptionKwh: state.previousYearConsumptionKwh,
@@ -844,7 +845,7 @@ export async function runCalculation() {
     annualOMCost, annualInsurance, inverterReplaceCost, inverterLifetime, batteryReplaceCost, batteryLifetime, totalExpenses25y,
     lidFactor: (lidFactor * 100).toFixed(1),
     inverterType: invTypeKey,
-    inverterEfficiency: (inverterEfficiencyFactor * 100).toFixed(1),
+    inverterEfficiency: (weightedInverterEfficiency * 100).toFixed(1),
     costBreakdown: {
       panel: Math.round(panelCost), inverter: Math.round(inverterCost),
       mounting: Math.round(mountingCost), dcCable: Math.round(dcCableCost),
@@ -887,7 +888,12 @@ export async function runCalculation() {
     heatPumpLoad,
     bessMetrics, nmMetrics,
     evMetrics, heatPumpMetrics, structuralCheck, taxMetrics, billAnalysis,
-    sectionResults: validSections.length > 1 ? validSections : null
+    sectionResults: validSections.length > 1 ? validSections : null,
+    hourlyProfileSource: state.hourlyProfileSource || (Array.isArray(state.hourlyConsumption8760) && state.hourlyConsumption8760.length >= 8760 ? 'hourly-uploaded' : 'synthetic'),
+    tariffInputMode: tariffModel.tariffInputMode || state.tariffInputMode || 'net-plus-fee',
+    tariffSourceType: tariffModel.tariffSourceType || state.tariffSourceType || 'manual',
+    costSourceType: state.costSourceType || 'catalog',
+    shadowQuality: state.shadingQuality || 'user-estimate'
   };
   results.calculationWarnings = detectCalculationWarnings(results);
   results.evidenceGovernance = buildEvidenceRegistry(state, results);

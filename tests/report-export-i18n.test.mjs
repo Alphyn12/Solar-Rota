@@ -62,6 +62,17 @@ function sampleState() {
     displayCurrency: 'TRY',
     usdToTry: 40,
     tariffType: 'commercial',
+    subscriberType: 'commercial',
+    connectionType: 'trifaze',
+    usageProfile: 'business-hours',
+    annualConsumptionKwh: 16425,
+    designTarget: 'bill-offset',
+    roofType: 'metal-trapez',
+    usableRoofRatio: 0.7,
+    shadingQuality: 'map-assisted',
+    exportSettlementMode: 'monthly',
+    settlementDate: '2026-04-01',
+    authoritativeFinancialBasis: 'frontend-8760',
     netMeteringEnabled: true,
     omRate: 1,
     insuranceRate: 0.5,
@@ -212,6 +223,14 @@ function sampleState() {
 }
 
 await setLocale('en');
+const indexHtml = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+assert.match(indexHtml, /id="on-grid-flow-panel"/);
+assert.match(indexHtml, /id="on-grid-subscriber-type"/);
+assert.match(indexHtml, /id="on-grid-usage-profile"/);
+assert.match(indexHtml, /id="on-grid-design-target"/);
+assert.match(indexHtml, /id="on-grid-result-layers"/);
+assert.match(indexHtml, /data-i18n="onGridFlow\.title"/);
+assert.match(indexHtml, /data-i18n="onGridFlow\.profileBusiness"/);
 assert.equal(i18n.t('finance.simplePayback'), 'Cumulative Net Payback Period');
 assert.equal(i18n.t('report.simplePayback'), 'Cumulative Net Payback');
 assert.doesNotMatch(i18n.t('finance.simplePayback'), /Simple Payback/);
@@ -227,6 +246,14 @@ assert.doesNotMatch(reportBody.innerHTML, /Panel &amp; Sistem Tasarımı/);
 assert.doesNotMatch(reportBody.innerHTML, /Maliyet Kırılımı/);
 assert.doesNotMatch(reportBody.innerHTML, /Kullanılabilir çatı alanı/);
 assert.doesNotMatch(reportBody.innerHTML, /İnverter AC çıkış verimi/);
+assert.equal(i18n.t('onGridFlow.title'), 'Customer, consumption, and settlement basis');
+assert.equal(i18n.t('onGridFlow.profileBusiness'), 'Business-hours focused');
+assert.equal(i18n.t('onGridResult.confidenceTitle'), 'Calculation Confidence / Assumptions');
+const onGridProposalEn = buildStructuredProposalExport(window.state, window.state.results);
+assert.equal(onGridProposalEn.onGridFlow.subscriberType, 'commercial');
+assert.equal(onGridProposalEn.onGridFlow.usageProfile, 'business-hours');
+assert.equal(onGridProposalEn.onGridFlow.designTarget, 'bill-offset');
+assert.equal(onGridProposalEn.onGridFlow.authoritativeFinancialBasis, 'frontend-8760-financial-model');
 
 const offGridState = sampleState();
 offGridState.scenarioKey = 'off-grid';
@@ -330,5 +357,99 @@ downloadPDF();
 assert.ok(pdfText.some(value => value.includes('PDF yerlesik font fallback')));
 assert.ok(pdfText.some(value => value.includes('Turkiye Gunes Paneli Enerji ve Yatirim Raporu')));
 assert.ok(pdfText.some(value => value.includes('Solar Rota')));
+
+// --- New i18n key existence tests ---
+await setLocale('en');
+// onGridFlow new keys
+assert.ok(i18n.t('onGridFlow.tariffInputMode') !== 'onGridFlow.tariffInputMode', 'tariffInputMode key missing in en');
+assert.ok(i18n.t('onGridFlow.tariffInputModeNet') !== 'onGridFlow.tariffInputModeNet', 'tariffInputModeNet key missing in en');
+assert.ok(i18n.t('onGridFlow.tariffInputModeGross') !== 'onGridFlow.tariffInputModeGross', 'tariffInputModeGross key missing in en');
+assert.ok(i18n.t('onGridFlow.hourlyUpload') !== 'onGridFlow.hourlyUpload', 'hourlyUpload key missing in en');
+assert.ok(i18n.t('onGridFlow.tariffSourceType') !== 'onGridFlow.tariffSourceType', 'tariffSourceType key missing in en');
+assert.ok(i18n.t('onGridFlow.tariffSourceOfficial') !== 'onGridFlow.tariffSourceOfficial', 'tariffSourceOfficial key missing in en');
+assert.ok(i18n.t('onGridFlow.costSourceType') !== 'onGridFlow.costSourceType', 'costSourceType key missing in en');
+assert.ok(i18n.t('onGridFlow.costSourceBom') !== 'onGridFlow.costSourceBom', 'costSourceBom key missing in en');
+// onGridResult new keys
+assert.ok(i18n.t('onGridResult.profileSourceLabel') !== 'onGridResult.profileSourceLabel', 'profileSourceLabel key missing in en');
+assert.ok(i18n.t('onGridResult.profileSourceSynthetic') !== 'onGridResult.profileSourceSynthetic', 'profileSourceSynthetic key missing in en');
+assert.ok(i18n.t('onGridResult.profileSourceHourly') !== 'onGridResult.profileSourceHourly', 'profileSourceHourly key missing in en');
+assert.ok(i18n.t('onGridResult.shadowQualityLabel') !== 'onGridResult.shadowQualityLabel', 'shadowQualityLabel key missing in en');
+assert.ok(i18n.t('onGridResult.costConfidenceLabel') !== 'onGridResult.costConfidenceLabel', 'costConfidenceLabel key missing in en');
+assert.ok(i18n.t('onGridResult.dataSourceQuestion') !== 'onGridResult.dataSourceQuestion', 'dataSourceQuestion key missing in en');
+assert.ok(i18n.t('onGridResult.missingDataQuestion') !== 'onGridResult.missingDataQuestion', 'missingDataQuestion key missing in en');
+// warnings new keys
+assert.ok(i18n.t('warnings.syntheticConsumptionProfile') !== 'warnings.syntheticConsumptionProfile', 'syntheticConsumptionProfile key missing in en');
+assert.ok(i18n.t('warnings.noBomCostEvidence') !== 'warnings.noBomCostEvidence', 'noBomCostEvidence key missing in en');
+assert.ok(i18n.t('warnings.shadowQualityLow') !== 'warnings.shadowQualityLow', 'shadowQualityLow key missing in en');
+
+// Same checks in TR
+await setLocale('tr');
+assert.ok(i18n.t('onGridFlow.tariffInputMode') !== 'onGridFlow.tariffInputMode', 'tariffInputMode key missing in tr');
+assert.ok(i18n.t('onGridResult.profileSourceSynthetic') !== 'onGridResult.profileSourceSynthetic', 'profileSourceSynthetic key missing in tr');
+assert.ok(i18n.t('warnings.syntheticConsumptionProfile') !== 'warnings.syntheticConsumptionProfile', 'syntheticConsumptionProfile key missing in tr');
+
+// Same checks in DE
+await setLocale('de');
+assert.ok(i18n.t('onGridFlow.tariffInputMode') !== 'onGridFlow.tariffInputMode', 'tariffInputMode key missing in de');
+assert.ok(i18n.t('onGridResult.profileSourceSynthetic') !== 'onGridResult.profileSourceSynthetic', 'profileSourceSynthetic key missing in de');
+assert.ok(i18n.t('warnings.syntheticConsumptionProfile') !== 'warnings.syntheticConsumptionProfile', 'syntheticConsumptionProfile key missing in de');
+
+// New HTML fields exist in index.html
+assert.match(indexHtml, /id="tariff-input-mode"/, 'tariff-input-mode select missing from index.html');
+assert.match(indexHtml, /id="hourly-csv-upload"/, 'hourly-csv-upload input missing from index.html');
+assert.match(indexHtml, /id="tariff-source-type"/, 'tariff-source-type select missing from index.html');
+assert.match(indexHtml, /id="cost-source-type"/, 'cost-source-type select missing from index.html');
+
+// Proposal export includes new metadata fields
+await setLocale('en');
+window.state = sampleState();
+window.state.tariffInputMode = 'net-plus-fee';
+window.state.tariffSourceType = 'official';
+window.state.costSourceType = 'bom-verified';
+window.state.hourlyProfileSource = 'hourly-uploaded';
+window.state.shadingQuality = 'site-verified';
+const proposalWithNewMeta = buildStructuredProposalExport(window.state, window.state.results);
+assert.equal(proposalWithNewMeta.system.tariffInputMode, 'net-plus-fee', 'tariffInputMode not in proposal export');
+assert.equal(proposalWithNewMeta.system.tariffSourceType, 'official', 'tariffSourceType not in proposal export');
+assert.equal(proposalWithNewMeta.system.costSourceType, 'bom-verified', 'costSourceType not in proposal export');
+assert.equal(proposalWithNewMeta.system.hourlyProfileSource, 'hourly-uploaded', 'hourlyProfileSource not in proposal export');
+assert.equal(proposalWithNewMeta.system.shadowQuality, 'site-verified', 'shadowQuality not in proposal export');
+
+// --- Turn-2 i18n key existence tests ---
+await setLocale('en');
+assert.ok(i18n.t('engine.comparisonUnavailable') !== 'engine.comparisonUnavailable', 'EN: engine.comparisonUnavailable missing');
+assert.ok(i18n.t('engine.comparisonUnavailableHint') !== 'engine.comparisonUnavailableHint', 'EN: engine.comparisonUnavailableHint missing');
+assert.ok(i18n.t('offGrid.syntheticDispatchNote') !== 'offGrid.syntheticDispatchNote', 'EN: offGrid.syntheticDispatchNote missing');
+assert.ok(i18n.t('offGrid.notFeasibilityAnalysis') !== 'offGrid.notFeasibilityAnalysis', 'EN: offGrid.notFeasibilityAnalysis missing');
+assert.ok(i18n.t('offGrid.preFeasibilityOnly') !== 'offGrid.preFeasibilityOnly', 'EN: offGrid.preFeasibilityOnly missing');
+assert.ok(i18n.t('onGridResult.parityLabel') !== 'onGridResult.parityLabel', 'EN: onGridResult.parityLabel missing');
+assert.ok(i18n.t('onGridResult.parityUnavailable') !== 'onGridResult.parityUnavailable', 'EN: onGridResult.parityUnavailable missing');
+
+await setLocale('tr');
+assert.ok(i18n.t('engine.comparisonUnavailable') !== 'engine.comparisonUnavailable', 'TR: engine.comparisonUnavailable missing');
+assert.ok(i18n.t('offGrid.syntheticDispatchNote') !== 'offGrid.syntheticDispatchNote', 'TR: offGrid.syntheticDispatchNote missing');
+assert.ok(i18n.t('offGrid.preFeasibilityOnly') !== 'offGrid.preFeasibilityOnly', 'TR: offGrid.preFeasibilityOnly missing');
+assert.ok(i18n.t('onGridResult.parityUnavailable') !== 'onGridResult.parityUnavailable', 'TR: onGridResult.parityUnavailable missing');
+
+await setLocale('de');
+assert.ok(i18n.t('engine.comparisonUnavailable') !== 'engine.comparisonUnavailable', 'DE: engine.comparisonUnavailable missing');
+assert.ok(i18n.t('offGrid.syntheticDispatchNote') !== 'offGrid.syntheticDispatchNote', 'DE: offGrid.syntheticDispatchNote missing');
+assert.ok(i18n.t('offGrid.preFeasibilityOnly') !== 'offGrid.preFeasibilityOnly', 'DE: offGrid.preFeasibilityOnly missing');
+
+// parityAvailable boolean in buildStructuredProposalExport
+await setLocale('en');
+window.state = sampleState();
+// With intentionalDifference=true in fixture — should be true
+const exportWithParity = buildStructuredProposalExport(window.state, window.state.results);
+assert.strictEqual(typeof exportWithParity.system.parityAvailable, 'boolean', 'parityAvailable must be boolean');
+assert.strictEqual(exportWithParity.system.parityAvailable, true, 'parityAvailable should be true when intentionalDifference=true');
+assert.strictEqual(exportWithParity.system.parityDeltaPct, 3.45, 'parityDeltaPct should equal deltaPct from fixture');
+
+// Without engineParity — should be false
+const stateNoParity = sampleState();
+stateNoParity.results = { ...stateNoParity.results, engineParity: null };
+const exportNoParity = buildStructuredProposalExport(stateNoParity, stateNoParity.results);
+assert.strictEqual(exportNoParity.system.parityAvailable, false, 'parityAvailable should be false when engineParity is null');
+assert.strictEqual(exportNoParity.system.parityDeltaPct, null, 'parityDeltaPct should be null when no parity');
 
 console.log('report/export i18n tests passed');

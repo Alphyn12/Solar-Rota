@@ -892,6 +892,135 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <p class="step-heading-sub">Tarife, tüketim ve gelişmiş finansal seçenekleri belirleyin.</p>
   </div>
 
+  <div class="on-grid-flow-panel" id="on-grid-flow-panel">
+    <div class="on-grid-flow-head">
+      <div>
+        <div class="step-heading-eyebrow" data-i18n="onGridFlow.eyebrow">ON-GRID ÖN FİZİBİLİTE</div>
+        <h2 data-i18n="onGridFlow.title">Abone, tüketim ve mahsuplaşma temeli</h2>
+        <p data-i18n="onGridFlow.subtitle">Bu bölüm öz tüketim, mahsuplaşma ve finansal sonucu belirleyen minimum verileri toplar. Saatlik veri yoksa seçilen kullanım profili sentetik 8760 yük eğrisine çevrilir.</p>
+      </div>
+      <div class="on-grid-mode-toggle">
+        <button type="button" data-on-grid-mode-btn="basic" onclick="setOnGridInputMode('basic')" class="active" data-i18n="onGridFlow.basic">Basit</button>
+        <button type="button" data-on-grid-mode-btn="advanced" onclick="setOnGridInputMode('advanced')" data-i18n="onGridFlow.advanced">İleri</button>
+      </div>
+    </div>
+
+    <div class="on-grid-flow-grid">
+      <section class="on-grid-panel-section">
+        <h3 data-i18n="onGridFlow.customerContext">Müşteri / Abone / Tarife Bağlamı</h3>
+        <div class="on-grid-field-grid">
+          <label><span data-i18n="onGridFlow.subscriberType">Abone tipi</span>
+            <select id="on-grid-subscriber-type" onchange="updateOnGridAssumptions(); updateTariffAssumptions()">
+              <option value="residential" data-i18n="onGridFlow.subscriberResidential">Mesken</option>
+              <option value="commercial" data-i18n="onGridFlow.subscriberCommercial">Ticari</option>
+              <option value="industrial" data-i18n="onGridFlow.subscriberIndustrial">Sanayi</option>
+              <option value="osb" data-i18n="onGridFlow.subscriberOsb">OSB</option>
+              <option value="public" data-i18n="onGridFlow.subscriberPublic">Kamu</option>
+              <option value="other" data-i18n="onGridFlow.subscriberOther">Diğer / manuel</option>
+            </select>
+          </label>
+          <label><span data-i18n="onGridFlow.connectionType">Bağlantı tipi</span>
+            <select id="on-grid-connection-type" onchange="updateOnGridAssumptions()">
+              <option value="monofaze" data-i18n="onGridFlow.connectionMono">Monofaze</option>
+              <option value="trifaze" selected data-i18n="onGridFlow.connectionTri">Trifaze</option>
+              <option value="unknown" data-i18n="onGridFlow.connectionUnknown">Bilinmiyor</option>
+            </select>
+          </label>
+          <label><span data-i18n="onGridFlow.annualConsumption">Yıllık tüketim (kWh)</span>
+            <input type="number" id="on-grid-annual-consumption" min="0" step="1" value="3650" oninput="updateOnGridAssumptions({ fillMonthly: true })">
+          </label>
+          <label><span data-i18n="onGridFlow.usageProfile">Kullanım profili</span>
+            <select id="on-grid-usage-profile" onchange="updateOnGridAssumptions()">
+              <option value="daytime-heavy" data-i18n="onGridFlow.profileDaytime">Gündüz ağırlıklı</option>
+              <option value="balanced" selected data-i18n="onGridFlow.profileBalanced">Dengeli</option>
+              <option value="evening-heavy" data-i18n="onGridFlow.profileEvening">Akşam ağırlıklı</option>
+              <option value="business-hours" data-i18n="onGridFlow.profileBusiness">İş saatleri odaklı</option>
+            </select>
+          </label>
+          <label><span data-i18n="onGridFlow.tariffInputMode">Tarife giriş modu</span>
+            <select id="tariff-input-mode" onchange="updateTariffAssumptions()">
+              <option value="net-plus-fee" selected data-i18n="onGridFlow.tariffInputModeNet">Enerji bedeli + dağıtım bedeli ayrı</option>
+              <option value="gross" data-i18n="onGridFlow.tariffInputModeGross">Brüt tarife (dağıtım dahil)</option>
+            </select>
+          </label>
+          <label id="distribution-fee-label"><span data-i18n="onGridFlow.distributionFee">Dağıtım bedeli (importa ek, TL/kWh)</span>
+            <input type="number" id="distribution-fee-input" min="0" step="0.01" value="0" oninput="updateTariffAssumptions()">
+          </label>
+          <label><span data-i18n="onGridFlow.designTarget">Sistem hedefi</span>
+            <select id="on-grid-design-target" onchange="updateOnGridAssumptions()">
+              <option value="bill-offset" selected data-i18n="onGridFlow.targetBillOffset">Fatura hedefi kadar sistem kur</option>
+              <option value="fill-roof" data-i18n="onGridFlow.targetFillRoof">Çatımın teknik sınırını kullan</option>
+            </select>
+          </label>
+        </div>
+        <div class="on-grid-explain" id="on-grid-regulation-note" data-i18n="onGridFlow.regulationNote">Mahsuplaşma modu ve devreye alma tarihi ücretli ihracat hesabını etkiler. Tarih yoksa quote-ready kabul edilmez.</div>
+      </section>
+
+      <section class="on-grid-panel-section">
+        <h3 data-i18n="onGridFlow.consumptionData">Tüketim verisi</h3>
+        <div class="on-grid-monthly-head">
+          <span data-i18n="onGridFlow.monthlyDistribution">Aylık kWh dağılımı</span>
+          <button type="button" onclick="fillOnGridMonthlyFromAnnual(document.getElementById('on-grid-annual-consumption').value)" data-i18n="onGridFlow.autoDistribute">Otomatik dağıt</button>
+        </div>
+        <div class="on-grid-monthly-grid" id="on-grid-monthly-grid"></div>
+        <div class="on-grid-explain" data-i18n="onGridFlow.consumptionNote">kWh verisi fatura tutarından daha güvenilirdir. Aylık tüketim girilirse SKTT/PST ve self-consumption hesabı yıllık tek değerden daha savunulabilir olur.</div>
+        <div class="on-grid-hourly-upload">
+          <label class="on-grid-upload-label">
+            <span data-i18n="onGridFlow.hourlyUpload">Saatlik tüketim verisi (8760 CSV, isteğe bağlı)</span>
+            <div class="on-grid-upload-row">
+              <input type="file" id="hourly-csv-upload" accept=".csv,.txt" onchange="handleHourlyCsvUpload(event)" style="flex:1">
+              <button type="button" id="hourly-csv-clear" onclick="clearHourlyCsvUpload()" style="display:none" data-i18n="onGridFlow.hourlyUploadClear">Saatlik veriyi sil</button>
+            </div>
+            <div id="hourly-csv-status" class="on-grid-explain" style="display:none"></div>
+          </label>
+          <div class="on-grid-explain" data-i18n="onGridFlow.hourlyUploadHint">Her satır bir saati temsil eden tek sütunlu 8760 satırlı CSV. Yüklenmezse sentetik profil kullanılır.</div>
+        </div>
+      </section>
+    </div>
+
+    <div id="on-grid-advanced-fields" style="display:none">
+      <div class="on-grid-flow-grid on-grid-advanced-grid">
+        <section class="on-grid-panel-section">
+          <h3 data-i18n="onGridFlow.roofPlacement">Çatı / yerleşim varsayımları</h3>
+          <div class="on-grid-field-grid">
+            <label><span data-i18n="onGridFlow.roofType">Çatı tipi</span>
+              <select id="on-grid-roof-type" onchange="updateOnGridAssumptions()">
+                <option value="flat-concrete" data-i18n="onGridFlow.roofFlat">Beton teras / düz çatı</option>
+                <option value="metal-trapez" data-i18n="onGridFlow.roofMetal">Metal trapez</option>
+                <option value="tile" data-i18n="onGridFlow.roofTile">Kiremit / eğimli çatı</option>
+                <option value="ground" data-i18n="onGridFlow.roofGround">Zemin konstrüksiyon</option>
+              </select>
+            </label>
+            <label><span data-i18n="onGridFlow.usableRoofRatio">Net kullanılabilir alan (%)</span>
+              <input type="number" id="on-grid-usable-roof-ratio" min="10" max="95" step="1" value="75" oninput="updateOnGridAssumptions()">
+            </label>
+            <label><span data-i18n="onGridFlow.shadingQuality">Gölge veri kalitesi</span>
+              <select id="on-grid-shading-quality" onchange="updateOnGridAssumptions()">
+                <option value="user-estimate" selected data-i18n="onGridFlow.shadingUser">Kullanıcı beyanı</option>
+                <option value="map-assisted" data-i18n="onGridFlow.shadingMap">Harita/OSM destekli ön değerlendirme</option>
+                <option value="site-verified" data-i18n="onGridFlow.shadingSite">Saha doğrulamalı</option>
+                <option value="unknown" data-i18n="onGridFlow.shadingUnknown">Bilinmiyor</option>
+              </select>
+            </label>
+          </div>
+          <div class="on-grid-explain" id="on-grid-usable-roof-hint">75% net alan: servis boşluğu, parapet, yangın yolu ve bakım koridoru sonrası ön fizibilite varsayımı.</div>
+          <div class="on-grid-explain" id="on-grid-roof-mode-preview">Fatura hedefi kadar boyutlandır · 75% kullanılabilir alan</div>
+        </section>
+        <section class="on-grid-panel-section">
+          <h3 data-i18n="onGridFlow.assumptionImpact">Sonuca etkisi</h3>
+          <ul class="on-grid-impact-list">
+            <li data-i18n="onGridFlow.impactProfile">Kullanım profili saatlik yük eğrisini, öz tüketim ve ihracatı değiştirir.</li>
+            <li data-i18n="onGridFlow.impactSettlement">Mahsuplaşma modu ücretli ihracat sınırını belirler.</li>
+            <li data-i18n="onGridFlow.impactRoof">Net çatı alanı panel sayısını ve kurulu gücü doğrudan değiştirir.</li>
+            <li data-i18n="onGridFlow.impactEvidence">Fatura, tarife ve gölge kanıtı güven seviyesini belirler.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+
+    <div class="on-grid-flow-summary" id="on-grid-flow-summary"></div>
+  </div>
+
   <div class="card">
     <!-- Tariff tabs -->
     <div class="card-title" style="margin-bottom:16px">
@@ -1070,6 +1199,15 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           </select>
         </div>
         <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px" data-i18n="onGridFlow.tariffSourceType">Tarife kaynak türü</div>
+          <select id="tariff-source-type" onchange="updateTariffAssumptions()"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;min-width:200px">
+            <option value="manual" selected data-i18n="onGridFlow.tariffSourceManual">Manuel giriş</option>
+            <option value="estimate" data-i18n="onGridFlow.tariffSourceEstimate">Tahmini / varsayılan</option>
+            <option value="official" data-i18n="onGridFlow.tariffSourceOfficial">Resmi / güncel kaynak (EPDK, RG)</option>
+          </select>
+        </div>
+        <div>
           <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Tarife Kanıt Ref</div>
           <input type="text" id="tariff-evidence-ref" value="EPDK/SKTT-2026-local"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:175px;font-size:0.9rem"
@@ -1203,6 +1341,15 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
               <option value="requested">İstendi</option>
               <option value="received">Alındı</option>
               <option value="expired">Süresi Doldu</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px" data-i18n="onGridFlow.costSourceType">Maliyet kaynağı</div>
+            <select id="cost-source-type" onchange="updateTariffAssumptions()"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;min-width:200px">
+              <option value="catalog" selected data-i18n="onGridFlow.costSourceCatalog">Katalog / otomatik fiyat</option>
+              <option value="manual" data-i18n="onGridFlow.costSourceManual">Manuel override</option>
+              <option value="bom-verified" data-i18n="onGridFlow.costSourceBom">BOM ile doğrulanmış tedarikçi teklifi</option>
             </select>
           </div>
           <div>
@@ -1812,6 +1959,8 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <div class="kpi-sub" id="kpi-tree-sub"></div>
     </div>
   </div>
+
+  <div class="on-grid-result-layers" id="on-grid-result-layers" style="display:none"></div>
 
   <div class="fin-box">
     <div class="card-title" style="margin-bottom:8px">Finansal Analiz</div>

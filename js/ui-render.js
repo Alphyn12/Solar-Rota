@@ -213,6 +213,7 @@ export function renderResults() {
 
   renderBESSResults(r.bessMetrics);
   renderNMResults(r.nmMetrics, state.netMeteringEnabled);
+  renderOnGridResultLayers(state, r);
   renderWarningsAndAudit(state, r);
   renderBomResults(r.costBreakdown?.bom);
 
@@ -247,16 +248,16 @@ function renderBESSResults(bess) {
   document.getElementById('bess-night').textContent = `${bess.nightCoverage}%`;
   // Faz-4 Fix-14: Show autonomy metrics when available (off-grid scenario)
   const autonomyHtml = (bess.autonomousDaysPct != null)
-    ? `<span>Sentetik otonom gün oranı: <strong>${bess.autonomousDaysPct}%</strong> (${bess.autonomousDays} gün/yıl)</span>
-    <span>Sentetik dispatch karşılanamayan yük: <strong>${Number(bess.unmetLoadKwh || 0).toLocaleString('tr-TR')} kWh/yıl</strong></span>`
+    ? `<span>${escapeHtml(i18n.t('offGrid.autonomousDaysNote'))}: <strong>${bess.autonomousDaysPct}%</strong> (${bess.autonomousDays} gün/yıl)</span>
+    <span>${escapeHtml(i18n.t('offGrid.nightCoverageNote'))}: <strong>${Number(bess.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh/${escapeHtml(i18n.t('units.year'))}</strong></span>`
     : '';
   document.getElementById('bess-detail-row').innerHTML = `
     <span>Kullanılabilir kapasite: <strong>${bess.usableCapacity} kWh</strong></span>
-    <span>Yıllık batarya deşarjı: <strong>${Number(bess.batteryStored || 0).toLocaleString('tr-TR')} kWh</strong></span>
+    <span>Yıllık batarya deşarjı: <strong>${Number(bess.batteryStored || 0).toLocaleString(localeTag())} kWh</strong></span>
     <span>Tahmini çevrim/yıl: <strong>${bess.cyclesPerYear || '—'}</strong></span>
     <span>Batarya maliyeti: <strong>${money(bess.batteryCost)}</strong></span>
     ${autonomyHtml}
-    ${isOffGrid ? '<span>Not: Bu metrikler sentetik 8760 dispatch ön değerlendirmesidir; off-grid yeterlilik garantisi değildir.</span>' : ''}
+    ${isOffGrid ? `<div class="off-grid-honesty-note">${escapeHtml(i18n.t('offGrid.syntheticDispatchNote'))}</div><div class="off-grid-honesty-note off-grid-honesty-warn">${escapeHtml(i18n.t('offGrid.notFeasibilityAnalysis'))}</div>` : ''}
   `;
 }
 
@@ -270,6 +271,213 @@ function renderNMResults(nm, enabled) {
   document.getElementById('nm-export-kwh').textContent = `${nm.paidGridExport.toLocaleString('tr-TR')} / ${nm.annualGridExport.toLocaleString('tr-TR')}`;
   document.getElementById('nm-export-revenue').textContent = money(nm.annualExportRevenue);
   document.getElementById('nm-self-consumption').textContent = `${nm.selfConsumptionPct}%`;
+}
+
+function onGridConfidenceAssessment(state, r) {
+  const missing = [];
+  // Core data blockers
+  if (!Array.isArray(state.hourlyConsumption8760) || state.hourlyConsumption8760.length !== 8760) missing.push(i18n.t('onGridResult.missingHourly'));
+  if (state.exportSettlementMode === 'auto' && !state.settlementDate) missing.push(i18n.t('onGridResult.missingSettlementDate'));
+  if (!state.roofGeometry) missing.push(i18n.t('onGridResult.missingRoofGeometry'));
+  if (!state.hasSignedCustomerBillData && state.evidence?.customerBill?.status !== 'verified') missing.push(i18n.t('onGridResult.missingBillEvidence'));
+  if (!state.tariffSourceCheckedAt) missing.push(i18n.t('onGridResult.missingTariffCheck'));
+
+  // Shadow quality
+  const shadowQuality = r.shadowQuality || state.shadingQuality || 'user-estimate';
+  if (shadowQuality === 'unknown') missing.push(i18n.t('onGridResult.missingShading'));
+  else if (!state.osmShadowEnabled && shadowQuality !== 'site-verified' && shadowQuality !== 'map-assisted') missing.push(i18n.t('onGridResult.missingShading'));
+
+  // Cost confidence
+  const costSourceType = r.costSourceType || state.costSourceType || 'catalog';
+  if (costSourceType !== 'bom-verified') missing.push(i18n.t('onGridResult.missingCostOverride'));
+
+  // Tariff source quality
+  const tariffSourceType = r.tariffSourceType || state.tariffSourceType || 'manual';
+  const tariffIsBlocker = tariffSourceType === 'estimate';
+  const tariffIsWarning = tariffSourceType === 'manual';
+  if (tariffIsBlocker) missing.push(i18n.t('warnings.manualTariff'));
+
+  let score = 100 - missing.length * 10;
+  if (r.usedFallback) score -= 25;
+  if (r.authoritativeEngineSource?.pvlibBacked) score += 5;
+  // Graduated deductions for soft-warnings (don't add to missing list)
+  if (tariffIsWarning) score -= 5;
+  if ((r.hourlyProfileSource || state.hourlyProfileSource) === 'synthetic') score -= 5;
+  if (shadowQuality === 'user-estimate') score -= 5;
+  score = Math.max(0, Math.min(100, score));
+
+  // quoteCandidate requires: no fallback, score ≥ 82, ≤1 missing, bom-verified cost, official/manual tariff, shadow ≠ unknown
+  const isQuoteCandidate = !r.usedFallback && score >= 82 && missing.length <= 1
+    && costSourceType === 'bom-verified'
+    && tariffSourceType !== 'estimate'
+    && shadowQuality !== 'unknown'
+    && shadowQuality !== 'user-estimate';
+
+  const level = r.usedFallback || score < 55
+    ? 'rough'
+    : isQuoteCandidate
+      ? 'quoteCandidate'
+      : 'engineering';
+  return { score, level, missing, shadowQuality, costSourceType, tariffSourceType };
+}
+
+function renderOnGridResultLayers(state, r) {
+  const wrap = document.getElementById('on-grid-result-layers');
+  if (!wrap) return;
+  if (state.scenarioKey !== 'on-grid') {
+    wrap.style.display = 'none';
+    wrap.innerHTML = '';
+    return;
+  }
+  const assessment = onGridConfidenceAssessment(state, r);
+  const levelLabels = {
+    rough: i18n.t('onGridResult.roughEstimate'),
+    engineering: i18n.t('onGridResult.engineeringEstimate'),
+    quoteCandidate: i18n.t('onGridResult.quoteReadyCandidate')
+  };
+  const roofAreaTotal = (Number(state.roofArea) || 0) + (state.multiRoof ? (state.roofSections || []).reduce((s, sec) => s + (Number(sec.area) || 0), 0) : 0);
+  const panelArea = (PANEL_TYPES[state.panelType]?.width || 0) * (PANEL_TYPES[state.panelType]?.height || 0) * (Number(r.panelCount) || 0);
+  const roofUsePct = roofAreaTotal > 0 ? Math.min(100, panelArea / roofAreaTotal * 100) : 0;
+  const exportText = `${Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString(localeTag())} / ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag())} kWh`;
+  const readinessStatus = statusLabel(r.quoteReadiness?.status || 'not-quote-ready');
+  const blockers = localizeMessageList(r.quoteReadiness?.blockers || []).slice(0, 4);
+  const missingHtml = assessment.missing.length
+    ? assessment.missing.map(item => `<li>${escapeHtml(item)}</li>`).join('')
+    : `<li>${escapeHtml(i18n.t('onGridResult.noMajorMissingData'))}</li>`;
+  const multiRoofNote = state.multiRoof && Array.isArray(r.sectionResults) && r.sectionResults.length > 1
+    ? `${r.sectionResults.length} ${i18n.t('onGridResult.roofSurfaces')}`
+    : i18n.t('onGridResult.singleRoof');
+  const usageProfileLabels = {
+    'daytime-heavy': i18n.t('onGridFlow.profileDaytime'),
+    balanced: i18n.t('onGridFlow.profileBalanced'),
+    'evening-heavy': i18n.t('onGridFlow.profileEvening'),
+    'business-hours': i18n.t('onGridFlow.profileBusiness')
+  };
+  const usageProfileText = usageProfileLabels[state.usageProfile] || state.usageProfile || i18n.t('onGridFlow.profileBalanced');
+
+  // Profile source labels
+  const profileSourceKey = r.hourlyProfileSource || state.hourlyProfileSource || 'synthetic';
+  const profileSourceLabels = {
+    'hourly-uploaded': i18n.t('onGridResult.profileSourceHourly'),
+    'monthly-derived': i18n.t('onGridResult.profileSourceMonthly'),
+    'synthetic': i18n.t('onGridResult.profileSourceSynthetic')
+  };
+  const profileSourceText = profileSourceLabels[profileSourceKey] || profileSourceLabels.synthetic;
+  const profileSourceClass = profileSourceKey === 'hourly-uploaded' ? 'data-source-good' : profileSourceKey === 'monthly-derived' ? 'data-source-ok' : 'data-source-warn';
+
+  // Shadow quality display
+  const shadowQuality = assessment.shadowQuality;
+  const shadowLabels = {
+    'site-verified': i18n.t('onGridFlow.shadingSite'),
+    'map-assisted': i18n.t('onGridFlow.shadingMap'),
+    'user-estimate': i18n.t('onGridFlow.shadingUser'),
+    'unknown': i18n.t('onGridFlow.shadingUnknown')
+  };
+  const shadowText = shadowLabels[shadowQuality] || shadowQuality;
+  const shadowClass = shadowQuality === 'site-verified' ? 'data-source-good' : shadowQuality === 'map-assisted' ? 'data-source-ok' : 'data-source-warn';
+
+  // Tariff mode display
+  const tariffInputMode = r.tariffInputMode || state.tariffInputMode || 'net-plus-fee';
+  const tariffModeText = tariffInputMode === 'gross' ? i18n.t('onGridResult.tariffModeGross') : i18n.t('onGridResult.tariffModeNet');
+
+  // Tariff source display
+  const tariffSourceType = assessment.tariffSourceType;
+  const tariffSourceLabels = {
+    'official': i18n.t('onGridFlow.tariffSourceOfficial'),
+    'manual': i18n.t('onGridFlow.tariffSourceManual'),
+    'estimate': i18n.t('onGridFlow.tariffSourceEstimate')
+  };
+  const tariffSourceText = tariffSourceLabels[tariffSourceType] || tariffSourceType;
+  const tariffSourceClass = tariffSourceType === 'official' ? 'data-source-good' : tariffSourceType === 'manual' ? 'data-source-ok' : 'data-source-warn';
+
+  // Cost source display
+  const costSourceType = assessment.costSourceType;
+  const costSourceLabels = {
+    'bom-verified': i18n.t('onGridFlow.costSourceBom'),
+    'manual': i18n.t('onGridFlow.costSourceManual'),
+    'catalog': i18n.t('onGridFlow.costSourceCatalog')
+  };
+  const costSourceText = costSourceLabels[costSourceType] || costSourceType;
+  const costSourceClass = costSourceType === 'bom-verified' ? 'data-source-good' : costSourceType === 'manual' ? 'data-source-ok' : 'data-source-warn';
+
+  // Engine parity — intentionalDifference=true only when backend pvlib was used
+  const engineMode = r.calculationMode || r.authoritativeEngineMode || '—';
+  const parityData = r.engineParity || null;
+  const parityIsReal = parityData?.intentionalDifference === true;
+  let engineParityHtml = '';
+  let parityRowClass = 'data-source-ok';
+  let parityRowText = '';
+  if (!parityData || !parityIsReal) {
+    // No backend comparison — do NOT show 0% or any numeric diff
+    parityRowClass = 'data-source-warn';
+    parityRowText = i18n.t('onGridResult.parityUnavailable');
+    engineParityHtml = `<div class="on-grid-explain" style="font-size:.78rem;color:var(--text-muted)">${escapeHtml(i18n.t('engine.comparisonUnavailableHint'))}</div>`;
+  } else {
+    // Real backend comparison available — use deltaPct (correct field name)
+    const diff = typeof parityData.deltaPct === 'number' ? parityData.deltaPct : 0;
+    const diffAbs = Math.abs(diff);
+    parityRowClass = diffAbs > 10 ? 'data-source-warn' : 'data-source-good';
+    parityRowText = `${diff > 0 ? '+' : ''}${diff.toFixed(1)}% (${Math.round(parityData.deltaKwh || 0).toLocaleString(localeTag())} kWh)`;
+    if (diffAbs > 10) {
+      engineParityHtml = `<div class="on-grid-explain"><span class="data-source-warn">${escapeHtml(i18n.t('onGridResult.engineDiff'))}: ${parityRowText} — ${escapeHtml(i18n.t('onGridResult.engineDiffWarning'))}</span></div>`;
+    }
+  }
+
+  wrap.style.display = '';
+  wrap.innerHTML = `
+    <section class="on-grid-result-card">
+      <h3>${escapeHtml(i18n.t('onGridResult.technicalTitle'))}</h3>
+      <div class="on-grid-result-metrics">
+        <div class="on-grid-result-metric"><strong>${Number(r.systemPower || 0).toFixed(2)} kWp</strong><span>${escapeHtml(i18n.t('onGridResult.installedPower'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${Number(r.panelCount || 0).toLocaleString(localeTag())}</strong><span>${escapeHtml(i18n.t('onGridResult.panelCount'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${Number(r.annualEnergy || 0).toLocaleString(localeTag())} kWh</strong><span>${escapeHtml(i18n.t('onGridResult.annualProduction'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${r.nmMetrics?.selfConsumptionPct || 0}%</strong><span>${escapeHtml(i18n.t('onGridResult.selfConsumption'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${exportText}</strong><span>${escapeHtml(i18n.t('onGridResult.exportableEnergy'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${roofUsePct.toFixed(1)}%</strong><span>${escapeHtml(i18n.t('onGridResult.roofUse'))} · ${escapeHtml(multiRoofNote)}</span></div>
+        <div class="on-grid-result-metric"><strong>${r.ysp} kWh/kWp</strong><span>${escapeHtml(i18n.t('onGridResult.specificYield'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${escapeHtml(usageProfileText)}</strong><span>${escapeHtml(i18n.t('onGridResult.loadProfile'))}</span></div>
+        <div class="on-grid-result-metric"><strong><span class="${profileSourceClass}">${escapeHtml(profileSourceText)}</span></strong><span>${escapeHtml(i18n.t('onGridResult.profileSourceLabel'))}</span></div>
+        <div class="on-grid-result-metric"><strong><span class="${shadowClass}">${escapeHtml(shadowText)}</span></strong><span>${escapeHtml(i18n.t('onGridResult.shadowQualityLabel'))}</span></div>
+      </div>
+    </section>
+    <section class="on-grid-result-card">
+      <h3>${escapeHtml(i18n.t('onGridResult.economicTitle'))}</h3>
+      <div class="on-grid-result-metrics">
+        <div class="on-grid-result-metric"><strong>${money(r.totalCost)}</strong><span>${escapeHtml(i18n.t('onGridResult.totalCost'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${money(r.financialCostBasis || r.totalCost)}</strong><span>${escapeHtml(i18n.t('onGridResult.financialBasis'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${money(r.annualSavings)}</strong><span>${escapeHtml(i18n.t('onGridResult.annualSavings'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${r.simplePaybackYear || '>25'} ${escapeHtml(i18n.t('units.year'))}</strong><span>${escapeHtml(i18n.t('finance.simplePayback'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${money(r.npvTotal)}</strong><span>NPV</span></div>
+        <div class="on-grid-result-metric"><strong>${r.irr === 'N/A' ? 'N/A' : r.irr + '%'}</strong><span>IRR</span></div>
+        <div class="on-grid-result-metric"><strong>${moneyRate(r.lcoe, 'kWh')}</strong><span>LCOE</span></div>
+        <div class="on-grid-result-metric"><strong>${r.roi}%</strong><span>${escapeHtml(i18n.t('onGridResult.roiLabel'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${escapeHtml(tariffModeText)}</strong><span>${escapeHtml(i18n.t('onGridResult.tariffModeNet').replace('Enerji bedeli + ', '').replace('Energy rate + ', '').replace('Energiepreis + ', '') || 'Tarife modu')}</span></div>
+        <div class="on-grid-result-metric"><strong><span class="${costSourceClass}">${escapeHtml(costSourceText)}</span></strong><span>${escapeHtml(i18n.t('onGridResult.costConfidenceLabel'))}</span></div>
+      </div>
+    </section>
+    <section class="on-grid-result-card">
+      <h3>${escapeHtml(i18n.t('onGridResult.confidenceTitle'))}</h3>
+      <div class="confidence-pill">${escapeHtml(levelLabels[assessment.level])} · ${assessment.score}/100</div>
+      <p class="on-grid-explain on-grid-question"><strong>${escapeHtml(i18n.t('onGridResult.dataSourceQuestion'))}</strong></p>
+      <div class="on-grid-data-source-table">
+        <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.engine'))}</span><span>${escapeHtml(engineMode)}</span></div>
+        <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.profileSourceLabel'))}</span><span class="${profileSourceClass}">${escapeHtml(profileSourceText)}</span></div>
+        <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.tariffSourceLabel'))}</span><span class="${tariffSourceClass}">${escapeHtml(tariffSourceText)}</span></div>
+        <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.shadowQualityLabel'))}</span><span class="${shadowClass}">${escapeHtml(shadowText)}</span></div>
+        <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.costConfidenceLabel'))}</span><span class="${costSourceClass}">${escapeHtml(costSourceText)}</span></div>
+        <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.parityLabel'))}</span><span class="${parityRowClass}">${escapeHtml(parityRowText || i18n.t('onGridResult.parityUnavailable'))}</span></div>
+      </div>
+      ${engineParityHtml}
+      <p class="on-grid-explain on-grid-question"><strong>${escapeHtml(i18n.t('onGridResult.missingDataQuestion'))}</strong></p>
+      <ul class="on-grid-missing-list">${missingHtml}</ul>
+    </section>
+    <section class="on-grid-result-card">
+      <h3>${escapeHtml(i18n.t('onGridResult.commercialTitle'))}</h3>
+      <div class="confidence-pill">${escapeHtml(readinessStatus)}</div>
+      <div class="on-grid-explain">${escapeHtml(state.scenarioContext?.nextAction || i18n.t('onGridResult.commercialNextAction'))}</div>
+      <ul class="on-grid-missing-list">${blockers.length ? blockers.map(item => `<li>${escapeHtml(item)}</li>`).join('') : `<li>${escapeHtml(i18n.t('onGridResult.noCommercialBlockers'))}</li>`}</ul>
+    </section>
+  `;
 }
 
 function renderBomResults(bom) {
@@ -350,10 +558,14 @@ function renderWarningsAndAudit(state, r) {
   const gridStatus = gov.gridChecklistComplete ? i18n.t('audit.complete') : i18n.t('audit.missingDocuments');
   const tariffFreshness = tariffSource.stale ? 'STALE' : i18n.t('audit.current');
   const parity = r.engineParity || null;
-  const parityText = parity
+  const parityHasRealComparison = parity?.intentionalDifference === true;
+  const parityText = parity && parityHasRealComparison
     ? `${i18n.t('engine.authoritativeSource')}: ${parity.authoritativeSource || '—'} | ${i18n.t('engine.productionDelta')}: ${Number(parity.deltaKwh || 0).toLocaleString(localeTag())} kWh (${Number(parity.deltaPct || 0).toFixed(2)}%)`
-    : '—';
+    : i18n.t('engine.comparisonUnavailable');
   const isOffGrid = state.scenarioKey === 'off-grid';
+  const offGridAuditNote = isOffGrid
+    ? `<p class="audit-offgrid-note">${escapeHtml(i18n.t('offGrid.preFeasibilityOnly'))} ${escapeHtml(i18n.t('offGrid.notFeasibilityAnalysis'))}</p>`
+    : '';
   const energyBalanceLabel = state.netMeteringEnabled
     ? i18n.t('audit.selfConsumptionExport')
     : isOffGrid
@@ -367,6 +579,7 @@ function renderWarningsAndAudit(state, r) {
 
   audit.innerHTML = `
     <div class="card-title">${escapeHtml(i18n.t('governance.auditPanel'))}</div>
+    ${offGridAuditNote}
     ${warningHtml}
     <table class="tech-table">
       <tbody>

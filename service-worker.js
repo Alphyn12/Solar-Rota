@@ -1,6 +1,5 @@
-// v21: Faz-1 calculation correctness fixes — PVGIS temperature parity,
-//      off-grid financial basis, honest payback/off-grid metric wording.
-const CACHE_NAME = 'solarRota-v21';
+// v22: On-grid pre-feasibility flow, assumption layers and cache refresh.
+const CACHE_NAME = 'solarRota-v22';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',
