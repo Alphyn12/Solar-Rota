@@ -31,7 +31,8 @@
       "Bash(wc -l /c/Users/Monster/Desktop/GüneşHesap/js/*.js)",
       "Bash(git *)",
       "Bash(python3 *)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(python -m pytest tests/ -q)"
     ]
   }
 }

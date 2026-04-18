@@ -1748,7 +1748,10 @@ function validateStep5() {
   runCalculation()
     .catch(e => {
       window.state.calculationError = e?.message || String(e);
-      window.showToast?.(`Hesaplama hatası: ${window.state.calculationError}`, 'error');
+      window.finalizeCalculationUI?.({
+        targetStep: 5,
+        errorMsg: 'Hesaplama sırasında bir hata oluştu. Lütfen tekrar deneyin.'
+      });
     })
     .finally(() => {
       if (calcBtn) { calcBtn.disabled = false; calcBtn.style.opacity = ''; }

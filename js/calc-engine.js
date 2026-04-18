@@ -23,7 +23,7 @@ import { buildPvEngineRequest } from './pv-engine-contracts.js';
 import { sourceMetaForCurrentCalculation } from './solar-engine-adapter.js';
 import { scenarioSourceQualityNote } from './scenario-workflows.js';
 import { buildOffgridLoadProfile, runOffgridDispatch, runBadWeatherScenario, buildOffgridResults } from './offgrid-dispatch.js';
-import { fetchPVGISLive, PVGIS_FETCH_STATUS, getPvgisSourceLabel } from './pvgis-fetch.js';
+import { fetchPVGISLive, PVGIS_FETCH_STATUS, getPvgisSourceLabel, CALC_TOTAL_TIMEOUT_MS } from './pvgis-fetch.js';
 import { buildBackendUrl, BACKEND_CONFIG } from './backend-config.js';
 
 const LOADING_MSGS = [
@@ -32,6 +32,25 @@ const LOADING_MSGS = [
   "Enerji üretimi hesaplanıyor...",
   "Finansal analiz yapılıyor..."
 ];
+
+// ── Merkezi loading state yönetimi ──────────────────────────────────────────
+let _activeMsgInterval = null;
+let _calcFinalized = false;
+
+function finalizeCalculationUI({ success = false, targetStep = null, errorMsg = null } = {}) {
+  _calcFinalized = true;
+  if (_activeMsgInterval) { clearInterval(_activeMsgInterval); _activeMsgInterval = null; }
+  const lp = document.getElementById('loading-particles');
+  if (lp) lp.innerHTML = '';
+  setLoadingProgress(success ? 100 : 0, success ? 3 : 0);
+  if (window.state) window.state.isCalculating = false;
+  if (targetStep !== null) window.goToStep(targetStep);
+  if (errorMsg) window.showToast?.(errorMsg, 'error');
+}
+
+if (typeof window !== 'undefined') {
+  window.finalizeCalculationUI = finalizeCalculationUI;
+}
 
 // FIX-2: Tilt factor lookup for PSH fallback path.
 // Matches the TILT_COEFFS table in app.js and the backend simple_engine.py _tilt_factor().
@@ -229,12 +248,19 @@ export async function runCalculation() {
   if (fallbackBanner) fallbackBanner.style.display = 'none';
   spawnLoadingParticles();
   setLoadingProgress(10, 0);
+  _calcFinalized = false;
 
   let msgIdx = 0;
-  const msgInterval = setInterval(() => {
+  _activeMsgInterval = setInterval(() => {
     msgIdx = Math.min(msgIdx + 1, 3);
     setLoadingProgress(10 + msgIdx * 23, msgIdx);
   }, 1200);
+
+  const _calcHardTimeout = setTimeout(() => {
+    finalizeCalculationUI({ targetStep: 5, errorMsg: 'Hesaplama zaman aşımına uğradı. Lütfen tekrar deneyin.' });
+  }, CALC_TOTAL_TIMEOUT_MS);
+
+  try {
 
   const layout = calculateSystemLayout(state);
   const panel = layout.panel;
@@ -243,9 +269,8 @@ export async function runCalculation() {
 
   const totalPCCheck = layout.panelCount;
   if (totalPCCheck === 0) {
-    clearInterval(msgInterval);
-    window.showToast('Panel sayısı sıfır. Lütfen çatı alanını artırın (min ~5 m² gerekli).', 'error');
-    window.goToStep(3); return;
+    finalizeCalculationUI({ targetStep: 3, errorMsg: 'Panel sayısı sıfır. Lütfen çatı alanını artırın (min ~5 m² gerekli).' });
+    return;
   }
 
   let avgSummerTemp = CITY_SUMMER_TEMPS[state.cityName] || CITY_SUMMER_TEMPS['default'];
@@ -323,6 +348,7 @@ export async function runCalculation() {
     : 0;
 
   const sectionResults = await Promise.all(allSections.map(async sec => {
+    try {
     const secPC = Math.max(0, Number(sec.panelCount) || 0);
     const secPower = Number(sec.systemPower) || secPC * panel.wattPeak / 1000;
     if (secPower <= 0) return null;
@@ -420,13 +446,16 @@ export async function runCalculation() {
       cableLoss: rawEnergy * cableLossPct / 100,
       sectionArea: sec.area, sectionTilt: sec.tilt, sectionAzimuthName: sec.azimuthName
     };
+    } catch (secErr) {
+      console.error('[calc-engine] Section calculation failed:', secErr);
+      return null;
+    }
   }));
 
   const validSections = sectionResults.filter(r => r !== null);
   if (validSections.length === 0) {
-    clearInterval(msgInterval);
-    window.showToast('Hesaplama başarısız. Lütfen tekrar deneyin.', 'error');
-    window.goToStep(3); return;
+    finalizeCalculationUI({ targetStep: 5, errorMsg: 'Hesaplama başarısız. Lütfen panel ve çatı ayarlarını kontrol edin.' });
+    return;
   }
 
   let panelCount    = validSections.reduce((s, r) => s + r.panelCount, 0);
@@ -543,8 +572,7 @@ export async function runCalculation() {
         avgSummerTemp
       });
 
-  clearInterval(msgInterval);
-  setLoadingProgress(100, 3);
+  finalizeCalculationUI({ success: true });
   if (usedFallback) {
     const banner = document.getElementById('fallback-banner');
     if (banner) {
@@ -1048,6 +1076,7 @@ export async function runCalculation() {
   if (window.renderEngCalcPanel) window.renderEngCalcPanel();
 
   setTimeout(() => {
+    if (window.state?.step !== 6) return; // hard timeout zaten başka adıma geçmişse dur
     window.goToStep(7);
     window.renderResults();
     window.launchConfetti();
@@ -1058,6 +1087,11 @@ export async function runCalculation() {
     // Güneş yolu diyagramını güncelle
     if (window.renderSunPath) window.renderSunPath();
   }, 500);
+
+  } finally {
+    clearTimeout(_calcHardTimeout);
+    if (_activeMsgInterval) { clearInterval(_activeMsgInterval); _activeMsgInterval = null; }
+  }
 }
 
 // ── EV Şarj Hesabı ─────────────────────────────────────────────────────────

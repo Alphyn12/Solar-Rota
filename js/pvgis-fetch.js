@@ -18,8 +18,9 @@ const PVGIS_ENDPOINTS = [
   'https://re.jrc.ec.europa.eu/api/PVcalc',
 ];
 
-const DEFAULT_TIMEOUT_MS = 25000;
-const PROXY_TIMEOUT_MS   = 10000;
+const PROXY_TIMEOUT_MS             = 15000; // backend 22 s alır; 15 s proxy için makul üst sınır
+const DEFAULT_TIMEOUT_MS           = 20000; // direkt PVGIS başına (3 deneme × 20 s = max ~67 s)
+export const CALC_TOTAL_TIMEOUT_MS = 55000; // tüm hesaplama için hard upper limit
 const DEFAULT_RETRY_DELAYS_MS = [0, 2500, 5000];
 
 function classifyError(e) {
