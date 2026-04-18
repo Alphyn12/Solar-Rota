@@ -116,6 +116,7 @@ export const i18n = {
       this.translations = await res.json();
       this.locale = safeLang;
       persistLanguage(safeLang);
+      if (typeof window !== 'undefined') window._currentLang = safeLang;
       this.applyTranslations();
       this.updateLangButtons();
       this.afterLanguageChange();

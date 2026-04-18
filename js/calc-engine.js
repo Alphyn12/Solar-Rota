@@ -23,6 +23,8 @@ import { buildPvEngineRequest } from './pv-engine-contracts.js';
 import { sourceMetaForCurrentCalculation } from './solar-engine-adapter.js';
 import { scenarioSourceQualityNote } from './scenario-workflows.js';
 import { buildOffgridLoadProfile, runOffgridDispatch, runBadWeatherScenario, buildOffgridResults } from './offgrid-dispatch.js';
+import { fetchPVGISLive, PVGIS_FETCH_STATUS, getPvgisSourceLabel } from './pvgis-fetch.js';
+import { buildBackendUrl, BACKEND_CONFIG } from './backend-config.js';
 
 const LOADING_MSGS = [
   "PVGIS'ten güneş ışınım verisi alınıyor...",
@@ -326,44 +328,26 @@ export async function runCalculation() {
     if (secPower <= 0) return null;
 
     let rawEnergy = null, rawMonthly = null, rawPoa = null, usedFallback = false;
+    let pvgisFetchStatus = PVGIS_FETCH_STATUS.FALLBACK_USED;
+    let pvgisUserMessage = null;
 
-    async function fetchPVGIS(retries = 3) {
+    {
       const pvgisAzimut = sec.azimuth - 180;
-      const baseParams = `lat=${state.lat}&lon=${state.lon}&peakpower=${secPower}&loss=${PVGIS_LOSS_PARAM}&angle=${sec.tilt}&aspect=${pvgisAzimut}&outputformat=json&pvtechchoice=crystSi&mountingplace=free`;
-      const urls = [
-        `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?${baseParams}`,
-        `https://re.jrc.ec.europa.eu/api/v5_3/PVcalc?${baseParams}`,
-        `https://re.jrc.ec.europa.eu/api/PVcalc?${baseParams}`,
-      ];
-      for (let attempt = 0; attempt < retries; attempt++) {
-        const url = urls[Math.min(attempt, urls.length - 1)];
-        try {
-          const ctrl = new AbortController();
-          const timeout = setTimeout(() => ctrl.abort(), 30000);
-          const res = await fetch(url, { signal: ctrl.signal, credentials: 'omit', cache: 'no-store' });
-          clearTimeout(timeout);
-          if (res.ok) {
-            const data = await res.json();
-            const ey = data.outputs?.totals?.fixed?.E_y;
-            if (ey && ey > 0) {
-              rawEnergy = ey;
-              rawPoa = data.outputs?.totals?.fixed?.['H(i)_y'] || data.outputs?.totals?.fixed?.H_i_y || null;
-              if (data.outputs?.monthly?.fixed) rawMonthly = data.outputs.monthly.fixed.map(m => m.E_m);
-              window._pvgisLastError = null;
-              return;
-            }
-          } else {
-            window._pvgisLastError = `HTTP ${res.status} (deneme ${attempt + 1})`;
-            console.warn('[PVGIS]', window._pvgisLastError);
-          }
-        } catch(e) {
-          window._pvgisLastError = e?.message || String(e);
-          console.warn('[PVGIS] Deneme', attempt + 1, 'başarısız:', e);
-        }
-        if (attempt < retries - 1) await new Promise(r => setTimeout(r, 2000));
+      const backendProxyUrl = (typeof window !== 'undefined' && window.state?.backendEngineAvailable)
+        ? buildBackendUrl(BACKEND_CONFIG.pvgisProxyPath)
+        : null;
+      const fetchResult = await fetchPVGISLive(
+        { lat: state.lat, lon: state.lon, peakpower: secPower, loss: PVGIS_LOSS_PARAM, angle: sec.tilt, aspect: pvgisAzimut },
+        { retries: 3, lang: (typeof window !== 'undefined' && window._currentLang) || 'tr', backendProxyUrl, proxyFirst: true }
+      );
+      pvgisFetchStatus = fetchResult.fetchStatus;
+      pvgisUserMessage = fetchResult.userMessage;
+      if (fetchResult.rawEnergy) {
+        rawEnergy  = fetchResult.rawEnergy;
+        rawPoa     = fetchResult.rawPoa;
+        rawMonthly = fetchResult.rawMonthly;
       }
     }
-    await fetchPVGIS(3);
 
     if (!rawEnergy) {
       usedFallback = true;
@@ -424,6 +408,7 @@ export async function runCalculation() {
       panelCount: secPC, systemPower: secPower,
       annualEnergy: adjustedE, monthlyData: monthly,
       pvgisRawEnergy: rawEnergy, pvgisPoa: rawPoa, usedFallback,
+      pvgisFetchStatus, pvgisUserMessage,
       shadingLoss:    rawEnergy * (effectiveShadingFactor / 100),
       effectiveShadingFactor,
       osmShadowFactor,
@@ -449,6 +434,12 @@ export async function runCalculation() {
   let adjustedEnergy= validSections.reduce((s, r) => s + r.annualEnergy, 0);
   let monthlyData   = validSections.reduce((agg, r) => agg.map((v,i) => v + r.monthlyData[i]), new Array(12).fill(0));
   let usedFallback  = validSections.some(r => r.usedFallback);
+  // Aggregate PVGIS fetch status: if any section got live data, report live; else fallback
+  const aggregateFetchStatus = validSections.every(r => r.pvgisFetchStatus === PVGIS_FETCH_STATUS.LIVE_SUCCESS)
+    ? PVGIS_FETCH_STATUS.LIVE_SUCCESS
+    : validSections.some(r => r.pvgisFetchStatus === PVGIS_FETCH_STATUS.PROXY_SUCCESS)
+      ? PVGIS_FETCH_STATUS.PROXY_SUCCESS
+      : PVGIS_FETCH_STATUS.FALLBACK_USED;
   let pvgisRawEnergy= validSections.reduce((s, r) => s + r.pvgisRawEnergy, 0);
   const pvgisPoaWeighted = validSections.reduce((s, r) => s + (Number(r.pvgisPoa) || 0) * r.systemPower, 0);
   let pvgisPoa = systemPower > 0 ? pvgisPoaWeighted / systemPower : 0;
@@ -461,6 +452,7 @@ export async function runCalculation() {
   let effectiveShadingFactor = systemPower > 0
     ? validSections.reduce((s, r) => s + (Number(r.effectiveShadingFactor) || 0) * r.systemPower, 0) / systemPower
     : Number(state.shadingFactor) || 0;
+  const currentLang = (typeof window !== 'undefined' && window._currentLang) || 'tr';
   const localProductionSnapshot = {
     annualEnergy: Math.round(adjustedEnergy),
     monthlyData: normalizeMonthlyProductionToAnnual(monthlyData, adjustedEnergy),
@@ -469,6 +461,8 @@ export async function runCalculation() {
     usedFallback,
     pvgisRawEnergy,
     pvgisPoa,
+    pvgisFetchStatus: aggregateFetchStatus,
+    pvgisSourceLabel: getPvgisSourceLabel(aggregateFetchStatus, currentLang),
     source: usedFallback ? 'local-fallback' : 'browser-pvgis'
   };
   const authoritativeOverride = state.authoritativeEngineOverride;
@@ -554,8 +548,10 @@ export async function runCalculation() {
   if (usedFallback) {
     const banner = document.getElementById('fallback-banner');
     if (banner) {
-      const reason = window._pvgisLastError ? ` (${window._pvgisLastError.slice(0, 80)})` : '';
-      banner.textContent = `PVGIS API'sine ulaşılamadı${reason}. Yerel güneşlenme verileriyle hesaplama yapılıyor.`;
+      // Prioritize user-friendly message from pvgis-fetch module over raw error
+      const lastSection = validSections.find(r => r.pvgisFetchStatus === PVGIS_FETCH_STATUS.FALLBACK_USED);
+      const friendlyMsg = lastSection?.pvgisUserMessage || 'Canlı güneş verisi alınamadı — yerel tahmini model kullanıldı.';
+      banner.textContent = friendlyMsg;
       banner.style.display = 'block';
     }
   }
@@ -746,6 +742,12 @@ export async function runCalculation() {
         generatorCapexTry: Math.max(0, Number(state.offgridGeneratorCapexTry) || 0)
       }
     );
+    // Üretim kaynağı şeffaflığını off-grid sonucuna ekle
+    offgridL2Results.productionSource = aggregateFetchStatus;
+    offgridL2Results.productionSourceLabel = getPvgisSourceLabel(aggregateFetchStatus, currentLang);
+    offgridL2Results.productionFallback = usedFallback;
+    offgridL2Results.loadSource = offgridLoadProfile.mode;
+    offgridL2Results.parityAvailable = aggregateFetchStatus === PVGIS_FETCH_STATUS.LIVE_SUCCESS && !!state.authoritativeEngineOverride;
 
     // batterySummary köprüsü — mevcut finansal tablo + BESS renderer'ı çalışmaya devam etsin
     batterySummary = {
@@ -937,6 +939,8 @@ export async function runCalculation() {
     temperatureAdjustment: authoritativeTempAdjustment,
     psh: psh.toFixed(2), avgSummerTemp: avgSummerTemp.toFixed(1),
     usedFallback,
+    pvgisFetchStatus: aggregateFetchStatus,
+    pvgisSourceLabel: getPvgisSourceLabel(aggregateFetchStatus, currentLang),
     pvgisRawEnergy: Math.round(pvgisRawEnergy), pvgisPoa: Math.round(pvgisPoa),
     energyP90, energyP10,
     shadingLoss: Math.round(shadingLoss),

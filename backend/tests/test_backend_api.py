@@ -240,3 +240,122 @@ def test_contract_cable_loss_is_not_hidden_backend_default():
     loss_response = client.post("/api/pv/calculate", json=with_loss).json()
     assert loss_response["production"]["annualEnergyKwh"] < base_response["production"]["annualEnergyKwh"]
     assert loss_response["losses"].get("wiringLossPct") == 3
+
+
+# ── PVGIS Proxy endpoint tests ────────────────────────────────────────────────
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
+
+VALID_PVGIS_UPSTREAM = {
+    "outputs": {
+        "totals": {
+            "fixed": {"E_y": 1250.0, "H(i)_y": 1680.0}
+        },
+        "monthly": {
+            "fixed": [{"E_m": 100 + i} for i in range(12)]
+        },
+    }
+}
+
+
+def _mock_httpx_client(status_code=200, body=None, exc=None):
+    """Returns a mock async context manager standing in for httpx.AsyncClient(...)."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = status_code
+    mock_resp.json.return_value = body if body is not None else {}
+
+    inner = AsyncMock()
+    if exc is not None:
+        inner.get = AsyncMock(side_effect=exc)
+    else:
+        inner.get = AsyncMock(return_value=mock_resp)
+
+    cm = AsyncMock()
+    cm.__aenter__ = AsyncMock(return_value=inner)
+    cm.__aexit__ = AsyncMock(return_value=None)
+    return cm
+
+
+def test_pvgis_proxy_invalid_lat_rejected():
+    """FastAPI Query validation rejects lat outside -90..90."""
+    resp = client.get("/api/pvgis-proxy?lat=200&lon=32&peakpower=5")
+    assert resp.status_code == 422
+
+
+def test_pvgis_proxy_peakpower_zero_rejected():
+    """peakpower=0 is rejected by the gt=0 constraint on the Query param."""
+    resp = client.get("/api/pvgis-proxy?lat=39&lon=32&peakpower=0")
+    assert resp.status_code == 422
+
+
+def test_pvgis_proxy_missing_required_params():
+    """Omitting lat/lon/peakpower entirely returns 422."""
+    resp = client.get("/api/pvgis-proxy?lat=39")
+    assert resp.status_code == 422
+
+
+def test_pvgis_proxy_success():
+    """Successful PVGIS upstream → ok=True, proxy-success, energy/poa/monthly populated."""
+    cm = _mock_httpx_client(status_code=200, body=VALID_PVGIS_UPSTREAM)
+    with patch("httpx.AsyncClient", return_value=cm):
+        resp = client.get("/api/pvgis-proxy?lat=39&lon=32&peakpower=5&loss=14&angle=30&aspect=0")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["fetchStatus"] == "proxy-success"
+    assert data["rawEnergy"] == 1250.0
+    assert data["rawPoa"] == 1680.0
+    assert isinstance(data["rawMonthly"], list) and len(data["rawMonthly"]) == 12
+    assert data["error_type"] is None
+
+
+def test_pvgis_proxy_timeout():
+    """PVGIS upstream timeout → ok=False, error_type=timeout, rawEnergy=None."""
+    import httpx as httpx_lib
+    cm = _mock_httpx_client(exc=httpx_lib.TimeoutException("upstream timed out"))
+    with patch("httpx.AsyncClient", return_value=cm):
+        resp = client.get("/api/pvgis-proxy?lat=39&lon=32&peakpower=5")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is False
+    assert data["error_type"] == "timeout"
+    assert data["rawEnergy"] is None
+    assert data["rawMonthly"] is None
+
+
+def test_pvgis_proxy_http_error():
+    """PVGIS upstream HTTP 503 → ok=False, error_type=http-error."""
+    cm = _mock_httpx_client(status_code=503, body={})
+    with patch("httpx.AsyncClient", return_value=cm):
+        resp = client.get("/api/pvgis-proxy?lat=39&lon=32&peakpower=5")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is False
+    assert data["error_type"] == "http-error"
+    assert data["rawEnergy"] is None
+
+
+def test_pvgis_proxy_empty_ey_response():
+    """PVGIS returning E_y=0 → ok=False, error_type=empty-response."""
+    empty = {"outputs": {"totals": {"fixed": {"E_y": 0}}, "monthly": {"fixed": []}}}
+    cm = _mock_httpx_client(status_code=200, body=empty)
+    with patch("httpx.AsyncClient", return_value=cm):
+        resp = client.get("/api/pvgis-proxy?lat=39&lon=32&peakpower=5")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is False
+    assert data["error_type"] == "empty-response"
+
+
+def test_pvgis_proxy_network_error():
+    """Network-level exception → ok=False, error_type not http-error."""
+    import httpx as httpx_lib
+    cm = _mock_httpx_client(exc=httpx_lib.ConnectError("connection refused"))
+    with patch("httpx.AsyncClient", return_value=cm):
+        resp = client.get("/api/pvgis-proxy?lat=39&lon=32&peakpower=5")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is False
+    assert data["rawEnergy"] is None
+    assert data["error_type"] in {"network", "unknown"}

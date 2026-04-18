@@ -5,7 +5,8 @@ export const BACKEND_CONFIG = {
   healthPath: '/health',
   pvCalculatePath: '/api/pv/calculate',
   pvlibCompatPath: '/api/pvlib/calculate',
-  financialPath: '/api/financial/proposal'
+  financialPath: '/api/financial/proposal',
+  pvgisProxyPath: '/api/pvgis-proxy'
 };
 
 function cleanBaseUrl(value) {

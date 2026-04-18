@@ -16,17 +16,40 @@ export const BAD_WEATHER_PV_FACTORS = {
   severe:   0.25   // -75% PV — Karadeniz / dağ kışı
 };
 
-// Cihaz kategorisi başına 24 saatlik şablonlar (toplamları 1.0)
+// Cihaz kategorisi başına 24 saatlik şablonlar (her biri normalize edilir, toplamları ≈1.0)
 // Fiziksel anlam: tipik günlük kullanım ağırlığı saat başına
 export const DEVICE_LOAD_TEMPLATES = {
+  // Aydınlatma: gün batımı (17-22) ve sabah (6-8) ağırlıklı
   lighting:      [0.005,0.005,0.005,0.005,0.005,0.010,0.020,0.030,0.020,0.015,0.015,0.015,
                   0.015,0.015,0.015,0.020,0.030,0.060,0.080,0.085,0.085,0.075,0.060,0.025],
+  // Buzdolabı: sürekli (sabit döngü)
   refrigerator:  [0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,
                   0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0413],
-  pump:          [0,0,0,0,0,0,0.050,0.120,0.140,0.140,0.140,0.120,
-                  0.100,0.100,0.100,0.090,0,0,0,0,0,0,0,0],
+  // Klima / Fan: sabah-öğle-akşam ağırlıklı (08-23)
+  hvac:          [0.000,0.000,0.000,0.000,0.000,0.005,0.015,0.040,0.070,0.090,0.090,0.085,
+                  0.085,0.080,0.075,0.070,0.065,0.060,0.065,0.070,0.065,0.035,0.005,0.000],
+  // Güvenlik: sürekli (aydınlatma kaybı geceleri biraz azalabilir ama ihmal edilir)
+  security:      [0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,
+                  0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0417,0.0413],
+  // Pompa / Hidrofor: gündüz ağırlıklı (07-16)
+  pump:          [0.000,0.000,0.000,0.000,0.000,0.000,0.050,0.120,0.140,0.140,0.140,0.120,
+                  0.100,0.100,0.100,0.090,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000],
+  // Eğlence / Medya: akşam ağırlıklı
   entertainment: [0.005,0.005,0.005,0.005,0.005,0.005,0.010,0.020,0.030,0.030,0.030,0.030,
                   0.030,0.030,0.030,0.030,0.040,0.075,0.105,0.120,0.120,0.100,0.065,0.025],
+  // Küçük mutfak: sabah (06-08) ve öğle/akşam yemek saatleri
+  kitchen:       [0.000,0.000,0.000,0.000,0.000,0.010,0.080,0.120,0.080,0.050,0.030,0.030,
+                  0.080,0.100,0.060,0.030,0.020,0.060,0.090,0.090,0.060,0.040,0.020,0.000],
+  // Çamaşır / ütü: gündüz ağırlıklı (09-18)
+  laundry:       [0.000,0.000,0.000,0.000,0.000,0.000,0.010,0.040,0.100,0.130,0.130,0.120,
+                  0.110,0.110,0.100,0.090,0.060,0.000,0.000,0.000,0.000,0.000,0.000,0.000],
+  // Atölye: mesai saatleri (08-17)
+  workshop:      [0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.010,0.120,0.140,0.140,0.140,
+                  0.110,0.110,0.110,0.110,0.010,0.000,0.000,0.000,0.000,0.000,0.000,0.000],
+  // Oyun / Konsol: akşam + hafta sonu (burada günlük ortalaması kullanılır)
+  gaming:        [0.005,0.005,0.005,0.005,0.005,0.000,0.000,0.000,0.010,0.020,0.020,0.020,
+                  0.020,0.020,0.020,0.020,0.040,0.070,0.110,0.140,0.145,0.130,0.090,0.050],
+  // Genel: düz dağılım
   generic:       [0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,
                   0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.034]
 };
@@ -44,11 +67,13 @@ function norm24(arr) {
  *
  * @param {Array<{
  *   name: string,
- *   category: 'lighting'|'refrigerator'|'pump'|'entertainment'|'generic',
- *   powerW: number,
- *   hoursPerDay: number,
- *   isCritical: boolean
- * }>} devices - Cihaz listesi (boşsa basit mod kullanılır)
+ *   category: string,
+ *   powerW: number,           — nominal güç, W (adet zaten çarpılmış olarak gelir)
+ *   hoursPerDay: number,      — günlük toplam kullanım saati
+ *   nightHoursPerDay?: number,— gece kullanım saati (18:00–06:00); ≤ hoursPerDay
+ *   isCritical: boolean,
+ *   usageType?: string        — 'continuous'|'cyclic'|'scheduled'|'manual'
+ * }>} devices
  *
  * @param {{
  *   fallbackDailyKwh?: number,
@@ -61,13 +86,17 @@ function norm24(arr) {
  *   criticalHourly8760: number[],
  *   annualTotalKwh: number,
  *   annualCriticalKwh: number,
- *   deviceSummary: Array<{name,dailyKwh,annualKwh,isCritical}>,
- *   mode: 'device-list'|'simple-fallback'
+ *   deviceSummary: Array<{name,dailyWh,annualKwh,isCritical,category}>,
+ *   mode: 'device-list'|'simple-fallback',
+ *   deviceCount: number,
+ *   criticalDeviceCount: number
  * }}
  */
 export function buildOffgridLoadProfile(devices, options = {}) {
   const monthDays = [31,28,31,30,31,30,31,31,30,31,30,31];
-  const validDevices = Array.isArray(devices) ? devices.filter(d => d && Number(d.powerW) > 0 && Number(d.hoursPerDay) > 0) : [];
+  const validDevices = Array.isArray(devices)
+    ? devices.filter(d => d && Number(d.powerW) > 0 && Number(d.hoursPerDay) > 0)
+    : [];
 
   if (validDevices.length === 0) {
     // ── Basit mod: günlük kWh + kritik oran ──────────────────────────────────
@@ -95,7 +124,9 @@ export function buildOffgridLoadProfile(devices, options = {}) {
       annualTotalKwh,
       annualCriticalKwh: annualTotalKwh * critFrac,
       deviceSummary: [],
-      mode: 'simple-fallback'
+      mode: 'simple-fallback',
+      deviceCount: 0,
+      criticalDeviceCount: 0
     };
   }
 
@@ -103,14 +134,38 @@ export function buildOffgridLoadProfile(devices, options = {}) {
   const totalHourly8760 = new Array(8760).fill(0);
   const criticalHourly8760 = new Array(8760).fill(0);
   const deviceSummary = [];
+  let criticalDeviceCount = 0;
 
   for (const device of validDevices) {
     const powerKw = Math.max(0, Number(device.powerW) || 0) / 1000;
     const hoursPerDay = Math.max(0, Math.min(24, Number(device.hoursPerDay) || 0));
+    // nightHoursPerDay: gece saatleri (18:00–05:59), hoursPerDay'i aşamaz
+    const nightHours = Math.max(0, Math.min(hoursPerDay, Number(device.nightHoursPerDay) || 0));
+    const dayHours = hoursPerDay - nightHours;
     const dailyKwh = powerKw * hoursPerDay;
     const isCritical = !!device.isCritical;
+
+    // Kategori şablonu seç
     const category = device.category && DEVICE_LOAD_TEMPLATES[device.category] ? device.category : 'generic';
-    const template = norm24([...DEVICE_LOAD_TEMPLATES[category]]);
+    const rawTemplate = [...DEVICE_LOAD_TEMPLATES[category]];
+
+    // Gündüz/gece bölümü: nightHours > 0 ise şablonu gece saatlerine kaydır
+    let template;
+    if (nightHours > 0 && dayHours > 0 && hoursPerDay > 0) {
+      // Gündüz (06-17) ve gece (18-05) ağırlıkları belirle
+      const dayMask  = rawTemplate.map((v, h) => (h >= 6 && h < 18) ? v : 0);
+      const nightMask= rawTemplate.map((v, h) => (h < 6 || h >= 18) ? v : 0);
+      const dayFrac  = dayHours / hoursPerDay;
+      const nightFrac= nightHours / hoursPerDay;
+      const combined = rawTemplate.map((_, h) => dayMask[h] * dayFrac + nightMask[h] * nightFrac);
+      template = norm24(combined);
+    } else if (nightHours > 0 && dayHours === 0) {
+      // Yalnızca gece
+      const nightOnly = rawTemplate.map((v, h) => (h < 6 || h >= 18) ? v : 0);
+      template = norm24(nightOnly);
+    } else {
+      template = norm24(rawTemplate);
+    }
 
     let cursor = 0;
     for (let monthIdx = 0; monthIdx < 12; monthIdx++) {
@@ -124,11 +179,14 @@ export function buildOffgridLoadProfile(devices, options = {}) {
       }
     }
 
+    if (isCritical) criticalDeviceCount++;
     deviceSummary.push({
       name: device.name || category,
-      dailyKwh: Math.round(dailyKwh * 1000) / 1000,
+      dailyWh: Math.round(powerKw * 1000 * hoursPerDay),   // Wh/gün (yeni alan)
+      dailyKwh: Math.round(dailyKwh * 1000) / 1000,        // kWh/gün (geriye dönük uyum)
       annualKwh: Math.round(dailyKwh * 365 * 100) / 100,
-      isCritical
+      isCritical,
+      category
     });
   }
 
@@ -141,7 +199,9 @@ export function buildOffgridLoadProfile(devices, options = {}) {
     annualTotalKwh,
     annualCriticalKwh,
     deviceSummary,
-    mode: 'device-list'
+    mode: 'device-list',
+    deviceCount: validDevices.length,
+    criticalDeviceCount
   };
 }
 
@@ -422,6 +482,8 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     annualTotalLoadKwh: loadProfile.annualTotalKwh,
     annualCriticalLoadKwh: loadProfile.annualCriticalKwh,
     deviceSummary: loadProfile.deviceSummary || [],
+    deviceCount: loadProfile.deviceCount || 0,
+    criticalDeviceCount: loadProfile.criticalDeviceCount || 0,
 
     // Dürüstlük meta
     methodologyNote: 'synthetic-dispatch-pre-feasibility',

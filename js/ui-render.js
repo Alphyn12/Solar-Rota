@@ -300,23 +300,29 @@ function renderOffgridL2Results(offgridL2Results, state) {
   if (totalCovEl) totalCovEl.textContent = `${(L.totalLoadCoverage * 100).toFixed(1)}%`;
   if (critCovEl) critCovEl.textContent = `${(L.criticalLoadCoverage * 100).toFixed(1)}%`;
 
-  // Jeneratör analizi
+  // Jeneratör analizi (enhanced with narrative)
   const genResultWrap = document.getElementById('offgrid-generator-result-wrap');
   const genResultDetails = document.getElementById('offgrid-generator-result-details');
   if (genResultWrap && genResultDetails) {
     if (L.generatorEnabled) {
       genResultWrap.style.display = '';
+      const hoursStr = Math.round(L.generatorRunHoursPerYear).toLocaleString(locale);
+      const kwhStr   = Math.round(L.generatorKwh).toLocaleString(locale);
+      const narrative = i18n.t('offgridL2.genNarrativeActive')
+        .replace('{hours}', hoursStr).replace('{kwh}', kwhStr)
+        .replace('{cost}', Math.round(L.generatorFuelCostAnnual).toLocaleString(locale));
       genResultDetails.innerHTML = [
-        `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genRunHours'))}: <strong style="color:var(--text)">${Math.round(L.generatorRunHoursPerYear).toLocaleString(locale)} h/yıl</strong></span>`,
+        `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genRunHours'))}: <strong style="color:var(--text)">${hoursStr} h/yıl</strong></span>`,
         `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genFuelCost'))}: <strong style="color:var(--text)">${money(L.generatorFuelCostAnnual)} / yıl</strong></span>`,
-        `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genKwh'))}: <strong style="color:var(--text)">${Math.round(L.generatorKwh).toLocaleString(locale)} kWh/yıl</strong></span>`,
+        `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genKwh'))}: <strong style="color:var(--text)">${kwhStr} kWh/yıl</strong></span>`,
+        `<div style="margin-top:6px;font-size:0.72rem;color:var(--text-muted);font-style:italic;width:100%">${escapeHtml(narrative)}</div>`,
       ].join('');
     } else {
       genResultWrap.style.display = 'none';
     }
   }
 
-  // Kötü hava senaryosu
+  // Kötü hava senaryosu (enhanced with narrative)
   const bwWrap = document.getElementById('offgrid-badweather-result-wrap');
   const bwDetails = document.getElementById('offgrid-badweather-result-details');
   if (bwWrap && bwDetails) {
@@ -324,13 +330,30 @@ function renderOffgridL2Results(offgridL2Results, state) {
     if (bw) {
       bwWrap.style.display = '';
       const levelKey = 'offgridL2.badWeather_' + bw.weatherLevel;
+      const critDrop = bw.criticalCoverageDropPct.toFixed(1);
+      const totalDrop = bw.totalCoverageDropPct.toFixed(1);
+      const factor = Math.round((bw.pvScaleFactor || 1) * 100);
+      const resilient = bw.criticalCoverageDropPct < 10
+        ? i18n.t('offgridL2.badWeatherResilientYes')
+        : i18n.t('offgridL2.badWeatherResilientNo');
+      const risk = bw.criticalCoverageDropPct < 15
+        ? i18n.t('offgridL2.badWeatherRiskLow')
+        : i18n.t('offgridL2.badWeatherRiskHigh');
+      const narrativeKey = `offgridL2.badWeatherNarrative${bw.weatherLevel.charAt(0).toUpperCase() + bw.weatherLevel.slice(1)}`;
+      const narrative = i18n.t(narrativeKey)
+        .replace('{factor}', factor).replace('{critDrop}', critDrop)
+        .replace('{totalDrop}', totalDrop).replace('{resilient}', resilient)
+        .replace('{risk}', risk);
       const addGenPart = bw.additionalGeneratorKwh > 0
-        ? ` &nbsp;|&nbsp; ${escapeHtml(i18n.t('offgridL2.addGenKwh'))}: <strong>${Math.round(bw.additionalGeneratorKwh).toLocaleString(locale)} kWh</strong>`
+        ? `<div style="margin-top:4px">${escapeHtml(i18n.t('offgridL2.addGenKwh'))}: <strong>${Math.round(bw.additionalGeneratorKwh).toLocaleString(locale)} kWh</strong></div>`
         : '';
       bwDetails.innerHTML = `
-        ${escapeHtml(i18n.t('offgridL2.badWeatherLevel'))}: <strong style="color:var(--text)">${escapeHtml(i18n.t(levelKey))}</strong>
-        &nbsp;|&nbsp; ${escapeHtml(i18n.t('offgridL2.criticalDropLabel'))}: <strong style="color:#EF4444">−${bw.criticalCoverageDropPct.toFixed(1)}%</strong>
-        &nbsp;|&nbsp; ${escapeHtml(i18n.t('offgridL2.totalDropLabel'))}: <strong style="color:#F59E0B">−${bw.totalCoverageDropPct.toFixed(1)}%</strong>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+          <span>${escapeHtml(i18n.t('offgridL2.badWeatherLevel'))}: <strong style="color:var(--text)">${escapeHtml(i18n.t(levelKey))}</strong></span>
+          <span>${escapeHtml(i18n.t('offgridL2.criticalDropLabel'))}: <strong style="color:#EF4444">−${critDrop}%</strong></span>
+          <span>${escapeHtml(i18n.t('offgridL2.totalDropLabel'))}: <strong style="color:#F59E0B">−${totalDrop}%</strong></span>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);font-style:italic">${escapeHtml(narrative)}</div>
         ${addGenPart}
       `;
     } else {
@@ -342,6 +365,85 @@ function renderOffgridL2Results(offgridL2Results, state) {
   const lcWrap = document.getElementById('offgrid-lifecycle-details');
   if (lcWrap) {
     lcWrap.innerHTML = `${escapeHtml(i18n.t('offgridL2.lifecycleAnnual'))}: <strong>${money(L.lifecycleCostAnnual)} / ${escapeHtml(i18n.t('units.year'))}</strong>`;
+  }
+
+  // Genişletilmiş dispatch metrikleri
+  const extMetricsEl = document.getElementById('offgrid-extended-metrics');
+  const extMetricsBody = document.getElementById('offgrid-extended-metrics-body');
+  if (extMetricsEl && extMetricsBody) {
+    extMetricsEl.style.display = '';
+    const stat = (label, val, color) =>
+      `<span style="color:var(--text-muted);font-size:0.75rem">${escapeHtml(label)}: <strong style="color:${color||'var(--text)'}">${escapeHtml(val)}</strong></span>`;
+    const items = [
+      stat(i18n.t('offgridL2.resultTotalLoad'), `${Math.round(L.annualTotalLoadKwh || 0).toLocaleString(locale)} kWh/yıl`, 'var(--text)'),
+      L.annualCriticalLoadKwh > 0 ? stat(i18n.t('offgridL2.resultCriticalLoad'), `${Math.round(L.annualCriticalLoadKwh).toLocaleString(locale)} kWh/yıl`, '#EF4444') : '',
+      stat(i18n.t('offgridL2.directPvLabel'), `${Math.round(L.directPvKwh || 0).toLocaleString(locale)} kWh/yıl`, '#F59E0B'),
+      stat(i18n.t('offgridL2.batteryLabel'), `${Math.round(L.batteryKwh || 0).toLocaleString(locale)} kWh/yıl`, '#8B5CF6'),
+      L.autonomousDays != null ? stat(i18n.t('offgridL2.resultAutonomousDays'), `${L.autonomousDays} gün (${L.autonomousDaysPct != null ? L.autonomousDaysPct.toFixed(1) : '—'}%)`, '#22C55E') : '',
+      L.cyclesPerYear != null ? stat(i18n.t('offgridL2.resultCyclesPerYear'), L.cyclesPerYear.toFixed(0), 'var(--text-muted)') : '',
+    ].filter(Boolean);
+    extMetricsBody.innerHTML = items.join('');
+  }
+
+  // Cihaz özet metrikleri (cihaz listesi modunda)
+  const deviceMetricsEl = document.getElementById('offgrid-device-metrics');
+  if (deviceMetricsEl) {
+    if (L.loadMode === 'device-list' && L.deviceCount > 0) {
+      const totalWh = L.annualTotalLoadKwh > 0 ? (L.annualTotalLoadKwh / 365 * 1000).toFixed(0) : '—';
+      const critWh  = L.annualCriticalLoadKwh > 0 ? (L.annualCriticalLoadKwh / 365 * 1000).toFixed(0) : '0';
+      deviceMetricsEl.style.display = '';
+      deviceMetricsEl.innerHTML = `
+        <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:0.75rem">
+          <span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.deviceCount'))}: <strong style="color:var(--text)">${L.deviceCount}</strong></span>
+          <span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.totalDailyWh'))}: <strong style="color:var(--text)">${totalWh} Wh/gün</strong></span>
+          <span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.criticalDailyWh'))}: <strong style="color:#EF4444">${critWh} Wh/gün</strong></span>
+          <span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.criticalDeviceCount'))}: <strong style="color:#EF4444">${L.criticalDeviceCount || 0}</strong></span>
+        </div>`;
+    } else {
+      deviceMetricsEl.style.display = 'none';
+    }
+  }
+
+  // Karşılanamayan yük uyarısı
+  const unmetWarnEl = document.getElementById('offgrid-unmet-warn');
+  if (unmetWarnEl) {
+    const unmetKwh = Math.round(L.unmetLoadKwh || 0);
+    if (unmetKwh > 10) {
+      const msg = i18n.t(L.generatorEnabled
+        ? 'offgridL2.genNarrativeUnmet'
+        : 'offgridL2.honestUnmetWarning')
+        .replace('{unmet}', unmetKwh.toLocaleString(locale));
+      unmetWarnEl.style.display = '';
+      unmetWarnEl.textContent = msg;
+    } else {
+      unmetWarnEl.style.display = 'none';
+    }
+  }
+
+  // Kaynak şeffaflığı (üretim + yük kaynağı)
+  const sourceTransEl = document.getElementById('offgrid-source-transparency');
+  if (sourceTransEl) {
+    const prodSource = L.productionSourceLabel || (L.productionFallback ? i18n.t('pvgis.fallbackUsed') : i18n.t('pvgis.liveSuccess'));
+    const loadSrc = L.loadMode === 'device-list' ? i18n.t('offgridL2.loadSourceDeviceList') : i18n.t('offgridL2.loadSourceSimple');
+    const parityText = L.parityAvailable
+      ? `<span style="color:#22C55E">✓ ${escapeHtml(i18n.t('offgridL2.parityAvailable'))}</span>`
+      : `<span style="color:#94A3B8">${escapeHtml(i18n.t('offgridL2.parityNotAvailable'))}</span>`;
+    const fallbackBadge = L.productionFallback
+      ? `<span style="background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 6px;font-size:0.68rem;margin-left:4px">${escapeHtml(i18n.t('offgridL2.fallbackUsed'))}</span>`
+      : `<span style="background:rgba(34,197,94,0.12);color:#22C55E;border:1px solid rgba(34,197,94,0.25);border-radius:4px;padding:1px 6px;font-size:0.68rem;margin-left:4px">${escapeHtml(i18n.t('offgridL2.liveData'))}</span>`;
+    sourceTransEl.style.display = '';
+    sourceTransEl.innerHTML = `
+      <div style="font-size:0.72rem;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <span>${escapeHtml(i18n.t('offgridL2.productionSource'))}: <strong style="color:var(--text)">${escapeHtml(prodSource)}</strong>${fallbackBadge}</span>
+        <span>${escapeHtml(i18n.t('offgridL2.loadSourceLabel'))}: <strong style="color:var(--text)">${escapeHtml(loadSrc)}</strong></span>
+        <span>${escapeHtml(i18n.t('offgridL2.dispatchLabel'))}: <strong style="color:var(--text)">${escapeHtml(i18n.t('offgridL2.syntheticDispatch'))}</strong></span>
+        ${parityText}
+      </div>
+      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;font-size:0.68rem;color:var(--text-muted)">
+        <span>⚗ ${escapeHtml(i18n.t('offgridL2.honestSyntheticNote'))}</span>
+        <span>📊 ${escapeHtml(i18n.t('offgridL2.honestPreFeasibility'))}</span>
+        <span>🏗 ${escapeHtml(i18n.t('offgridL2.honestSiteRequired'))}</span>
+      </div>`;
   }
 
   // Versiyon damgası ve yük modu
