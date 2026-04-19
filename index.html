@@ -6,7 +6,8 @@
 <title>Profesyonel GES Mühendislik Aracı</title>
 <meta name="description" content="Solar Rota ile Türkiye için senaryo bazlı güneş paneli enerji ve yatırım hesaplaması yapın."/>
 <link rel="manifest" href="/manifest.json"/>
-<link rel="icon" type="image/png" href="logo_solarrota.png"/>
+<link rel="icon" type="image/png" href="logo_solarrota.png" sizes="any"/>
+<link rel="apple-touch-icon" href="logo_solarrota.png"/>
 <meta name="theme-color" content="#F59E0B"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" integrity="sha384-NZLkVuBRMEeB4VeZz27WwTRvlhec30biQ8Xx7zG7JJnkvEKRg5qi6BNbEXo9ydwv" crossorigin="anonymous"/>
@@ -80,11 +81,8 @@ body>main{z-index:auto}
 .header-inner{max-width:1200px;margin:0 auto}
 .header-top{display:flex;align-items:center;gap:16px;margin-bottom:14px}
 .logo{display:flex;align-items:center;gap:10px}
-.logo-icon{width:40px;height:40px;filter:drop-shadow(0 0 8px rgba(245,158,11,0.5));animation:logoGlow 3s ease-in-out infinite alternate;}
+.logo-icon{width:52px;height:52px;filter:drop-shadow(0 0 8px rgba(245,158,11,0.5));animation:logoGlow 3s ease-in-out infinite alternate;}
 @keyframes logoGlow{0%{filter:drop-shadow(0 0 6px rgba(245,158,11,0.4))}100%{filter:drop-shadow(0 0 16px rgba(245,158,11,0.75))}}
-/* global back button */
-#global-back-btn{display:none;position:fixed;top:calc(var(--header-h) + 12px);left:16px;z-index:200;font-size:0.82rem;padding:7px 14px;border-radius:10px}
-@media(max-width:600px){#global-back-btn{top:calc(var(--header-h) + 6px);left:8px;padding:5px 10px;font-size:0.75rem}}
 
 /* Leaflet.Draw pro overrides */
 .leaflet-draw-toolbar a{background-color:rgba(15,23,42,0.92)!important;border-color:rgba(71,85,105,0.6)!important;color:#F1F5F9!important;backdrop-filter:blur(8px);}
@@ -336,18 +334,12 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 </head>
 <body>
 
-<!-- Global back button — always top-left below header -->
-<button id="global-back-btn" class="btn btn-secondary" onclick="window._globalGoBack?.()">
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-  Geri
-</button>
-
 <!-- HEADER -->
 <header id="app-header">
   <div class="header-inner">
     <div class="header-top">
       <div class="logo">
-        <img src="logo_solarrota.png" class="logo-icon" alt="Solar Rota" width="40" height="40" style="object-fit:contain;border-radius:8px"/>
+        <img src="logo_solarrota.png" class="logo-icon" alt="Solar Rota" style="object-fit:contain;border-radius:8px"/>
         <div>
           <div class="logo-text">Solar Rota</div>
           <div class="logo-tagline">Profesyonel GES Mühendislik Aracı</div>
@@ -487,7 +479,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   <!-- Continue button -->
   <div class="hero-cta-wrap">
     <button class="btn btn-primary hero-cta-btn" id="step1-continue-btn" onclick="validateStep1()" style="display:none">
-      <span data-i18n-text>Devam Et</span>
+      <span data-i18n-text>Sonraki Adım</span>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
     </button>
   </div>
@@ -497,6 +489,10 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 <div class="step-pane" id="step-2">
   <!-- Top bar: search + geolocate -->
   <div class="step2-topbar">
+    <button class="btn btn-secondary" onclick="goToStep(1)" style="flex-shrink:0;padding:7px 14px;font-size:0.82rem;gap:5px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Geri
+    </button>
     <div class="step2-search-wrap">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--text-muted)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <div class="input-wrap" style="flex:1">
@@ -553,7 +549,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div class="loc-bottom-right">
       <button class="btn btn-secondary" id="step2-back-btn" onclick="goToStep(1)" style="padding:9px 16px;font-size:0.82rem">← Geri</button>
       <button class="btn btn-primary" id="step2-continue-btn" onclick="validateStep2()" style="padding:9px 20px">
-        <span class="step2-continue-label">Devam Et</span> →
+        <span class="step2-continue-label">Sonraki Adım</span> →
       </button>
     </div>
   </div>
@@ -780,7 +776,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <!-- Step 3 nav -->
       <div class="step3-nav-sticky">
         <button class="btn btn-secondary" onclick="goToStep(2)">← Geri</button>
-        <button class="btn btn-primary" onclick="validateStep3()">Ekipman Seçimine Git →</button>
+        <button class="btn btn-primary" onclick="validateStep3()">Sonraki Adım →</button>
       </div>
     </div>
   </div>
@@ -898,14 +894,9 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       </div>
       <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
         <button class="btn btn-secondary btn-full" onclick="goToStep(3)" style="font-size:0.82rem">← Geri</button>
-        <button class="btn btn-primary btn-full" onclick="validateStep4()" data-i18n="step4.next">Finansal Ayarlar →</button>
+        <button class="btn btn-primary btn-full" onclick="validateStep4()" data-i18n="step4.next">Sonraki Adım →</button>
       </div>
     </div>
-  </div>
-
-  <div class="nav-btns" style="display:none">
-    <button class="btn btn-secondary" onclick="goToStep(3)">← Geri</button>
-    <button class="btn btn-primary" onclick="validateStep4()">Devam Et →</button>
   </div>
 </div>
 
@@ -2017,10 +2008,8 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   </div>
 
   <div class="nav-btns" style="margin-top:28px">
-    <button class="btn btn-primary" onclick="validateStep5()" style="font-size:1rem;padding:13px 32px">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-      Hesaplamayı Başlat →
-    </button>
+    <button class="btn btn-secondary" onclick="goToStep(4)">← Geri</button>
+    <button class="btn btn-primary" onclick="validateStep5()">Sonraki Adım →</button>
   </div>
 </div>
 

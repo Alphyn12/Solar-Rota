@@ -575,8 +575,8 @@ function selectCity(city) {
 
 async function _fetchNominatim(q, qLow, list) {
   try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)},+Türkiye&countrycodes=tr&format=json&limit=6&addressdetails=1`;
-    const resp = await fetch(url, { headers: { 'Accept-Language': 'tr', 'User-Agent': 'SolarRota/2.0' } });
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ', Türkiye')}&countrycodes=tr&format=json&limit=6&addressdetails=1&accept-language=tr`;
+    const resp = await fetch(url);
     if (!resp.ok) return;
     const results = await resp.json();
     // Staleness check
@@ -1739,16 +1739,6 @@ function goToStep(n) {
   toEl.classList.add('active');
   updateProgressBar();
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  // Global back button visibility
-  const backBtn = document.getElementById('global-back-btn');
-  if (backBtn) {
-    if (n > 1 && n < 7) {
-      backBtn.style.display = 'flex';
-      window._globalGoBack = () => goToStep(n - 1);
-    } else {
-      backBtn.style.display = 'none';
-    }
-  }
   // Show/hide roof start hint
   const roofStartHint = document.getElementById('roof-draw-start-hint');
   if (roofStartHint) {
