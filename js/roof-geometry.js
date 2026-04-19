@@ -286,6 +286,10 @@ export function initRoofDrawing(map) {
   // ── Şekil oluşturuldu ─────────────────────────────────
   map.on(L.Draw.Event.CREATED, e => {
     const layer = e.layer;
+    const startHint = document.getElementById('roof-draw-start-hint');
+    if (startHint) startHint.style.display = 'none';
+    const clearBtn = document.getElementById('clear-roof-btn');
+    if (clearBtn) clearBtn.style.display = 'flex';
     // Rectangle ise polygon'a normalize et
     if (e.layerType === 'rectangle') {
       const bounds = layer.getBounds();

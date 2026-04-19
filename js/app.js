@@ -499,14 +499,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('city-search');
   const list = document.getElementById('autocomplete-list');
 
+  let _nominatimTimer = null;
+
   input.addEventListener('input', () => {
-    const q = input.value.trim().toLowerCase();
+    const q = input.value.trim();
+    const qLow = q.toLowerCase();
     list.innerHTML = '';
     acIndex = -1;
     if (q.length < 1) { list.classList.remove('open'); input.setAttribute('aria-expanded','false'); return; }
-    const matches = TURKISH_CITIES.filter(c => c.name.toLowerCase().includes(q)).slice(0, 8);
-    if (!matches.length) { list.classList.remove('open'); input.setAttribute('aria-expanded','false'); return; }
-    matches.forEach((c, i) => {
+    const matches = TURKISH_CITIES.filter(c => c.name.toLowerCase().includes(qLow)).slice(0, 5);
+    matches.forEach(c => {
       const item = document.createElement('div');
       item.className = 'autocomplete-item';
       item.setAttribute('role', 'option');
@@ -515,8 +517,12 @@ document.addEventListener('DOMContentLoaded', () => {
       item.addEventListener('mousedown', () => selectCity(c));
       list.appendChild(item);
     });
-    list.classList.add('open');
-    input.setAttribute('aria-expanded', 'true');
+    if (list.children.length) { list.classList.add('open'); input.setAttribute('aria-expanded', 'true'); }
+    // Nominatim geocoding for street/neighborhood search
+    if (_nominatimTimer) clearTimeout(_nominatimTimer);
+    if (q.length >= 3) {
+      _nominatimTimer = setTimeout(() => _fetchNominatim(q, qLow, list), 450);
+    }
   });
 
   input.addEventListener('keydown', e => {
@@ -565,6 +571,58 @@ function selectCity(city) {
   map.setView([city.lat, city.lon], 9, { animate: true });
   marker.setLatLng([city.lat, city.lon]);
   setLocationBottomCard(city.name, city.lat, city.lon, city.ghi);
+}
+
+async function _fetchNominatim(q, qLow, list) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)},+Türkiye&countrycodes=tr&format=json&limit=6&addressdetails=1`;
+    const resp = await fetch(url, { headers: { 'Accept-Language': 'tr', 'User-Agent': 'SolarRota/2.0' } });
+    if (!resp.ok) return;
+    const results = await resp.json();
+    // Staleness check
+    const currentQ = document.getElementById('city-search')?.value?.trim()?.toLowerCase();
+    if (currentQ !== qLow) return;
+    const added = [];
+    for (const r of results) {
+      if (added.length >= 4) break;
+      const lat = parseFloat(r.lat), lon = parseFloat(r.lon);
+      if (!isLocationInTurkey(lat, lon)) continue;
+      const parts = r.display_name.split(',');
+      const shortName = parts.slice(0, Math.min(3, parts.length)).join(',').trim();
+      // Skip duplicates with local cities
+      if (TURKISH_CITIES.some(c => c.name.toLowerCase() === parts[0].trim().toLowerCase())) continue;
+      const item = document.createElement('div');
+      item.className = 'autocomplete-item';
+      item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', 'false');
+      item.innerHTML = `<span style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${shortName}</span><span class="autocomplete-ghi" style="color:#06B6D4;font-size:0.68rem">📍 Adres</span>`;
+      item.addEventListener('mousedown', () => _selectNominatimResult(r));
+      list.appendChild(item);
+      added.push(r);
+    }
+    if (list.children.length > 0) {
+      list.classList.add('open');
+      document.getElementById('city-search')?.setAttribute('aria-expanded', 'true');
+    }
+  } catch { /* network errors silently ignored */ }
+}
+
+function _selectNominatimResult(result) {
+  const lat = parseFloat(result.lat), lon = parseFloat(result.lon);
+  const parts = result.display_name.split(',');
+  const name = parts.slice(0, Math.min(3, parts.length)).join(',').trim();
+  // Find nearest city for GHI lookup
+  const nearest = TURKISH_CITIES.reduce((best, c) =>
+    Math.hypot(c.lat - lat, c.lon - lon) < Math.hypot(best.lat - lat, best.lon - lon) ? c : best
+  );
+  window.state.lat = lat; window.state.lon = lon;
+  window.state.cityName = name; window.state.ghi = nearest.ghi;
+  document.getElementById('city-search').value = name;
+  document.getElementById('autocomplete-list').classList.remove('open');
+  document.getElementById('location-warning').style.display = 'none';
+  map.setView([lat, lon], 15, { animate: true });
+  marker.setLatLng([lat, lon]);
+  setLocationBottomCard(name, lat, lon, nearest.ghi);
 }
 
 function initScenarioExperience() {
@@ -1681,6 +1739,21 @@ function goToStep(n) {
   toEl.classList.add('active');
   updateProgressBar();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Global back button visibility
+  const backBtn = document.getElementById('global-back-btn');
+  if (backBtn) {
+    if (n > 1 && n < 7) {
+      backBtn.style.display = 'flex';
+      window._globalGoBack = () => goToStep(n - 1);
+    } else {
+      backBtn.style.display = 'none';
+    }
+  }
+  // Show/hide roof start hint
+  const roofStartHint = document.getElementById('roof-draw-start-hint');
+  if (roofStartHint) {
+    roofStartHint.style.display = (n === 3 && !window.roofDrawnItems?.getLayers().length) ? 'flex' : 'none';
+  }
 }
 
 function updateProgressBar() {
@@ -2137,6 +2210,8 @@ window.clearRoofDrawing = function() {
     if (roofAreaInput) roofAreaInput.value = '';
     showToast('Çatı çizimleri temizlendi.', 'info');
     document.getElementById('clear-roof-btn').style.display = 'none';
+    const startHint = document.getElementById('roof-draw-start-hint');
+    if (startHint) startHint.style.display = 'flex';
     const badge = document.getElementById('roof-area-badge');
     if (badge) badge.style.display = 'none';
   }

@@ -3,9 +3,10 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Solar Rota – Türkiye Güneş Paneli Hesaplayıcı</title>
+<title>Profesyonel GES Mühendislik Aracı</title>
 <meta name="description" content="Solar Rota ile Türkiye için senaryo bazlı güneş paneli enerji ve yatırım hesaplaması yapın."/>
 <link rel="manifest" href="/manifest.json"/>
+<link rel="icon" type="image/png" href="logo_solarrota.png"/>
 <meta name="theme-color" content="#F59E0B"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" integrity="sha384-NZLkVuBRMEeB4VeZz27WwTRvlhec30biQ8Xx7zG7JJnkvEKRg5qi6BNbEXo9ydwv" crossorigin="anonymous"/>
@@ -81,8 +82,26 @@ body>main{z-index:auto}
 .logo{display:flex;align-items:center;gap:10px}
 .logo-icon{width:40px;height:40px;filter:drop-shadow(0 0 8px rgba(245,158,11,0.5));animation:logoGlow 3s ease-in-out infinite alternate;}
 @keyframes logoGlow{0%{filter:drop-shadow(0 0 6px rgba(245,158,11,0.4))}100%{filter:drop-shadow(0 0 16px rgba(245,158,11,0.75))}}
-.logo-icon g{animation:sunRaysSpin 14s linear infinite;transform-origin:18px 18px}
-@keyframes sunRaysSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+/* global back button */
+#global-back-btn{display:none;position:fixed;top:calc(var(--header-h) + 12px);left:16px;z-index:200;font-size:0.82rem;padding:7px 14px;border-radius:10px}
+@media(max-width:600px){#global-back-btn{top:calc(var(--header-h) + 6px);left:8px;padding:5px 10px;font-size:0.75rem}}
+
+/* Leaflet.Draw pro overrides */
+.leaflet-draw-toolbar a{background-color:rgba(15,23,42,0.92)!important;border-color:rgba(71,85,105,0.6)!important;color:#F1F5F9!important;backdrop-filter:blur(8px);}
+.leaflet-draw-toolbar a:hover{background-color:rgba(245,158,11,0.15)!important;border-color:#F59E0B!important;}
+.leaflet-draw-toolbar{border-radius:10px!important;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.5)!important}
+.leaflet-draw-tooltip{background:rgba(15,23,42,0.92);border:1px solid rgba(245,158,11,0.4);border-radius:8px;color:#F1F5F9;font-size:0.78rem;padding:6px 10px;backdrop-filter:blur(8px)}
+.leaflet-draw-tooltip:before{display:none}
+.leaflet-draw-guide-dash{background:#F59E0B!important}
+.leaflet-editing-icon{border-color:#F59E0B!important;background:#0F172A!important;width:10px!important;height:10px!important;border-radius:50%!important;}
+.roof-draw-hint{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:999;background:rgba(15,23,42,0.92);border:1px solid rgba(245,158,11,0.35);border-radius:10px;padding:8px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;font-size:0.78rem;color:#F1F5F9;white-space:nowrap;backdrop-filter:blur(8px);pointer-events:none}
+.rdh-step{display:flex;align-items:center;gap:5px}.rdh-num{width:18px;height:18px;border-radius:50%;background:#F59E0B;color:#000;font-size:0.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rdh-sep{color:#475569;margin:0 2px}
+.roof-draw-toolbar{position:absolute;bottom:16px;right:16px;z-index:999;display:flex;flex-direction:column;gap:7px}
+.roof-tool-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:0.8rem;font-weight:600;border-radius:9px;border:1px solid rgba(71,85,105,0.5);background:rgba(15,23,42,0.9);color:#F1F5F9;cursor:pointer;backdrop-filter:blur(8px);transition:all 0.2s;white-space:nowrap}
+.roof-tool-btn:hover{border-color:#F59E0B;background:rgba(245,158,11,0.12);color:#F59E0B}
+.roof-tool-btn.active{border-color:#F59E0B;background:rgba(245,158,11,0.18);color:#F59E0B}
+.roof-tool-btn.danger:hover{border-color:#EF4444;background:rgba(239,68,68,0.12);color:#EF4444}
 .logo-text{font-family:var(--font-display);font-size:1.6rem;font-weight:800;letter-spacing:-0.03em;background:linear-gradient(135deg,var(--primary) 0%,#FCD34D 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 .logo-tagline{font-size:0.7rem;color:var(--text-muted);margin-left:2px;letter-spacing:0.02em}
 
@@ -317,27 +336,21 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 </head>
 <body>
 
+<!-- Global back button — always top-left below header -->
+<button id="global-back-btn" class="btn btn-secondary" onclick="window._globalGoBack?.()">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+  Geri
+</button>
+
 <!-- HEADER -->
 <header id="app-header">
   <div class="header-inner">
     <div class="header-top">
       <div class="logo">
-        <svg class="logo-icon" width="40" height="40" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="18" cy="18" r="10" fill="#F59E0B" opacity="0.9"/>
-          <g stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round">
-            <line x1="18" y1="2" x2="18" y2="6"/>
-            <line x1="18" y1="30" x2="18" y2="34"/>
-            <line x1="2" y1="18" x2="6" y2="18"/>
-            <line x1="30" y1="18" x2="34" y2="18"/>
-            <line x1="6.34" y1="6.34" x2="9.17" y2="9.17"/>
-            <line x1="26.83" y1="26.83" x2="29.66" y2="29.66"/>
-            <line x1="29.66" y1="6.34" x2="26.83" y2="9.17"/>
-            <line x1="9.17" y1="26.83" x2="6.34" y2="29.66"/>
-          </g>
-        </svg>
+        <img src="logo_solarrota.png" class="logo-icon" alt="Solar Rota" width="40" height="40" style="object-fit:contain;border-radius:8px"/>
         <div>
           <div class="logo-text">Solar Rota</div>
-          <div class="logo-tagline">Türkiye Güneş Paneli Hesaplayıcı</div>
+          <div class="logo-tagline">Profesyonel GES Mühendislik Aracı</div>
         </div>
       </div>
       <div class="header-utility-bar" style="display:flex;align-items:center;gap:8px;margin-left:auto">
@@ -487,7 +500,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div class="step2-search-wrap">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--text-muted)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <div class="input-wrap" style="flex:1">
-        <input type="text" id="city-search" placeholder="Şehir adı yazın..." autocomplete="off"
+        <input type="text" id="city-search" placeholder="Şehir, ilçe, mahalle veya adres yazın..." autocomplete="off"
           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-owns="autocomplete-list"
           style="background:transparent;border:none;padding:0;font-size:0.95rem"/>
         <div class="autocomplete-list" id="autocomplete-list" role="listbox"></div>
@@ -552,15 +565,25 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <!-- LEFT: sticky map col -->
     <div class="step3-map-col">
       <div id="step3-map-slot" style="width:100%;height:100%"></div>
-      <!-- Roof tools overlay -->
-      <div style="position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:999">
-        <button class="btn btn-secondary" style="font-size:0.8rem;padding:7px 14px" onclick="toggleMapLayer()" title="Uydu görünümüne geç">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
-          Uydu
-        </button>
-        <button class="btn btn-secondary" style="font-size:0.8rem;padding:7px 14px" onclick="clearRoofDrawing()" id="clear-roof-btn" title="Çizimleri temizle">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-          Temizle
+      <!-- Başlangıç ipucu (çizim yokken gösterilir) -->
+      <div class="roof-draw-hint" id="roof-draw-start-hint">
+        <span class="rdh-step"><span class="rdh-num">1</span></span>
+        <span style="color:#F59E0B;font-weight:700">Uydu</span>
+        <span style="color:#94A3B8">görünümüne geç</span>
+        <span class="rdh-sep">→</span>
+        <span class="rdh-step"><span class="rdh-num">2</span></span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5" style="flex-shrink:0"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        <span style="color:#F59E0B;font-weight:700">Poligon aracı</span>
+        <span style="color:#94A3B8">sol üstte</span>
+        <span class="rdh-sep">→</span>
+        <span class="rdh-step"><span class="rdh-num">3</span></span>
+        <span style="color:#10B981;font-weight:600">Çatı köşelerine tıkla, çift tıkla bitir</span>
+      </div>
+      <!-- Sağ alt araç çubuğu (sadece temizle — uydu butonu harita kartında) -->
+      <div class="roof-draw-toolbar">
+        <button class="roof-tool-btn danger" onclick="clearRoofDrawing()" id="clear-roof-btn" title="Tüm çizimleri sil" style="display:none">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          Çizimleri Temizle
         </button>
       </div>
     </div>
@@ -1993,16 +2016,11 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     </div>
   </div>
 
-  <!-- Big CTA button -->
-  <div style="margin-top:28px;text-align:center">
-    <button class="btn btn-primary calc-cta-btn" onclick="validateStep5()">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-      Hesapla ☀
+  <div class="nav-btns" style="margin-top:28px">
+    <button class="btn btn-primary" onclick="validateStep5()" style="font-size:1rem;padding:13px 32px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      Hesaplamayı Başlat →
     </button>
-  </div>
-
-  <div class="nav-btns" style="justify-content:flex-start;margin-top:12px">
-    <button class="btn btn-secondary" onclick="goToStep(4)">← Geri</button>
   </div>
 </div>
 

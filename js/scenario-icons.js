@@ -2,66 +2,126 @@
 // Inline SVG kullanılır çünkü <img> tag'i ile CSS animasyonları Safari/Firefox'ta çalışmaz
 
 export const SCENARIO_ICONS = {
-  'on-grid': `<svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" class="scenario-svg-icon">
+  'on-grid': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="scenario-svg-icon">
+  <defs>
     <style>
-      .sg-sun{animation:sgSpin 12s linear infinite;transform-origin:40px 24px}
-      .sg-pulse{animation:sgPulse 2s ease-in-out infinite alternate}
-      .sg-flow{animation:sgFlow 2.5s ease-in-out infinite}
-      @keyframes sgSpin{to{transform:rotate(360deg)}}
-      @keyframes sgPulse{from{opacity:0.5}to{opacity:1}}
-      @keyframes sgFlow{0%,100%{stroke-dashoffset:20}50%{stroke-dashoffset:0}}
+      .og-sun-pulse{animation:ogPulse 2.5s ease-in-out infinite alternate}
+      .og-dc-flow{stroke-dasharray:4 6;animation:ogFlowMove 1s linear infinite}
+      .og-ac-flow{stroke-dasharray:4 6;animation:ogFlowMove 1s linear infinite}
+      .og-led-blink{animation:ogBlink 1.5s step-end infinite}
+      .og-glass-shine{animation:ogShine 4s ease-in-out infinite alternate}
+      @keyframes ogPulse{0%{transform:scale(0.95);opacity:0.7}100%{transform:scale(1.05);opacity:1;filter:drop-shadow(0 0 8px #F59E0B)}}
+      @keyframes ogFlowMove{to{stroke-dashoffset:-10}}
+      @keyframes ogBlink{0%,100%{fill:#10B981;filter:drop-shadow(0 0 4px #10B981)}50%{fill:#064E3B;filter:none}}
+      @keyframes ogShine{0%{opacity:0.1}100%{opacity:0.3}}
     </style>
-    <circle cx="40" cy="24" r="10" fill="#F59E0B" class="sg-pulse"/>
-    <g class="sg-sun" stroke="#F59E0B" stroke-width="2" stroke-linecap="round">
-      <line x1="40" y1="8" x2="40" y2="4"/>
-      <line x1="40" y1="40" x2="40" y2="44"/>
-      <line x1="24" y1="24" x2="20" y2="24"/>
-      <line x1="56" y1="24" x2="60" y2="24"/>
-      <line x1="28.7" y1="12.7" x2="25.9" y2="9.9"/>
-      <line x1="51.3" y1="35.3" x2="54.1" y2="38.1"/>
-      <line x1="51.3" y1="12.7" x2="54.1" y2="9.9"/>
-      <line x1="28.7" y1="35.3" x2="25.9" y2="38.1"/>
+    <linearGradient id="ogPanelCells" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#020617"/><stop offset="50%" stop-color="#0F172A"/><stop offset="100%" stop-color="#1E3A8A"/>
+    </linearGradient>
+    <linearGradient id="ogSunGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047"/><stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(35,35)" class="og-sun-pulse">
+    <circle cx="0" cy="0" r="14" fill="url(#ogSunGrad)"/>
+    <path d="M0-19L0-24M0 19L0 24M-19 0L-24 0M19 0L24 0M-13.5-13.5L-17-17M13.5 13.5L17 17M-13.5 13.5L-17 17M13.5-13.5L17-17" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+  <path d="M70 110Q70 150,95 150" fill="none" stroke="#F59E0B" stroke-width="3" stroke-linecap="round" class="og-dc-flow"/>
+  <path d="M125 150Q165 150,165 110L165 80" fill="none" stroke="#38BDF8" stroke-width="3" stroke-linecap="round" class="og-ac-flow"/>
+  <g transform="translate(165,75)" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-12 35L0-15L12 35" fill="none" stroke="#64748B" stroke-width="2.5"/>
+    <path d="M0-15L0 35" fill="none" stroke="#475569" stroke-width="1.5"/>
+    <path d="M-18 5L18 5M-12-5L12-5M-22 15L22 15" fill="none" stroke="#64748B" stroke-width="2"/>
+    <path d="M-12 35L0 15L12 35M-8 15L0 5L8 15M-4 5L0-5L4 5" fill="none" stroke="#475569" stroke-width="1" opacity="0.6"/>
+    <circle cx="-18" cy="5" r="2" fill="#E2E8F0"/><circle cx="18" cy="5" r="2" fill="#E2E8F0"/>
+    <circle cx="-22" cy="15" r="2" fill="#E2E8F0"/><circle cx="22" cy="15" r="2" fill="#E2E8F0"/>
+  </g>
+  <g transform="translate(110,150)">
+    <rect x="-14" y="-18" width="28" height="36" rx="4" fill="#0F172A"/>
+    <rect x="-16" y="-20" width="32" height="40" rx="4" fill="#1E293B" stroke="#475569" stroke-width="2"/>
+    <path d="M-10-12L10-12M-10-7L10-7M-10-2L10-2" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+    <rect x="-8" y="5" width="16" height="10" rx="1.5" fill="#020617"/>
+    <circle cx="0" cy="10" r="2" class="og-led-blink"/>
+  </g>
+  <g transform="translate(70,95) scale(0.9) rotate(-30) skewX(25)">
+    <rect x="-38" y="-38" width="76" height="76" rx="4" fill="#64748B" transform="translate(2,2)"/>
+    <rect x="-40" y="-40" width="80" height="80" rx="4" fill="#CBD5E1" stroke="#94A3B8" stroke-width="1.5"/>
+    <rect x="-36" y="-36" width="72" height="72" rx="2" fill="url(#ogPanelCells)"/>
+    <g stroke="#3B82F6" stroke-width="0.75" opacity="0.6">
+      <line x1="-12" y1="-36" x2="-12" y2="36"/><line x1="12" y1="-36" x2="12" y2="36"/>
+      <line x1="-36" y1="-12" x2="36" y2="-12"/><line x1="-36" y1="12" x2="36" y2="12"/>
     </g>
-    <rect x="8" y="46" width="64" height="4" rx="2" fill="#475569"/>
-    <line x1="40" y1="34" x2="40" y2="46" stroke="#F59E0B" stroke-width="2.5" stroke-dasharray="4 2" class="sg-flow" style="stroke-dasharray:4 2"/>
-    <rect x="12" y="52" width="8" height="18" rx="1" fill="#334155" stroke="#475569" stroke-width="1"/>
-    <rect x="14" y="60" width="4" height="2" fill="#F59E0B" class="sg-pulse"/>
-    <rect x="36" y="52" width="8" height="18" rx="1" fill="#334155" stroke="#475569" stroke-width="1"/>
-    <rect x="38" y="60" width="4" height="2" fill="#F59E0B" class="sg-pulse"/>
-    <rect x="60" y="52" width="8" height="18" rx="1" fill="#334155" stroke="#475569" stroke-width="1"/>
-    <rect x="62" y="60" width="4" height="2" fill="#F59E0B" class="sg-pulse"/>
-    <line x1="20" y1="50" x2="20" y2="52" stroke="#475569" stroke-width="1.5"/>
-    <line x1="44" y1="50" x2="44" y2="52" stroke="#475569" stroke-width="1.5"/>
-    <line x1="64" y1="50" x2="64" y2="52" stroke="#475569" stroke-width="1.5"/>
-  </svg>`,
+    <g stroke="#94A3B8" stroke-width="0.3" opacity="0.8">
+      <line x1="-24" y1="-36" x2="-24" y2="36"/><line x1="0" y1="-36" x2="0" y2="36"/><line x1="24" y1="-36" x2="24" y2="36"/>
+    </g>
+    <polygon points="-36,-36 10,-36 -36,10" fill="#ffffff" class="og-glass-shine"/>
+  </g>
+</svg>`,
 
-  'off-grid': `<svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" class="scenario-svg-icon">
+  'off-grid': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="scenario-svg-icon">
+  <defs>
     <style>
-      .bat-sun{animation:batSpin 14s linear infinite;transform-origin:28px 18px}
-      .bat-fill{animation:batCharge 3s ease-in-out infinite}
-      .bat-bolt{animation:batBolt 1.5s ease-in-out infinite alternate}
-      @keyframes batSpin{to{transform:rotate(360deg)}}
-      @keyframes batCharge{0%,100%{height:8px;y:46}50%{height:14px;y:40}}
-      @keyframes batBolt{from{opacity:0.4}to{opacity:1}}
+      .off-sun-pulse{animation:offPulse 2.5s ease-in-out infinite alternate}
+      .off-dc-flow{stroke-dasharray:4 6;animation:offFlowMove 1s linear infinite}
+      .off-charge-flow{stroke-dasharray:4 6;animation:offFlowMove 1.2s linear infinite}
+      .off-mppt-blink{animation:offBlink 1s step-end infinite}
+      .off-glass-shine{animation:offShine 4s ease-in-out infinite alternate}
+      .off-led-1{animation:offLedPulse 1.5s infinite 0.0s}
+      .off-led-2{animation:offLedPulse 1.5s infinite 0.3s}
+      .off-led-3{animation:offLedPulse 1.5s infinite 0.6s}
+      @keyframes offPulse{0%{transform:scale(0.95);opacity:0.7}100%{transform:scale(1.05);opacity:1;filter:drop-shadow(0 0 8px #F59E0B)}}
+      @keyframes offFlowMove{to{stroke-dashoffset:-10}}
+      @keyframes offBlink{0%,100%{fill:#F59E0B;filter:drop-shadow(0 0 4px #F59E0B)}50%{fill:#78350F;filter:none}}
+      @keyframes offShine{0%{opacity:0.1}100%{opacity:0.3}}
+      @keyframes offLedPulse{0%,100%{fill:#064E3B;filter:none}50%{fill:#10B981;filter:drop-shadow(0 0 4px #10B981)}}
     </style>
-    <circle cx="28" cy="18" r="8" fill="#8B5CF6" opacity="0.9"/>
-    <g class="bat-sun" stroke="#8B5CF6" stroke-width="1.8" stroke-linecap="round">
-      <line x1="28" y1="5" x2="28" y2="2"/>
-      <line x1="28" y1="30" x2="28" y2="33"/>
-      <line x1="15" y1="18" x2="12" y2="18"/>
-      <line x1="41" y1="18" x2="44" y2="18"/>
-      <line x1="19.8" y1="9.8" x2="17.7" y2="7.7"/>
-      <line x1="36.2" y1="26.2" x2="38.3" y2="28.3"/>
-      <line x1="36.2" y1="9.8" x2="38.3" y2="7.7"/>
-      <line x1="19.8" y1="26.2" x2="17.7" y2="28.3"/>
+    <linearGradient id="offPanelCells" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#020617"/><stop offset="50%" stop-color="#0F172A"/><stop offset="100%" stop-color="#1E3A8A"/>
+    </linearGradient>
+    <linearGradient id="offSunGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047"/><stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(35,35)" class="off-sun-pulse">
+    <circle cx="0" cy="0" r="14" fill="url(#offSunGrad)"/>
+    <path d="M0-19L0-24M0 19L0 24M-19 0L-24 0M19 0L24 0M-13.5-13.5L-17-17M13.5 13.5L17 17M-13.5 13.5L-17 17M13.5-13.5L17-17" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+  <path d="M85 100Q120 75,145 75" fill="none" stroke="#F59E0B" stroke-width="3" stroke-linecap="round" class="off-dc-flow"/>
+  <path d="M165 100Q165 150,135 150" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round" class="off-charge-flow"/>
+  <g transform="translate(165,75)">
+    <rect x="-14" y="-18" width="28" height="36" rx="3" fill="#0F172A"/>
+    <rect x="-16" y="-20" width="32" height="40" rx="3" fill="#1E293B" stroke="#475569" stroke-width="2"/>
+    <path d="M-16-10L-20-10M-16-4L-20-4M-16 2L-20 2M-16 8L-20 8" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+    <path d="M16-10L20-10M16-4L20-4M16 2L20 2M16 8L20 8" stroke="#334155" stroke-width="2" stroke-linecap="round"/>
+    <rect x="-8" y="-12" width="16" height="10" rx="1.5" fill="#020617"/>
+    <circle cx="0" cy="-7" r="2" class="off-mppt-blink"/>
+    <circle cx="-6" cy="15" r="2.5" fill="#F59E0B"/>
+    <circle cx="6" cy="15" r="2.5" fill="#10B981"/>
+  </g>
+  <g transform="translate(110,150)">
+    <rect x="-22" y="-22" width="44" height="44" rx="4" fill="#0F172A"/>
+    <rect x="-24" y="-24" width="48" height="48" rx="4" fill="#1E293B" stroke="#475569" stroke-width="2"/>
+    <rect x="-16" y="-28" width="10" height="6" rx="1.5" fill="#EF4444"/>
+    <rect x="6" y="-28" width="10" height="6" rx="1.5" fill="#3B82F6"/>
+    <rect x="-12" y="-14" width="24" height="28" rx="2" fill="#020617"/>
+    <rect x="-6" y="6" width="12" height="4" rx="1" class="off-led-1"/>
+    <rect x="-6" y="-1" width="12" height="4" rx="1" class="off-led-2"/>
+    <rect x="-6" y="-8" width="12" height="4" rx="1" class="off-led-3"/>
+  </g>
+  <g transform="translate(70,95) scale(0.9) rotate(-30) skewX(25)">
+    <rect x="-38" y="-38" width="76" height="76" rx="4" fill="#64748B" transform="translate(2,2)"/>
+    <rect x="-40" y="-40" width="80" height="80" rx="4" fill="#CBD5E1" stroke="#94A3B8" stroke-width="1.5"/>
+    <rect x="-36" y="-36" width="72" height="72" rx="2" fill="url(#offPanelCells)"/>
+    <g stroke="#3B82F6" stroke-width="0.75" opacity="0.6">
+      <line x1="-12" y1="-36" x2="-12" y2="36"/><line x1="12" y1="-36" x2="12" y2="36"/>
+      <line x1="-36" y1="-12" x2="36" y2="-12"/><line x1="-36" y1="12" x2="36" y2="12"/>
     </g>
-    <rect x="42" y="32" width="24" height="40" rx="4" fill="#1E293B" stroke="#8B5CF6" stroke-width="2"/>
-    <rect x="50" y="28" width="8" height="6" rx="2" fill="#8B5CF6" opacity="0.7"/>
-    <rect x="44" y="34" width="20" height="36" rx="3" fill="#0F172A"/>
-    <rect id="bat-fill-rect" x="46" y="46" width="16" height="8" rx="2" fill="#8B5CF6" class="bat-fill" style="animation:batCharge 3s ease-in-out infinite"/>
-    <rect x="46" y="58" width="16" height="8" rx="2" fill="rgba(139,92,246,0.3)"/>
-    <path d="M52 42 L49 50 H53 L51 58" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bat-bolt"/>
-  </svg>`,
+    <g stroke="#94A3B8" stroke-width="0.3" opacity="0.8">
+      <line x1="-24" y1="-36" x2="-24" y2="36"/><line x1="0" y1="-36" x2="0" y2="36"/><line x1="24" y1="-36" x2="24" y2="36"/>
+    </g>
+    <polygon points="-36,-36 10,-36 -36,10" fill="#ffffff" class="off-glass-shine"/>
+  </g>
+</svg>`,
 
   'agricultural-irrigation': `<svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" class="scenario-svg-icon">
     <style>
