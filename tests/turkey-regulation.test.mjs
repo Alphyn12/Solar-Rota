@@ -14,6 +14,27 @@ const residentialSktt = determineSkttRegime({
 assert.equal(residentialSktt.effectiveRegime, 'sktt');
 assert.equal(residentialSktt.limitKwh, 4000);
 
+const activationPending = determineSkttRegime({
+  tariffType: 'residential',
+  annualConsumptionKwh: 4500,
+  tariffRegime: 'auto',
+  skttExceededDate: '2026-04-15',
+  tariffEvaluationDate: '2026-05-01'
+});
+assert.equal(activationPending.effectiveRegime, 'pst');
+assert.equal(activationPending.activationDate, '2026-07-01');
+assert.equal(activationPending.activationReached, false);
+
+const activationReached = determineSkttRegime({
+  tariffType: 'residential',
+  annualConsumptionKwh: 4500,
+  tariffRegime: 'auto',
+  skttExceededDate: '2026-04-15',
+  tariffEvaluationDate: '2026-07-01'
+});
+assert.equal(activationReached.effectiveRegime, 'sktt');
+assert.equal(activationReached.activationReached, true);
+
 const residentialPst = determineSkttRegime({
   tariffType: 'residential',
   annualConsumptionKwh: 3500,
@@ -31,12 +52,21 @@ const contract = determineSkttRegime({
 assert.equal(contract.effectiveRegime, 'contract');
 
 const monthlyRows = [
-  { gridExport: 100, load: 50 },
-  { gridExport: 200, load: 500 }
+  { gridExport: 100, gridImport: 50, load: 50 },
+  { gridExport: 200, gridImport: 500, load: 500 }
 ];
 const monthly = applyExportCompensation(monthlyRows, { interval: 'monthly', annualSellableExportCapKwh: 1000 });
-assert.equal(monthly.paidGridExport, 250);
-assert.equal(monthly.unpaidGridExport, 50);
+assert.equal(monthly.importOffsetEnergy, 250);
+assert.equal(monthly.paidGridExport, 50);
+assert.equal(monthly.unpaidGridExport, 0);
+
+const monthlyCapped = applyExportCompensation(
+  [{ gridExport: 500, gridImport: 100, load: 100 }],
+  { interval: 'monthly', annualSellableExportCapKwh: 150 }
+);
+assert.equal(monthlyCapped.importOffsetEnergy, 100);
+assert.equal(Math.round(monthlyCapped.paidGridExport), 150);
+assert.equal(Math.round(monthlyCapped.unpaidGridExport), 250);
 
 const hourlyRows = new Array(8760).fill(0).map((_, idx) => ({
   month: idx < 2 ? 0 : 1,
@@ -51,6 +81,22 @@ const hourly = applyExportCompensation(monthlyRows, {
 assert.equal(Math.round(hourly.paidGridExport), 180);
 assert.equal(Math.round(hourly.unpaidGridExport), 120);
 assert.equal(hourly.policy.interval, 'hourly');
+
+const zeroLoadNoonExport = applyExportCompensation(
+  [{ gridExport: 100, gridImport: 0, load: 0 }],
+  {
+    interval: 'hourly',
+    annualSellableExportCapKwh: 1000,
+    hourlyRows: new Array(8760).fill(0).map((_, idx) => ({
+      month: 0,
+      gridExport: idx === 0 ? 100 : 0,
+      gridImport: 0,
+      load: 0
+    }))
+  }
+);
+assert.equal(Math.round(zeroLoadNoonExport.paidGridExport), 100);
+assert.equal(Math.round(zeroLoadNoonExport.unpaidGridExport), 0);
 
 const mislabeledHourly = applyExportCompensation(monthlyRows, { interval: 'hourly', annualSellableExportCapKwh: 180 });
 assert.equal(mislabeledHourly.paidGridExport, 0);
@@ -67,6 +113,14 @@ const policy = buildExportCompensationPolicy({
 assert.equal(policy.interval, 'hourly');
 assert.equal(policy.annualSellableExportCapKwh, 2000);
 
+const provisionalPolicy = buildExportCompensationPolicy({
+  annualConsumptionKwh: 1000,
+  exportSettlementMode: 'auto'
+});
+assert.equal(provisionalPolicy.interval, 'monthly');
+assert.equal(provisionalPolicy.provisional, true);
+assert.equal(provisionalPolicy.settlementDateMissing, true);
+
 const readiness = buildQuoteReadiness({
   state: { roofGeometry: null },
   results: { usedFallback: true, calculationWarnings: [] },
@@ -75,5 +129,19 @@ const readiness = buildQuoteReadiness({
 assert.equal(readiness.status, 'not-quote-ready');
 assert.ok(readiness.blockers.some(b => b.includes('PVGIS')));
 assert.ok(readiness.blockers.some(b => b.includes('Proposal')));
+
+const missingSettlementReadiness = buildQuoteReadiness({
+  state: { exportSettlementMode: 'auto', settlementDate: '' },
+  results: { usedFallback: false, calculationWarnings: [] },
+  tariffModel: { regulation: { effectiveRegime: 'pst', warnings: [] }, exportCompensationPolicy: { sources: [{}] } }
+});
+assert.ok(missingSettlementReadiness.blockers.some(b => b.includes('SETTLEMENT_DATE_MISSING')));
+
+const datedSettlementReadiness = buildQuoteReadiness({
+  state: { exportSettlementMode: 'auto', settlementDate: '2026-04-01' },
+  results: { usedFallback: false, calculationWarnings: [] },
+  tariffModel: { regulation: { effectiveRegime: 'pst', warnings: [] }, exportCompensationPolicy: { sources: [{}] } }
+});
+assert.ok(!datedSettlementReadiness.blockers.some(b => b.includes('SETTLEMENT_DATE_MISSING')));
 
 console.log('turkey regulation tests passed');

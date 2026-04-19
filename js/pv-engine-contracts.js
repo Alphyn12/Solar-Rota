@@ -1,4 +1,5 @@
 import { INVERTER_TYPES, PANEL_TYPES } from './data.js';
+import { calculateSystemLayout } from './calc-core.js';
 
 export const PV_ENGINE_CONTRACT_VERSION = 'GH-PV-ENGINE-CONTRACT-2026.04-v1';
 
@@ -15,6 +16,43 @@ function nullableFinite(value) {
 function currentTargetPowerKwp(state = {}) {
   const explicit = nullableFinite(state.targetSystemPowerKwp ?? state.systemPowerKwp);
   return explicit !== null && explicit > 0 ? explicit : null;
+}
+
+function buildLayoutSnapshot(state = {}) {
+  if (!state || !Number.isFinite(Number(state.roofArea)) || Number(state.roofArea) <= 0) return null;
+  try {
+    const layout = calculateSystemLayout(state, state.panelType || 'mono');
+    const sections = (layout.sections || []).map(sec => ({
+      areaM2: finite(sec.area, 0),
+      tiltDeg: finite(sec.tilt, 0),
+      azimuthDeg: finite(sec.azimuth, 180),
+      azimuthName: sec.azimuthName || null,
+      shadingPct: finite(sec.shadingFactor, 0),
+      panelCount: finite(sec.panelCount, 0),
+      systemPowerKwp: finite(sec.systemPower, 0)
+    }));
+    return {
+      authoritativeSizing: true,
+      panelCount: layout.panelCount,
+      chosenSystemPowerKwp: Number((layout.systemPower || 0).toFixed(6)),
+      targetSystemPowerKwp: layout.targetSystemPowerKwp,
+      usableRoofRatio: finite(state.usableRoofRatio, 0.75),
+      usableAreaM2: Number((layout.usableArea || 0).toFixed(3)),
+      designTargetMode: state.designTarget || 'fill-roof',
+      designTargetApplied: layout.designTargetApplied,
+      limitedBy: layout.designTargetApplied === 'bill-offset' ? 'bill-target' : 'roof-area',
+      multiRoof: !!state.multiRoof,
+      sections,
+      shadow: {
+        userShadingPct: finite(state.shadingFactor, 0),
+        osmShadowEnabled: !!state.osmShadowEnabled,
+        osmShadowFactorPct: finite(state.osmShadow?.shadowFactorPct, 0),
+        shadingQuality: state.shadingQuality || 'user-estimate'
+      }
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function hasValidSiteCoordinates(site = {}) {
@@ -44,6 +82,7 @@ export function buildPvEngineRequest(state = {}) {
   const cableLossPct = state.cableLossEnabled && state.cableLoss
     ? Math.max(0, finite(state.cableLoss.totalLossPct, 0))
     : 0;
+  const layoutSnapshot = buildLayoutSnapshot(state);
   return {
     schema: PV_ENGINE_CONTRACT_VERSION,
     requestedEngine: state.enginePreference || 'auto',
@@ -82,8 +121,15 @@ export function buildPvEngineRequest(state = {}) {
       cableLossPct,
       wiringMismatchPct: cableLossPct,
       targetPowerKwp: currentTargetPowerKwp(state),
+      layoutSnapshot,
+      authoritativePanelCount: layoutSnapshot?.panelCount ?? null,
+      chosenSystemPowerKwp: layoutSnapshot?.chosenSystemPowerKwp ?? null,
       batteryEnabled: !!state.batteryEnabled,
       battery: state.battery || null,
+      batteryMaxChargeKw: state.scenarioKey === 'off-grid' ? nullableFinite(state.offgridBatteryMaxChargeKw) : null,
+      batteryMaxDischargeKw: state.scenarioKey === 'off-grid' ? nullableFinite(state.offgridBatteryMaxDischargeKw) : null,
+      offgridInverterAcKw: state.scenarioKey === 'off-grid' ? nullableFinite(state.offgridInverterAcKw) : null,
+      offgridInverterSurgeMultiplier: state.scenarioKey === 'off-grid' ? finite(state.offgridInverterSurgeMultiplier, 1.25) : null,
       netMeteringEnabled: state.scenarioKey === 'off-grid' ? false : !!state.netMeteringEnabled,
       evEnabled: !!state.evEnabled,
       ev: state.ev || null,
@@ -103,8 +149,19 @@ export function buildPvEngineRequest(state = {}) {
     load: {
       dailyConsumptionKwh: finite(state.dailyConsumption, 0),
       monthlyConsumptionKwh: Array.isArray(state.monthlyConsumption) ? state.monthlyConsumption.map(v => Math.max(0, finite(v, 0))).slice(0, 12) : null,
-      hourlyConsumption8760: normalizeHourlyProfile(state.hourlyConsumption8760)
+      hourlyConsumption8760: normalizeHourlyProfile(state.hourlyConsumption8760),
+      offgridDevices: state.scenarioKey === 'off-grid' && Array.isArray(state.offgridDevices) ? state.offgridDevices : [],
+      offgridCriticalFraction: state.scenarioKey === 'off-grid' ? finite(state.offgridCriticalFraction, 0.6) : null
     },
+    offgrid: state.scenarioKey === 'off-grid' ? {
+      generatorEnabled: !!state.offgridGeneratorEnabled,
+      generatorKw: finite(state.offgridGeneratorKw, 0),
+      generatorFuelCostPerKwh: finite(state.offgridGeneratorFuelCostPerKwh, 0),
+      generatorCapexTry: finite(state.offgridGeneratorCapexTry, 0),
+      badWeatherLevel: state.offgridBadWeatherLevel || '',
+      loadSourcePriority: ['hourlyConsumption8760', 'offgridDevices', 'dailyConsumptionSyntheticProfile'],
+      dispatchLevel: 'L2'
+    } : null,
     tariff: {
       tariffType: state.tariffType || 'residential',
       tariffRegime: state.tariffRegime || 'auto',

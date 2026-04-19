@@ -170,6 +170,28 @@ def test_representative_scenarios_preserve_frontend_system_sizing_contract(scena
         assert round(data["losses"]["contractPanelAreaM2"], 4) == round(1.134 * 1.762, 4)
 
 
+def test_backend_uses_frontend_layout_snapshot_for_authoritative_sizing():
+    request = sample_request()
+    request["system"]["layoutSnapshot"] = {
+        "authoritativeSizing": True,
+        "panelCount": 6,
+        "chosenSystemPowerKwp": 2.58,
+        "usableRoofRatio": 0.75,
+        "designTargetMode": "bill-offset",
+        "designTargetApplied": "bill-offset",
+        "limitedBy": "bill-target",
+        "sections": [{"areaM2": 80, "panelCount": 6, "systemPowerKwp": 2.58}],
+        "shadow": {"userShadingPct": 10, "osmShadowEnabled": False, "osmShadowFactorPct": 0},
+    }
+
+    response = client.post("/api/pv/calculate", json=request)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["production"]["panelCount"] == 6
+    assert data["production"]["systemPowerKwp"] == 2.58
+    assert data["losses"]["layoutSnapshotUsed"] is True
+
+
 def test_fix3_self_consumption_target_caps_self_consumed_energy():
     """FIX-3: Backend self-consumption must be <= annual_energy * scenario_target.
     Before the fix, self_consumed = min(annual_energy, annual_load) which could
@@ -359,3 +381,78 @@ def test_pvgis_proxy_network_error():
     assert data["ok"] is False
     assert data["rawEnergy"] is None
     assert data["error_type"] in {"network", "unknown"}
+
+
+# ── Bug-fix tests ─────────────────────────────────────────────────────────────
+
+def test_pvlib_gamma_pdc_varies_by_panel_type():
+    """Bug 3 fix: gamma_pdc must differ per panel type (mono/-0.0034, poly/-0.0040, bifacial/-0.0028)."""
+    from backend.engines.pvlib_engine import PANEL_GAMMA_PDC
+    assert PANEL_GAMMA_PDC["mono"] == -0.0034
+    assert PANEL_GAMMA_PDC["poly"] == -0.0040
+    assert PANEL_GAMMA_PDC["bifacial"] == -0.0028
+    # All values are physically valid (between -1% and 0%)
+    for panel_type, coeff in PANEL_GAMMA_PDC.items():
+        assert -0.01 <= coeff <= 0, f"{panel_type}: gamma_pdc {coeff} out of physical range"
+
+
+@pytest.mark.skipif(not PVLIB_AVAILABLE, reason="pvlib not installed")
+def test_pvlib_gamma_pdc_reported_in_loss_flags():
+    """Bug 3 fix: loss_flags must report gammaPdc and gammaPdcSource when pvlib is used."""
+    response = client.post("/api/pv/calculate", json=sample_request())
+    assert response.status_code == 200
+    data = response.json()
+    if data["engineSource"]["pvlibBacked"]:
+        assert "gammaPdc" in data["losses"], "gammaPdc must be reported in loss_flags"
+        assert data["losses"]["gammaPdc"] == -0.0034, "mono panel should use -0.0034"
+        assert data["losses"]["gammaPdcSource"] in {"contract", "panel-type-map"}
+
+
+@pytest.mark.skipif(not PVLIB_AVAILABLE, reason="pvlib not installed")
+def test_pvlib_gamma_pdc_contract_override():
+    """Bug 3 fix: panelTempCoeffPerC in contract overrides the panel-type default."""
+    request = sample_request()
+    request["system"]["panelTempCoeffPerC"] = -0.0036  # custom coefficient
+    response = client.post("/api/pv/calculate", json=request)
+    assert response.status_code == 200
+    data = response.json()
+    if data["engineSource"]["pvlibBacked"]:
+        assert data["losses"]["gammaPdc"] == -0.0036
+        assert data["losses"]["gammaPdcSource"] == "contract"
+
+
+def test_psh_fallback_covers_all_81_provinces():
+    """Bug 4 fix: _annual_ghi_to_psh fallback must cover all 81 Turkish provinces, not just 5."""
+    from backend.engines.simple_engine import _annual_ghi_to_psh
+    all_provinces = [
+        "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Aksaray", "Amasya", "Ankara",
+        "Antalya", "Ardahan", "Artvin", "Aydın", "Balıkesir", "Bartın", "Batman",
+        "Bayburt", "Bilecik", "Bingöl", "Bitlis", "Bolu", "Burdur", "Bursa",
+        "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Düzce",
+        "Edirne", "Elazığ", "Erzincan", "Erzurum", "Eskişehir", "Gaziantep",
+        "Giresun", "Gümüşhane", "Hakkari", "Hatay", "Iğdır", "Isparta",
+        "İstanbul", "İzmir", "Kahramanmaraş", "Karabük", "Karaman", "Kars",
+        "Kastamonu", "Kayseri", "Kırıkkale", "Kırklareli", "Kırşehir", "Kocaeli",
+        "Konya", "Kütahya", "Malatya", "Manisa", "Mardin", "Mersin", "Muğla",
+        "Muş", "Nevşehir", "Niğde", "Ordu", "Osmaniye", "Rize", "Sakarya",
+        "Samsun", "Siirt", "Sinop", "Şırnak", "Sivas", "Şanlıurfa", "Tekirdağ",
+        "Tokat", "Trabzon", "Tunceli", "Uşak", "Van", "Yozgat", "Zonguldak",
+    ]
+    default_psh = _annual_ghi_to_psh(None, "UnknownCity")
+    assert default_psh == 4.50, "default PSH for unknown city must remain 4.50"
+    missing = [p for p in all_provinces if _annual_ghi_to_psh(None, p) == default_psh]
+    assert not missing, (
+        f"Bug 4: {len(missing)} province(s) still using default PSH 4.50 (not in fallback dict): {missing}"
+    )
+
+
+def test_psh_fallback_coastal_vs_inner_provinces():
+    """Bug 4 fix: PSH values for coastal high-irradiance vs. Black Sea provinces are calibrated correctly."""
+    from backend.engines.simple_engine import _annual_ghi_to_psh
+    antalya = _annual_ghi_to_psh(None, "Antalya")
+    rize = _annual_ghi_to_psh(None, "Rize")
+    sanliurfa = _annual_ghi_to_psh(None, "Şanlıurfa")
+    ankara = _annual_ghi_to_psh(None, "Ankara")
+    assert antalya > ankara, "Antalya (Mediterranean) must have higher PSH than Ankara"
+    assert rize < ankara, "Rize (Black Sea) must have lower PSH than Ankara"
+    assert sanliurfa > antalya, "Şanlıurfa (SE Anatolia) must have the highest PSH"

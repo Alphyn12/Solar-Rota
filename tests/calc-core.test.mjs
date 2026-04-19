@@ -70,6 +70,8 @@ nearly(hourly.annualLoad, 960);
 assert.ok(hourly.selfConsumption <= hourly.annualProduction);
 assert.ok(hourly.gridExport >= 0);
 assert.equal(hourly.exportPolicy.interval, 'monthly');
+assert.ok(hourly.importOffsetEnergy > 0);
+assert.ok(hourly.paidGridExport >= 0);
 
 const daytimeHourly = simulateHourlyEnergy(
   new Array(12).fill(300),
@@ -167,6 +169,61 @@ const cappedFinancial = computeFinancialTable({
   exportRateOverride: 2
 });
 assert.equal(cappedFinancial.rows[0].savings, 900);
+
+const offsetFinancial = computeFinancialTable({
+  annualEnergy: 1000,
+  hourlySummary: {
+    annualProduction: 1000,
+    annualLoad: 1000,
+    selfConsumption: 300,
+    importOffsetEnergy: 400,
+    gridExport: 700,
+    paidGridExport: 200,
+    unpaidGridExport: 100,
+    gridImport: 700
+  },
+  batterySummary: null,
+  totalCost: 10000,
+  tariffModel,
+  panel: { firstYearDeg: 0, degradation: 0 },
+  annualOMCost: 0,
+  annualInsurance: 0,
+  inverterLifetime: 12,
+  inverterReplaceCost: 0,
+  netMeteringEnabled: true,
+  exportRateOverride: 2
+});
+assert.equal(offsetFinancial.rows[0].selfConsumptionKwh, 300);
+assert.equal(offsetFinancial.rows[0].importOffsetKwh, 400);
+assert.equal(offsetFinancial.rows[0].paidExportKwh, 200);
+assert.equal(offsetFinancial.rows[0].savings, 3900);
+
+const zeroExportTariffOffsetFinancial = computeFinancialTable({
+  annualEnergy: 1000,
+  hourlySummary: {
+    annualProduction: 1000,
+    annualLoad: 1000,
+    selfConsumption: 300,
+    importOffsetEnergy: 400,
+    gridExport: 700,
+    paidGridExport: 200,
+    unpaidGridExport: 100,
+    gridImport: 700
+  },
+  batterySummary: null,
+  totalCost: 10000,
+  tariffModel: { ...tariffModel, exportRate: 0 },
+  panel: { firstYearDeg: 0, degradation: 0 },
+  annualOMCost: 0,
+  annualInsurance: 0,
+  inverterLifetime: 12,
+  inverterReplaceCost: 0,
+  netMeteringEnabled: true,
+  exportRateOverride: 0
+});
+assert.equal(zeroExportTariffOffsetFinancial.rows[0].importOffsetKwh, 400);
+assert.equal(zeroExportTariffOffsetFinancial.rows[0].paidExportKwh, 200);
+assert.equal(zeroExportTariffOffsetFinancial.rows[0].savings, 3500);
 
 const offGridRate = 19.5;
 const offGridTariffModel = { ...tariffModel, importRate: offGridRate, exportRate: 0, annualPriceIncrease: 0 };
@@ -270,6 +327,37 @@ assert.equal(tariffGross.importRate, 6.0);
 // Verify distribution fee does NOT leak to export rate
 assert.equal(tariffNetPlusFee.exportRate, 0);
 assert.equal(tariffGross.exportRate, 0);
+
+// effectiveImportRate = importRate + distributionFee in net-plus-fee mode
+assert.equal(tariffNetPlusFee.effectiveImportRate, 7.0, 'net-plus-fee: effectiveImportRate = importRate + distributionFee');
+// gross mode: effectiveImportRate = importRate (no fee added)
+assert.equal(tariffGross.effectiveImportRate, 6.0, 'gross mode: effectiveImportRate = importRate');
+
+// Distribution fee increases savings in net-plus-fee mode
+const feeModel = buildTariffModel({
+  tariffType: 'residential',
+  tariff: 5.0,
+  distributionFee: 2.0,
+  tariffInputMode: 'net-plus-fee',
+  annualPriceIncrease: 0,
+  discountRate: 0,
+  exportTariff: 0
+});
+const feeFinancial = computeFinancialTable({
+  annualEnergy: 1000,
+  hourlySummary: { annualProduction: 1000, annualLoad: 1000, selfConsumption: 500, gridExport: 500, paidGridExport: 0, gridImport: 500 },
+  batterySummary: null,
+  totalCost: 10000,
+  tariffModel: feeModel,
+  panel: { firstYearDeg: 0, degradation: 0 },
+  annualOMCost: 0, annualInsurance: 0, inverterLifetime: 12, inverterReplaceCost: 0,
+  netMeteringEnabled: false, exportRateOverride: 0
+});
+// effectiveImportRate = 5 + 2 = 7; savings = 500 * 7 = 3500
+assert.equal(feeModel.effectiveImportRate, 7.0);
+assert.equal(feeFinancial.rows[0].savings, 3500, 'distribution fee included in savings');
+// row.rate should still show base importRate (5.00), not effective rate
+assert.equal(feeFinancial.rows[0].rate, '5.00', 'row.rate shows importRate (display), not effectiveImportRate');
 
 // tariffSourceType is passed through
 const tariffOfficial = buildTariffModel({ tariff: 5, tariffSourceType: 'official', annualPriceIncrease: 0, discountRate: 0 });

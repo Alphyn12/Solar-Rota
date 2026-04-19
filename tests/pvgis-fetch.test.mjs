@@ -108,7 +108,7 @@ describe('fetchPVGISLive — ağ hatası fallback', () => {
 
   it('userMessage Türkçe hata mesajı içerir (tr)', async () => {
     const fetchImpl = makeMockFetch(['throw', 'throw', 'throw']);
-    const result = await fetchPVGISLive(PARAMS, { fetchImpl, timeoutMs: 5000, retries: 3, lang: 'tr' });
+    const result = await fetchPVGISLive(PARAMS, { fetchImpl, timeoutMs: 5000, retries: 3, retryDelaysMs: [0, 0, 0], lang: 'tr' });
     assert.ok(result.userMessage && result.userMessage.length > 0);
     // Türkçe içermeli
     assert.ok(result.userMessage.includes('tahmini') || result.userMessage.includes('model') || result.userMessage.includes('alınamadı'));
@@ -116,7 +116,7 @@ describe('fetchPVGISLive — ağ hatası fallback', () => {
 
   it('userMessage İngilizce hata mesajı içerir (en)', async () => {
     const fetchImpl = makeMockFetch(['throw', 'throw', 'throw']);
-    const result = await fetchPVGISLive(PARAMS, { fetchImpl, timeoutMs: 5000, retries: 3, lang: 'en' });
+    const result = await fetchPVGISLive(PARAMS, { fetchImpl, timeoutMs: 5000, retries: 3, retryDelaysMs: [0, 0, 0], lang: 'en' });
     assert.ok(result.userMessage && result.userMessage.toLowerCase().includes('estimated'));
   });
 });

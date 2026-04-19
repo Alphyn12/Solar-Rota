@@ -136,6 +136,24 @@ describe('buildOffgridLoadProfile — device list', () => {
   });
 });
 
+// ── 2b. buildOffgridLoadProfile: gerçek 8760 önceliği ──────────────────────
+describe('buildOffgridLoadProfile — real 8760 source priority', () => {
+  it('gerçek 8760 yük varsa cihaz listesiyle karıştırmadan onu kullanır', () => {
+    const hourly = Array.from({ length: 8760 }, (_, i) => (i % 24 >= 18 ? 1.2 : 0.3));
+    const devices = [{ name: 'Pompa', category: 'pump', powerW: 2000, hoursPerDay: 6, isCritical: false }];
+    const result = buildOffgridLoadProfile(devices, {
+      hourlyLoad8760: hourly,
+      hourlyLoadSource: 'hourly-uploaded',
+      criticalFraction: 0.4
+    });
+    assert.equal(result.mode, 'hourly-8760');
+    assert.equal(result.loadSource, 'hourly-uploaded');
+    assert.equal(result.deviceCount, 1, 'cihazlar inventory olarak korunmalı');
+    nearly(result.annualTotalKwh, hourly.reduce((a, b) => a + b, 0), 0.01, 'real 8760 sum');
+    nearly(result.annualCriticalKwh, result.annualTotalKwh * 0.4, 0.01, 'critical fallback fraction');
+  });
+});
+
 // ── 3. runOffgridDispatch: SOC / Rezerv Davranışı ───────────────────────────
 describe('runOffgridDispatch — SOC ve rezerv', () => {
   it('SOC hiçbir zaman rezerv altına düşmez', () => {
@@ -167,6 +185,54 @@ describe('runOffgridDispatch — SOC ve rezerv', () => {
     const result = runOffgridDispatch(pv, load, critical, largeBattery, NO_GENERATOR, {});
     // Büyük batarya ile unmet çok küçük olmalı
     assert.ok(result.totalLoadCoverage > 0.9, 'büyük batarya ile yüksek kapsama bekleniyor');
+  });
+});
+
+// ── 3b. runOffgridDispatch: batarya ve inverter güç limitleri ───────────────
+describe('runOffgridDispatch — battery and inverter power limits', () => {
+  it('kWh yeterli olsa bile maxDischargePowerKw unmet load üretir', () => {
+    const largeBattery = { usableCapacityKwh: 20000, efficiency: 1.0, socReserveKwh: 0, initialSocKwh: 20000, maxDischargePowerKw: 0.5 };
+    const unlimitedBattery = { ...largeBattery, maxDischargePowerKw: 10 };
+    const pv = makeLoadHourly(0);
+    const load = makeLoadHourly(48); // 2 kWh/h
+    const critical = makeLoadHourly(24);
+    const limited = runOffgridDispatch(pv, load, critical, largeBattery, NO_GENERATOR, {});
+    const unlimited = runOffgridDispatch(pv, load, critical, unlimitedBattery, NO_GENERATOR, {});
+    assert.ok(limited.unmetLoadKwh > unlimited.unmetLoadKwh, 'deşarj kW limiti unmet load artırmalı');
+    assert.ok(limited.batteryDischargeLimitedKwh > 0, 'deşarj kW limit metriği dolmalı');
+  });
+
+  it('maxChargePowerKw PV kırpılmasını artırır', () => {
+    const batterySlow = { usableCapacityKwh: 20, efficiency: 1.0, socReserveKwh: 0, initialSocKwh: 0, maxChargePowerKw: 0.2 };
+    const batteryFast = { ...batterySlow, maxChargePowerKw: 20 };
+    const pv = makeDaytimePvHourly(40);
+    const load = makeLoadHourly(2);
+    const critical = makeLoadHourly(1);
+    const slow = runOffgridDispatch(pv, load, critical, batterySlow, NO_GENERATOR, {});
+    const fast = runOffgridDispatch(pv, load, critical, batteryFast, NO_GENERATOR, {});
+    assert.ok(slow.curtailedPvKwh > fast.curtailedPvKwh, 'şarj kW limiti curtailed PV artırmalı');
+    assert.ok(slow.batteryChargeLimitedKwh > 0, 'şarj kW limit metriği dolmalı');
+  });
+
+  it('inverter AC limiti enerji yeterliyken bile kapsama düşürür', () => {
+    const battery = { usableCapacityKwh: 1000, efficiency: 1.0, socReserveKwh: 0, initialSocKwh: 1000, maxDischargePowerKw: 20 };
+    const pv = makeLoadHourly(240); // 10 kWh/h
+    const load = makeLoadHourly(240);
+    const critical = makeLoadHourly(120);
+    const limited = runOffgridDispatch(pv, load, critical, battery, NO_GENERATOR, { inverterAcLimitKw: 2, inverterSurgeMultiplier: 1 });
+    const unlimited = runOffgridDispatch(pv, load, critical, battery, NO_GENERATOR, {});
+    assert.ok(limited.totalLoadCoverage < unlimited.totalLoadCoverage, 'inverter limiti kapsamayı düşürmeli');
+    assert.ok(limited.inverterPowerLimitedLoadKwh > 0, 'inverter limit metriği dolmalı');
+  });
+
+  it('jeneratör dahil kapsama PV+BESS kapsamasından ayrı raporlanır', () => {
+    const tinyBattery = { usableCapacityKwh: 1, efficiency: 0.9, socReserveKwh: 0.1, initialSocKwh: 1, maxDischargePowerKw: 1 };
+    const pv = makeLoadHourly(1);
+    const load = makeLoadHourly(10);
+    const critical = makeLoadHourly(5);
+    const result = runOffgridDispatch(pv, load, critical, tinyBattery, WITH_GENERATOR, {});
+    assert.ok(result.totalLoadCoverage > result.solarBatteryLoadCoverage, 'jeneratör dahil kapsama ayrı artmalı');
+    assert.ok(result.criticalLoadCoverage >= result.solarBatteryCriticalCoverage, 'kritik kapsamada jeneratör katkısı ayrı görünmeli');
   });
 });
 
@@ -345,6 +411,8 @@ describe('buildOffgridResults', () => {
     const result = buildOffgridResults(normal, null, loadProfile, { enabled: false }, { systemCapexTry: 50000, alternativeEnergyCostPerKwh: 15 });
     assert.equal(result.methodologyNote, 'synthetic-dispatch-pre-feasibility');
     assert.ok(result.dispatchVersion.startsWith('OGD-'), 'dispatchVersion başlangıcı');
+    assert.equal(typeof result.pvBatteryLoadCoverage, 'number');
+    assert.equal(typeof result.minimumSoc, 'number');
   });
 
   it('badWeatherScenario null olabilir', () => {

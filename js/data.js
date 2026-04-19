@@ -176,10 +176,41 @@ export const COMPASS_DIRS = [
   { name: "Kuzeybatı", azimuth: 315, coeff: 0.70, angle: 225 }
 ];
 
+// PSH (Peak Sun Hours/day) fallback tüm 81 il için genişletildi.
+// Kaynak: TURKISH_CITIES GHI (kWh/m²/yıl) / 365. Orijinal 12 şehir PVGIS bazlı
+// değerleri korundu; yeni iller GHI/365 formülüyle hesaplandı.
 export const PSH_FALLBACK = {
-  "İstanbul":4.24,"Ankara":4.44,"İzmir":4.71,"Antalya":4.93,"Bursa":4.32,
-  "Adana":4.87,"Konya":4.60,"Gaziantep":4.99,"Şanlıurfa":5.15,"Mersin":4.90,
-  "Diyarbakır":4.79,"Trabzon":3.62,"default":4.50
+  // Marmara
+  "İstanbul":4.24,"Edirne":4.08,"Tekirdağ":4.08,"Kırklareli":4.03,
+  "Çanakkale":4.27,"Bursa":4.32,"Balıkesir":4.33,"Bilecik":4.14,
+  "Kocaeli":4.05,"Sakarya":4.11,"Düzce":3.89,"Bolu":4.00,
+  "Bartın":3.81,"Karabük":3.95,"Zonguldak":3.78,
+  // İç Anadolu
+  "Ankara":4.44,"Eskişehir":4.33,"Kırıkkale":4.38,"Kırşehir":4.44,
+  "Çankırı":4.22,"Çorum":4.33,"Yozgat":4.33,"Amasya":4.16,
+  "Tokat":4.11,"Sivas":4.38,"Kayseri":4.52,"Nevşehir":4.52,
+  "Aksaray":4.49,"Niğde":4.52,"Konya":4.60,"Karaman":4.66,
+  "Afyonkarahisar":4.44,
+  // Ege
+  "İzmir":4.71,"Manisa":4.60,"Aydın":4.82,"Denizli":4.71,
+  "Muğla":4.88,"Kütahya":4.36,"Uşak":4.55,"Isparta":4.66,"Burdur":4.71,
+  // Akdeniz
+  "Antalya":4.93,"Mersin":4.90,"Adana":4.87,"Hatay":4.93,
+  "Osmaniye":4.82,"Kahramanmaraş":4.88,
+  // Karadeniz
+  "Trabzon":3.62,"Giresun":3.62,"Ordu":3.67,"Samsun":3.78,
+  "Sinop":3.78,"Kastamonu":3.97,"Rize":3.45,"Artvin":3.51,
+  "Gümüşhane":4.11,"Bayburt":4.16,
+  // Doğu Anadolu
+  "Erzurum":4.33,"Erzincan":4.49,"Malatya":4.71,"Elazığ":4.71,
+  "Van":4.66,"Bitlis":4.49,"Muş":4.44,"Bingöl":4.60,
+  "Tunceli":4.55,"Hakkari":4.66,"Kars":4.25,"Ardahan":4.05,
+  "Ağrı":4.44,"Iğdır":4.60,
+  // Güneydoğu Anadolu
+  "Şanlıurfa":5.15,"Gaziantep":4.99,"Diyarbakır":4.79,"Mardin":5.04,
+  "Adıyaman":4.93,"Batman":4.82,"Şırnak":4.82,"Siirt":4.82,
+  // default — Türkiye ortalaması
+  "default":4.50
 };
 
 export const CITY_SUMMER_TEMPS = {

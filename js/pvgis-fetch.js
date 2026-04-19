@@ -64,14 +64,14 @@ function buildUserMessage(errorType, lang) {
  * Returns a result object or null if the proxy is unavailable/fails quickly.
  */
 async function _tryBackendProxy(backendProxyUrl, baseParams, fetchImpl, timeoutMs) {
+  let timer = null;
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    timer = setTimeout(() => ctrl.abort(), timeoutMs);
     const res = await fetchImpl(`${backendProxyUrl}?${baseParams}`, {
       signal: ctrl.signal,
       headers: { accept: 'application/json' }
     });
-    clearTimeout(timer);
 
     if (!res.ok) return null;
 
@@ -90,6 +90,8 @@ async function _tryBackendProxy(backendProxyUrl, baseParams, fetchImpl, timeoutM
     };
   } catch {
     return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -156,11 +158,10 @@ export async function fetchPVGISLive(params, options = {}) {
     const endpoint = PVGIS_ENDPOINTS[Math.min(attempt, PVGIS_ENDPOINTS.length - 1)];
     const url = `${endpoint}?${baseParams}`;
 
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
       const res = await fetchImpl(url, { signal: ctrl.signal, credentials: 'omit', cache: 'no-store' });
-      clearTimeout(timer);
 
       if (!res.ok) {
         lastError = `HTTP ${res.status}`;
@@ -200,6 +201,8 @@ export async function fetchPVGISLive(params, options = {}) {
       lastError = e?.message || String(e);
       lastErrorType = etype;
       console.warn('[pvgis-fetch] Attempt', attempt + 1, 'failed:', etype, '-', e?.message);
+    } finally {
+      clearTimeout(timer);
     }
   }
 

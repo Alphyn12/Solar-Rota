@@ -99,14 +99,23 @@ def select_ankara_with_search(page):
     assert "kWh/m²/yıl" in page.locator("#loc-bottom-ghi-val").inner_text()
 
 
-def run_click_flow_to_results(page):
+def run_click_flow_to_results(
+    page,
+    *,
+    roof_area="80",
+    design_target="bill-offset",
+    usable_roof_ratio="70",
+    settlement_date=None,
+    tariff_source_type="manual",
+    export_tariff="0",
+):
     page.click('.scenario-choice-card[data-scenario-key="on-grid"]')
     page.click("#step1-continue-btn")
     page.wait_for_function("window.state.step === 2")
     select_ankara_with_search(page)
     page.click("#step2-continue-btn")
     page.wait_for_function("window.state.step === 3")
-    page.fill("#roof-area", "80")
+    page.fill("#roof-area", roof_area)
     page.click(".step3-nav-sticky .btn-primary")
     page.wait_for_function("window.state.step === 4")
     assert page.locator(".panel-card").count() >= 3
@@ -120,7 +129,7 @@ def run_click_flow_to_results(page):
     page.select_option("#on-grid-subscriber-type", "commercial")
     page.select_option("#on-grid-usage-profile", "business-hours")
     page.fill("#on-grid-annual-consumption", "18000")
-    page.select_option("#on-grid-design-target", "bill-offset")
+    page.select_option("#on-grid-design-target", design_target)
     page.click('[data-on-grid-mode-btn="advanced"]')
     assert page.locator("#on-grid-advanced-fields").is_visible()
     # Verify new Turn-1 form fields exist
@@ -130,19 +139,31 @@ def run_click_flow_to_results(page):
     assert page.locator("#cost-source-type").count() == 1
     # Tariff mode must default to net-plus-fee so distribution fee is added (not gross/double-count)
     assert page.evaluate("window.state.tariffInputMode") == "net-plus-fee"
-    page.fill("#on-grid-usable-roof-ratio", "70")
+    page.fill("#on-grid-usable-roof-ratio", usable_roof_ratio)
     page.fill("#distribution-fee-input", "0.50")
+    page.select_option("#tariff-source-type", tariff_source_type)
+    page.fill("#export-tariff-input", export_tariff)
+    if settlement_date:
+        page.fill("#settlement-date", settlement_date)
+    else:
+        page.fill("#settlement-date", "")
     page.wait_for_function(
-        "window.state.subscriberType === 'commercial' && window.state.usageProfile === 'business-hours' && window.state.designTarget === 'bill-offset' && Math.round(window.state.usableRoofRatio * 100) === 70"
+        """([target, usablePct]) =>
+            window.state.subscriberType === 'commercial'
+            && window.state.usageProfile === 'business-hours'
+            && window.state.designTarget === target
+            && Math.round(window.state.usableRoofRatio * 100) === usablePct""",
+        arg=[design_target, int(float(usable_roof_ratio))]
     )
     page.fill("#tariff-input", "8.44")
     page.wait_for_function("Math.abs(window.state.tariff - 8.94) < 0.001")
-    page.click(".calc-cta-btn")
+    page.click('[data-testid="calculate-results"]')
     try:
         page.wait_for_function(
             "document.getElementById('step-7')?.classList.contains('active') && window.state.results",
             timeout=30000,
         )
+        page.wait_for_function("!window.isCalculationInProgress?.()")
     except Exception as exc:
         debug_state = page.evaluate(
             """() => ({
@@ -165,6 +186,50 @@ def run_click_flow_to_results(page):
     page.wait_for_timeout(800)
 
 
+def assert_on_grid_economics(page, *, expected_design_target, settlement_expected):
+    summary = page.evaluate(
+        """() => {
+            const r = window.state?.results || {};
+            const tm = r.tariffModel || {};
+            const readiness = r.quoteReadiness || {};
+            const blockers = readiness.blockers || [];
+            const comp = r.compensationSummary || {};
+            const layout = r.authoritativeProduction?.layoutSnapshot || r.engineParity?.layoutSnapshot || null;
+            return {
+                step: window.state?.step,
+                settlementProvisional: Boolean(r.settlementProvisional),
+                settlementAssumptionBasis: r.settlementAssumptionBasis || null,
+                readinessStatus: readiness.status || null,
+                settlementMissingBlocker: blockers.some(b => String(b).includes('SETTLEMENT_DATE_MISSING')),
+                compensationSummary: comp,
+                annualSavings: r.annualSavings,
+                firstYearGrossSavings: r.firstYearGrossSavings,
+                firstYearNetCashFlow: r.firstYearNetCashFlow,
+                nmMetrics: r.nmMetrics || {},
+                settlementInterval: tm.exportCompensationPolicy?.interval || null,
+                designTarget: window.state?.designTarget,
+                layoutSnapshot: layout
+            };
+        }"""
+    )
+    assert summary["step"] == 7, summary
+    assert summary["designTarget"] == expected_design_target, summary
+    assert summary["settlementProvisional"] is settlement_expected["provisional"], summary
+    assert summary["settlementMissingBlocker"] is settlement_expected["missing_blocker"], summary
+    if settlement_expected["provisional"]:
+        assert summary["settlementAssumptionBasis"], summary
+    else:
+        assert summary["settlementAssumptionBasis"] != "auto-settlement-date-missing-assumed-monthly-for-preliminary-economics", summary
+    assert summary["annualSavings"] == summary["firstYearGrossSavings"], summary
+    assert summary["firstYearNetCashFlow"] is not None, summary
+    assert summary["nmMetrics"].get("importOffsetEnergy", 0) >= 0, summary
+    assert summary["nmMetrics"].get("paidGridExport", 0) >= 0, summary
+    assert summary["compensationSummary"].get("compensatedConsumptionEnergy", 0) >= 0, summary
+    assert page.locator("#on-grid-result-layers .on-grid-result-card").count() == 4
+    result_text = page.locator("#on-grid-result-layers").inner_text()
+    assert "Mahsuplaşma" in result_text or "Settlement" in result_text, result_text
+
+
 def desktop_backend_flow(browser, base_url):
     ctx = browser.new_context(viewport={"width": 1366, "height": 900}, service_workers="block", accept_downloads=True)
     page = ctx.new_page()
@@ -174,8 +239,21 @@ def desktop_backend_flow(browser, base_url):
     install_backend_routes(page)
     page.goto(f"{base_url}/index.html", wait_until="networkidle")
 
-    run_click_flow_to_results(page)
+    run_click_flow_to_results(
+        page,
+        roof_area="80",
+        design_target="bill-offset",
+        usable_roof_ratio="70",
+        settlement_date="2026-04-01",
+        tariff_source_type="official",
+        export_tariff="0",
+    )
     assert page.evaluate("window.state.step") == 7
+    assert_on_grid_economics(
+        page,
+        expected_design_target="bill-offset",
+        settlement_expected={"provisional": False, "missing_blocker": False},
+    )
     assert "pvlib-backed" in page.locator("#result-engine-source").inner_text()
     assert int(page.locator("#kpi-energy").inner_text().replace(".", "").replace(",", "")) > 0
     assert page.locator("#audit-panel-card").count() == 1
@@ -230,8 +308,21 @@ def backend_unavailable_fallback_flow(browser, base_url):
     install_common_routes(page)
     page.route("http://127.0.0.1:8000/**", lambda route: route.abort())
     page.goto(f"{base_url}/index.html", wait_until="networkidle")
-    run_click_flow_to_results(page)
+    run_click_flow_to_results(
+        page,
+        roof_area="45",
+        design_target="fill-roof",
+        usable_roof_ratio="60",
+        settlement_date=None,
+        tariff_source_type="manual",
+        export_tariff="0",
+    )
     assert page.evaluate("window.state.backendEngineAvailable") is False
+    assert_on_grid_economics(
+        page,
+        expected_design_target="fill-roof",
+        settlement_expected={"provisional": True, "missing_blocker": True},
+    )
     assert "PVGIS-based" in page.locator("#result-engine-source").inner_text()
     assert page.locator("#on-grid-result-layers .on-grid-result-card").count() == 4
     assert_no_overflow(page, "mobile fallback results")

@@ -252,11 +252,16 @@ function renderBESSResults(bess) {
     ? `<span>${escapeHtml(i18n.t('offGrid.autonomousDaysNote'))}: <strong>${bess.autonomousDaysPct}%</strong> (${bess.autonomousDays} gün/yıl)</span>
     <span>${escapeHtml(i18n.t('offGrid.nightCoverageNote'))}: <strong>${Number(bess.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh/${escapeHtml(i18n.t('units.year'))}</strong></span>`
     : '';
+  const offgridPowerHtml = isOffGrid
+    ? `<span>${escapeHtml(i18n.t('offgridL2.batteryPowerLimitLabel'))}: <strong>${bess.batteryMaxChargeKw || '—'} / ${bess.batteryMaxDischargeKw || '—'} kW</strong></span>
+       <span>${escapeHtml(i18n.t('offgridL2.inverterLimitLabel'))}: <strong>${bess.inverterAcLimitKw || '—'} kW AC</strong></span>`
+    : '';
   document.getElementById('bess-detail-row').innerHTML = `
     <span>Kullanılabilir kapasite: <strong>${bess.usableCapacity} kWh</strong></span>
     <span>Yıllık batarya deşarjı: <strong>${Number(bess.batteryStored || 0).toLocaleString(localeTag())} kWh</strong></span>
     <span>Tahmini çevrim/yıl: <strong>${bess.cyclesPerYear || '—'}</strong></span>
     <span>Batarya maliyeti: <strong>${money(bess.batteryCost)}</strong></span>
+    ${offgridPowerHtml}
     ${autonomyHtml}
     ${isOffGrid ? `<div class="off-grid-honesty-note">${escapeHtml(i18n.t('offGrid.syntheticDispatchNote'))}</div><div class="off-grid-honesty-note off-grid-honesty-warn">${escapeHtml(i18n.t('offGrid.notFeasibilityAnalysis'))}</div>` : ''}
   `;
@@ -315,8 +320,10 @@ function renderOffgridL2Results(offgridL2Results, state) {
         `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genRunHours'))}: <strong style="color:var(--text)">${hoursStr} h/yıl</strong></span>`,
         `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genFuelCost'))}: <strong style="color:var(--text)">${money(L.generatorFuelCostAnnual)} / yıl</strong></span>`,
         `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genKwh'))}: <strong style="color:var(--text)">${kwhStr} kWh/yıl</strong></span>`,
+        `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.generatorCapex'))}: <strong style="color:var(--text)">${money(L.generatorCapex || 0)}</strong></span>`,
+        L.generatorCapexMissing ? `<span style="color:#F59E0B">${escapeHtml(i18n.t('offgridL2.generatorCapexMissing'))}</span>` : '',
         `<div style="margin-top:6px;font-size:0.72rem;color:var(--text-muted);font-style:italic;width:100%">${escapeHtml(narrative)}</div>`,
-      ].join('');
+      ].filter(Boolean).join('');
     } else {
       genResultWrap.style.display = 'none';
     }
@@ -377,8 +384,15 @@ function renderOffgridL2Results(offgridL2Results, state) {
     const items = [
       stat(i18n.t('offgridL2.resultTotalLoad'), `${Math.round(L.annualTotalLoadKwh || 0).toLocaleString(locale)} kWh/yıl`, 'var(--text)'),
       L.annualCriticalLoadKwh > 0 ? stat(i18n.t('offgridL2.resultCriticalLoad'), `${Math.round(L.annualCriticalLoadKwh).toLocaleString(locale)} kWh/yıl`, '#EF4444') : '',
+      stat(i18n.t('offgridL2.pvBessCoverageLabel'), `${((L.pvBatteryLoadCoverage ?? L.totalLoadCoverage) * 100).toFixed(1)}%`, '#22C55E'),
+      stat(i18n.t('offgridL2.pvBessCriticalCoverageLabel'), `${((L.pvBatteryCriticalCoverage ?? L.criticalLoadCoverage) * 100).toFixed(1)}%`, '#22C55E'),
       stat(i18n.t('offgridL2.directPvLabel'), `${Math.round(L.directPvKwh || 0).toLocaleString(locale)} kWh/yıl`, '#F59E0B'),
       stat(i18n.t('offgridL2.batteryLabel'), `${Math.round(L.batteryKwh || 0).toLocaleString(locale)} kWh/yıl`, '#8B5CF6'),
+      L.minimumSoc != null ? stat(i18n.t('offgridL2.minSocLabel'), `${(L.minimumSoc * 100).toFixed(1)}%`, '#94A3B8') : '',
+      L.averageSoc != null ? stat(i18n.t('offgridL2.avgSocLabel'), `${(L.averageSoc * 100).toFixed(1)}%`, '#94A3B8') : '',
+      L.inverterAcLimitKw != null ? stat(i18n.t('offgridL2.inverterLimitLabel'), `${Number(L.inverterAcLimitKw).toFixed(1)} kW AC`, '#F59E0B') : '',
+      L.batteryMaxChargeKw != null || L.batteryMaxDischargeKw != null ? stat(i18n.t('offgridL2.batteryPowerLimitLabel'), `${L.batteryMaxChargeKw ?? '—'} / ${L.batteryMaxDischargeKw ?? '—'} kW`, '#8B5CF6') : '',
+      (L.inverterPowerLimitedKwh || 0) > 0 ? stat(i18n.t('offgridL2.powerLimitedLabel'), `${Math.round(L.inverterPowerLimitedKwh).toLocaleString(locale)} kWh (${L.inverterPowerLimitHours || 0} h)`, '#EF4444') : '',
       L.autonomousDays != null ? stat(i18n.t('offgridL2.resultAutonomousDays'), `${L.autonomousDays} gün (${L.autonomousDaysPct != null ? L.autonomousDaysPct.toFixed(1) : '—'}%)`, '#22C55E') : '',
       L.cyclesPerYear != null ? stat(i18n.t('offgridL2.resultCyclesPerYear'), L.cyclesPerYear.toFixed(0), 'var(--text-muted)') : '',
     ].filter(Boolean);
@@ -400,7 +414,12 @@ function renderOffgridL2Results(offgridL2Results, state) {
           <span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.criticalDeviceCount'))}: <strong style="color:#EF4444">${L.criticalDeviceCount || 0}</strong></span>
         </div>`;
     } else {
-      deviceMetricsEl.style.display = 'none';
+      if (L.loadMode === 'hourly-8760') {
+        deviceMetricsEl.style.display = '';
+        deviceMetricsEl.innerHTML = `<div style="font-size:0.75rem;color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.loadSourceHourly'))}</div>`;
+      } else {
+        deviceMetricsEl.style.display = 'none';
+      }
     }
   }
 
@@ -424,7 +443,12 @@ function renderOffgridL2Results(offgridL2Results, state) {
   const sourceTransEl = document.getElementById('offgrid-source-transparency');
   if (sourceTransEl) {
     const prodSource = L.productionSourceLabel || (L.productionFallback ? i18n.t('pvgis.fallbackUsed') : i18n.t('pvgis.liveSuccess'));
-    const loadSrc = L.loadMode === 'device-list' ? i18n.t('offgridL2.loadSourceDeviceList') : i18n.t('offgridL2.loadSourceSimple');
+    const loadSrc = L.loadMode === 'hourly-8760'
+      ? i18n.t('offgridL2.loadSourceHourly')
+      : (L.loadMode === 'device-list' ? i18n.t('offgridL2.loadSourceDeviceList') : i18n.t('offgridL2.loadSourceSimple'));
+    const dispatchLabel = L.dispatchType === 'hourly-8760-dispatch'
+      ? i18n.t('offgridL2.dispatchHourly')
+      : i18n.t('offgridL2.syntheticDispatch');
     const parityText = L.parityAvailable
       ? `<span style="color:#22C55E">✓ ${escapeHtml(i18n.t('offgridL2.parityAvailable'))}</span>`
       : `<span style="color:#94A3B8">${escapeHtml(i18n.t('offgridL2.parityNotAvailable'))}</span>`;
@@ -436,7 +460,7 @@ function renderOffgridL2Results(offgridL2Results, state) {
       <div style="font-size:0.72rem;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:10px;align-items:center">
         <span>${escapeHtml(i18n.t('offgridL2.productionSource'))}: <strong style="color:var(--text)">${escapeHtml(prodSource)}</strong>${fallbackBadge}</span>
         <span>${escapeHtml(i18n.t('offgridL2.loadSourceLabel'))}: <strong style="color:var(--text)">${escapeHtml(loadSrc)}</strong></span>
-        <span>${escapeHtml(i18n.t('offgridL2.dispatchLabel'))}: <strong style="color:var(--text)">${escapeHtml(i18n.t('offgridL2.syntheticDispatch'))}</strong></span>
+        <span>${escapeHtml(i18n.t('offgridL2.dispatchLabel'))}: <strong style="color:var(--text)">${escapeHtml(dispatchLabel)}</strong></span>
         ${parityText}
       </div>
       <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;font-size:0.68rem;color:var(--text-muted)">
@@ -451,7 +475,9 @@ function renderOffgridL2Results(offgridL2Results, state) {
   if (versionEl) versionEl.textContent = L.dispatchVersion || '';
   const loadModeEl = document.getElementById('offgrid-l2-load-mode');
   if (loadModeEl) {
-    const modeKey = L.loadMode === 'device-list' ? 'offgridL2.loadModeDeviceList' : 'offgridL2.loadModeSimple';
+    const modeKey = L.loadMode === 'hourly-8760'
+      ? 'offgridL2.loadModeHourly'
+      : (L.loadMode === 'device-list' ? 'offgridL2.loadModeDeviceList' : 'offgridL2.loadModeSimple');
     loadModeEl.textContent = i18n.t(modeKey);
   }
 }
@@ -533,6 +559,7 @@ function renderOnGridResultLayers(state, r) {
   const roofAreaTotal = (Number(state.roofArea) || 0) + (state.multiRoof ? (state.roofSections || []).reduce((s, sec) => s + (Number(sec.area) || 0), 0) : 0);
   const panelArea = (PANEL_TYPES[state.panelType]?.width || 0) * (PANEL_TYPES[state.panelType]?.height || 0) * (Number(r.panelCount) || 0);
   const roofUsePct = roofAreaTotal > 0 ? Math.min(100, panelArea / roofAreaTotal * 100) : 0;
+  const comp = r.compensationSummary || {};
   const exportText = `${Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString(localeTag())} / ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag())} kWh`;
   const readinessStatus = statusLabel(r.quoteReadiness?.status || 'not-quote-ready');
   const blockers = localizeMessageList(r.quoteReadiness?.blockers || []).slice(0, 4);
@@ -574,6 +601,9 @@ function renderOnGridResultLayers(state, r) {
   // Tariff mode display
   const tariffInputMode = r.tariffInputMode || state.tariffInputMode || 'net-plus-fee';
   const tariffModeText = tariffInputMode === 'gross' ? i18n.t('onGridResult.tariffModeGross') : i18n.t('onGridResult.tariffModeNet');
+  const settlementBasisText = r.settlementProvisional
+    ? i18n.t('onGridResult.settlementProvisional')
+    : `${comp.settlementInterval || r.tariffModel?.exportCompensationPolicy?.interval || '—'}${comp.annualExportCapKwh ? ` / ${Math.round(comp.annualExportCapKwh).toLocaleString(localeTag())} kWh cap` : ''}`;
 
   // Tariff source display
   const tariffSourceType = assessment.tariffSourceType;
@@ -627,6 +657,8 @@ function renderOnGridResultLayers(state, r) {
         <div class="on-grid-result-metric"><strong>${Number(r.panelCount || 0).toLocaleString(localeTag())}</strong><span>${escapeHtml(i18n.t('onGridResult.panelCount'))}</span></div>
         <div class="on-grid-result-metric"><strong>${Number(r.annualEnergy || 0).toLocaleString(localeTag())} kWh</strong><span>${escapeHtml(i18n.t('onGridResult.annualProduction'))}</span></div>
         <div class="on-grid-result-metric"><strong>${r.nmMetrics?.selfConsumptionPct || 0}%</strong><span>${escapeHtml(i18n.t('onGridResult.selfConsumption'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${Math.round(comp.directSelfConsumptionKwh || 0).toLocaleString(localeTag())} kWh</strong><span>${escapeHtml(i18n.t('onGridResult.directSelfConsumption'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${Math.round(comp.importOffsetKwh || 0).toLocaleString(localeTag())} kWh</strong><span>${escapeHtml(i18n.t('onGridResult.monthlyOffset'))}</span></div>
         <div class="on-grid-result-metric"><strong>${exportText}</strong><span>${escapeHtml(i18n.t('onGridResult.exportableEnergy'))}</span></div>
         <div class="on-grid-result-metric"><strong>${roofUsePct.toFixed(1)}%</strong><span>${escapeHtml(i18n.t('onGridResult.roofUse'))} · ${escapeHtml(multiRoofNote)}</span></div>
         <div class="on-grid-result-metric"><strong>${r.ysp} kWh/kWp</strong><span>${escapeHtml(i18n.t('onGridResult.specificYield'))}</span></div>
@@ -641,11 +673,13 @@ function renderOnGridResultLayers(state, r) {
         <div class="on-grid-result-metric"><strong>${money(r.totalCost)}</strong><span>${escapeHtml(i18n.t('onGridResult.totalCost'))}</span></div>
         <div class="on-grid-result-metric"><strong>${money(r.financialCostBasis || r.totalCost)}</strong><span>${escapeHtml(i18n.t('onGridResult.financialBasis'))}</span></div>
         <div class="on-grid-result-metric"><strong>${money(r.annualSavings)}</strong><span>${escapeHtml(i18n.t('onGridResult.annualSavings'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${money(r.firstYearNetCashFlow ?? 0)}</strong><span>${escapeHtml(i18n.t('onGridResult.firstYearNetCashFlow'))}</span></div>
         <div class="on-grid-result-metric"><strong>${r.simplePaybackYear || '>25'} ${escapeHtml(i18n.t('units.year'))}</strong><span>${escapeHtml(i18n.t('finance.simplePayback'))}</span></div>
         <div class="on-grid-result-metric"><strong>${money(r.npvTotal)}</strong><span>NPV</span></div>
         <div class="on-grid-result-metric"><strong>${r.irr === 'N/A' ? 'N/A' : r.irr + '%'}</strong><span>IRR</span></div>
-        <div class="on-grid-result-metric"><strong>${moneyRate(r.lcoe, 'kWh')}</strong><span>LCOE</span></div>
+        <div class="on-grid-result-metric"><strong>${moneyRate(r.lcoe, 'kWh')}</strong><span>${escapeHtml(i18n.t('onGridResult.lcoeLabel'))}</span></div>
         <div class="on-grid-result-metric"><strong>${r.roi}%</strong><span>${escapeHtml(i18n.t('onGridResult.roiLabel'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${escapeHtml(settlementBasisText)}</strong><span>${escapeHtml(i18n.t('onGridResult.settlementBasisLabel'))}</span></div>
         <div class="on-grid-result-metric"><strong>${escapeHtml(tariffModeText)}</strong><span>${escapeHtml(i18n.t('onGridResult.tariffModeNet').replace('Enerji bedeli + ', '').replace('Energy rate + ', '').replace('Energiepreis + ', '') || 'Tarife modu')}</span></div>
         <div class="on-grid-result-metric"><strong><span class="${costSourceClass}">${escapeHtml(costSourceText)}</span></strong><span>${escapeHtml(i18n.t('onGridResult.costConfidenceLabel'))}</span></div>
       </div>
@@ -660,6 +694,7 @@ function renderOnGridResultLayers(state, r) {
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.tariffSourceLabel'))}</span><span class="${tariffSourceClass}">${escapeHtml(tariffSourceText)}</span></div>
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.shadowQualityLabel'))}</span><span class="${shadowClass}">${escapeHtml(shadowText)}</span></div>
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.costConfidenceLabel'))}</span><span class="${costSourceClass}">${escapeHtml(costSourceText)}</span></div>
+        <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.settlementBasisLabel'))}</span><span class="${r.settlementProvisional ? 'data-source-warn' : 'data-source-good'}">${escapeHtml(settlementBasisText)}</span></div>
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.parityLabel'))}</span><span class="${parityRowClass}">${escapeHtml(parityRowText || i18n.t('onGridResult.parityUnavailable'))}</span></div>
       </div>
       ${engineParityHtml}
@@ -766,8 +801,11 @@ function renderWarningsAndAudit(state, r) {
     : isOffGrid
       ? i18n.t('audit.selfConsumptionOffGrid')
       : i18n.t('audit.selfConsumptionSurplus');
-  const energyBalanceValue = state.netMeteringEnabled
-    ? `${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh / paid ${Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString(localeTag())} kWh / total ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag())} kWh`
+  const L2 = isOffGrid ? r.offgridL2Results : null;
+  const energyBalanceValue = L2
+    ? `${i18n.t('offgridL2.pvBessCoverageLabel')}: ${((L2.pvBatteryLoadCoverage ?? L2.totalLoadCoverage) * 100).toFixed(1)}% / ${i18n.t('offgridL2.generatorLabel')}: ${Math.round(L2.generatorEnergyKwh || L2.generatorKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.unservedLoad')}: ${Math.round(L2.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.curtailedPv')}: ${Math.round(L2.curtailedPvKwh || 0).toLocaleString(localeTag())} kWh`
+    : state.netMeteringEnabled
+    ? `${Math.round(r.nmMetrics?.directSelfConsumedEnergy || r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh direct / offset ${Math.round(r.nmMetrics?.importOffsetEnergy || 0).toLocaleString(localeTag())} kWh / paid ${Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString(localeTag())} kWh / total ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag())} kWh`
     : isOffGrid
       ? `${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.unservedLoad')}: ${Math.round(r.bessMetrics?.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.curtailedPv')}: ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag())} kWh`
       : `${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.exportRevenueDisabled')}`;
@@ -780,6 +818,7 @@ function renderWarningsAndAudit(state, r) {
       <tbody>
         <tr><td>${escapeHtml(i18n.t('audit.location'))}</td><td>${escapeHtml(state.cityName || '—')} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
         <tr><td>${escapeHtml(i18n.t('audit.tariff'))}</td><td>${escapeHtml(r.tariffModel?.type || state.tariffType)} | ${escapeHtml(r.tariffModel?.effectiveRegime || '—')} | ${moneyRate(r.tariff, 'kWh')} | ${escapeHtml(i18n.t('audit.source'))}: ${escapeHtml(r.tariffModel?.sourceDate || '—')}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('audit.regulationEngine'))}</td><td>${escapeHtml(r.tariffModel?.regulation?.effectiveRegimeBasis || '—')} | SKTT activation: ${escapeHtml(r.tariffModel?.regulation?.activationDate || '—')} | eval: ${escapeHtml(r.tariffModel?.regulation?.evaluationDate || '—')}</td></tr>
         <tr><td>${escapeHtml(i18n.t('audit.consumption'))}</td><td>${Math.round(r.hourlySummary?.annualLoad || state.dailyConsumption * 365).toLocaleString(localeTag())} kWh/${escapeHtml(i18n.t('units.year'))}</td></tr>
         <tr><td>${escapeHtml(energyBalanceLabel)}</td><td>${escapeHtml(energyBalanceValue)}</td></tr>
         <tr><td>${escapeHtml(i18n.t('audit.productionConfidenceRange'))}</td><td>${escapeHtml(i18n.t('audit.badYear'))}: ${Math.round(r.annualEnergy * 0.90).toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.baseYear'))}: ${r.annualEnergy.toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.goodYear'))}: ${Math.round(r.annualEnergy * 1.10).toLocaleString(localeTag())} kWh</td></tr>
@@ -789,7 +828,7 @@ function renderWarningsAndAudit(state, r) {
         <tr><td>${escapeHtml(i18n.t('engine.parity'))}</td><td>${escapeHtml(parityText)}</td></tr>
         <tr><td>${escapeHtml(i18n.t('engine.fallbackReason'))}</td><td>${escapeHtml(localizeKnownMessage(r.authoritativeEngineFallbackReason || '—'))}</td></tr>
         <tr><td>${escapeHtml(i18n.t('governance.quoteReadiness'))}</td><td>${escapeHtml(statusLabel(r.quoteReadiness?.status || '—'))}${quoteBlockers.length ? ' | ' + escapeHtml(quoteBlockers.join(' · ')) : ''}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('audit.regulationEngine'))}</td><td>${escapeHtml(r.quoteReadiness?.version || r.tariffModel?.exportCompensationPolicy?.version || '—')}</td></tr>
+        <tr><td>${escapeHtml(i18n.t('audit.regulationEngine'))}</td><td>${escapeHtml(r.quoteReadiness?.version || r.tariffModel?.exportCompensationPolicy?.version || '—')} | ${escapeHtml(r.tariffModel?.exportCompensationPolicy?.assumptionBasis || '—')}</td></tr>
         <tr><td>${escapeHtml(i18n.t('audit.tariffSourceGovernance'))}</td><td>${escapeHtml(tariffSource.sourceLabel || '—')} | ${escapeHtml(i18n.t('audit.sourceAge'))}: ${tariffSource.ageDays ?? '—'} ${escapeHtml(i18n.t('units.year')) === 'year' ? 'days' : 'gün'} | ${escapeHtml(tariffFreshness)}</td></tr>
         <tr><td>${escapeHtml(i18n.t('governance.proposalConfidence'))}</td><td>${confidence.score ?? '—'} / 100 · ${escapeHtml(statusLabel(confidence.level || '—'))}</td></tr>
         <tr><td>${escapeHtml(i18n.t('governance.approvalState'))}</td><td>${escapeHtml(statusLabel(approval.state || 'draft'))}${approval.approvalRecord ? ' | immutable: ' + escapeHtml(approval.approvalRecord.id) : ''}${approvalBlockers.length ? ' | ' + escapeHtml(approvalBlockers.join(' · ')) : ''}</td></tr>
@@ -1103,6 +1142,7 @@ export function downloadPDF() {
   const kpis = [
     [pdfSafeText(i18n.t('report.annualProduction')), r.annualEnergy.toLocaleString(dateLocale) + ' kWh'],
     [pdfSafeText(i18n.t('report.annualSavings')), money(r.annualSavings)],
+    [pdfSafeText(i18n.t('onGridResult.firstYearNetCashFlow')), money(r.firstYearNetCashFlow ?? 0)],
     [pdfSafeText(i18n.t('report.systemPower')), r.systemPower.toFixed(2) + ' kWp'],
     [pdfSafeText(i18n.t('report.totalCost')), money(r.totalCost)],
     [pdfSafeText(i18n.t('report.simplePayback')), (r.simplePaybackYear || '>25') + ` ${yearUnit}`],
@@ -1113,6 +1153,17 @@ export function downloadPDF() {
     ['ROI', r.roi + '%'],
     [pdfSafeText(i18n.t('report.co2Savings')), r.co2Savings + ` ${i18n.t('units.tonsCo2PerYear')}`],
   ];
+  if (state.scenarioKey === 'off-grid' && r.offgridL2Results) {
+    const L = r.offgridL2Results;
+    kpis.push(
+      [pdfSafeText(i18n.t('offgridL2.pvBessCoverageLabel')), `${((L.pvBatteryLoadCoverage ?? L.totalLoadCoverage) * 100).toFixed(1)}%`],
+      [pdfSafeText(i18n.t('offgridL2.totalCoverageWithGeneratorLabel')), `${(L.totalLoadCoverage * 100).toFixed(1)}%`],
+      [pdfSafeText(i18n.t('offgridL2.generatorLabel')), `${Math.round(L.generatorEnergyKwh || L.generatorKwh || 0).toLocaleString(dateLocale)} kWh`],
+      [pdfSafeText(i18n.t('offgridL2.unmetLabel')), `${Math.round(L.unmetLoadKwh || 0).toLocaleString(dateLocale)} kWh`]
+    );
+  } else {
+    kpis.push([pdfSafeText(i18n.t('onGridResult.settlementBasisLabel')), pdfSafeText(r.settlementProvisional ? i18n.t('onGridResult.settlementProvisional') : (r.tariffModel?.exportCompensationPolicy?.assumptionBasis || '—'))]);
+  }
 
   let y = 72;
   doc.setFontSize(9);
@@ -1152,18 +1203,21 @@ export function downloadPDF() {
   doc.text(pdfSafeText(i18n.t('report.costBreakdown')), 20, y); y += 8;
   doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   const cb = r.costBreakdown;
+  const costDenominator = cb.totalWithBatteryAndGenerator || cb.totalWithBattery || cb.total || 1;
   const costRows = [
     ['Panel', cb.panel], ['Inverter', cb.inverter],
     [i18n.t('report.mounting'), cb.mounting], ['DC Cable', cb.dcCable],
     ['AC Electrical', cb.acElec], [i18n.t('report.labor'), cb.labor],
     ['TEDAŞ + Permit', cb.permits], [`VAT/KDV (%${Math.round((cb.kdvRate ?? 0.20) * 100)})`, cb.kdv],
-    [i18n.t('report.grandTotal'), cb.total]
+    ...(cb.battery ? [[i18n.t('offgridL2.batteryLabel'), cb.battery]] : []),
+    ...(cb.generatorCapex ? [[i18n.t('offgridL2.generatorCapex'), cb.generatorCapex]] : []),
+    [i18n.t('report.grandTotal'), costDenominator]
   ];
   costRows.forEach(([lbl, val]) => {
     doc.setTextColor(148, 163, 184);
     doc.text(pdfSafeText(lbl), 25, y);
     const w = 40;
-    const barW = Math.min((val / cb.total) * w, w);
+    const barW = Math.min((val / costDenominator) * w, w);
     doc.setFillColor(245, 158, 11); doc.rect(75, y - 3, barW * 1.2, 4, 'F');
     doc.setTextColor(241, 245, 249);
     doc.text(money(Math.round(val)), 165, y);

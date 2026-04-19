@@ -63,6 +63,7 @@ export function renderEngReport() {
   const panelUnit = report('panelCountUnit');
   const statusText = value => statusLabel(value);
   const financialRate = Number(r.financialSavingsRate || r.tariff || 0);
+  const comp = r.compensationSummary || {};
 
   let html = `
   <div class="eng-section-header">
@@ -215,11 +216,12 @@ P_stc: kWp, POA: kWh/m²/${escapeHtml(yearUnit)} → ${escapeHtml(report('dimens
     <div class="formula-body">LCOE = Σ(Cost_t/(1+d)ᵗ) ÷ Σ(E_t/(1+d)ᵗ)
 
 ${escapeHtml(i18n.t('report.totalCost'))} (${escapeHtml(report('year'))} 0): ${money(r.totalCost)}
+${escapeHtml(i18n.t('onGridResult.financialBasis'))}: ${money(r.financialCostBasis || r.totalCost)}
 ${escapeHtml(report('totalLifetimeExpenses'))}: ${money(r.totalExpenses25y)}
 ${escapeHtml(report('discountRate'))}: %${(r.discountRate*100).toFixed(0)}
 
 LCOE = ${moneyRate(r.lcoe, 'kWh')}</div>
-    <div class="formula-note">${escapeHtml(report('userTariff'))}: ${moneyRate(r.tariff, 'kWh')} (${escapeHtml(state.tariffType)}). ${escapeHtml(report('lcoeNote'))}${Number.isFinite(lcoeValue) ? ` ${escapeHtml(report('difference'))}: ${moneyRate(r.tariff - lcoeValue, 'kWh')}.` : ''}</div>
+    <div class="formula-note">${escapeHtml(report('userTariff'))}: ${moneyRate(r.tariff, 'kWh')} (${escapeHtml(state.tariffType)}). ${escapeHtml(report('lcoeNote'))} ${escapeHtml(i18n.t('onGridResult.lcoeLabel'))}.</div>
   </div>
   <div class="formula-card">
     <div class="formula-title">IRR — ${escapeHtml(report('irrTitle'))} (${escapeHtml(report('rootSearch'))})</div>
@@ -269,6 +271,7 @@ IRR = ${r.irr === 'N/A' ? escapeHtml(report('unableToCalculate')) : r.irr + '%'}
     <div class="formula-body">Eₜ = E₁ × (1−LID) × (1−δ)ⁿ⁻¹    LID=${r.lidFactor}%, δ=${(p.degradation*100).toFixed(2)}%/${escapeHtml(yearUnit)}
 Pₜ = P₀ × (1 + g)ᵗ⁻¹   g=${(r.annualPriceIncrease*100).toFixed(0)}%/${escapeHtml(yearUnit)}, P₀=${financialRate} TL/kWh
 ${escapeHtml(report(state.scenarioKey === 'off-grid' ? 'incomeFormulaOffGrid' : 'incomeFormula'))}
+${escapeHtml(i18n.t('onGridResult.directSelfConsumption'))}: ${fmt(comp.directSelfConsumptionKwh || 0)} kWh; ${escapeHtml(i18n.t('onGridResult.monthlyOffset'))}: ${fmt(comp.importOffsetKwh || 0)} kWh; ${escapeHtml(i18n.t('onGridResult.paidSurplus'))}: ${fmt(comp.paidExportKwh || 0)} kWh
 ${escapeHtml(report('expenseFormula'))}
 NCFₜ = ${escapeHtml(report('netCashFlow'))}
 NPVₜ = NCFₜ ÷ (1+d)ᵗ    d=${(r.discountRate*100).toFixed(0)}%
@@ -344,6 +347,35 @@ ${escapeHtml(report('batteryInstalledCost'))}: ${money(bm.batteryCost)}${offGrid
   </div>`;
   }
 
+  // ── 8b. Off-grid L2 dispatch source of truth ──────────────────────────────
+  if (state.scenarioKey === 'off-grid' && r.offgridL2Results) {
+    const L = r.offgridL2Results;
+    html += `
+  <div class="eng-section-header">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16"/><path d="M12 4v16"/><path d="M7 7l10 10"/><path d="M17 7L7 17"/></svg>
+    9. ${escapeHtml(i18n.t('offgridL2.dispatchLabel'))}
+  </div>
+  <div class="formula-card">
+    <div class="formula-title">${escapeHtml(i18n.t('offGrid.preFeasibilityOnly'))}</div>
+    <div class="formula-body">${escapeHtml(i18n.t('offgridL2.productionSource'))}: ${escapeHtml(L.productionSourceLabel || L.productionSource || '—')}
+${escapeHtml(i18n.t('offgridL2.loadSourceLabel'))}: ${escapeHtml(L.loadSource || L.loadMode || '—')}
+${escapeHtml(i18n.t('offgridL2.dispatchLabel'))}: ${escapeHtml(L.dispatchType || 'synthetic-8760-dispatch')}
+${escapeHtml(i18n.t('offgridL2.pvBessCoverageLabel'))}: ${((L.pvBatteryLoadCoverage ?? L.totalLoadCoverage) * 100).toFixed(1)}%
+${escapeHtml(i18n.t('offgridL2.totalCoverageWithGeneratorLabel'))}: ${(L.totalLoadCoverage * 100).toFixed(1)}%
+${escapeHtml(i18n.t('offgridL2.pvBessCriticalCoverageLabel'))}: ${((L.pvBatteryCriticalCoverage ?? L.criticalLoadCoverage) * 100).toFixed(1)}%
+${escapeHtml(i18n.t('offgridL2.criticalCoverageWithGeneratorLabel'))}: ${(L.criticalLoadCoverage * 100).toFixed(1)}%
+${escapeHtml(i18n.t('offgridL2.unmetLabel'))}: ${fmt(L.unmetLoadKwh || 0)} kWh/${escapeHtml(yearUnit)}
+${escapeHtml(i18n.t('offgridL2.curtailedLabel'))}: ${fmt(L.curtailedPvKwh || 0)} kWh/${escapeHtml(yearUnit)}
+${escapeHtml(i18n.t('offgridL2.generatorLabel'))}: ${fmt(L.generatorEnergyKwh || L.generatorKwh || 0)} kWh/${escapeHtml(yearUnit)}; ${escapeHtml(i18n.t('offgridL2.generatorCapex'))}: ${money(L.generatorCapex || 0)}
+${escapeHtml(i18n.t('offgridL2.minSocLabel'))}: ${L.minimumSoc != null ? (L.minimumSoc * 100).toFixed(1) + '%' : '—'}; ${escapeHtml(i18n.t('offgridL2.avgSocLabel'))}: ${L.averageSoc != null ? (L.averageSoc * 100).toFixed(1) + '%' : '—'}
+${escapeHtml(i18n.t('offgridL2.inverterLimitLabel'))}: ${L.inverterAcLimitKw || '—'} kW; ${escapeHtml(i18n.t('offgridL2.batteryPowerLimitLabel'))}: ${L.batteryMaxChargeKw || '—'} / ${L.batteryMaxDischargeKw || '—'} kW
+${escapeHtml(i18n.t('offgridL2.powerLimitedLabel'))}: ${fmt(L.inverterPowerLimitedKwh || 0)} kWh (${L.inverterPowerLimitHours || 0} h)
+
+${escapeHtml(i18n.t('offGrid.notFeasibilityAnalysis'))}</div>
+    <div class="formula-note">${escapeHtml(i18n.t('offGrid.syntheticDispatchNote'))}</div>
+  </div>`;
+  }
+
   // ── 9. Grid export / settlement ────────────────────────────────────────────
   if (r.nmMetrics && state.netMeteringEnabled) {
     const nm = r.nmMetrics;
@@ -358,11 +390,13 @@ ${escapeHtml(report('batteryInstalledCost'))}: ${money(bm.batteryCost)}${offGrid
     <div class="formula-body">${escapeHtml(report('annualProduction'))}: ${fmt(r.annualEnergy)} kWh
 ${escapeHtml(report('annualConsumption'))}: ${fmt(r.hourlySummary?.annualLoad || state.dailyConsumption * 365)} kWh
 ${escapeHtml(report('selfConsumptionRatio'))} = ${nm.selfConsumptionPct}%
+${escapeHtml(i18n.t('onGridResult.directSelfConsumption'))} = ${fmt(comp.directSelfConsumptionKwh || nm.directSelfConsumedEnergy || nm.selfConsumedEnergy || 0)} kWh
+${escapeHtml(i18n.t('onGridResult.monthlyOffset'))} = ${fmt(comp.importOffsetKwh || nm.importOffsetEnergy || 0)} kWh
 ${escapeHtml(report('annualExport'))} = ${fmt(nm.annualGridExport)} kWh
 ${escapeHtml(report('paidExport'))} = ${fmt(nm.paidGridExport || 0)} kWh
 ${escapeHtml(report('unpaidExport'))} = ${fmt(nm.unpaidGridExport || 0)} kWh
 
-${escapeHtml(report('settlementBasis'))}: ${escapeHtml(nm.systemType)}
+${escapeHtml(report('settlementBasis'))}: ${escapeHtml(nm.systemType)}${r.settlementProvisional ? `\n${escapeHtml(i18n.t('onGridResult.settlementProvisional'))}` : ''}
 ${escapeHtml(report('exportRevenue'))} = ${money(nm.annualExportRevenue)}/${escapeHtml(yearUnit)}</div>
     <div class="formula-result">✓ ${escapeHtml(tx('report.exportRevenueResult', { value: money(nm.annualExportRevenue) }))}</div>
   </div>`;

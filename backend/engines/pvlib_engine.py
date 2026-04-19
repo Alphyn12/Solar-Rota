@@ -9,13 +9,22 @@ from backend.engines.simple_engine import (
     bifacial_gain,
     cable_loss_factor,
     inverter_efficiency,
+    layout_snapshot,
     panel_area_m2,
     panel_watt_peak,
+    system_power_from_layout_snapshot,
 )
 from backend.models.engine_contracts import EngineRequest, EngineSource
 
 
 PVLIB_AVAILABLE = find_spec("pvlib") is not None
+
+# Temperature coefficients (P_max / °C) per panel technology — used for pvwatts_dc gamma_pdc
+PANEL_GAMMA_PDC: dict[str, float] = {
+    "mono": -0.0034,
+    "bifacial": -0.0028,
+    "poly": -0.0040,
+}
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -23,6 +32,9 @@ def _clamp(value: float, low: float, high: float) -> float:
 
 
 def _system_power_kwp(request: EngineRequest) -> tuple[float, int]:
+    snapshot_power = system_power_from_layout_snapshot(request)
+    if snapshot_power:
+        return snapshot_power
     explicit_kwp = getattr(request.system, "targetPowerKwp", None)
     if explicit_kwp:
         kwp = max(0, float(explicit_kwp))
@@ -200,11 +212,20 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
     cell_temp = pvlib.temperature.sapm_cell(poa_effective, ambient_temp, wind_speed, **temp_params)
 
     pdc0_w = system_power_kwp * 1000
+    _contract_coeff = getattr(request.system, "panelTempCoeffPerC", None)
+    if _contract_coeff is not None:
+        try:
+            _contract_coeff = float(_contract_coeff)
+            gamma_pdc = _contract_coeff if -0.01 <= _contract_coeff <= 0 else PANEL_GAMMA_PDC.get(request.system.panelType, -0.0037)
+        except (TypeError, ValueError):
+            gamma_pdc = PANEL_GAMMA_PDC.get(request.system.panelType, -0.0037)
+    else:
+        gamma_pdc = PANEL_GAMMA_PDC.get(request.system.panelType, -0.0037)
     pdc_w = pvlib.pvsystem.pvwatts_dc(
         effective_irradiance=poa_effective,
         temp_cell=cell_temp,
         pdc0=pdc0_w,
-        gamma_pdc=-0.0037,
+        gamma_pdc=gamma_pdc,
         temp_ref=25,
     ).clip(lower=0)
 
@@ -233,6 +254,10 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
         "contractPanelWattPeak": round(panel_watt_peak(request), 3),
         "contractPanelAreaM2": round(panel_area_m2(request), 4),
         "contractInverterEfficiency": round(inverter_eff, 4),
+        "layoutSnapshotUsed": bool(system_power_from_layout_snapshot(request)),
+        "layoutSnapshot": layout_snapshot(request),
+        "gammaPdc": round(gamma_pdc, 4),
+        "gammaPdcSource": "contract" if (_contract_coeff is not None and -0.01 <= float(_contract_coeff) <= 0) else "panel-type-map",
         "temperatureModel": "pvlib.sapm_cell.open_rack_glass_glass",
         "dcModel": "pvlib.pvsystem.pvwatts_dc",
         "transpositionModel": "pvlib.irradiance.haydavies",

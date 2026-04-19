@@ -1,5 +1,5 @@
-// v22: On-grid pre-feasibility flow, assumption layers and cache refresh.
-const CACHE_NAME = 'solarRota-v22';
+// v23: Stabilized test coverage and complete module precache list.
+const CACHE_NAME = 'solarRota-v23';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',
@@ -23,6 +23,7 @@ const STATIC_ASSETS = [
   '/js/crm-export.js',
   '/js/dashboard.js',
   '/js/data.js',
+  '/js/device-catalog.js',
   '/js/eng-report.js',
   '/js/ev-charging.js',
   '/js/evidence-governance.js',

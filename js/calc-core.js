@@ -341,12 +341,16 @@ export function simulateHourlyEnergy(monthlyProduction, monthlyLoad, options = {
     selfConsumption: directSelfConsumption,
     gridExport,
     gridImport,
+    importOffsetEnergy: capped.importOffsetEnergy,
+    compensableSurplus: capped.compensableSurplus,
     paidGridExport: capped.paidGridExport,
     unpaidGridExport: capped.unpaidGridExport,
     selfConsumptionRatio: annualProduction > 0 ? Math.min(1, directSelfConsumption / annualProduction) : 0,
     hourly8760,
     monthly: monthly.map((m, i) => ({
       ...m,
+      importOffsetEnergy: capped.monthly[i].importOffsetEnergy || 0,
+      compensableSurplus: capped.monthly[i].compensableSurplus || 0,
       paidGridExport: capped.monthly[i].paidGridExport,
       unpaidGridExport: capped.monthly[i].unpaidGridExport
     })),
@@ -395,6 +399,8 @@ export function simulateBatteryOnHourlySummary(hourlySummary, battery, options =
       gridIndependence: hourlySummary.annualLoad > 0 ? Math.min(1, hourlySummary.selfConsumption / hourlySummary.annualLoad) : 0,
       selfConsumptionRatio: hourlySummary.annualProduction > 0 ? Math.min(1, hourlySummary.selfConsumption / hourlySummary.annualProduction) : 0,
       cyclesPerYear: 0,
+      importOffsetEnergy: hourlySummary.importOffsetEnergy ?? 0,
+      compensableSurplus: hourlySummary.compensableSurplus ?? hourlySummary.gridExport ?? 0,
       paidGridExport: hourlySummary.paidGridExport ?? hourlySummary.gridExport,
       unpaidGridExport: hourlySummary.unpaidGridExport ?? 0,
       batteryExportPaid: 0,
@@ -469,6 +475,8 @@ export function simulateBatteryOnHourlySummary(hourlySummary, battery, options =
     autonomousDays,
     autonomousDaysPct: dayOfYear > 0 ? Math.round(autonomousDays / dayOfYear * 100) : 0,
     socReserveKwh,
+    importOffsetEnergy: capped.importOffsetEnergy,
+    compensableSurplus: capped.compensableSurplus,
     paidGridExport: capped.paidGridExport,
     unpaidGridExport: capped.unpaidGridExport,
     batteryExportPaid: 0,
@@ -478,6 +486,8 @@ export function simulateBatteryOnHourlySummary(hourlySummary, battery, options =
       selfConsumption: Math.round(m.selfConsumption),
       gridExport: Math.round(m.gridExport),
       gridImport: Math.round(m.gridImport),
+      importOffsetEnergy: capped.monthly[i].importOffsetEnergy || 0,
+      compensableSurplus: capped.monthly[i].compensableSurplus || 0,
       paidGridExport: capped.monthly[i].paidGridExport,
       unpaidGridExport: capped.monthly[i].unpaidGridExport
     })),
@@ -543,6 +553,7 @@ export function buildTariffModel(state) {
     includesTax: state.tariffIncludesTax ?? true,
     tariffInputMode: state.tariffInputMode || 'net-plus-fee',
     distributionFee: state.tariffInputMode === 'gross' ? 0 : Math.max(0, Number(state.distributionFee) || 0),
+    effectiveImportRate: importRateByRegime + (state.tariffInputMode === 'gross' ? 0 : Math.max(0, Number(state.distributionFee) || 0)),
     tariffSourceType: state.tariffSourceType || 'manual',
     regulation,
     exportCompensationPolicy
@@ -561,8 +572,10 @@ export function computeFinancialTable({
   let paybackYear = 0;
   const lidFactor = panel.firstYearDeg || 0;
   const annualBaseSelf = batterySummary?.totalSelfConsumption ?? hourlySummary.selfConsumption;
+  const annualBaseOffset = batterySummary?.importOffsetEnergy ?? hourlySummary.importOffsetEnergy ?? 0;
   const annualBaseExport = batterySummary?.paidGridExport ?? hourlySummary.paidGridExport ?? batterySummary?.remainingExport ?? hourlySummary.gridExport;
   const selfRatio = annualEnergy > 0 ? annualBaseSelf / annualEnergy : 0;
+  const offsetRatio = annualEnergy > 0 ? annualBaseOffset / annualEnergy : 0;
   const exportRatio = annualEnergy > 0 ? annualBaseExport / annualEnergy : 0;
   const exportRate = exportRateOverride ?? tariffModel.exportRate;
   let cumulativeDiscounted = 0;
@@ -570,18 +583,24 @@ export function computeFinancialTable({
 
   for (let year = 1; year <= 25; year++) {
     const degradedEnergy = annualEnergy * (1 - lidFactor) * Math.pow(1 - panel.degradation, year - 1);
-    const electricityPrice = tariffModel.importRate * Math.pow(1 + tariffModel.annualPriceIncrease, year - 1);
+    const electricityPriceDisplay = tariffModel.importRate * Math.pow(1 + tariffModel.annualPriceIncrease, year - 1);
+    // Distribution fee is included in savings (net-plus-fee mode). Off-grid sets distributionFee: 0.
+    const effectiveImportRate = tariffModel.importRate + (tariffModel.distributionFee ?? 0);
+    const electricityPrice = effectiveImportRate * Math.pow(1 + tariffModel.annualPriceIncrease, year - 1);
     const escalatedExportRate = exportRate * Math.pow(1 + tariffModel.annualPriceIncrease, year - 1);
     // Faz-3 Fix-13: Load growth shifts more solar output into self-consumption each year.
     // As load grows, the system covers a larger fraction of a larger consumption → selfRatio grows.
     // Capped at 1.0 (cannot self-consume more than is produced).
     const loadGrowthFactor = Math.pow(1 + (annualLoadGrowth || 0), year - 1);
     const yearSelfRatio  = Math.min(1.0, selfRatio  * loadGrowthFactor);
-    const yearExportRatio = Math.max(0,  exportRatio / loadGrowthFactor); // exports shrink as load absorbs more
+    const yearOffsetRatio = Math.min(Math.max(0, 1 - yearSelfRatio), offsetRatio * loadGrowthFactor);
+    const yearExportRatio = Math.min(Math.max(0, 1 - yearSelfRatio - yearOffsetRatio), Math.max(0, exportRatio / loadGrowthFactor)); // exports shrink as load absorbs more
     const selfE  = degradedEnergy * yearSelfRatio;
+    const offsetE = netMeteringEnabled ? degradedEnergy * yearOffsetRatio : 0;
     const exportE = degradedEnergy * yearExportRatio;
     const paidExportE = netMeteringEnabled ? exportE : 0;
-    const yearSavings = selfE * electricityPrice + paidExportE * escalatedExportRate;
+    const compensatedConsumptionE = selfE + offsetE;
+    const yearSavings = compensatedConsumptionE * electricityPrice + paidExportE * escalatedExportRate;
     let yearExpenses = (annualOMCost + annualInsurance + annualGeneratorCost) * Math.pow(1 + (tariffModel.expenseEscalationRate || 0), year - 1);
     const invLife = Math.round(Number(inverterLifetime) || 0);
     if (invLife > 0 && year % invLife === 0) yearExpenses += inverterReplaceCost * Math.pow(1 + (tariffModel.expenseEscalationRate || 0), year - 1);
@@ -597,9 +616,11 @@ export function computeFinancialTable({
     rows.push({
       year,
       energy: Math.round(degradedEnergy),
-      rate: electricityPrice.toFixed(2),
+      rate: electricityPriceDisplay.toFixed(2),
       exportRate: escalatedExportRate.toFixed(2),
       selfConsumptionKwh: Math.round(selfE),
+      importOffsetKwh: Math.round(offsetE),
+      compensatedConsumptionKwh: Math.round(compensatedConsumptionE),
       paidExportKwh: Math.round(paidExportE),
       savings: Math.round(yearSavings),
       expenses: Math.round(yearExpenses),
@@ -673,6 +694,9 @@ export function detectCalculationWarnings(results) {
   if (results.tariffModel?.effectiveRegime === 'sktt' && !results.tariffModel?.skttRate) warnings.push('SKTT seçili ancak SKTT birim fiyatı tanımlı değil.');
   if (results.tariffModel?.exportRate <= 0 && results.netMeteringEnabled) warnings.push('Şebeke ihracatı açık ancak ihracat birim fiyatı 0 TL/kWh.');
   if (results.tariffModel?.regulation?.warnings?.length) warnings.push(...results.tariffModel.regulation.warnings);
+  if (results.tariffModel?.exportCompensationPolicy?.provisional) {
+    warnings.push('Mahsuplaşma tarihi eksik; ekonomik sonuç aylık mahsuplaşma varsayımıyla ön fizibilite olarak hesaplandı.');
+  }
   if (Number(results.tariffModel?.contractedPowerKw) > 0 && Number(results.systemPower) > Number(results.tariffModel.contractedPowerKw)) {
     warnings.push('Kurulu güç sözleşme gücünü aşıyor; bağlantı görüşü ve mahsuplaşma sınırları proje bazında kontrol edilmeli.');
   }

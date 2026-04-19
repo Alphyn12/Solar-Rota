@@ -5,9 +5,9 @@
   "private": true,
   "scripts": {
     "start": "npx serve . -l 3000 --no-clipboard",
-    "test": "node tests/calc-core.test.mjs && node tests/calc-regression.test.mjs && node tests/advanced-features.test.mjs && node tests/currency-i18n.test.mjs && node tests/report-export-i18n.test.mjs && node tests/brand-surface.test.mjs && node tests/security-state.test.mjs && node tests/input-validation.test.mjs && node tests/scenario-engine-contracts.test.mjs && node tests/turkey-regulation.test.mjs && node tests/proposal-governance.test.mjs && node tests/bom-commercial.test.mjs && node tests/storage-roundtrip.test.mjs && node tests/service-worker-assets.test.mjs && node tests/evidence-governance.test.mjs && node tests/enterprise-governance.test.mjs && node --test tests/offgrid-dispatch.test.mjs && node --test tests/device-catalog.test.mjs && node --test tests/pvgis-fetch.test.mjs",
-    "test:offgrid": "node --test tests/offgrid-dispatch.test.mjs && node --test tests/device-catalog.test.mjs",
-    "test:pvgis": "node --test tests/pvgis-fetch.test.mjs",
+    "test": "node tests/calc-core.test.mjs && node tests/calc-regression.test.mjs && node tests/advanced-features.test.mjs && node tests/currency-i18n.test.mjs && node tests/report-export-i18n.test.mjs && node tests/brand-surface.test.mjs && node tests/security-state.test.mjs && node tests/input-validation.test.mjs && node tests/scenario-engine-contracts.test.mjs && node tests/turkey-regulation.test.mjs && node tests/proposal-governance.test.mjs && node tests/bom-commercial.test.mjs && node tests/storage-roundtrip.test.mjs && node tests/service-worker-assets.test.mjs && node tests/evidence-governance.test.mjs && node tests/enterprise-governance.test.mjs && node tests/offgrid-dispatch.test.mjs && node tests/device-catalog.test.mjs && node tests/pvgis-fetch.test.mjs",
+    "test:offgrid": "node tests/offgrid-dispatch.test.mjs && node tests/device-catalog.test.mjs",
+    "test:pvgis": "node tests/pvgis-fetch.test.mjs",
     "test:usd": "python tests/playwright-usd-smoke.py",
     "test:i18n": "python tests/playwright-i18n-smoke.py",
     "test:mobile": "python tests/playwright-mobile-brand-smoke.py",

@@ -12,7 +12,7 @@ function staticAssets(source) {
 }
 
 const assets = staticAssets(sw);
-assert.ok(/solarRota-v22/.test(sw), 'cache name must be bumped when active assets change');
+assert.ok(/solarRota-v23/.test(sw), 'cache name must be bumped when active assets change');
 
 for (const required of [
   '/',

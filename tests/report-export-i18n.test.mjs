@@ -175,17 +175,34 @@ function sampleState() {
         exportRate: 1.2,
         sourceDate: '2026-01-01',
         sourceLabel: 'Tariff source',
-        exportCompensationPolicy: { version: 'TR-REG-2026.04' }
+        regulation: {
+          effectiveRegimeBasis: 'activation-date-reached',
+          activationDate: '2026-04-01',
+          evaluationDate: '2026-04-19'
+        },
+        exportCompensationPolicy: { version: 'TR-REG-2026.04', interval: 'monthly' }
       },
       hourlySummary: { annualLoad: 16425 },
       nmMetrics: {
         selfConsumedEnergy: 12000,
+        directSelfConsumedEnergy: 9000,
+        importOffsetEnergy: 2500,
+        compensableSurplus: 1800,
         paidGridExport: 1500,
         annualGridExport: 3000,
         annualExportRevenue: 1800,
         selfConsumptionPct: 80,
         unpaidGridExport: 1500,
         systemType: 'monthly-aggregation'
+      },
+      settlementProvisional: false,
+      settlementAssumptionBasis: null,
+      compensationSummary: {
+        directSelfConsumptionKwh: 9000,
+        importOffsetKwh: 2500,
+        paidExportKwh: 1500,
+        unpaidExportKwh: 1500,
+        compensatedConsumptionEnergy: 11500
       },
       proposalGovernance: {
         confidence: { score: 62, level: 'medium' },
@@ -242,6 +259,8 @@ assert.match(reportBody.innerHTML, /Inverter AC output efficiency/);
 assert.match(reportBody.innerHTML, /The 75% usable-area factor/);
 assert.match(reportBody.innerHTML, /Cost Breakdown/);
 assert.match(reportBody.innerHTML, /PVGIS live data is unavailable/);
+assert.match(reportBody.innerHTML, /Instant self-consumption/);
+assert.match(reportBody.innerHTML, /Settlement import offset/);
 assert.doesNotMatch(reportBody.innerHTML, /Panel &amp; Sistem Tasarımı/);
 assert.doesNotMatch(reportBody.innerHTML, /Maliyet Kırılımı/);
 assert.doesNotMatch(reportBody.innerHTML, /Kullanılabilir çatı alanı/);
@@ -254,6 +273,11 @@ assert.equal(onGridProposalEn.onGridFlow.subscriberType, 'commercial');
 assert.equal(onGridProposalEn.onGridFlow.usageProfile, 'business-hours');
 assert.equal(onGridProposalEn.onGridFlow.designTarget, 'bill-offset');
 assert.equal(onGridProposalEn.onGridFlow.authoritativeFinancialBasis, 'frontend-8760-financial-model');
+assert.equal(onGridProposalEn.onGridFlow.settlementProvisional, false);
+assert.equal(onGridProposalEn.onGridFlow.compensationSummary.importOffsetKwh, 2500);
+assert.equal(onGridProposalEn.tariff.regimeBasis, 'activation-date-reached');
+assert.equal(onGridProposalEn.tariff.skttActivationDate, '2026-04-01');
+assert.equal(onGridProposalEn.tariff.tariffEvaluationDate, '2026-04-19');
 
 const offGridState = sampleState();
 offGridState.scenarioKey = 'off-grid';
@@ -277,6 +301,44 @@ offGridState.results = {
     gridIndependence: '78.0',
     nightCoverage: '62.0',
     batteryCost: 120000
+  },
+  generatorCapex: 65000,
+  offgridL2Results: {
+    productionSource: 'PVGIS-based',
+    productionSourceLabel: 'PVGIS Live',
+    productionFallback: false,
+    loadSource: 'hourly-uploaded',
+    loadMode: 'hourly-8760',
+    dispatchType: 'hourly-8760-dispatch',
+    generatorEnabled: true,
+    generatorCapacityKw: 5,
+    generatorEnergyKwh: 900,
+    generatorKwh: 900,
+    generatorFuelCostAnnual: 7200,
+    generatorCapex: 65000,
+    generatorCapexMissing: false,
+    pvBatteryLoadCoverage: 0.72,
+    pvBatteryCriticalCoverage: 0.91,
+    totalLoadCoverage: 0.96,
+    criticalLoadCoverage: 0.99,
+    minimumSoc: 0.1,
+    averageSoc: 0.48,
+    batteryMaxChargeKw: 4,
+    batteryMaxDischargeKw: 4,
+    inverterAcLimitKw: 5,
+    inverterSurgeMultiplier: 1.25,
+    inverterPowerLimitedKwh: 120,
+    batteryChargeLimitedKwh: 50,
+    batteryDischargeLimitedKwh: 70,
+    unmetLoadKwh: 250,
+    unmetCriticalKwh: 20,
+    curtailedPvKwh: 600,
+    weatherScenario: 'moderate',
+    methodologyNote: 'hourly-load-dispatch-pre-feasibility',
+    provisional: true,
+    synthetic: false,
+    feasibilityNotGuaranteed: true,
+    dispatchVersion: 'OGD-2026.04-v1.1'
   }
 };
 window.state = offGridState;
@@ -284,6 +346,8 @@ renderEngReport();
 assert.match(reportBody.innerHTML, /PV-served load share \(synthetic dispatch\)/);
 assert.match(reportBody.innerHTML, /surplus PV is not monetized/);
 assert.match(reportBody.innerHTML, /synthetic 8760 dispatch pre-check/);
+assert.match(reportBody.innerHTML, /PV\+BESS total coverage/);
+assert.match(reportBody.innerHTML, /Generator CAPEX/);
 assert.doesNotMatch(reportBody.innerHTML, /Grid Export \/ Settlement/);
 assert.doesNotMatch(reportBody.innerHTML, /Annual export/);
 
@@ -300,6 +364,11 @@ assert.equal(proposalEn.system.authoritativeProduction.annualEnergyKwh, 15000);
 assert.equal(proposalEn.system.productionParity.deltaKwh, 500);
 assert.equal(proposalEn.tariff.exportRate, 0);
 assert.equal(proposalEn.financialSummary.financialSavingsBasis, 'off-grid-user-alternative-energy-cost');
+assert.equal(proposalEn.offGridL2.loadMode, 'hourly-8760');
+assert.equal(proposalEn.offGridL2.dispatchType, 'hourly-8760-dispatch');
+assert.equal(proposalEn.offGridL2.generatorCapex, 65000);
+assert.equal(proposalEn.offGridL2.pvBatteryLoadCoverage, 0.72);
+assert.equal(proposalEn.offGridL2.inverterAcLimitKw, 5);
 
 const crmEn = buildCrmLeadExport(window.state, window.state.results);
 assert.equal(crmEn.display.language, 'en');
@@ -422,6 +491,9 @@ assert.ok(i18n.t('engine.comparisonUnavailableHint') !== 'engine.comparisonUnava
 assert.ok(i18n.t('offGrid.syntheticDispatchNote') !== 'offGrid.syntheticDispatchNote', 'EN: offGrid.syntheticDispatchNote missing');
 assert.ok(i18n.t('offGrid.notFeasibilityAnalysis') !== 'offGrid.notFeasibilityAnalysis', 'EN: offGrid.notFeasibilityAnalysis missing');
 assert.ok(i18n.t('offGrid.preFeasibilityOnly') !== 'offGrid.preFeasibilityOnly', 'EN: offGrid.preFeasibilityOnly missing');
+assert.ok(i18n.t('offgridL2.loadSourceHourly') !== 'offgridL2.loadSourceHourly', 'EN: offgridL2.loadSourceHourly missing');
+assert.ok(i18n.t('offgridL2.pvBessCoverageLabel') !== 'offgridL2.pvBessCoverageLabel', 'EN: offgridL2.pvBessCoverageLabel missing');
+assert.ok(i18n.t('offgridL2.generatorCapex') !== 'offgridL2.generatorCapex', 'EN: offgridL2.generatorCapex missing');
 assert.ok(i18n.t('onGridResult.parityLabel') !== 'onGridResult.parityLabel', 'EN: onGridResult.parityLabel missing');
 assert.ok(i18n.t('onGridResult.parityUnavailable') !== 'onGridResult.parityUnavailable', 'EN: onGridResult.parityUnavailable missing');
 
@@ -429,12 +501,16 @@ await setLocale('tr');
 assert.ok(i18n.t('engine.comparisonUnavailable') !== 'engine.comparisonUnavailable', 'TR: engine.comparisonUnavailable missing');
 assert.ok(i18n.t('offGrid.syntheticDispatchNote') !== 'offGrid.syntheticDispatchNote', 'TR: offGrid.syntheticDispatchNote missing');
 assert.ok(i18n.t('offGrid.preFeasibilityOnly') !== 'offGrid.preFeasibilityOnly', 'TR: offGrid.preFeasibilityOnly missing');
+assert.ok(i18n.t('offgridL2.loadSourceHourly') !== 'offgridL2.loadSourceHourly', 'TR: offgridL2.loadSourceHourly missing');
+assert.ok(i18n.t('offgridL2.pvBessCoverageLabel') !== 'offgridL2.pvBessCoverageLabel', 'TR: offgridL2.pvBessCoverageLabel missing');
 assert.ok(i18n.t('onGridResult.parityUnavailable') !== 'onGridResult.parityUnavailable', 'TR: onGridResult.parityUnavailable missing');
 
 await setLocale('de');
 assert.ok(i18n.t('engine.comparisonUnavailable') !== 'engine.comparisonUnavailable', 'DE: engine.comparisonUnavailable missing');
 assert.ok(i18n.t('offGrid.syntheticDispatchNote') !== 'offGrid.syntheticDispatchNote', 'DE: offGrid.syntheticDispatchNote missing');
 assert.ok(i18n.t('offGrid.preFeasibilityOnly') !== 'offGrid.preFeasibilityOnly', 'DE: offGrid.preFeasibilityOnly missing');
+assert.ok(i18n.t('offgridL2.loadSourceHourly') !== 'offgridL2.loadSourceHourly', 'DE: offgridL2.loadSourceHourly missing');
+assert.ok(i18n.t('offgridL2.pvBessCoverageLabel') !== 'offgridL2.pvBessCoverageLabel', 'DE: offgridL2.pvBessCoverageLabel missing');
 
 // parityAvailable boolean in buildStructuredProposalExport
 await setLocale('en');

@@ -46,6 +46,8 @@ assert.equal(request.tariff.tariffType, 'commercial');
 assert.equal(request.tariff.annualPriceIncrease, 0.12);
 assert.equal(request.tariff.discountRate, 0.18);
 assert.equal(request.system.targetPowerKwp, null);
+assert.equal(request.system.layoutSnapshot.authoritativeSizing, true);
+assert.ok(request.system.layoutSnapshot.panelCount > 0);
 assert.equal(request.system.panelWattPeak, 430);
 assert.ok(Math.abs(request.system.panelAreaM2 - (1.134 * 1.762)) < 1e-9);
 assert.equal(request.system.inverterEfficiency, 0.97);
@@ -59,6 +61,38 @@ const staleResultRequest = buildPvEngineRequest({
   results: { systemPower: 999 }
 });
 assert.equal(staleResultRequest.system.targetPowerKwp, null);
+
+const billOffsetRequest = buildPvEngineRequest({
+  scenarioKey: 'on-grid',
+  designTarget: 'bill-offset',
+  lat: 39.9,
+  lon: 32.8,
+  roofArea: 100,
+  panelType: 'mono',
+  dailyConsumption: 3,
+  annualConsumptionKwh: 1095,
+  ghi: 1600,
+  usableRoofRatio: 0.75
+});
+assert.equal(billOffsetRequest.system.layoutSnapshot.designTargetApplied, 'bill-offset');
+assert.equal(billOffsetRequest.system.layoutSnapshot.limitedBy, 'bill-target');
+assert.equal(billOffsetRequest.system.chosenSystemPowerKwp, billOffsetRequest.system.layoutSnapshot.chosenSystemPowerKwp);
+assert.ok(billOffsetRequest.system.layoutSnapshot.panelCount < request.system.layoutSnapshot.panelCount);
+
+const roofLimitedRequest = buildPvEngineRequest({
+  scenarioKey: 'on-grid',
+  designTarget: 'fill-roof',
+  lat: 39.9,
+  lon: 32.8,
+  roofArea: 35,
+  panelType: 'mono',
+  annualConsumptionKwh: 50000,
+  ghi: 1600,
+  usableRoofRatio: 0.6
+});
+assert.equal(roofLimitedRequest.system.layoutSnapshot.designTargetApplied, 'fill-roof');
+assert.equal(roofLimitedRequest.system.layoutSnapshot.limitedBy, 'roof-area');
+assert.equal(roofLimitedRequest.system.authoritativePanelCount, roofLimitedRequest.system.layoutSnapshot.panelCount);
 
 const explicitTargetRequest = buildPvEngineRequest({
   lat: 39.9,

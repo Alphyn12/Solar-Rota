@@ -192,11 +192,16 @@ export function calculateNMMetrics(annualEnergy, systemPower, dailyConsumption, 
   const tariffModel = typeof tariffModelOrRate === 'object' ? tariffModelOrRate : null;
   const tariff = tariffModel ? tariffModel.exportRate : tariffModelOrRate;
   const annualConsumption = hourlySummary?.annualLoad ?? dailyConsumption * 365;
-  const selfConsumedEnergy = batterySummary?.totalSelfConsumption ?? hourlySummary?.selfConsumption ?? Math.min(annualConsumption, annualEnergy);
-  const selfConsumptionRatio = annualEnergy > 0 ? Math.min(selfConsumedEnergy / annualEnergy, 1.0) : 0;
+  const directSelfConsumedEnergy = batterySummary?.totalSelfConsumption ?? hourlySummary?.selfConsumption ?? Math.min(annualConsumption, annualEnergy);
+  const importOffsetEnergy = batterySummary?.importOffsetEnergy ?? hourlySummary?.importOffsetEnergy ?? 0;
+  const selfConsumedEnergy = directSelfConsumedEnergy;
+  const compensatedConsumptionEnergy = directSelfConsumedEnergy + importOffsetEnergy;
+  const selfConsumptionRatio = annualEnergy > 0 ? Math.min(directSelfConsumedEnergy / annualEnergy, 1.0) : 0;
+  const compensatedConsumptionRatio = annualEnergy > 0 ? Math.min(compensatedConsumptionEnergy / annualEnergy, 1.0) : 0;
   const annualGridExport = Math.round(batterySummary?.remainingExport ?? hourlySummary?.gridExport ?? annualEnergy * (1 - selfConsumptionRatio));
   const paidGridExport = Math.round(batterySummary?.paidGridExport ?? hourlySummary?.paidGridExport ?? annualGridExport);
   const unpaidGridExport = Math.round(batterySummary?.unpaidGridExport ?? hourlySummary?.unpaidGridExport ?? Math.max(0, annualGridExport - paidGridExport));
+  const compensableSurplus = Math.round(batterySummary?.compensableSurplus ?? hourlySummary?.compensableSurplus ?? paidGridExport + unpaidGridExport);
 
   const annualExportRevenue = Math.round(paidGridExport * Math.max(0, tariff));
 
@@ -204,11 +209,17 @@ export function calculateNMMetrics(annualEnergy, systemPower, dailyConsumption, 
     annualGridExport,
     paidGridExport,
     unpaidGridExport,
+    importOffsetEnergy: Math.round(importOffsetEnergy),
+    compensableSurplus,
     annualExportRevenue,
     selfConsumptionRatio,
+    compensatedConsumptionRatio,
     annualConsumption: Math.round(annualConsumption),
+    directSelfConsumedEnergy: Math.round(directSelfConsumedEnergy),
     selfConsumedEnergy: Math.round(selfConsumedEnergy),
+    compensatedConsumptionEnergy: Math.round(compensatedConsumptionEnergy),
     selfConsumptionPct: (selfConsumptionRatio * 100).toFixed(1),
+    compensatedConsumptionPct: (compensatedConsumptionRatio * 100).toFixed(1),
     isLicenseFree: true,
     systemType: (batterySummary?.exportPolicy || hourlySummary?.exportPolicy || tariffModel?.exportCompensationPolicy)?.interval === 'hourly'
       ? 'Lisanssız Üretim — Saatlik mahsuplaşma + yıllık tüketim ihracat sınırı'
@@ -676,6 +687,20 @@ export async function runCalculation() {
   tariff = tariffModel.importRate || tariffModel.pstRate || 7.16;
   const annualPriceIncrease = tariffModel.annualPriceIncrease;
   const discountRate = tariffModel.discountRate;
+  const effectiveSavingsTariff = (state.scenarioKey === 'off-grid')
+    ? (Number(state.offGridCostPerKwh) > 0 ? Number(state.offGridCostPerKwh) : tariff * 2.5)
+    : (tariffModel.effectiveImportRate ?? tariff);
+  const financialTariffModel = state.scenarioKey === 'off-grid'
+    ? {
+        ...tariffModel,
+        importRate: effectiveSavingsTariff,
+        distributionFee: 0,
+        exportRate: 0,
+        financialBasis: Number(state.offGridCostPerKwh) > 0
+          ? 'off-grid-user-alternative-energy-cost'
+          : 'off-grid-grid-tariff-times-2_5-proxy'
+      }
+    : tariffModel;
 
   if (state.evEnabled && state.ev) {
     evMetrics = calculateEVMetrics(adjustedEnergy, state.dailyConsumption, state.ev, tariff);
@@ -710,12 +735,23 @@ export async function runCalculation() {
     const battDod = Math.max(0, Math.min(1, Number(batt.dod) || 0.9));
     const battEff = Math.max(0.5, Math.min(1, Number(batt.efficiency) || 0.92));
     const usableCapKwh = battCap * battDod;
+    const defaultBatteryPowerKw = Math.max(0.5, usableCapKwh * 0.5);
+    const batteryMaxChargeKw = Math.max(0.1, Number(batt.maxChargePowerKw ?? batt.maxChargeKw ?? state.offgridBatteryMaxChargeKw ?? defaultBatteryPowerKw) || defaultBatteryPowerKw);
+    const batteryMaxDischargeKw = Math.max(0.1, Number(batt.maxDischargePowerKw ?? batt.maxDischargeKw ?? state.offgridBatteryMaxDischargeKw ?? defaultBatteryPowerKw) || defaultBatteryPowerKw);
+    const inverterAcLimitKw = Math.max(
+      0.5,
+      Number(state.offgridInverterAcKw ?? state.inverterAcKw)
+        || Math.max(systemPower || 0, batteryMaxDischargeKw, 1)
+    );
+    const inverterSurgeMultiplier = Math.max(1, Math.min(3, Number(state.offgridInverterSurgeMultiplier) || 1.25));
 
     const batteryConfig = {
       usableCapacityKwh: usableCapKwh,
       efficiency: battEff,
       socReserveKwh: usableCapKwh * 0.10,
-      initialSocKwh: usableCapKwh * 0.10
+      initialSocKwh: usableCapKwh * 0.10,
+      maxChargePowerKw: batteryMaxChargeKw,
+      maxDischargePowerKw: batteryMaxDischargeKw
     };
 
     const generatorConfig = {
@@ -724,15 +760,24 @@ export async function runCalculation() {
       fuelCostPerKwh: Math.max(0, Number(state.offgridGeneratorFuelCostPerKwh) || 0)
     };
 
-    // Yük profili oluştur (cihaz listesi veya basit mod)
+    // Yük profili oluştur. Gerçek 8760 saha yükü varsa cihaz listesinin önüne geçer.
+    const hasRealHourlyLoad = hasCompleteHourlyProfile8760(state.hourlyConsumption8760);
     const offgridLoadProfile = buildOffgridLoadProfile(
       Array.isArray(state.offgridDevices) ? state.offgridDevices : [],
       {
+        hourlyLoad8760: hasRealHourlyLoad ? hourlyLoad8760 : null,
+        hourlyLoadSource: hasRealHourlyLoad ? (state.hourlyProfileSource || 'hourly-uploaded') : null,
         fallbackDailyKwh: hourlySummaryRaw.annualLoad / 365,
         criticalFraction: Math.max(0.1, Math.min(1, Number(state.offgridCriticalFraction) || 0.6)),
         tariffType: state.tariffType
       }
     );
+    const dispatchOptions = {
+      loadPeakKw8760: offgridLoadProfile.hourlyPeakKw8760,
+      criticalPeakKw8760: offgridLoadProfile.criticalPeakKw8760,
+      inverterAcLimitKw,
+      inverterSurgeMultiplier
+    };
 
     // Normal dispatch çalıştır
     const normalDispatch = runOffgridDispatch(
@@ -741,7 +786,7 @@ export async function runCalculation() {
       offgridLoadProfile.criticalHourly8760,
       batteryConfig,
       generatorConfig,
-      {}
+      dispatchOptions
     );
 
     // Kötü hava senaryosu (kullanıcı seçtiyse)
@@ -754,7 +799,8 @@ export async function runCalculation() {
           offgridLoadProfile.criticalHourly8760,
           batteryConfig,
           generatorConfig,
-          weatherLevel
+          weatherLevel,
+          dispatchOptions
         )
       : null;
 
@@ -767,30 +813,32 @@ export async function runCalculation() {
       {
         alternativeEnergyCostPerKwh: effectiveSavingsTariff,
         systemCapexTry: solarCost + modelBatteryCost(state.battery || {}),
-        generatorCapexTry: Math.max(0, Number(state.offgridGeneratorCapexTry) || 0)
+        generatorCapexTry: Math.max(0, Number(state.offgridGeneratorCapexTry) || 0),
+        weatherScenario: weatherLevel
       }
     );
     // Üretim kaynağı şeffaflığını off-grid sonucuna ekle
-    offgridL2Results.productionSource = aggregateFetchStatus;
-    offgridL2Results.productionSourceLabel = getPvgisSourceLabel(aggregateFetchStatus, currentLang);
-    offgridL2Results.productionFallback = usedFallback;
-    offgridL2Results.loadSource = offgridLoadProfile.mode;
-    offgridL2Results.parityAvailable = aggregateFetchStatus === PVGIS_FETCH_STATUS.LIVE_SUCCESS && !!state.authoritativeEngineOverride;
+    offgridL2Results.productionSource = authoritativeSourceMeta.source || aggregateFetchStatus;
+    offgridL2Results.productionSourceLabel = authoritativeBackend ? authoritativeSourceMeta.source : getPvgisSourceLabel(aggregateFetchStatus, currentLang);
+    offgridL2Results.productionFallback = usedFallback || !!authoritativeSourceMeta.fallbackUsed;
+    offgridL2Results.loadSource = offgridLoadProfile.loadSource || offgridLoadProfile.mode;
+    offgridL2Results.loadMode = offgridLoadProfile.mode;
+    offgridL2Results.parityAvailable = engineParity?.intentionalDifference === true;
 
     // batterySummary köprüsü — mevcut finansal tablo + BESS renderer'ı çalışmaya devam etsin
     batterySummary = {
       usableCapacity: usableCapKwh,
       batteryDischarge: normalDispatch.batteryToLoadKwh,
       chargedFromPv: normalDispatch.chargedFromPvKwh,
-      remainingExport: 0,
+      remainingExport: normalDispatch.curtailedPvKwh,
       remainingImport: normalDispatch.unmetLoadKwh,
       totalSelfConsumption: normalDispatch.directPvToLoadKwh + normalDispatch.batteryToLoadKwh,
       selfConsumptionRatio: normalDispatch.totalPvGeneratedKwh > 0
-        ? Math.min(1, (normalDispatch.directPvToLoadKwh + normalDispatch.chargedFromPvKwh) / normalDispatch.totalPvGeneratedKwh)
+        ? Math.min(1, (normalDispatch.directPvToLoadKwh + normalDispatch.batteryToLoadKwh) / normalDispatch.totalPvGeneratedKwh)
         : 0,
-      gridIndependence: normalDispatch.totalLoadCoverage,
+      gridIndependence: normalDispatch.solarBatteryLoadCoverage,
       paidGridExport: 0,
-      unpaidGridExport: 0,
+      unpaidGridExport: normalDispatch.curtailedPvKwh,
       batteryExportPaid: 0,
       cyclesPerYear: normalDispatch.cyclesPerYear,
       unmetLoadKwh: normalDispatch.unmetLoadKwh,
@@ -803,14 +851,21 @@ export async function runCalculation() {
     };
 
     bessMetrics = calculateBatteryMetrics(adjustedEnergy, hourlySummaryRaw.annualLoad / 365, state.battery);
-    bessMetrics.gridIndependence = (normalDispatch.totalLoadCoverage * 100).toFixed(1);
-    bessMetrics.criticalLoadCoverage = (normalDispatch.criticalLoadCoverage * 100).toFixed(1);
+    bessMetrics.gridIndependence = (normalDispatch.solarBatteryLoadCoverage * 100).toFixed(1);
+    bessMetrics.totalLoadCoverageWithGenerator = (normalDispatch.totalLoadCoverage * 100).toFixed(1);
+    bessMetrics.criticalLoadCoverage = (normalDispatch.solarBatteryCriticalCoverage * 100).toFixed(1);
+    bessMetrics.criticalLoadCoverageWithGenerator = (normalDispatch.criticalLoadCoverage * 100).toFixed(1);
     bessMetrics.nightCoverage = bessMetrics.gridIndependence;
     bessMetrics.batteryStored = normalDispatch.batteryToLoadKwh.toFixed(1);
     bessMetrics.cyclesPerYear = normalDispatch.cyclesPerYear.toFixed(0);
     bessMetrics.autonomousDaysPct = normalDispatch.autonomousDaysPct;
     bessMetrics.autonomousDays = normalDispatch.autonomousDays;
     bessMetrics.unmetLoadKwh = Math.round(normalDispatch.unmetLoadKwh);
+    bessMetrics.minimumSoc = normalDispatch.minimumSocPct;
+    bessMetrics.averageSoc = normalDispatch.averageSocPct;
+    bessMetrics.batteryMaxChargeKw = batteryMaxChargeKw;
+    bessMetrics.batteryMaxDischargeKw = batteryMaxDischargeKw;
+    bessMetrics.inverterAcLimitKw = inverterAcLimitKw;
     batteryCostVal = bessMetrics.batteryCost;
 
   } else if (state.batteryEnabled) {
@@ -834,7 +889,10 @@ export async function runCalculation() {
     }
     batteryCostVal = bessMetrics.batteryCost;
   }
-  const grossTotalCost = solarCost + batteryCostVal;
+  const generatorCapexVal = state.scenarioKey === 'off-grid' && state.offgridGeneratorEnabled
+    ? Math.max(0, Number(state.offgridGeneratorCapexTry) || 0)
+    : 0;
+  const grossTotalCost = solarCost + batteryCostVal + generatorCapexVal;
   const taxTreatment = resolveTaxTreatment({
     grossTotalCost,
     solarKdv: kdv,
@@ -859,27 +917,12 @@ export async function runCalculation() {
     ? tariffModel.exportRate
     : 0;
 
-  // FIX-5: Off-grid replaces generator/diesel, not grid electricity.
-  // Using the grid import tariff as the "savings rate" for an off-grid system
-  // would understate savings by ~2-3×. Use state.offGridCostPerKwh if the user
-  // has configured it; otherwise apply a conservative 2.5× multiplier relative
-  // to the grid tariff as a proxy for diesel/generator fuel cost avoidance.
-  const effectiveSavingsTariff = (state.scenarioKey === 'off-grid')
-    ? (Number(state.offGridCostPerKwh) > 0 ? Number(state.offGridCostPerKwh) : tariff * 2.5)
-    : tariff;
-  const financialTariffModel = state.scenarioKey === 'off-grid'
-    ? {
-        ...tariffModel,
-        importRate: effectiveSavingsTariff,
-        exportRate: 0,
-        financialBasis: Number(state.offGridCostPerKwh) > 0
-          ? 'off-grid-user-alternative-energy-cost'
-          : 'off-grid-grid-tariff-times-2_5-proxy'
-      }
-    : tariffModel;
-
-  const annualSavings = nmMetrics.selfConsumedEnergy * effectiveSavingsTariff
+  const compensatedValueEnergy = state.netMeteringEnabled
+    ? (nmMetrics.compensatedConsumptionEnergy ?? nmMetrics.selfConsumedEnergy)
+    : nmMetrics.selfConsumedEnergy;
+  const grossAnnualSavingsPreDegradation = compensatedValueEnergy * effectiveSavingsTariff
     + (state.netMeteringEnabled ? nmMetrics.paidGridExport * exportRate : 0);
+  const annualSavings = grossAnnualSavingsPreDegradation;
   const co2Savings = adjustedEnergy * 0.442 / 1000;
   const trees = Math.round(co2Savings * 1000 / 21);
 
@@ -914,7 +957,9 @@ export async function runCalculation() {
   const yearlyTable = financial.rows;
   const displayAnnualSavings = state.scenarioKey === 'off-grid'
     ? (financial.rows[0]?.savings || annualSavings)
-    : annualSavings;
+    : (financial.rows[0]?.savings || annualSavings);
+  const firstYearGrossSavings = financial.rows[0]?.savings ?? Math.round(annualSavings);
+  const firstYearNetCashFlow = financial.rows[0]?.netCashFlow ?? Math.round(annualSavings - annualOMCost - annualInsurance);
   const paybackYear = financial.paybackYear;
   const discountedPaybackYear = financial.discountedPaybackYear;
   const totalExpenses25y = financial.totalExpenses25y;
@@ -954,12 +999,15 @@ export async function runCalculation() {
     taxMetrics = calculateTaxBenefits(totalCost, npvTotal, state.tax, discountRate, kdv, taxTreatment);
   }
   const billAnalysis = state.billAnalysisEnabled && hasMeaningfulMonthlyConsumption(state.monthlyConsumption)
-    ? calculateBillAnalysis(state.monthlyConsumption, monthlyData, tariff)
+    ? calculateBillAnalysis(state.monthlyConsumption, monthlyData, tariffModel.importRate + (tariffModel.distributionFee ?? 0))
     : null;
 
   const results = {
     panelCount, systemPower, annualEnergy: Math.round(adjustedEnergy),
     annualSavings: Math.round(displayAnnualSavings), totalCost: Math.round(totalCost),
+    grossAnnualSavingsPreDegradation: Math.round(grossAnnualSavingsPreDegradation),
+    firstYearGrossSavings: Math.round(firstYearGrossSavings),
+    firstYearNetCashFlow: Math.round(firstYearNetCashFlow),
     paybackYear, simplePaybackYear: financial.simplePaybackYear, discountedPaybackYear,
     npvTotal: Math.round(npvTotal), discountedCashFlow: Math.round(financial.discountedCashFlow), roi: roi.toFixed(1),
     co2Savings: co2Savings.toFixed(2), trees, monthlyData,
@@ -985,6 +1033,20 @@ export async function runCalculation() {
     financialSavingsRate: effectiveSavingsTariff,
     financialSavingsBasis: financialTariffModel.financialBasis || 'grid-import-tariff',
     financialTariffModel,
+    settlementProvisional: !!tariffModel.exportCompensationPolicy?.provisional,
+    settlementAssumptionBasis: tariffModel.exportCompensationPolicy?.assumptionBasis || null,
+    compensationSummary: {
+      directSelfConsumptionKwh: nmMetrics.directSelfConsumedEnergy,
+      importOffsetKwh: nmMetrics.importOffsetEnergy,
+      compensatedConsumptionKwh: nmMetrics.compensatedConsumptionEnergy,
+      paidExportKwh: nmMetrics.paidGridExport,
+      unpaidSurplusKwh: nmMetrics.unpaidGridExport,
+      compensableSurplusKwh: nmMetrics.compensableSurplus,
+      annualPhysicalExportKwh: nmMetrics.annualGridExport,
+      settlementInterval: tariffModel.exportCompensationPolicy?.interval || null,
+      annualExportCapKwh: tariffModel.exportCompensationPolicy?.annualSellableExportCapKwh ?? null,
+      provisional: !!tariffModel.exportCompensationPolicy?.provisional
+    },
     yearlyTable,
     annualOMCost, annualInsurance, inverterReplaceCost, inverterLifetime, batteryReplaceCost, batteryLifetime, totalExpenses25y,
     lidFactor: (lidFactor * 100).toFixed(1),
@@ -996,9 +1058,14 @@ export async function runCalculation() {
       acElec: Math.round(acElecCost), labor: Math.round(laborCost),
       permits: Math.round(permitCost), subtotal: Math.round(subtotal),
       kdv: Math.round(kdv), kdvRate, total: Math.round(solarCost), invUnit: invUnitEffective,
-      battery: batteryCostVal, totalWithBattery: Math.round(totalCost),
+      battery: batteryCostVal,
+      generator: generatorCapexVal,
+      generatorCapex: generatorCapexVal,
+      totalWithBattery: Math.round(solarCost + batteryCostVal),
+      totalWithBatteryAndGenerator: Math.round(totalCost),
       bom: bomTotalsForSystem || state.bomTotals || null
     },
+    generatorCapex: Math.round(generatorCapexVal),
     financialCostBasis: Math.round(financialCostBasis),
     taxTreatment,
     methodologyVersion: METHODOLOGY_VERSION,
@@ -1041,6 +1108,9 @@ export async function runCalculation() {
     shadowQuality: state.shadingQuality || 'user-estimate'
   };
   results.calculationWarnings = detectCalculationWarnings(results);
+  if (results.offgridL2Results?.generatorCapexMissing) {
+    results.calculationWarnings.push('Off-grid jeneratör etkin ancak jeneratör CAPEX girilmemiş; finansal sonuçlar jeneratör yatırımını eksik gösterebilir.');
+  }
   results.evidenceGovernance = buildEvidenceRegistry(state, results);
   results.tariffSourceGovernance = buildTariffSourceGovernance(tariffModel, results.evidenceGovernance);
   if (results.tariffSourceGovernance.warning) results.calculationWarnings.push(results.tariffSourceGovernance.warning);

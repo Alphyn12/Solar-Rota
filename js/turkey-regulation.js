@@ -70,6 +70,16 @@ function startOfFollowingThirdMonth(exceededDate) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 3, 1));
 }
 
+function dateOnly(value) {
+  return value ? String(value).slice(0, 10) : null;
+}
+
+function isOnOrAfter(date, threshold) {
+  const d = dateOnly(date);
+  const t = dateOnly(threshold);
+  return !!(d && t && d >= t);
+}
+
 export function determineSkttRegime(state = {}) {
   const type = state.tariffType || 'residential';
   const limit = SKTT_LIMITS_2026[type] ?? null;
@@ -79,17 +89,25 @@ export function determineSkttRegime(state = {}) {
   const tariffRegime = state.tariffRegime || 'auto';
   const hasBilateralContract = !!state.hasBilateralContract || tariffRegime === 'contract';
   const exceeded = !!limit && Math.max(annualConsumptionKwh, previousYearConsumptionKwh, currentYearConsumptionKwh) >= limit;
-  const requested = tariffRegime === 'auto'
-    ? (exceeded ? 'sktt' : 'pst')
-    : tariffRegime;
-  const effectiveRegime = hasBilateralContract ? 'contract' : requested;
   const warnings = [];
+
+  const activationDate = state.skttActivationDate || (state.skttExceededDate ? startOfFollowingThirdMonth(state.skttExceededDate)?.toISOString().slice(0, 10) : null);
+  const evaluationDate = dateOnly(state.tariffEvaluationDate || state.settlementDate || state.operationDate || new Date().toISOString().slice(0, 10));
+  const activationReached = exceeded && (!activationDate || isOnOrAfter(evaluationDate, activationDate));
+  const requested = tariffRegime === 'auto'
+    ? (activationReached ? 'sktt' : 'pst')
+    : tariffRegime;
+  const forcedSkttBeforeActivation = tariffRegime === 'sktt' && exceeded && activationDate && !activationReached;
+  const effectiveRegime = hasBilateralContract
+    ? 'contract'
+    : forcedSkttBeforeActivation
+      ? 'pst'
+      : requested;
 
   if (!limit && tariffRegime === 'sktt') warnings.push('Bu abone grubu için SKTT limiti tanımlı değil; manuel seçim doğrulanmalı.');
   if (effectiveRegime === 'sktt' && !exceeded && limit) warnings.push('SKTT seçili ancak yıllık tüketim limiti aşmıyor.');
   if (effectiveRegime === 'contract' && !state.contractedTariff) warnings.push('Sözleşmeli tarife seçili ancak sözleşmeli birim fiyat girilmedi.');
-
-  const activationDate = state.skttActivationDate || (state.skttExceededDate ? startOfFollowingThirdMonth(state.skttExceededDate)?.toISOString().slice(0, 10) : null);
+  if (forcedSkttBeforeActivation) warnings.push('SKTT limiti aşılmış görünüyor ancak aktivasyon tarihi henüz gelmediği için PST baz alınmıştır.');
 
   return {
     type,
@@ -102,6 +120,15 @@ export function determineSkttRegime(state = {}) {
     requestedRegime: requested,
     effectiveRegime,
     activationDate,
+    activationReached,
+    evaluationDate,
+    effectiveRegimeBasis: hasBilateralContract
+      ? 'bilateral-contract'
+      : activationReached
+        ? 'sktt-limit-exceeded-and-activation-reached'
+        : exceeded
+          ? 'sktt-limit-exceeded-activation-pending'
+          : 'below-sktt-limit',
     warnings
   };
 }
@@ -113,8 +140,9 @@ export function buildExportCompensationPolicy(state = {}) {
   // depending on the calendar date. Null out when no explicit date is stored so
   // callers can detect the missing value and show a governance blocker instead.
   const settlementDate = state.settlementDate || null;
+  const settlementDateMissing = settlementMode === 'auto' && !settlementDate;
   const interval = settlementMode === 'auto'
-    ? (settlementDate >= SETTLEMENT_CHANGE_DATE ? 'hourly' : 'monthly')
+    ? (settlementDate && settlementDate >= SETTLEMENT_CHANGE_DATE ? 'hourly' : 'monthly')
     : settlementMode;
   const annualConsumptionKwh = Math.max(0, finiteNumber(state.annualConsumptionKwh, finiteNumber(state.dailyConsumption) * 365));
   const previousYearConsumptionKwh = Math.max(0, finiteNumber(state.previousYearConsumptionKwh, annualConsumptionKwh));
@@ -130,6 +158,13 @@ export function buildExportCompensationPolicy(state = {}) {
     settlementMode,
     interval,
     settlementDate,
+    settlementDateMissing,
+    provisional: settlementDateMissing,
+    assumptionBasis: settlementDateMissing
+      ? 'auto-settlement-date-missing-assumed-monthly-for-preliminary-economics'
+      : interval === 'hourly'
+        ? 'hourly-net-export-compensation'
+        : 'monthly-netting-import-offset-then-surplus-compensation',
     annualSellableExportCapKwh,
     capBasis: hasManualCap ? 'manual' : 'max(current/previous/annual consumption)',
     paidBatteryExportAllowed: false,
@@ -139,7 +174,7 @@ export function buildExportCompensationPolicy(state = {}) {
 }
 
 function proratePaidExport(monthly, paidTotal) {
-  const exports = monthly.map(m => Math.max(0, Number(m.gridExport) || 0));
+  const exports = monthly.map(m => Math.max(0, Number(m.compensableSurplus ?? m.gridExport) || 0));
   const totalExport = exports.reduce((s, v) => s + v, 0);
   if (totalExport <= 0) return monthly.map(() => ({ paidGridExport: 0, unpaidGridExport: 0 }));
   return exports.map(v => {
@@ -152,11 +187,9 @@ function aggregateHourlyCompensation(hourlyRows, annualCap) {
   const hourly = Array.isArray(hourlyRows) ? hourlyRows : [];
   const compensatedHourly = hourly.map(row => {
     const rawExport = Math.max(0, Number(row.gridExport) || 0);
-    const load = Math.max(0, Number(row.load) || 0);
-    const paidBeforeAnnualCap = Math.min(rawExport, load);
     return {
       month: Math.max(0, Math.min(11, Number(row.month) || 0)),
-      paidBeforeAnnualCap,
+      paidBeforeAnnualCap: rawExport,
       rawExport
     };
   });
@@ -167,6 +200,8 @@ function aggregateHourlyCompensation(hourlyRows, annualCap) {
     const paidGridExport = row.paidBeforeAnnualCap * annualScale;
     monthly[row.month].paidGridExport += paidGridExport;
     monthly[row.month].unpaidGridExport += Math.max(0, row.rawExport - paidGridExport);
+    monthly[row.month].compensableSurplus = (monthly[row.month].compensableSurplus || 0) + row.rawExport;
+    monthly[row.month].importOffsetEnergy = (monthly[row.month].importOffsetEnergy || 0);
   });
   return monthly;
 }
@@ -186,24 +221,36 @@ export function applyExportCompensation(monthly, policy = {}) {
     } else {
       compensated = rows.map(m => {
         const rawExport = Math.max(0, Number(m.gridExport) || 0);
-        return { paidGridExport: 0, unpaidGridExport: rawExport };
+        return { importOffsetEnergy: 0, compensableSurplus: rawExport, paidGridExport: 0, unpaidGridExport: rawExport };
       });
     }
   } else {
     compensated = rows.map(m => {
       const rawExport = Math.max(0, Number(m.gridExport) || 0);
-      const load = Math.max(0, Number(m.load) || 0);
-      const paidGridExport = Math.min(rawExport, load);
+      const gridImport = Math.max(0, Number(m.gridImport) || 0);
+      const monthlyOffsetEnergy = Math.min(rawExport, gridImport);
+      const compensableSurplus = Math.max(0, rawExport - monthlyOffsetEnergy);
       return {
-        paidGridExport,
-        unpaidGridExport: Math.max(0, rawExport - paidGridExport)
+        importOffsetEnergy: monthlyOffsetEnergy,
+        compensableSurplus,
+        paidGridExport: compensableSurplus,
+        unpaidGridExport: 0
       };
     });
     const paidBeforeAnnualCap = compensated.reduce((s, m) => s + m.paidGridExport, 0);
-    if (paidBeforeAnnualCap > annualCap) compensated = proratePaidExport(rows, annualCap);
+    if (paidBeforeAnnualCap > annualCap) {
+      const cappedPaid = proratePaidExport(compensated, annualCap);
+      compensated = compensated.map((m, idx) => ({
+        ...m,
+        paidGridExport: cappedPaid[idx].paidGridExport,
+        unpaidGridExport: Math.max(0, m.compensableSurplus - cappedPaid[idx].paidGridExport)
+      }));
+    }
   }
 
   return {
+    importOffsetEnergy: compensated.reduce((s, m) => s + (Number(m.importOffsetEnergy) || 0), 0),
+    compensableSurplus: compensated.reduce((s, m) => s + (Number(m.compensableSurplus ?? m.paidGridExport) || 0), 0),
     paidGridExport: compensated.reduce((s, m) => s + m.paidGridExport, 0),
     unpaidGridExport: compensated.reduce((s, m) => s + m.unpaidGridExport, 0),
     monthly: compensated,

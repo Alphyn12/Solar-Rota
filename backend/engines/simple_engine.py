@@ -46,11 +46,34 @@ def _annual_ghi_to_psh(ghi: float | None, city_name: str | None = None) -> float
         # Clamp to physical maximum of 10 h/day; values 10–20 indicate bad upstream data.
         return min(ghi, 10.0)
     fallback = {
-        "Ankara": 4.44,
-        "İstanbul": 4.24,
-        "Izmir": 4.71,
-        "İzmir": 4.71,
-        "Antalya": 4.93,
+        # Marmara
+        "İstanbul": 4.24, "Edirne": 4.08, "Tekirdağ": 4.08, "Kırklareli": 4.03,
+        "Çanakkale": 4.27, "Bursa": 4.32, "Balıkesir": 4.33, "Bilecik": 4.14,
+        "Kocaeli": 4.05, "Sakarya": 4.11, "Düzce": 3.89, "Bolu": 4.00,
+        "Bartın": 3.81, "Karabük": 3.95, "Zonguldak": 3.78,
+        # İç Anadolu
+        "Ankara": 4.44, "Eskişehir": 4.33, "Kırıkkale": 4.38, "Kırşehir": 4.44,
+        "Çankırı": 4.22, "Çorum": 4.33, "Yozgat": 4.33, "Amasya": 4.16,
+        "Tokat": 4.11, "Sivas": 4.38, "Kayseri": 4.52, "Nevşehir": 4.52,
+        "Aksaray": 4.49, "Niğde": 4.52, "Konya": 4.60, "Karaman": 4.66, "Afyonkarahisar": 4.44,
+        # Ege
+        "İzmir": 4.71, "Izmir": 4.71, "Manisa": 4.60, "Aydın": 4.82, "Denizli": 4.71,
+        "Muğla": 4.88, "Kütahya": 4.36, "Uşak": 4.55, "Isparta": 4.66, "Burdur": 4.71,
+        # Akdeniz
+        "Antalya": 4.93, "Mersin": 4.90, "Adana": 4.87, "Hatay": 4.93,
+        "Osmaniye": 4.82, "Kahramanmaraş": 4.88,
+        # Karadeniz
+        "Trabzon": 3.62, "Giresun": 3.62, "Ordu": 3.67, "Samsun": 3.78,
+        "Sinop": 3.78, "Kastamonu": 3.97, "Rize": 3.45, "Artvin": 3.51,
+        "Gümüşhane": 4.11, "Bayburt": 4.16,
+        # Doğu Anadolu
+        "Erzurum": 4.33, "Erzincan": 4.49, "Malatya": 4.71, "Elazığ": 4.71,
+        "Van": 4.66, "Bitlis": 4.49, "Muş": 4.44, "Bingöl": 4.60,
+        "Tunceli": 4.55, "Hakkari": 4.66, "Kars": 4.25, "Ardahan": 4.05,
+        "Ağrı": 4.44, "Iğdır": 4.60,
+        # Güneydoğu Anadolu
+        "Şanlıurfa": 5.15, "Gaziantep": 4.99, "Diyarbakır": 4.79, "Mardin": 5.04,
+        "Adıyaman": 4.93, "Batman": 4.82, "Şırnak": 4.82, "Siirt": 4.82,
     }
     return fallback.get(city_name or "", 4.50)
 
@@ -98,13 +121,35 @@ def cable_loss_factor(request: EngineRequest) -> float:
     return 1 - _clamp(float(loss_pct), 0, 50) / 100
 
 
+def layout_snapshot(request: EngineRequest) -> dict | None:
+    snap = getattr(request.system, "layoutSnapshot", None)
+    if snap and hasattr(snap, "model_dump"):
+        snap = snap.model_dump()
+    return snap if isinstance(snap, dict) else None
+
+
+def system_power_from_layout_snapshot(request: EngineRequest) -> tuple[float, int] | None:
+    snap = layout_snapshot(request)
+    if not snap or not snap.get("authoritativeSizing"):
+        return None
+    kwp = float(snap.get("chosenSystemPowerKwp") or 0)
+    panel_count = int(round(float(snap.get("panelCount") or 0)))
+    if kwp > 0 and panel_count > 0:
+        return kwp, panel_count
+    return None
+
+
 def calculate_production(request: EngineRequest) -> Dict[str, object]:
     panel_type = request.system.panelType
     panel_watt = panel_watt_peak(request)
     panel_area = panel_area_m2(request)
-    usable_area = max(0, request.roof.areaM2) * 0.75
-    panel_count = int(usable_area // panel_area)
-    system_power_kwp = panel_count * panel_watt / 1000
+    snapshot_power = system_power_from_layout_snapshot(request)
+    if snapshot_power:
+        system_power_kwp, panel_count = snapshot_power
+    else:
+        usable_area = max(0, request.roof.areaM2) * 0.75
+        panel_count = int(usable_area // panel_area)
+        system_power_kwp = panel_count * panel_watt / 1000
 
     psh = _annual_ghi_to_psh(request.site.ghi, request.site.cityName)
     base_energy = system_power_kwp * psh * 365
@@ -127,6 +172,8 @@ def calculate_production(request: EngineRequest) -> Dict[str, object]:
         "bifacialFactor": bifacial_factor,
         "wiringLossPct": round((1 - wiring_factor) * 100, 3),
         "modelCompleteness": "deterministic backend fallback aligned to frontend panel/inverter contract; pvlib hourly model chain preferred when available",
+        "layoutSnapshotUsed": bool(snapshot_power),
+        "layoutSnapshot": layout_snapshot(request),
         "parityNotes": [
             "Panel wattage, panel area, inverter efficiency, bifacial gain, and cable loss are read from the shared request contract when present.",
             "This fallback still uses a deterministic GHI/PSH orientation model, so it is not expected to numerically match pvlib-backed or browser PVGIS output exactly.",

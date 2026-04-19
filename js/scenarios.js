@@ -146,7 +146,8 @@ function computeSensitivityNpv(r, state, overrides = {}) {
     inverterLifetime: r.inverterLifetime || 12,
     inverterReplaceCost: r.inverterReplaceCost,
     netMeteringEnabled: state.netMeteringEnabled,
-    exportRateOverride: state.netMeteringEnabled && state.scenarioKey !== 'off-grid' ? tariffModel.exportRate : 0
+    exportRateOverride: state.netMeteringEnabled && state.scenarioKey !== 'off-grid' ? tariffModel.exportRate : 0,
+    annualGeneratorCost: state.scenarioKey === 'off-grid' ? (r.offgridL2Results?.generatorFuelCostAnnual || 0) : 0
   });
   return Math.round(financial.projectNPV);
 }
@@ -258,7 +259,8 @@ function computeScenario(r, inflationRate, state) {
     inverterLifetime: r.inverterLifetime || 12,
     inverterReplaceCost: r.inverterReplaceCost,
     netMeteringEnabled: state.netMeteringEnabled,
-    exportRateOverride: state.netMeteringEnabled && state.scenarioKey !== 'off-grid' ? tariffModel.exportRate : 0
+    exportRateOverride: state.netMeteringEnabled && state.scenarioKey !== 'off-grid' ? tariffModel.exportRate : 0,
+    annualGeneratorCost: state.scenarioKey === 'off-grid' ? (r.offgridL2Results?.generatorFuelCostAnnual || 0) : 0
   });
   const cashFlows = [-totalCost, ...financial.rows.map(row => row.netCashFlow)];
 

@@ -106,10 +106,12 @@ export function runComparison() {
     const basePower = Math.max(r.systemPower, 0.001);
     const annualEnergy = Math.round(r.annualEnergy * (systemPower / basePower) * inv.efficiency / (INVERTER_TYPES[state.inverterType || 'string']?.efficiency || 0.97));
 
-    // Maliyet
+    // Maliyet — Law 7456/2023: Solar PV modülleri KDV %0, diğer bileşenler %20
     const invUnit = systemPower < 10 ? inv.pricePerKWp.lt10 : systemPower < 50 ? inv.pricePerKWp.lt50 : inv.pricePerKWp.gt50;
-    const baseCost = systemPower * 1000 * panel.pricePerWatt + systemPower * invUnit + systemPower * (2200 + 600 + 900 + 1800) + 5000;
-    const totalCost = customPrice || Math.round(baseCost * 1.20);
+    const panelCostComp = systemPower * 1000 * panel.pricePerWatt;
+    const nonPanelCostComp = systemPower * invUnit + systemPower * (2200 + 600 + 900 + 1800) + 5000;
+    const kdvComp = nonPanelCostComp * 0.20;
+    const totalCost = customPrice || Math.round(panelCostComp + nonPanelCostComp + kdvComp);
 
     const monthlyData = (r.monthlyData || []).map(v => Math.round((Number(v) || 0) * (annualEnergy / Math.max(r.annualEnergy, 1))));
     const monthlyLoad = Array.isArray(r.monthlyLoad)
@@ -132,7 +134,7 @@ export function runComparison() {
     const inverterReplaceCost = state.omEnabled ? Math.round((systemPower * invUnit) * 1.1) : 0;
     const isOffGridScenario = state.scenarioKey === 'off-grid';
     const financialTariffModel = isOffGridScenario && r.financialSavingsRate
-      ? { ...tariffModel, importRate: r.financialSavingsRate, exportRate: 0, financialBasis: r.financialSavingsBasis || 'off-grid-alternative-energy-cost' }
+      ? { ...tariffModel, importRate: r.financialSavingsRate, distributionFee: 0, exportRate: 0, financialBasis: r.financialSavingsBasis || 'off-grid-alternative-energy-cost' }
       : tariffModel;
     const exportRate = state.netMeteringEnabled && !isOffGridScenario
       ? tariffModel.exportRate
@@ -149,7 +151,8 @@ export function runComparison() {
       inverterLifetime: inv.lifetime || 12,
       inverterReplaceCost,
       netMeteringEnabled: state.netMeteringEnabled && !isOffGridScenario,
-      exportRateOverride: exportRate
+      exportRateOverride: exportRate,
+      annualGeneratorCost: isOffGridScenario ? (r.offgridL2Results?.generatorFuelCostAnnual || 0) : 0
     });
 
     let lcoeCostSum = totalCost;

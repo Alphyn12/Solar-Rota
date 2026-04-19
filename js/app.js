@@ -233,7 +233,11 @@ window.state = {
   offgridGeneratorKw: 5,
   offgridGeneratorFuelCostPerKwh: 8,
   offgridGeneratorCapexTry: 0,
-  offgridBadWeatherLevel: ''
+  offgridBadWeatherLevel: '',
+  offgridBatteryMaxChargeKw: null,
+  offgridBatteryMaxDischargeKw: null,
+  offgridInverterAcKw: null,
+  offgridInverterSurgeMultiplier: 1.25
 };
 
 const persistedProposal = !window.location.hash ? loadProposalState() : null;
@@ -760,6 +764,8 @@ function syncScenarioControls() {
     if (genKwEl) genKwEl.value = s.offgridGeneratorKw || 5;
     const genFuelEl = document.getElementById('offgrid-generator-fuel-cost');
     if (genFuelEl) genFuelEl.value = s.offgridGeneratorFuelCostPerKwh || 8;
+    const genCapexEl = document.getElementById('offgrid-generator-capex');
+    if (genCapexEl) genCapexEl.value = s.offgridGeneratorCapexTry || 0;
     const genDetails = document.getElementById('offgrid-generator-details');
     if (genDetails) genDetails.style.display = s.offgridGeneratorEnabled ? 'flex' : 'none';
     const bwEl = document.getElementById('offgrid-bad-weather-level');
