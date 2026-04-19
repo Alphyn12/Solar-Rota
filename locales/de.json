@@ -19,6 +19,12 @@
     "titleHighlight": "verlässlich",
     "subtitle": "Szenario wählen · Standort setzen · Belastbare Schätzung erhalten"
   },
+  "tariff": {
+    "residential": "Haushalt",
+    "commercial": "Gewerbe",
+    "industrial": "Industrie",
+    "agriculture": "Landwirtschaft"
+  },
   "scenario": {
     "label": "Szenario",
     "gridLabel": "System-Szenario auswählen",

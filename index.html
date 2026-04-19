@@ -420,29 +420,29 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   </div>
 
   <!-- Floating background panel SVGs -->
-  <div class="hero-float-panels" aria-hidden="true">
-    <svg class="hero-panel-svg hero-panel-1" width="120" height="80" viewBox="0 0 120 80" fill="none">
+  <div class="hero-panels-bg" aria-hidden="true">
+    <svg class="hero-fp hero-fp-1" width="120" height="80" viewBox="0 0 120 80" fill="none">
       <rect width="120" height="80" rx="6" fill="rgba(6,182,212,0.08)" stroke="rgba(6,182,212,0.2)" stroke-width="1"/>
       <line x1="0" y1="27" x2="120" y2="27" stroke="rgba(6,182,212,0.15)" stroke-width="0.5"/>
       <line x1="0" y1="54" x2="120" y2="54" stroke="rgba(6,182,212,0.15)" stroke-width="0.5"/>
       <line x1="40" y1="0" x2="40" y2="80" stroke="rgba(6,182,212,0.15)" stroke-width="0.5"/>
       <line x1="80" y1="0" x2="80" y2="80" stroke="rgba(6,182,212,0.15)" stroke-width="0.5"/>
     </svg>
-    <svg class="hero-panel-svg hero-panel-2" width="100" height="68" viewBox="0 0 100 68" fill="none">
+    <svg class="hero-fp hero-fp-2" width="100" height="68" viewBox="0 0 100 68" fill="none">
       <rect width="100" height="68" rx="5" fill="rgba(245,158,11,0.07)" stroke="rgba(245,158,11,0.2)" stroke-width="1"/>
       <line x1="0" y1="23" x2="100" y2="23" stroke="rgba(245,158,11,0.15)" stroke-width="0.5"/>
       <line x1="0" y1="46" x2="100" y2="46" stroke="rgba(245,158,11,0.15)" stroke-width="0.5"/>
       <line x1="33" y1="0" x2="33" y2="68" stroke="rgba(245,158,11,0.15)" stroke-width="0.5"/>
       <line x1="67" y1="0" x2="67" y2="68" stroke="rgba(245,158,11,0.15)" stroke-width="0.5"/>
     </svg>
-    <svg class="hero-panel-svg hero-panel-3" width="140" height="95" viewBox="0 0 140 95" fill="none">
+    <svg class="hero-fp hero-fp-3" width="140" height="95" viewBox="0 0 140 95" fill="none">
       <rect width="140" height="95" rx="7" fill="rgba(139,92,246,0.06)" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
       <line x1="0" y1="32" x2="140" y2="32" stroke="rgba(139,92,246,0.12)" stroke-width="0.5"/>
       <line x1="0" y1="64" x2="140" y2="64" stroke="rgba(139,92,246,0.12)" stroke-width="0.5"/>
       <line x1="47" y1="0" x2="47" y2="95" stroke="rgba(139,92,246,0.12)" stroke-width="0.5"/>
       <line x1="94" y1="0" x2="94" y2="95" stroke="rgba(139,92,246,0.12)" stroke-width="0.5"/>
     </svg>
-    <svg class="hero-panel-svg hero-panel-4" width="90" height="60" viewBox="0 0 90 60" fill="none">
+    <svg class="hero-fp hero-fp-4" width="90" height="60" viewBox="0 0 90 60" fill="none">
       <rect width="90" height="60" rx="5" fill="rgba(16,185,129,0.06)" stroke="rgba(16,185,129,0.18)" stroke-width="1"/>
       <line x1="0" y1="20" x2="90" y2="20" stroke="rgba(16,185,129,0.12)" stroke-width="0.5"/>
       <line x1="0" y1="40" x2="90" y2="40" stroke="rgba(16,185,129,0.12)" stroke-width="0.5"/>
@@ -452,8 +452,9 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   </div>
 
   <!-- Glow orbs -->
-  <div class="hero-glow-orb hero-glow-1" aria-hidden="true"></div>
-  <div class="hero-glow-orb hero-glow-2" aria-hidden="true"></div>
+  <div class="hero-orb hero-orb-1" aria-hidden="true"></div>
+  <div class="hero-orb hero-orb-2" aria-hidden="true"></div>
+  <div class="hero-orb hero-orb-3" aria-hidden="true"></div>
 
   <!-- Hero content -->
   <div class="hero-content">
@@ -1034,8 +1035,27 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <label>Elektrik Tarifesi
         <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Elektrik faturanızdaki birim fiyat ve abone tipi. Konut, ticari ve sanayi tarifeleri farklı birim fiyat ve KDV oranlarına sahiptir.</span></span>
       </label>
+      <!-- Visual tariff type tabs -->
+      <div class="tariff-tabs" id="tariff-tabs-visual">
+        <button type="button" class="tariff-tab active" data-tariff="residential">
+          <span class="tariff-tab-icon">🏠</span>
+          <span data-i18n="tariff.residential">Mesken</span>
+        </button>
+        <button type="button" class="tariff-tab" data-tariff="commercial">
+          <span class="tariff-tab-icon">🏢</span>
+          <span data-i18n="tariff.commercial">Ticarethane</span>
+        </button>
+        <button type="button" class="tariff-tab" data-tariff="industrial">
+          <span class="tariff-tab-icon">🏭</span>
+          <span data-i18n="tariff.industrial">Sanayi</span>
+        </button>
+        <button type="button" class="tariff-tab" data-tariff="agriculture">
+          <span class="tariff-tab-icon">🌾</span>
+          <span data-i18n="tariff.agriculture">Tarımsal</span>
+        </button>
+      </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
-        <div>
+        <div style="display:none">
           <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Abone Tipi</div>
           <select id="tariff-type" onchange="updateTariffType(this.value)"
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;min-width:120px">

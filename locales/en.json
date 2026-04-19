@@ -19,6 +19,12 @@
     "titleHighlight": "with confidence",
     "subtitle": "Choose a scenario · Set the location · Get a disciplined estimate"
   },
+  "tariff": {
+    "residential": "Residential",
+    "commercial": "Commercial",
+    "industrial": "Industrial",
+    "agriculture": "Agricultural"
+  },
   "scenario": {
     "label": "Scenario",
     "gridLabel": "Choose your system scenario",

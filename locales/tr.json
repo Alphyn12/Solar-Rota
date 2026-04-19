@@ -19,6 +19,12 @@
     "titleHighlight": "tasarlayın",
     "subtitle": "Senaryo seçin · Konum belirleyin · Doğru hesap alın"
   },
+  "tariff": {
+    "residential": "Mesken",
+    "commercial": "Ticarethane",
+    "industrial": "Sanayi",
+    "agriculture": "Tarımsal"
+  },
   "scenario": {
     "label": "Senaryo",
     "gridLabel": "Sistem senaryonuzu seçin",

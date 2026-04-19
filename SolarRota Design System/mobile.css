@@ -272,8 +272,8 @@ textarea {
     margin-bottom: 0;
   }
 
-  .hero-panels-bg,
-  .hero-orb {
+  .hero-float-panels,
+  .hero-glow-orb {
     display: none;
   }
 

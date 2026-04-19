@@ -481,6 +481,19 @@ document.addEventListener('DOMContentLoaded', () => {
   syncEnterpriseInputsFromState();
   initScenarioExperience();
   updateDashboard();
+
+  // Wire up tariff visual tabs
+  document.querySelectorAll('#tariff-tabs-visual .tariff-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#tariff-tabs-visual .tariff-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tariffType = btn.dataset.tariff;
+      const sel = document.getElementById('tariff-type');
+      if (sel) sel.value = tariffType;
+      updateTariffType(tariffType);
+    });
+  });
+
   // BOM builder ilk açılışta initBomBuilder() ile başlatılır (HTML onclick)
 
   const input = document.getElementById('city-search');
