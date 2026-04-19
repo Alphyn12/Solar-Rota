@@ -767,8 +767,9 @@ h2, .h2, .step-heading-title {
 
 /* Responsive header order */
 @media(max-width:800px) {
-  .header-top { flex-wrap: wrap; }
-  .step-dots-wrap { order: 10; width: 100%; margin-top: 6px; }
+  .header-brand { padding: 12px 16px; }
+  .header-steps-row { padding: 8px 16px; }
+  .logo-icon { height: 80px !important; max-width: 200px !important; }
 }
 
 /* ═══════════════════════════════════════════════════════════

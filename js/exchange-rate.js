@@ -184,6 +184,21 @@ export function renderExchangeRateStatus() {
     headerEl.title = formatRateMeta(meta, locale);
     headerEl.style.color = meta.fallback ? 'var(--primary)' : 'var(--text-muted)';
   }
+
+  const settingsEl = document.getElementById('exchange-rate-status-settings');
+  if (settingsEl) {
+    if (meta?.rate) {
+      settingsEl.textContent = meta.fallback
+        ? `⚠ Canlı kur alınamadı — sabit yedek kullanılıyor`
+        : formatRateMeta(meta, locale);
+      settingsEl.style.color = meta.fallback ? 'var(--primary)' : '';
+    }
+  }
+
+  const settingsInput = document.getElementById('usd-try-settings');
+  if (settingsInput && meta?.rate && !settingsInput.matches(':focus')) {
+    settingsInput.value = Number(meta.rate).toFixed(2);
+  }
 }
 
 if (typeof window !== 'undefined') {
