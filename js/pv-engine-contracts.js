@@ -151,7 +151,7 @@ export function buildPvEngineRequest(state = {}) {
       monthlyConsumptionKwh: Array.isArray(state.monthlyConsumption) ? state.monthlyConsumption.map(v => Math.max(0, finite(v, 0))).slice(0, 12) : null,
       hourlyConsumption8760: normalizeHourlyProfile(state.hourlyConsumption8760),
       offgridDevices: state.scenarioKey === 'off-grid' && Array.isArray(state.offgridDevices) ? state.offgridDevices : [],
-      offgridCriticalFraction: state.scenarioKey === 'off-grid' ? finite(state.offgridCriticalFraction, 0.6) : null
+      offgridCriticalFraction: state.scenarioKey === 'off-grid' ? finite(state.offgridCriticalFraction, 0.3) : null
     },
     offgrid: state.scenarioKey === 'off-grid' ? {
       generatorEnabled: !!state.offgridGeneratorEnabled,

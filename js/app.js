@@ -227,7 +227,7 @@ window.state = {
   quoteReadyApproved: false,
   // Off-Grid Level 2 ayarları
   offgridDevices: [],
-  offgridCriticalFraction: 0.6,
+  offgridCriticalFraction: 0.3,
   offgridAutonomyGoal: 'reliability',
   offgridGeneratorEnabled: false,
   offgridGeneratorKw: 5,
@@ -754,8 +754,8 @@ function syncScenarioControls() {
   if (s.scenarioKey === 'off-grid') {
     const fracEl = document.getElementById('offgrid-critical-fraction');
     const fracValEl = document.getElementById('offgrid-critical-fraction-val');
-    if (fracEl) { fracEl.value = Math.round((Number(s.offgridCriticalFraction) || 0.6) * 100); }
-    if (fracValEl) fracValEl.textContent = (fracEl ? fracEl.value : 60) + '%';
+    if (fracEl) { fracEl.value = Math.round((Number(s.offgridCriticalFraction) || 0.3) * 100); }
+    if (fracValEl) fracValEl.textContent = (fracEl ? fracEl.value : 30) + '%';
     const goalEl = document.getElementById('offgrid-autonomy-goal');
     if (goalEl) goalEl.value = s.offgridAutonomyGoal || 'reliability';
     const genEnabledEl = document.getElementById('offgrid-generator-enabled');
@@ -2228,7 +2228,7 @@ const _escHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;
 function updateOffgridL2Settings() {
   const s = window.state;
   const fracEl = document.getElementById('offgrid-critical-fraction');
-  s.offgridCriticalFraction = fracEl ? Number(fracEl.value) / 100 : 0.6;
+  s.offgridCriticalFraction = fracEl ? Number(fracEl.value) / 100 : 0.3;
   const goalEl = document.getElementById('offgrid-autonomy-goal');
   s.offgridAutonomyGoal = goalEl ? goalEl.value : 'reliability';
   const genEnabledEl = document.getElementById('offgrid-generator-enabled');

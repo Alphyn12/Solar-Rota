@@ -564,7 +564,8 @@ export function computeFinancialTable({
   annualEnergy, hourlySummary, batterySummary, totalCost, tariffModel,
   panel, annualOMCost, annualInsurance, inverterLifetime, inverterReplaceCost,
   netMeteringEnabled, exportRateOverride, batteryLifetime = 0, batteryReplaceCost = 0,
-  annualLoadGrowth = 0, annualGeneratorCost = 0
+  annualLoadGrowth = 0, annualGeneratorCost = 0,
+  annualGeneratorKwh = 0, generatorAlternativeCostPerKwh = 0, generatorFuelCostPerKwh = 0
 }) {
   const rows = [];
   let cumulativeNet = 0;
@@ -600,7 +601,12 @@ export function computeFinancialTable({
     const exportE = degradedEnergy * yearExportRatio;
     const paidExportE = netMeteringEnabled ? exportE : 0;
     const compensatedConsumptionE = selfE + offsetE;
-    const yearSavings = compensatedConsumptionE * electricityPrice + paidExportE * escalatedExportRate;
+    // H3: Jeneratör net tasarrufu = generatorKwh × (alternativeCost - fuelCost)
+    // Jeneratör alternatif kaynağın yerini aldığında sağladığı fark değer kredilendirilir.
+    const netGenSavingsPerKwh = Math.max(0, generatorAlternativeCostPerKwh - generatorFuelCostPerKwh);
+    const yearGeneratorSavings = annualGeneratorKwh * netGenSavingsPerKwh
+      * Math.pow(1 + tariffModel.annualPriceIncrease, year - 1);
+    const yearSavings = compensatedConsumptionE * electricityPrice + paidExportE * escalatedExportRate + yearGeneratorSavings;
     let yearExpenses = (annualOMCost + annualInsurance + annualGeneratorCost) * Math.pow(1 + (tariffModel.expenseEscalationRate || 0), year - 1);
     const invLife = Math.round(Number(inverterLifetime) || 0);
     if (invLife > 0 && year % invLife === 0) yearExpenses += inverterReplaceCost * Math.pow(1 + (tariffModel.expenseEscalationRate || 0), year - 1);

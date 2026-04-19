@@ -6,6 +6,13 @@
 // ═══════════════════════════════════════════════════════════
 import { getLoadProfile } from './calc-core.js';
 
+function getLoadSeasonForMonth(monthIdx) {
+  if (monthIdx === 11 || monthIdx <= 1) return 'winter';
+  if (monthIdx >= 2 && monthIdx <= 4)   return 'spring';
+  if (monthIdx >= 5 && monthIdx <= 7)   return 'summer';
+  return 'autumn';
+}
+
 export const OFFGRID_DISPATCH_VERSION = 'OGD-2026.04-v1.1';
 
 const HOURS_PER_YEAR = 8760;
@@ -13,11 +20,19 @@ const MONTH_DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
 const DAY_HOURS = new Set([6,7,8,9,10,11,12,13,14,15,16,17]);
 const NIGHT_HOURS = new Set([0,1,2,3,4,5,18,19,20,21,22,23]);
 
-// Sentetik kötü hava PV ölçekleme faktörleri
+// Kötü hava senaryosu: ardışık gün sayısı + o penceredeki PV ölçek faktörü
+// Yıl içinde en düşük PV'ye sahip ardışık pencere seçilir ve orada PV düşürülür.
+export const BAD_WEATHER_CONFIG = {
+  light:    { days: 5,  pvFactor: 0.15 },  // 5 ardışık gün %15 PV — hafif bulutlu
+  moderate: { days: 10, pvFactor: 0.05 },  // 10 ardışık gün %5 PV — ağır bulutlu
+  severe:   { days: 15, pvFactor: 0.00 }   // 15 ardışık gün sıfır PV — dağ kışı / Karadeniz
+};
+
+// Geriye dönük uyumluluk — bazı testler bunu kullanabilir
 export const BAD_WEATHER_PV_FACTORS = {
-  light:    0.70,  // -30% PV — 3 bulutlu gün
-  moderate: 0.45,  // -55% PV — 5 ardışık kasvetli gün
-  severe:   0.25   // -75% PV — Karadeniz / dağ kışı
+  light:    BAD_WEATHER_CONFIG.light.pvFactor,
+  moderate: BAD_WEATHER_CONFIG.moderate.pvFactor,
+  severe:   BAD_WEATHER_CONFIG.severe.pvFactor
 };
 
 // Cihaz kategorisi başına 24 saatlik şablonlar (her biri normalize edilir, toplamları ≈1.0)
@@ -57,6 +72,33 @@ export const DEVICE_LOAD_TEMPLATES = {
   generic:       [0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,
                   0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.042,0.034]
 };
+
+// Mevsimsel yük çarpanları — kullanıcı girişinin yıllık toplamını koruyarak mevsimsel dağılım ekler.
+// Örnek: pump kışın 0.00, yazın 1.60 → sulama; normalizasyon yıllık toplamı garantiler.
+export const SEASONAL_LOAD_FACTORS = {
+  lighting:      { summer: 0.65, spring: 0.85, autumn: 0.90, winter: 1.25 },
+  refrigerator:  { summer: 1.15, spring: 1.00, autumn: 1.00, winter: 0.85 },
+  hvac:          { summer: 2.00, spring: 0.55, autumn: 0.60, winter: 0.85 },
+  security:      { summer: 1.00, spring: 1.00, autumn: 1.00, winter: 1.00 },
+  pump:          { summer: 1.60, spring: 1.20, autumn: 0.40, winter: 0.00 },
+  entertainment: { summer: 0.85, spring: 1.00, autumn: 1.05, winter: 1.10 },
+  kitchen:       { summer: 1.00, spring: 1.00, autumn: 1.00, winter: 1.00 },
+  laundry:       { summer: 1.00, spring: 1.00, autumn: 1.00, winter: 1.00 },
+  workshop:      { summer: 1.00, spring: 1.05, autumn: 1.00, winter: 0.95 },
+  gaming:        { summer: 0.85, spring: 1.00, autumn: 1.05, winter: 1.10 },
+  generic:       { summer: 1.00, spring: 1.00, autumn: 1.00, winter: 1.00 }
+};
+
+// Mevsimsel normalizasyon faktörleri — yıllık toplam (dailyKwh × 365) sabit kalır
+const SEASONAL_NORM_FACTORS = (() => {
+  const result = {};
+  for (const [cat, factors] of Object.entries(SEASONAL_LOAD_FACTORS)) {
+    let sum = 0;
+    for (let m = 0; m < 12; m++) sum += MONTH_DAYS[m] * (factors[getLoadSeasonForMonth(m)] ?? 1);
+    result[cat] = sum / 365 || 1;
+  }
+  return result;
+})();
 
 const CATEGORY_SURGE_MULTIPLIERS = {
   lighting: 1.0,
@@ -110,12 +152,16 @@ function buildDeviceSummary(validDevices) {
     const category = device.category && DEVICE_LOAD_TEMPLATES[device.category] ? device.category : 'generic';
     const powerKw = Math.max(0, Number(device.powerW) || 0) / 1000;
     const hoursPerDay = Math.max(0, Math.min(24, Number(device.hoursPerDay) || 0));
+    const nightHours = Math.max(0, Math.min(hoursPerDay, Number(device.nightHoursPerDay) || 0));
+    const dayHours = hoursPerDay - nightHours;
     const dailyKwh = powerKw * hoursPerDay;
     const isCritical = !!device.isCritical;
     if (isCritical) criticalDeviceCount++;
     return {
       name: device.name || category,
       dailyWh: Math.round(powerKw * 1000 * hoursPerDay),
+      dayWh:   Math.round(powerKw * 1000 * dayHours),
+      nightWh: Math.round(powerKw * 1000 * nightHours),
       dailyKwh: Math.round(dailyKwh * 1000) / 1000,
       annualKwh: Math.round(dailyKwh * 365 * 100) / 100,
       isCritical,
@@ -265,11 +311,16 @@ export function buildOffgridLoadProfile(devices, options = {}) {
     const template = blendDayNightTemplate(rawTemplate, dayHours, nightHours);
     const surgeMultiplier = deviceSurgeMultiplier(device, category);
 
+    const normFactor = SEASONAL_NORM_FACTORS[category] || 1;
+    const seasonFactors = SEASONAL_LOAD_FACTORS[category] || {};
     let cursor = 0;
     for (let monthIdx = 0; monthIdx < 12; monthIdx++) {
+      const season = getLoadSeasonForMonth(monthIdx);
+      const rawSeasonFactor = seasonFactors[season] ?? 1;
+      const seasonalDailyKwh = normFactor > 0 ? dailyKwh * rawSeasonFactor / normFactor : dailyKwh;
       for (let d = 0; d < MONTH_DAYS[monthIdx]; d++) {
         for (let h = 0; h < 24; h++) {
-          const val = dailyKwh * template[h];
+          const val = seasonalDailyKwh * template[h];
           totalHourly8760[cursor] += val;
           if (val > 1e-9) hourlyPeakKw8760[cursor] += powerKw * surgeMultiplier;
           if (isCritical) {
@@ -366,6 +417,7 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
 
   const N = Math.min(pvHourly8760.length, loadHourly8760.length, criticalLoadHourly8760.length, HOURS_PER_YEAR);
   let dailyUnmet = 0;
+  let dailyLoad = 0;
 
   for (let i = 0; i < N; i++) {
     const rawPv = Math.max(0, Number(pvHourly8760[i]) || 0);
@@ -478,10 +530,14 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
     unmetLoadKwh += finalUnmet;
     unmetCriticalLoadKwh += finalUnmetCritical;
     dailyUnmet += finalUnmet;
+    dailyLoad  += load;
 
     if (i % 24 === 23) {
-      if (dailyUnmet < 0.001) autonomousDays++;
+      // Göreceli eşik: günlük yükün %1'i veya minimum 1 Wh
+      const autonomyThreshold = Math.max(0.001, dailyLoad * 0.01);
+      if (dailyUnmet < autonomyThreshold) autonomousDays++;
       dailyUnmet = 0;
+      dailyLoad  = 0;
     }
 
     minSocKwh = Math.min(minSocKwh, soc);
@@ -570,24 +626,68 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
 }
 
 /**
- * Kötü hava senaryosu — PV ölçeklendirilerek dispatch yeniden çalıştırılır.
+ * Yıl içinde en düşük PV'ye sahip ardışık N günlük pencereyi bulur.
+ */
+function findWorstPvWindow(pvHourly8760, nDays) {
+  const nHours = nDays * 24;
+  const n = Math.min(pvHourly8760.length, HOURS_PER_YEAR);
+  if (nHours >= n) return 0;
+  let windowPv = 0;
+  for (let i = 0; i < nHours; i++) windowPv += Math.max(0, Number(pvHourly8760[i]) || 0);
+  let minPv = windowPv;
+  let worstStart = 0;
+  for (let start = 1; start + nHours <= n; start++) {
+    windowPv += (Math.max(0, Number(pvHourly8760[start + nHours - 1]) || 0))
+              - (Math.max(0, Number(pvHourly8760[start - 1]) || 0));
+    if (windowPv < minPv) { minPv = windowPv; worstStart = start; }
+  }
+  return worstStart;
+}
+
+/**
+ * Kötü hava senaryosu — yıl içindeki en kötü ardışık günler için PV sıfırlanır/düşürülür,
+ * dispatch yeniden çalıştırılır. Tüm yılı ölçeklemek yerine sadece o pencere etkilenir.
  */
 export function runBadWeatherScenario(normalDispatchResult, pvHourly8760, loadHourly8760, criticalHourly8760, battery, generator, weatherLevel, options = {}) {
-  const factor = BAD_WEATHER_PV_FACTORS[weatherLevel] || BAD_WEATHER_PV_FACTORS.moderate;
-  const badDispatch = runOffgridDispatch(pvHourly8760, loadHourly8760, criticalHourly8760, battery, generator, {
-    ...options,
-    pvScaleFactor: factor
+  const config = BAD_WEATHER_CONFIG[weatherLevel] || BAD_WEATHER_CONFIG.moderate;
+  const { days: badDays, pvFactor } = config;
+  const nHours = badDays * 24;
+
+  const worstStart = findWorstPvWindow(pvHourly8760, badDays);
+
+  // Sadece kötü hava penceresindeki PV'yi düşür, geri kalanı normal bırak
+  const scaledPvHourly = Array.from({ length: Math.min(pvHourly8760.length, HOURS_PER_YEAR) }, (_, i) => {
+    const v = Math.max(0, Number(pvHourly8760[i]) || 0);
+    return (i >= worstStart && i < worstStart + nHours) ? v * pvFactor : v;
   });
 
-  const criticalCoverageDropPct = Math.max(0, (normalDispatchResult.criticalLoadCoverage - badDispatch.criticalLoadCoverage) * 100);
-  const totalCoverageDropPct = Math.max(0, (normalDispatchResult.totalLoadCoverage - badDispatch.totalLoadCoverage) * 100);
-  const pvBatteryCoverageDropPct = Math.max(0, (normalDispatchResult.solarBatteryLoadCoverage - badDispatch.solarBatteryLoadCoverage) * 100);
-  const additionalGeneratorKwh = Math.max(0, badDispatch.generatorToLoadKwh - normalDispatchResult.generatorToLoadKwh);
-  const additionalGeneratorCost = Math.max(0, badDispatch.generatorFuelCostAnnual - normalDispatchResult.generatorFuelCostAnnual);
+  const badDispatch = runOffgridDispatch(scaledPvHourly, loadHourly8760, criticalHourly8760, battery, generator, options);
+
+  // Kötü hava penceresindeki anlık metrikleri hesapla
+  const windowHourly = badDispatch.hourly8760.slice(worstStart, worstStart + nHours);
+  const windowLoad           = windowHourly.reduce((s, h) => s + (h.loadKwh     || 0), 0);
+  const windowUnmet          = windowHourly.reduce((s, h) => s + (h.unmet       || 0), 0);
+  const windowCriticalLoad   = windowHourly.reduce((s, h) => s + (h.criticalKwh || 0), 0);
+  const windowUnmetCritical  = windowHourly.reduce((s, h) => s + (h.unmetCritical || 0), 0);
+  const windowCoverage         = windowLoad         > 0 ? Math.max(0, 1 - windowUnmet        / windowLoad)         : 1;
+  const windowCriticalCoverage = windowCriticalLoad > 0 ? Math.max(0, 1 - windowUnmetCritical / windowCriticalLoad) : 1;
+  const windowMinSoc = windowHourly.reduce((mn, h) => Math.min(mn, h.soc ?? Infinity), Infinity);
+
+  const criticalCoverageDropPct   = Math.max(0, (normalDispatchResult.criticalLoadCoverage   - badDispatch.criticalLoadCoverage)   * 100);
+  const totalCoverageDropPct      = Math.max(0, (normalDispatchResult.totalLoadCoverage      - badDispatch.totalLoadCoverage)      * 100);
+  const pvBatteryCoverageDropPct  = Math.max(0, (normalDispatchResult.solarBatteryLoadCoverage - badDispatch.solarBatteryLoadCoverage) * 100);
+  const additionalGeneratorKwh   = Math.max(0, badDispatch.generatorToLoadKwh       - normalDispatchResult.generatorToLoadKwh);
+  const additionalGeneratorCost  = Math.max(0, badDispatch.generatorFuelCostAnnual  - normalDispatchResult.generatorFuelCostAnnual);
 
   return {
     weatherLevel,
-    pvScaleFactor: factor,
+    pvScaleFactor: pvFactor,
+    consecutiveDays: badDays,
+    worstWindowStartHour: worstStart,
+    worstWindowDayOfYear: Math.floor(worstStart / 24) + 1,
+    windowCoverage,
+    windowCriticalCoverage,
+    windowMinSocKwh: isFinite(windowMinSoc) ? windowMinSoc : 0,
     dispatch: badDispatch,
     criticalCoverageDropPct,
     totalCoverageDropPct,
@@ -600,11 +700,19 @@ export function runBadWeatherScenario(normalDispatchResult, pvHourly8760, loadHo
 /**
  * Dispatch çıktılarını ui-render.js ve calc-engine.js için paketler.
  */
-export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProfile, generatorConfig, financialInputs = {}) {
+export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProfile, generatorConfig, financialInputs = {}, withoutGeneratorDispatch = null) {
   const capex = Math.max(0, Number(financialInputs.systemCapexTry) || 0);
   const genCapex = Math.max(0, Number(financialInputs.generatorCapexTry) || 0);
   const totalCapex = capex + genCapex;
-  const lifecycleCostAnnual = (totalCapex / 25) + (normalDispatch.generatorFuelCostAnnual || 0);
+
+  // Yaşam döngüsü maliyeti: düz amortisman + jeneratör yakıt + pil değişimi
+  const battCapex = Math.max(0, Number(financialInputs.batteryCapexTry) || 0);
+  const battLifetime = Math.max(0, Number(financialInputs.batteryLifetimeYears) || 0);
+  const battReplaceFraction = 0.85;
+  const battReplacementsIn25y = battLifetime > 0 ? Math.floor(24 / battLifetime) : 0;
+  const battReplacementAnnual = battLifetime > 0 ? (battCapex * battReplaceFraction * battReplacementsIn25y) / 25 : 0;
+  const lifecycleCostAnnual = (totalCapex / 25) + (normalDispatch.generatorFuelCostAnnual || 0) + battReplacementAnnual;
+
   const generatorEnabled = !!(generatorConfig && generatorConfig.enabled && Number(generatorConfig.capacityKw) > 0);
 
   return {
@@ -622,6 +730,16 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     criticalLoadCoverage: normalDispatch.criticalLoadCoverage,
     totalLoadCoverageWithGenerator: normalDispatch.totalLoadCoverage,
     criticalLoadCoverageWithGenerator: normalDispatch.criticalLoadCoverage,
+    // Jeneratörsüz karşılaştırma (jeneratör etkinse hesaplanır)
+    totalLoadCoverageWithoutGenerator: withoutGeneratorDispatch
+      ? withoutGeneratorDispatch.totalLoadCoverage
+      : (generatorEnabled ? null : normalDispatch.totalLoadCoverage),
+    criticalLoadCoverageWithoutGenerator: withoutGeneratorDispatch
+      ? withoutGeneratorDispatch.criticalLoadCoverage
+      : (generatorEnabled ? null : normalDispatch.criticalLoadCoverage),
+    unmetLoadWithoutGeneratorKwh: withoutGeneratorDispatch
+      ? withoutGeneratorDispatch.unmetLoadKwh
+      : (generatorEnabled ? null : normalDispatch.unmetLoadKwh),
     pvBatteryLoadCoverage: normalDispatch.solarBatteryLoadCoverage,
     pvBatteryCriticalCoverage: normalDispatch.solarBatteryCriticalCoverage,
 
@@ -661,6 +779,8 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
 
     // Ekonomi
     lifecycleCostAnnual,
+    battReplacementAnnual,
+    battReplacementsIn25y,
     systemCapexTry: capex,
     totalCapexTry: totalCapex,
     alternativeEnergyCostPerKwh: Math.max(0, Number(financialInputs.alternativeEnergyCostPerKwh) || 0),

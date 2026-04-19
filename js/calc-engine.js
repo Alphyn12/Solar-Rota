@@ -768,7 +768,7 @@ export async function runCalculation() {
         hourlyLoad8760: hasRealHourlyLoad ? hourlyLoad8760 : null,
         hourlyLoadSource: hasRealHourlyLoad ? (state.hourlyProfileSource || 'hourly-uploaded') : null,
         fallbackDailyKwh: hourlySummaryRaw.annualLoad / 365,
-        criticalFraction: Math.max(0.1, Math.min(1, Number(state.offgridCriticalFraction) || 0.6)),
+        criticalFraction: Math.max(0.1, Math.min(1, Number(state.offgridCriticalFraction) || 0.3)),
         tariffType: state.tariffType
       }
     );
@@ -779,8 +779,8 @@ export async function runCalculation() {
       inverterSurgeMultiplier
     };
 
-    // Normal dispatch çalıştır
-    const normalDispatch = runOffgridDispatch(
+    // R1: 2-geçişli SOC başlangıcı — ısınma geçişi Ocak artefaktını giderir
+    const warmupDispatch = runOffgridDispatch(
       pvHourly,
       offgridLoadProfile.totalHourly8760,
       offgridLoadProfile.criticalHourly8760,
@@ -788,6 +788,31 @@ export async function runCalculation() {
       generatorConfig,
       dispatchOptions
     );
+    const steadyStateSoc = warmupDispatch.hourly8760.at?.(-1)?.soc ?? batteryConfig.socReserveKwh;
+    const batteryConfigSteady = { ...batteryConfig, initialSocKwh: Math.max(batteryConfig.socReserveKwh, Math.min(usableCapKwh, steadyStateSoc)) };
+
+    // Normal dispatch (yetkili)
+    const normalDispatch = runOffgridDispatch(
+      pvHourly,
+      offgridLoadProfile.totalHourly8760,
+      offgridLoadProfile.criticalHourly8760,
+      batteryConfigSteady,
+      generatorConfig,
+      dispatchOptions
+    );
+
+    // Jeneratörsüz karşılaştırma dispatch (jeneratör etkinse)
+    const noGenConfig = { ...generatorConfig, enabled: false };
+    const withoutGeneratorDispatch = generatorConfig.enabled
+      ? runOffgridDispatch(
+          pvHourly,
+          offgridLoadProfile.totalHourly8760,
+          offgridLoadProfile.criticalHourly8760,
+          batteryConfigSteady,
+          noGenConfig,
+          dispatchOptions
+        )
+      : null;
 
     // Kötü hava senaryosu (kullanıcı seçtiyse)
     const weatherLevel = state.offgridBadWeatherLevel || '';
@@ -797,12 +822,16 @@ export async function runCalculation() {
           pvHourly,
           offgridLoadProfile.totalHourly8760,
           offgridLoadProfile.criticalHourly8760,
-          batteryConfig,
+          batteryConfigSteady,
           generatorConfig,
           weatherLevel,
           dispatchOptions
         )
       : null;
+
+    const batteryModel = BATTERY_MODELS[batt.model];
+    const battLifetimeYears = Number(batt.warranty || batteryModel?.warranty) || 10;
+    const battCapexForLifecycle = modelBatteryCost(batt);
 
     // L2 sonuç nesnesi oluştur
     offgridL2Results = buildOffgridResults(
@@ -812,10 +841,13 @@ export async function runCalculation() {
       generatorConfig,
       {
         alternativeEnergyCostPerKwh: effectiveSavingsTariff,
-        systemCapexTry: solarCost + modelBatteryCost(state.battery || {}),
+        systemCapexTry: solarCost + battCapexForLifecycle,
         generatorCapexTry: Math.max(0, Number(state.offgridGeneratorCapexTry) || 0),
+        batteryCapexTry: battCapexForLifecycle,
+        batteryLifetimeYears: battLifetimeYears,
         weatherScenario: weatherLevel
-      }
+      },
+      withoutGeneratorDispatch
     );
     // Üretim kaynağı şeffaflığını off-grid sonucuna ekle
     offgridL2Results.productionSource = authoritativeSourceMeta.source || aggregateFetchStatus;
@@ -855,7 +887,20 @@ export async function runCalculation() {
     bessMetrics.totalLoadCoverageWithGenerator = (normalDispatch.totalLoadCoverage * 100).toFixed(1);
     bessMetrics.criticalLoadCoverage = (normalDispatch.solarBatteryCriticalCoverage * 100).toFixed(1);
     bessMetrics.criticalLoadCoverageWithGenerator = (normalDispatch.criticalLoadCoverage * 100).toFixed(1);
-    bessMetrics.nightCoverage = bessMetrics.gridIndependence;
+    // H1: Gerçek gece kapsama hesabı — gece saatlerindeki yükün batarya ile karşılanma oranı
+    (function () {
+      const NIGHT_H = new Set([18,19,20,21,22,23,0,1,2,3,4,5]);
+      let nightLoad = 0, nightBatt = 0;
+      (normalDispatch.hourly8760 || []).forEach((row, i) => {
+        if (NIGHT_H.has(i % 24)) {
+          nightLoad += row.loadKwh     || 0;
+          nightBatt += row.batteryDischarge || 0;
+        }
+      });
+      bessMetrics.nightCoverage = nightLoad > 0
+        ? (Math.min(1, nightBatt / nightLoad) * 100).toFixed(1)
+        : bessMetrics.gridIndependence;
+    })();
     bessMetrics.batteryStored = normalDispatch.batteryToLoadKwh.toFixed(1);
     bessMetrics.cyclesPerYear = normalDispatch.cyclesPerYear.toFixed(0);
     bessMetrics.autonomousDaysPct = normalDispatch.autonomousDaysPct;
@@ -936,6 +981,9 @@ export async function runCalculation() {
 
   const lidFactor = panel.firstYearDeg || 0;
   const annualGeneratorCost = offgridL2Results ? (offgridL2Results.generatorFuelCostAnnual || 0) : 0;
+  const annualGeneratorKwh  = offgridL2Results ? (offgridL2Results.generatorKwh || 0) : 0;
+  const generatorFuelCostPerKwh = state.offgridGeneratorEnabled
+    ? Math.max(0, Number(state.offgridGeneratorFuelCostPerKwh) || 0) : 0;
   const financial = computeFinancialTable({
     annualEnergy: adjustedEnergy,
     hourlySummary: hourlySummaryRaw,
@@ -951,8 +999,12 @@ export async function runCalculation() {
     exportRateOverride: exportRate,
     batteryLifetime,
     batteryReplaceCost,
-    annualLoadGrowth: Number(state.annualLoadGrowth) || 0,  // Faz-3 Fix-13
-    annualGeneratorCost   // Off-grid jeneratör yakıt maliyeti (on-grid'de 0)
+    annualLoadGrowth: Number(state.annualLoadGrowth) || 0,
+    annualGeneratorCost,
+    // H3: Jeneratör kWh × (alternativeCost - fuelCost) tasarrufu finansal tabloya eklenir
+    annualGeneratorKwh,
+    generatorAlternativeCostPerKwh: state.scenarioKey === 'off-grid' ? effectiveSavingsTariff : 0,
+    generatorFuelCostPerKwh
   });
   const yearlyTable = financial.rows;
   const displayAnnualSavings = state.scenarioKey === 'off-grid'

@@ -358,10 +358,11 @@ describe('runBadWeatherScenario', () => {
       'kötü hava kapsama <= normal kapsama');
   });
 
-  it('hafif/orta/şiddetli PV faktörleri doğru', () => {
-    assert.equal(BAD_WEATHER_PV_FACTORS.light, 0.70);
-    assert.equal(BAD_WEATHER_PV_FACTORS.moderate, 0.45);
-    assert.equal(BAD_WEATHER_PV_FACTORS.severe, 0.25);
+  it('hafif/orta/şiddetli PV faktörleri doğru (ardışık-gün modeli)', () => {
+    // BAD_WEATHER_CONFIG ardışık-gün + pencere içi pvFactor
+    assert.equal(BAD_WEATHER_PV_FACTORS.light,    0.15);
+    assert.equal(BAD_WEATHER_PV_FACTORS.moderate,  0.05);
+    assert.equal(BAD_WEATHER_PV_FACTORS.severe,    0.00);
   });
 
   it('delta metrikleri pozitif veya sıfır', () => {
@@ -381,7 +382,8 @@ describe('runBadWeatherScenario', () => {
     const normal = runOffgridDispatch(pv, load, critical, DEFAULT_BATTERY, NO_GENERATOR, {});
     const bad = runBadWeatherScenario(normal, pv, load, critical, DEFAULT_BATTERY, NO_GENERATOR, 'light');
     assert.equal(bad.weatherLevel, 'light');
-    assert.equal(bad.pvScaleFactor, 0.70);
+    assert.equal(bad.pvScaleFactor, 0.15);
+    assert.ok(bad.consecutiveDays > 0, 'consecutiveDays > 0');
   });
 });
 

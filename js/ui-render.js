@@ -339,7 +339,7 @@ function renderOffgridL2Results(offgridL2Results, state) {
       const levelKey = 'offgridL2.badWeather_' + bw.weatherLevel;
       const critDrop = bw.criticalCoverageDropPct.toFixed(1);
       const totalDrop = bw.totalCoverageDropPct.toFixed(1);
-      const factor = Math.round((bw.pvScaleFactor || 1) * 100);
+      const days = bw.consecutiveDays || 0;
       const resilient = bw.criticalCoverageDropPct < 10
         ? i18n.t('offgridL2.badWeatherResilientYes')
         : i18n.t('offgridL2.badWeatherResilientNo');
@@ -348,9 +348,13 @@ function renderOffgridL2Results(offgridL2Results, state) {
         : i18n.t('offgridL2.badWeatherRiskHigh');
       const narrativeKey = `offgridL2.badWeatherNarrative${bw.weatherLevel.charAt(0).toUpperCase() + bw.weatherLevel.slice(1)}`;
       const narrative = i18n.t(narrativeKey)
-        .replace('{factor}', factor).replace('{critDrop}', critDrop)
+        .replace('{days}', days).replace('{critDrop}', critDrop)
         .replace('{totalDrop}', totalDrop).replace('{resilient}', resilient)
         .replace('{risk}', risk);
+      const windowDay = bw.worstWindowDayOfYear;
+      const windowPart = windowDay
+        ? `<span style="color:var(--text-muted);font-size:0.72rem">${escapeHtml(i18n.t('offgridL2.badWeatherWindowDay') || 'En kötü pencere: gün')} ${windowDay}</span>`
+        : '';
       const addGenPart = bw.additionalGeneratorKwh > 0
         ? `<div style="margin-top:4px">${escapeHtml(i18n.t('offgridL2.addGenKwh'))}: <strong>${Math.round(bw.additionalGeneratorKwh).toLocaleString(locale)} kWh</strong></div>`
         : '';
@@ -359,6 +363,7 @@ function renderOffgridL2Results(offgridL2Results, state) {
           <span>${escapeHtml(i18n.t('offgridL2.badWeatherLevel'))}: <strong style="color:var(--text)">${escapeHtml(i18n.t(levelKey))}</strong></span>
           <span>${escapeHtml(i18n.t('offgridL2.criticalDropLabel'))}: <strong style="color:#EF4444">−${critDrop}%</strong></span>
           <span>${escapeHtml(i18n.t('offgridL2.totalDropLabel'))}: <strong style="color:#F59E0B">−${totalDrop}%</strong></span>
+          ${windowPart}
         </div>
         <div style="font-size:0.72rem;color:var(--text-muted);font-style:italic">${escapeHtml(narrative)}</div>
         ${addGenPart}
