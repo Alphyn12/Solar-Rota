@@ -140,8 +140,16 @@ def test_backend_offgrid_financial_uses_alternative_cost_and_blocks_export_reven
     data = response.json()
     assert data["financial"]["financialBasis"] == "off-grid-user-alternative-energy-cost"
     assert data["financial"]["financialSavingsRateTryKwh"] == 19.5
+    assert data["financial"]["gridExportKwh"] == 0
     assert data["financial"]["paidGridExportKwh"] == 0
+    assert data["financial"]["curtailedSurplusEstimateKwh"] >= 0
     assert abs(data["financial"]["annualSavingsTry"] - round(data["financial"]["selfConsumedEnergyKwh"] * 19.5)) <= 20
+    assert data["financial"]["dispatchAvailable"] is False
+    assert data["financial"]["authoritativeForOffgrid"] is False
+    assert data["financial"]["offgridDispatchAuthority"] == "frontend-offgrid-l2-dispatch"
+    assert data["financial"]["selfConsumptionModel"] == "heuristic-target-not-dispatch"
+    assert data["proposal"]["quoteReadiness"] == "not-quote-ready"
+    assert "off-grid dispatch" in data["proposal"]["warningDetail"].lower()
 
 
 @pytest.mark.parametrize(

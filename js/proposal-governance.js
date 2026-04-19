@@ -111,6 +111,7 @@ export function createAssumptionLedger(state = {}, results = {}) {
   const tariff = results.tariffModel || {};
   const exchange = state.exchangeRate || {};
   const evidence = results.evidenceGovernance?.registry || {};
+  const offgridFieldGate = results.offgridL2Results?.fieldEvidenceGate || {};
   return {
     version: PROPOSAL_GOVERNANCE_VERSION,
     generatedAt: nowIso(),
@@ -163,7 +164,51 @@ export function createAssumptionLedger(state = {}, results = {}) {
         confidence: state.proposalApproval?.state === 'approved' ? 'high' : 'low',
         sourceLabel: state.proposalApproval?.approvedBy || 'not-approved',
         sourceDate: state.proposalApproval?.approvedAt || null
-      }
+      },
+      ...(state.scenarioKey === 'off-grid' ? [
+        {
+          key: 'offgrid.fieldEvidenceGate',
+          value: offgridFieldGate.status || 'not-evaluated',
+          confidence: offgridFieldGate.phase2Ready ? 'medium' : 'low',
+          sourceLabel: offgridFieldGate.version || 'missing',
+          sourceDate: null
+        },
+        {
+          key: 'offgrid.pv8760Evidence',
+          value: evidence.offgridPvProduction?.status || 'missing',
+          confidence: evidence.offgridPvProduction?.status === 'verified' ? 'medium' : 'low',
+          sourceLabel: evidence.offgridPvProduction?.ref || 'missing',
+          sourceDate: evidence.offgridPvProduction?.checkedAt || null
+        },
+        {
+          key: 'offgrid.load8760Evidence',
+          value: evidence.offgridLoadProfile?.status || 'missing',
+          confidence: evidence.offgridLoadProfile?.status === 'verified' ? 'medium' : 'low',
+          sourceLabel: evidence.offgridLoadProfile?.ref || 'missing',
+          sourceDate: evidence.offgridLoadProfile?.checkedAt || null
+        },
+        {
+          key: 'offgrid.criticalLoad8760Evidence',
+          value: evidence.offgridCriticalLoadProfile?.status || 'missing',
+          confidence: evidence.offgridCriticalLoadProfile?.status === 'verified' ? 'medium' : 'low',
+          sourceLabel: evidence.offgridCriticalLoadProfile?.ref || 'missing',
+          sourceDate: evidence.offgridCriticalLoadProfile?.checkedAt || null
+        },
+        {
+          key: 'offgrid.siteShadingEvidence',
+          value: evidence.offgridSiteShading?.status || 'missing',
+          confidence: evidence.offgridSiteShading?.status === 'verified' ? 'medium' : 'low',
+          sourceLabel: evidence.offgridSiteShading?.ref || 'missing',
+          sourceDate: evidence.offgridSiteShading?.checkedAt || null
+        },
+        {
+          key: 'offgrid.equipmentDatasheetEvidence',
+          value: evidence.offgridEquipmentDatasheets?.status || 'missing',
+          confidence: evidence.offgridEquipmentDatasheets?.status === 'verified' ? 'medium' : 'low',
+          sourceLabel: evidence.offgridEquipmentDatasheets?.ref || 'missing',
+          sourceDate: evidence.offgridEquipmentDatasheets?.checkedAt || null
+        }
+      ] : [])
     ]
   };
 }

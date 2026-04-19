@@ -4,6 +4,15 @@ import { i18n } from './i18n.js';
 import { localizeMessageList, statusLabel } from './output-i18n.js';
 
 export const EVIDENCE_GOVERNANCE_VERSION = 'GH-EVID-2026.04-v1';
+export const OFFGRID_FIELD_EVIDENCE_VERSION = 'GH-OFFGRID-FIELD-EVID-2026.04-v1';
+
+export const OFFGRID_FIELD_EVIDENCE_REQUIREMENTS = [
+  { key: 'offgridPvProduction', label: 'Off-grid PV 8760 production evidence', maxAgeDays: 365 },
+  { key: 'offgridLoadProfile', label: 'Off-grid total load 8760 evidence', maxAgeDays: 365 },
+  { key: 'offgridCriticalLoadProfile', label: 'Off-grid critical load 8760 evidence', maxAgeDays: 365 },
+  { key: 'offgridSiteShading', label: 'Off-grid site shading evidence', maxAgeDays: 365 },
+  { key: 'offgridEquipmentDatasheets', label: 'Off-grid equipment datasheet evidence', maxAgeDays: 365 }
+];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -54,6 +63,17 @@ function normalizeEvidenceRecord(record = {}, defaults = {}) {
 
 function hasValidatedFile(record = {}) {
   return Array.isArray(record.files) && record.files.some(file => file.sha256 && file.validationStatus !== 'rejected');
+}
+
+function hasCompleteHourly8760(value) {
+  return Array.isArray(value)
+    && value.length >= 8760
+    && value.slice(0, 8760).every(v => Number.isFinite(Number(v)) && Number(v) >= 0);
+}
+
+function runtimeEvidenceStatus(existing, hasRuntimeData) {
+  if (existing?.status) return existing.status;
+  return hasRuntimeData ? 'review-required' : 'missing';
 }
 
 export function isEvidenceFresh(record = {}, { today = currentDateIso(), maxAgeDays = 30 } = {}) {
@@ -120,8 +140,122 @@ export function buildEvidenceRegistry(state = {}, results = {}, { today = curren
     })
   };
 
+  if (state.scenarioKey === 'off-grid') {
+    const offgrid = results.offgridL2Results || {};
+    const hasRealPvProduction = offgrid.productionDispatchMetadata?.hasRealHourlyProduction === true
+      || hasCompleteHourly8760(state.offgridPvHourly8760)
+      || hasCompleteHourly8760(state.hourlyProduction8760);
+    const hasRealLoad = hasCompleteHourly8760(state.hourlyConsumption8760);
+    const hasRealCriticalLoad = hasCompleteHourly8760(state.offgridCriticalLoad8760)
+      || hasCompleteHourly8760(state.criticalLoad8760);
+    const hasSiteVerifiedShading = state.shadingQuality === 'site-verified';
+
+    registry.offgridPvProduction = normalizeEvidenceRecord(evidence.offgridPvProduction, {
+      type: 'offgridPvProduction',
+      status: runtimeEvidenceStatus(evidence.offgridPvProduction, hasRealPvProduction),
+      ref: evidence.offgridPvProduction?.ref || state.offgridPvHourlySource || (hasRealPvProduction ? 'runtime-offgrid-pv-8760' : ''),
+      checkedAt: evidence.offgridPvProduction?.checkedAt || null,
+      sourceLabel: 'Off-grid PV 8760 production evidence',
+      notes: hasRealPvProduction ? 'Runtime 8760 PV profile is present; Phase 2 still requires an auditable file hash.' : ''
+    });
+    registry.offgridLoadProfile = normalizeEvidenceRecord(evidence.offgridLoadProfile, {
+      type: 'offgridLoadProfile',
+      status: runtimeEvidenceStatus(evidence.offgridLoadProfile, hasRealLoad),
+      ref: evidence.offgridLoadProfile?.ref || (hasRealLoad ? 'runtime-total-load-8760' : ''),
+      checkedAt: evidence.offgridLoadProfile?.checkedAt || null,
+      sourceLabel: 'Off-grid total load 8760 evidence',
+      notes: hasRealLoad ? 'Runtime 8760 total load profile is present; Phase 2 still requires an auditable file hash.' : ''
+    });
+    registry.offgridCriticalLoadProfile = normalizeEvidenceRecord(evidence.offgridCriticalLoadProfile, {
+      type: 'offgridCriticalLoadProfile',
+      status: runtimeEvidenceStatus(evidence.offgridCriticalLoadProfile, hasRealCriticalLoad),
+      ref: evidence.offgridCriticalLoadProfile?.ref || (hasRealCriticalLoad ? 'runtime-critical-load-8760' : ''),
+      checkedAt: evidence.offgridCriticalLoadProfile?.checkedAt || null,
+      sourceLabel: 'Off-grid critical load 8760 evidence',
+      notes: hasRealCriticalLoad ? 'Runtime 8760 critical load profile is present; Phase 2 still requires an auditable file hash.' : ''
+    });
+    registry.offgridSiteShading = normalizeEvidenceRecord(evidence.offgridSiteShading, {
+      type: 'offgridSiteShading',
+      status: runtimeEvidenceStatus(evidence.offgridSiteShading, hasSiteVerifiedShading),
+      ref: evidence.offgridSiteShading?.ref || (hasSiteVerifiedShading ? 'site-verified-shading-input' : ''),
+      checkedAt: evidence.offgridSiteShading?.checkedAt || null,
+      sourceLabel: 'Off-grid site shading evidence',
+      notes: hasSiteVerifiedShading ? 'Shading quality is marked site-verified; Phase 2 still requires an auditable file hash.' : ''
+    });
+    registry.offgridEquipmentDatasheets = normalizeEvidenceRecord(evidence.offgridEquipmentDatasheets, {
+      type: 'offgridEquipmentDatasheets',
+      status: evidence.offgridEquipmentDatasheets?.status || 'missing',
+      ref: evidence.offgridEquipmentDatasheets?.ref || '',
+      checkedAt: evidence.offgridEquipmentDatasheets?.checkedAt || null,
+      sourceLabel: 'Off-grid equipment datasheet evidence'
+    });
+  }
+
   const validation = validateEvidenceRegistry(registry, { today });
   return { version: EVIDENCE_GOVERNANCE_VERSION, today, registry, validation };
+}
+
+export function buildOffgridFieldEvidenceGate(evidenceGovernance = {}, results = {}, { today = currentDateIso() } = {}) {
+  const registry = evidenceGovernance.registry || evidenceGovernance || {};
+  const offgrid = results.offgridL2Results || {};
+  const phase1 = offgrid.fieldGuaranteeReadiness || {};
+  const blockers = [];
+  const warnings = [];
+  const requiredEvidenceKeys = OFFGRID_FIELD_EVIDENCE_REQUIREMENTS.map(item => item.key);
+
+  if (phase1.status && phase1.phase1Ready !== true) {
+    blockers.push('Faz 1 saha dispatch girdileri tamamlanmadan Faz 2 kanıt kapısı açılamaz.');
+  }
+
+  OFFGRID_FIELD_EVIDENCE_REQUIREMENTS.forEach(req => {
+    const record = registry[req.key] || {};
+    if (record.status !== 'verified' || record.validationStatus === 'rejected') {
+      blockers.push(`${req.key}: doğrulanmış kanıt kaydı yok.`);
+    }
+    if (!hasValidatedFile(record)) {
+      blockers.push(`${req.key}: doğrulanmış dosya eki ve SHA-256 parmak izi yok.`);
+    }
+    if (isEvidenceExpired(record, { today })) {
+      blockers.push(`${req.key}: kanıt geçerlilik tarihi dolmuş.`);
+    }
+    if (record.status === 'verified' && !isEvidenceFresh(record, { today, maxAgeDays: req.maxAgeDays })) {
+      blockers.push(`${req.key}: kaynak kontrol tarihi ${req.maxAgeDays} günden eski veya eksik.`);
+    }
+  });
+
+  if (offgrid.loadMode && offgrid.loadMode !== 'hourly-8760') {
+    warnings.push('Cihaz kütüphanesi veya basit günlük yük modeli Faz 2 kanıtı sayılmaz; gerçek toplam yük 8760 dosyası gerekir.');
+  }
+  if (offgrid.productionDispatchMetadata?.hasRealHourlyProduction !== true) {
+    warnings.push('Aylık üretimden türetilmiş sentetik PV dispatch Faz 2 kanıtı sayılmaz; gerçek PV 8760 dosyası gerekir.');
+  }
+  if (offgrid.synthetic) {
+    warnings.push('Sentetik dispatch sonucu saha garantisi olarak kullanılamaz.');
+  }
+
+  const uniqueBlockers = [...new Set(blockers)];
+  const uniqueWarnings = [...new Set(warnings)];
+  const phase2Ready = uniqueBlockers.length === 0;
+  return {
+    version: OFFGRID_FIELD_EVIDENCE_VERSION,
+    status: phase2Ready ? 'phase2-ready' : 'blocked',
+    phase2Ready,
+    fieldGuaranteeReady: false,
+    requiredEvidenceKeys,
+    blockers: uniqueBlockers,
+    warnings: uniqueWarnings,
+    records: Object.fromEntries(requiredEvidenceKeys.map(key => {
+      const record = registry[key] || {};
+      return [key, {
+        status: record.status || 'missing',
+        validationStatus: record.validationStatus || 'unvalidated',
+        ref: record.ref || '',
+        checkedAt: record.checkedAt || record.issuedAt || null,
+        fileCount: Array.isArray(record.files) ? record.files.length : 0,
+        hasValidatedFile: hasValidatedFile(record)
+      }];
+    }))
+  };
 }
 
 export function validateEvidenceRegistry(registry = {}, { today = currentDateIso() } = {}) {
@@ -308,6 +442,8 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       productionSource: results.offgridL2Results.productionSource || null,
       productionSourceLabel: results.offgridL2Results.productionSourceLabel || null,
       productionFallback: !!results.offgridL2Results.productionFallback,
+      productionDispatchProfile: results.offgridL2Results.productionDispatchProfile || null,
+      productionDispatchMetadata: results.offgridL2Results.productionDispatchMetadata || null,
       loadSource: results.offgridL2Results.loadSource || null,
       loadMode: results.offgridL2Results.loadMode || null,
       dispatchType: results.offgridL2Results.dispatchType || null,
@@ -321,6 +457,10 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       pvBatteryCriticalCoverage: results.offgridL2Results.pvBatteryCriticalCoverage ?? null,
       totalLoadCoverage: results.offgridL2Results.totalLoadCoverage ?? null,
       criticalLoadCoverage: results.offgridL2Results.criticalLoadCoverage ?? null,
+      autonomousDays: results.offgridL2Results.autonomousDays ?? null,
+      autonomousDaysPct: results.offgridL2Results.autonomousDaysPct ?? null,
+      autonomousDaysWithGenerator: results.offgridL2Results.autonomousDaysWithGenerator ?? null,
+      autonomousDaysWithGeneratorPct: results.offgridL2Results.autonomousDaysWithGeneratorPct ?? null,
       minimumSoc: results.offgridL2Results.minimumSoc ?? null,
       averageSoc: results.offgridL2Results.averageSoc ?? null,
       batteryMaxChargeKw: results.offgridL2Results.batteryMaxChargeKw ?? null,
@@ -334,10 +474,20 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       unmetCriticalKwh: results.offgridL2Results.unmetCriticalKwh ?? null,
       curtailedPvKwh: results.offgridL2Results.curtailedPvKwh ?? null,
       weatherScenario: results.offgridL2Results.weatherScenario || results.offgridL2Results.badWeatherScenario?.weatherLevel || null,
+      badWeatherCriticalCoverageDropPct: results.offgridL2Results.badWeatherScenario?.criticalCoverageDropPct ?? null,
+      badWeatherTotalCoverageDropPct: results.offgridL2Results.badWeatherScenario?.totalCoverageDropPct ?? null,
+      badWeatherAdditionalGeneratorKwh: results.offgridL2Results.badWeatherScenario?.additionalGeneratorKwh ?? null,
+      badWeatherWindowCoverage: results.offgridL2Results.badWeatherScenario?.windowCoverage ?? null,
+      badWeatherWindowCriticalCoverage: results.offgridL2Results.badWeatherScenario?.windowCriticalCoverage ?? null,
+      badWeatherWorstWindowDayOfYear: results.offgridL2Results.badWeatherScenario?.worstWindowDayOfYear ?? null,
       methodologyNote: results.offgridL2Results.methodologyNote || null,
       provisional: results.offgridL2Results.provisional !== false,
       synthetic: !!results.offgridL2Results.synthetic,
       feasibilityNotGuaranteed: results.offgridL2Results.feasibilityNotGuaranteed !== false,
+      fieldGuaranteeReadiness: results.offgridL2Results.fieldGuaranteeReadiness || null,
+      fieldEvidenceGate: results.offgridL2Results.fieldEvidenceGate || null,
+      fieldGuaranteeCandidate: !!results.offgridL2Results.fieldGuaranteeCandidate,
+      fieldGuaranteeReady: !!results.offgridL2Results.fieldGuaranteeReady,
       dispatchVersion: results.offgridL2Results.dispatchVersion || null
     } : null,
     tariff: {

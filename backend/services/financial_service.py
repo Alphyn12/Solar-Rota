@@ -16,6 +16,7 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
     export_rate = max(0, request.tariff.exportRateTryKwh or 0)
 
     scenario_key = request.scenario.key
+    is_off_grid = scenario_key == "off-grid"
     net_metering = False if scenario_key == "off-grid" else bool(request.system.netMeteringEnabled)
     off_grid_cost = max(0, float(getattr(request.tariff, "offGridCostPerKwhTry", 0) or 0))
     financial_import_rate = (
@@ -79,12 +80,15 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
         blockers.append("Tüketim/fatura kanıtı eksik.")
     if not request.tariff.sourceCheckedAt:
         blockers.append("Tarife kaynak kontrol tarihi eksik.")
+    if is_off_grid:
+        blockers.append("Backend off-grid dispatch hesaplamaz; müşteri çıktısı için frontend L2 dispatch sonucu gerekir.")
 
     financial = {
         "annualLoadKwh": round(annual_load),
         "selfConsumedEnergyKwh": round(self_consumed),
-        "gridExportKwh": round(export_kwh),
+        "gridExportKwh": 0 if is_off_grid else round(export_kwh),
         "paidGridExportKwh": round(paid_export),
+        "curtailedSurplusEstimateKwh": round(export_kwh) if is_off_grid else None,
         "annualSavingsTry": round(annual_savings),
         "financialSavingsRateTryKwh": round(financial_import_rate, 4),
         "financialBasis": financial_basis,
@@ -94,9 +98,23 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
         "npv25Try": round(project_npv),
         "roiPct": round(roi, 1),
         "estimateOnly": True,
+        "dispatchAvailable": False if is_off_grid else None,
+        "authoritativeForOffgrid": False if is_off_grid else None,
+        "offgridDispatchAuthority": "frontend-offgrid-l2-dispatch" if is_off_grid else None,
+        "selfConsumptionModel": (
+            "heuristic-target-not-dispatch"
+            if is_off_grid
+            else "heuristic-scenario-target"
+        ),
         "warning": "estimate_only_not_for_commercial_quotes",
         "warningDetail": (
             "Backend financial payload uses heuristic scenario self-consumption targets "
+            "and default capex. It does not run the off-grid L2 dispatch, battery SOC, "
+            "critical-load priority, generator dispatch, or bad-weather model. It is not "
+            "the commercial quote source; use the frontend 8760 financial model, governance, "
+            "and BOM basis for customer-facing totals."
+            if is_off_grid
+            else "Backend financial payload uses heuristic scenario self-consumption targets "
             "and default capex. It is not the commercial quote source; use the frontend "
             "8760 financial model, governance, and BOM basis for customer-facing totals."
         ),
@@ -113,7 +131,12 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
         # simulation; this backend path uses heuristic self-consumption targets.
         "warning": "estimate_only_not_for_commercial_quotes",
         "warningDetail": (
-            "Self-consumption calculated via scenario-heuristic target ratios "
+            "Off-grid backend financials are heuristic only. The backend does not run "
+            "off-grid dispatch, battery SOC tracking, critical-load priority, generator dispatch, "
+            "or bad-weather stress tests. Use the frontend Off-Grid L2 dispatch result for any "
+            "customer-facing off-grid sufficiency or financial output."
+            if is_off_grid
+            else "Self-consumption calculated via scenario-heuristic target ratios "
             f"({self_consumption_target:.0%}), not 8760-hour hourly dispatch. "
             "NPV may differ from browser calculation by 10-15%. "
             "Use browser output for commercial proposals."

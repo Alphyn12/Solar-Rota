@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   buildOffgridLoadProfile,
+  buildOffgridPvDispatchProfile,
+  evaluateOffgridFieldGuaranteeReadiness,
   runOffgridDispatch,
   runBadWeatherScenario,
   buildOffgridResults,
@@ -151,6 +153,73 @@ describe('buildOffgridLoadProfile — real 8760 source priority', () => {
     assert.equal(result.deviceCount, 1, 'cihazlar inventory olarak korunmalı');
     nearly(result.annualTotalKwh, hourly.reduce((a, b) => a + b, 0), 0.01, 'real 8760 sum');
     nearly(result.annualCriticalKwh, result.annualTotalKwh * 0.4, 0.01, 'critical fallback fraction');
+  });
+});
+
+describe('buildOffgridPvDispatchProfile — üretim source-of-truth', () => {
+  it('gerçek 8760 PV üretimini sentetik fallback yerine kullanır', () => {
+    const realPv = makeLoadHourly(24);
+    const fallbackRows = makeLoadHourly(1).map(production => ({ production }));
+    const result = buildOffgridPvDispatchProfile({
+      realHourlyPv8760: realPv,
+      fallbackHourlyRows: fallbackRows,
+      source: 'field-meter-pv'
+    });
+
+    assert.equal(result.hasRealHourlyProduction, true);
+    assert.equal(result.productionDispatchProfile, 'real-hourly-pv-8760');
+    assert.equal(result.productionSeriesSource, 'field-meter-pv');
+    nearly(result.annualKwh, 24 * 365, 0.01, 'real pv annual');
+  });
+
+  it('gerçek PV yoksa aylık üretimden türetilmiş sentetik 8760 olarak işaretler', () => {
+    const fallbackRows = makeLoadHourly(12).map(production => ({ production }));
+    const result = buildOffgridPvDispatchProfile({ fallbackHourlyRows: fallbackRows });
+
+    assert.equal(result.hasRealHourlyProduction, false);
+    assert.equal(result.synthetic, true);
+    assert.equal(result.productionDispatchProfile, 'monthly-production-derived-synthetic-8760');
+    nearly(result.annualKwh, 12 * 365, 0.01, 'fallback pv annual');
+  });
+});
+
+describe('evaluateOffgridFieldGuaranteeReadiness — Faz 1 gate', () => {
+  it('sentetik üretim ve sentetik yük ile saha garantisini kapalı tutar', () => {
+    const productionProfile = buildOffgridPvDispatchProfile({
+      fallbackHourlyRows: makeLoadHourly(8).map(production => ({ production }))
+    });
+    const loadProfile = buildOffgridLoadProfile([], { fallbackDailyKwh: 8, criticalFraction: 0.5 });
+    const readiness = evaluateOffgridFieldGuaranteeReadiness({
+      productionProfile,
+      loadProfile,
+      battery: { maxChargePowerKw: 5, maxDischargePowerKw: 5 },
+      dispatchOptions: { inverterAcLimitKw: 5 }
+    });
+
+    assert.equal(readiness.phase1Ready, false);
+    assert.equal(readiness.fieldGuaranteeReady, false);
+    assert.ok(readiness.blockers.length >= 2);
+  });
+
+  it('gerçek PV, gerçek yük ve gerçek kritik yük varsa Faz 1 input-ready olur ama garanti vermez', () => {
+    const productionProfile = buildOffgridPvDispatchProfile({ realHourlyPv8760: makeLoadHourly(10) });
+    const total = makeLoadHourly(8);
+    const critical = makeLoadHourly(3);
+    const loadProfile = buildOffgridLoadProfile([], {
+      hourlyLoad8760: total,
+      criticalHourly8760: critical,
+      hourlyLoadSource: 'field-meter-load'
+    });
+    const readiness = evaluateOffgridFieldGuaranteeReadiness({
+      productionProfile,
+      loadProfile,
+      battery: { maxChargePowerKw: 5, maxDischargePowerKw: 5 },
+      dispatchOptions: { inverterAcLimitKw: 5 }
+    });
+
+    assert.equal(readiness.phase1Ready, true);
+    assert.equal(readiness.status, 'phase-1-input-ready');
+    assert.equal(readiness.fieldGuaranteeReady, false);
   });
 });
 
@@ -319,6 +388,24 @@ describe('runOffgridDispatch — jeneratör', () => {
     const result = runOffgridDispatch(pv, load, critical, tinyBat, gen, {});
     const expected = result.generatorToLoadKwh * 10;
     nearly(result.generatorFuelCostAnnual, expected, 0.01, 'fuel cost math');
+  });
+
+  it('jeneratör PV+BESS otonom gün sayısını şişirmez', () => {
+    const tinyBat = { usableCapacityKwh: 1, efficiency: 0.9, socReserveKwh: 0.1, initialSocKwh: 0.1 };
+    const pv = makeLoadHourly(0);
+    const load = makeLoadHourly(10);
+    const critical = makeLoadHourly(5);
+    const gen = { enabled: true, capacityKw: 20, fuelCostPerKwh: 8 };
+
+    const withoutGen = runOffgridDispatch(pv, load, critical, tinyBat, NO_GENERATOR, {});
+    const withGen = runOffgridDispatch(pv, load, critical, tinyBat, gen, {});
+
+    assert.equal(withGen.autonomousDays, withoutGen.autonomousDays,
+      'PV+BESS otonom gün jeneratörden etkilenmemeli');
+    assert.ok(withGen.autonomousDaysWithGenerator > withGen.autonomousDays,
+      'jeneratör dahil kapsama ayrı metrikte artmalı');
+    assert.equal(withGen.autonomousDaysWithGenerator, 365,
+      'yeterli jeneratör final unmet yükü kapatmalı');
   });
 });
 

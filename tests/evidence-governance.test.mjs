@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildOffgridFieldEvidenceGate,
   buildEvidenceRegistry,
   buildStructuredProposalExport,
   buildTariffSourceGovernance,
@@ -70,6 +71,63 @@ const invalid = validateEvidenceRegistry({
 assert.equal(invalid.status, 'incomplete');
 assert.ok(invalid.blockers.length >= 3);
 
+const offgridEvidenceBlocked = buildOffgridFieldEvidenceGate(
+  { registry: {} },
+  {
+    offgridL2Results: {
+      fieldGuaranteeReadiness: { status: 'blocked', phase1Ready: false },
+      productionDispatchMetadata: { hasRealHourlyProduction: false },
+      loadMode: 'device-list',
+      synthetic: true
+    }
+  },
+  { today: '2026-04-13' }
+);
+assert.equal(offgridEvidenceBlocked.phase2Ready, false);
+assert.ok(offgridEvidenceBlocked.blockers.some(item => item.includes('offgridPvProduction')));
+
+const evidenceFile = (id, sha) => ({ id, name: `${id}.csv`, size: 100, sha256: sha.repeat(64).slice(0, 64), validationStatus: 'validated' });
+const verifiedOffgridEvidence = {
+  offgridPvProduction: { status: 'verified', ref: 'pv.csv', checkedAt: '2026-04-12', files: [evidenceFile('pv', 'a')] },
+  offgridLoadProfile: { status: 'verified', ref: 'load.csv', checkedAt: '2026-04-12', files: [evidenceFile('load', 'b')] },
+  offgridCriticalLoadProfile: { status: 'verified', ref: 'critical.csv', checkedAt: '2026-04-12', files: [evidenceFile('critical', 'c')] },
+  offgridSiteShading: { status: 'verified', ref: 'shade.pdf', checkedAt: '2026-04-12', files: [evidenceFile('shade', 'd')] },
+  offgridEquipmentDatasheets: { status: 'verified', ref: 'datasheets.pdf', checkedAt: '2026-04-12', files: [evidenceFile('datasheets', 'e')] }
+};
+const offgridRegistry = buildEvidenceRegistry(
+  {
+    scenarioKey: 'off-grid',
+    hourlyConsumption8760: new Array(8760).fill(1),
+    offgridPvHourly8760: new Array(8760).fill(0.5),
+    offgridCriticalLoad8760: new Array(8760).fill(0.3),
+    shadingQuality: 'site-verified',
+    evidence: verifiedOffgridEvidence
+  },
+  {
+    offgridL2Results: {
+      fieldGuaranteeReadiness: { status: 'phase1-ready', phase1Ready: true },
+      productionDispatchMetadata: { hasRealHourlyProduction: true },
+      loadMode: 'hourly-8760',
+      synthetic: false
+    }
+  },
+  { today: '2026-04-13' }
+);
+const offgridEvidenceReady = buildOffgridFieldEvidenceGate(
+  offgridRegistry,
+  {
+    offgridL2Results: {
+      fieldGuaranteeReadiness: { status: 'phase1-ready', phase1Ready: true },
+      productionDispatchMetadata: { hasRealHourlyProduction: true },
+      loadMode: 'hourly-8760',
+      synthetic: false
+    }
+  },
+  { today: '2026-04-13' }
+);
+assert.equal(offgridEvidenceReady.phase2Ready, true);
+assert.equal(offgridEvidenceReady.fieldGuaranteeReady, false);
+
 const exported = buildStructuredProposalExport(
   { cityName: 'Ankara', tariffType: 'commercial', panelType: 'mono', inverterType: 'string' },
   {
@@ -85,5 +143,46 @@ assert.equal(exported.schema, 'guneshesap.proposal-handoff.v2');
 assert.equal(exported.customer.cityName, 'Ankara');
 assert.equal(exported.commercial.confidenceScore, 70);
 assert.ok(exported.financialSummary);
+
+const offgridExported = buildStructuredProposalExport(
+  { scenarioKey: 'off-grid', cityName: 'Ankara' },
+  {
+    offgridL2Results: {
+      productionDispatchProfile: 'monthly-production-derived-synthetic-8760',
+      productionDispatchMetadata: { hasRealHourlyProduction: false, synthetic: true },
+      loadMode: 'device-list',
+      dispatchType: 'synthetic-8760-dispatch',
+      generatorEnabled: true,
+      autonomousDays: 120,
+      autonomousDaysPct: 32.9,
+      autonomousDaysWithGenerator: 360,
+      autonomousDaysWithGeneratorPct: 98.6,
+      badWeatherScenario: {
+        weatherLevel: 'moderate',
+        criticalCoverageDropPct: 12.5,
+        totalCoverageDropPct: 18.2,
+        additionalGeneratorKwh: 240,
+        windowCoverage: 0.72,
+        windowCriticalCoverage: 0.91,
+        worstWindowDayOfYear: 15
+      },
+      fieldGuaranteeReadiness: { status: 'blocked', phase1Ready: false, fieldGuaranteeReady: false, blockers: ['missing real PV'] },
+      fieldEvidenceGate: { status: 'blocked', phase2Ready: false, fieldGuaranteeReady: false, blockers: ['missing evidence'] },
+      fieldGuaranteeCandidate: false,
+      fieldGuaranteeReady: false
+    },
+    proposalGovernance: { confidence: { score: 50 } },
+    tariffModel: {}
+  }
+);
+assert.equal(offgridExported.offGridL2.productionDispatchProfile, 'monthly-production-derived-synthetic-8760');
+assert.equal(offgridExported.offGridL2.productionDispatchMetadata.synthetic, true);
+assert.equal(offgridExported.offGridL2.autonomousDays, 120);
+assert.equal(offgridExported.offGridL2.autonomousDaysWithGenerator, 360);
+assert.equal(offgridExported.offGridL2.badWeatherCriticalCoverageDropPct, 12.5);
+assert.equal(offgridExported.offGridL2.badWeatherAdditionalGeneratorKwh, 240);
+assert.equal(offgridExported.offGridL2.fieldGuaranteeReadiness.status, 'blocked');
+assert.equal(offgridExported.offGridL2.fieldEvidenceGate.status, 'blocked');
+assert.equal(offgridExported.offGridL2.fieldGuaranteeReady, false);
 
 console.log('evidence governance tests passed');

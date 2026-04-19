@@ -17,12 +17,19 @@ import {
 } from './calc-core.js';
 import { buildQuoteReadiness } from './turkey-regulation.js';
 import { buildProposalGovernance } from './proposal-governance.js';
-import { buildEvidenceRegistry, buildTariffSourceGovernance } from './evidence-governance.js';
+import { buildEvidenceRegistry, buildOffgridFieldEvidenceGate, buildTariffSourceGovernance } from './evidence-governance.js';
 import { hasCompleteHourlyProfile8760, hasMeaningfulMonthlyConsumption } from './consumption-evidence.js';
 import { buildPvEngineRequest } from './pv-engine-contracts.js';
 import { sourceMetaForCurrentCalculation } from './solar-engine-adapter.js';
 import { scenarioSourceQualityNote } from './scenario-workflows.js';
-import { buildOffgridLoadProfile, runOffgridDispatch, runBadWeatherScenario, buildOffgridResults } from './offgrid-dispatch.js';
+import {
+  buildOffgridLoadProfile,
+  buildOffgridPvDispatchProfile,
+  evaluateOffgridFieldGuaranteeReadiness,
+  runOffgridDispatch,
+  runBadWeatherScenario,
+  buildOffgridResults
+} from './offgrid-dispatch.js';
 import { fetchPVGISLive, PVGIS_FETCH_STATUS, getPvgisSourceLabel, CALC_TOTAL_TIMEOUT_MS } from './pvgis-fetch.js';
 import { buildBackendUrl, BACKEND_CONFIG } from './backend-config.js';
 
@@ -32,6 +39,25 @@ const LOADING_MSGS = [
   "Enerji üretimi hesaplanıyor...",
   "Finansal analiz yapılıyor..."
 ];
+
+const COMMON_YEAR_MONTH_DAYS_LOCAL = [31,28,31,30,31,30,31,31,30,31,30,31];
+
+function completeHourlyArray(value) {
+  return hasCompleteHourlyProfile8760(value)
+    ? value.slice(0, 8760).map(v => Math.max(0, Number(v) || 0))
+    : null;
+}
+
+function monthlyFromHourly8760(hourly) {
+  const monthly = [];
+  let cursor = 0;
+  for (const days of COMMON_YEAR_MONTH_DAYS_LOCAL) {
+    const hours = days * 24;
+    monthly.push(hourly.slice(cursor, cursor + hours).reduce((sum, value) => sum + value, 0));
+    cursor += hours;
+  }
+  return normalizeMonthlyProductionToAnnual(monthly, monthly.reduce((sum, value) => sum + value, 0));
+}
 
 // ── Merkezi loading state yönetimi ──────────────────────────────────────────
 let _activeMsgInterval = null;
@@ -532,6 +558,18 @@ export async function runCalculation() {
     if (banner) banner.style.display = 'none';
   }
   monthlyData = normalizeMonthlyProductionToAnnual(monthlyData, adjustedEnergy);
+  const offgridRealPvHourly = state.scenarioKey === 'off-grid'
+    ? (completeHourlyArray(state.offgridPvHourly8760) || completeHourlyArray(state.hourlyProduction8760))
+    : null;
+  const offgridRealPvSource = offgridRealPvHourly
+    ? (state.offgridPvHourlySource || state.hourlyProductionSource || 'user-supplied-real-hourly-pv')
+    : null;
+  if (offgridRealPvHourly) {
+    adjustedEnergy = offgridRealPvHourly.reduce((sum, value) => sum + value, 0);
+    monthlyData = monthlyFromHourly8760(offgridRealPvHourly);
+    usedFallback = false;
+    pvgisRawEnergy = Math.round(adjustedEnergy);
+  }
 
   // Faz-4 Fix-15: PVGIS annual uncertainty ≈ ±7.6% at 1σ (interannual variability +
   // model uncertainty per PVGIS JRC documentation). P90 is the conservative estimate
@@ -542,7 +580,15 @@ export async function runCalculation() {
   const energyP90 = Math.round(adjustedEnergy * (1 - 1.28 * _PVGIS_SIGMA));
   const energyP10 = Math.round(adjustedEnergy * (1 + 1.28 * _PVGIS_SIGMA));
 
-  const authoritativeSourceMeta = authoritativeBackend?.engineSource || sourceMetaForCurrentCalculation({ usedFallback });
+  const authoritativeSourceMeta = offgridRealPvHourly
+    ? {
+        provider: 'user-supplied-hourly-pv',
+        source: offgridRealPvSource,
+        engine: 'real-hourly-pv-8760',
+        engineQuality: 'field-data-candidate',
+        pvlibBacked: false
+      }
+    : (authoritativeBackend?.engineSource || sourceMetaForCurrentCalculation({ usedFallback }));
   const authoritativeProduction = {
     annualEnergyKwh: Math.round(adjustedEnergy),
     monthlyEnergyKwh: monthlyData.slice(),
@@ -713,6 +759,7 @@ export async function runCalculation() {
     tariffType: state.tariffType,
     loadProfileKey: state.usageProfile || state.onGridUsageProfile,
     hourlyLoad8760,
+    hourlyProduction8760: offgridRealPvHourly,
     exportPolicy: tariffModel.exportCompensationPolicy,
     previousYearConsumptionKwh: state.previousYearConsumptionKwh,
     currentYearConsumptionKwh: state.currentYearConsumptionKwh,
@@ -727,8 +774,16 @@ export async function runCalculation() {
 
   if (state.scenarioKey === 'off-grid' && state.batteryEnabled) {
     // ── Off-Grid Level 2 Dispatch ─────────────────────────────────────────────
-    // PV saatlik dizisi: hourlySummaryRaw'dan doğrudan al (tutarlılık garantisi)
-    const pvHourly = hourlySummaryRaw.hourly8760.map(h => h.production);
+    const offgridPvProfile = buildOffgridPvDispatchProfile({
+      realHourlyPv8760: offgridRealPvHourly,
+      source: offgridRealPvSource,
+      sourceLabel: offgridRealPvHourly ? 'Real hourly PV 8760' : null,
+      fallbackHourlyRows: hourlySummaryRaw.hourly8760,
+      fallbackSource: 'monthly-production-derived-synthetic-8760',
+      fallbackSourceLabel: authoritativeBackend ? authoritativeSourceMeta.source : getPvgisSourceLabel(aggregateFetchStatus, currentLang),
+      fallbackUsed: usedFallback || !!authoritativeSourceMeta.fallbackUsed
+    });
+    const pvHourly = offgridPvProfile.pvHourly8760;
 
     const batt = state.battery || {};
     const battCap = Math.max(0, Number(batt.capacity) || 0);
@@ -762,11 +817,14 @@ export async function runCalculation() {
 
     // Yük profili oluştur. Gerçek 8760 saha yükü varsa cihaz listesinin önüne geçer.
     const hasRealHourlyLoad = hasCompleteHourlyProfile8760(state.hourlyConsumption8760);
+    const realCriticalHourly = completeHourlyArray(state.offgridCriticalLoad8760)
+      || completeHourlyArray(state.criticalLoad8760);
     const offgridLoadProfile = buildOffgridLoadProfile(
       Array.isArray(state.offgridDevices) ? state.offgridDevices : [],
       {
         hourlyLoad8760: hasRealHourlyLoad ? hourlyLoad8760 : null,
         hourlyLoadSource: hasRealHourlyLoad ? (state.hourlyProfileSource || 'hourly-uploaded') : null,
+        criticalHourly8760: realCriticalHourly,
         fallbackDailyKwh: hourlySummaryRaw.annualLoad / 365,
         criticalFraction: Math.max(0.1, Math.min(1, Number(state.offgridCriticalFraction) || 0.3)),
         tariffType: state.tariffType
@@ -851,11 +909,35 @@ export async function runCalculation() {
     );
     // Üretim kaynağı şeffaflığını off-grid sonucuna ekle
     offgridL2Results.productionSource = authoritativeSourceMeta.source || aggregateFetchStatus;
-    offgridL2Results.productionSourceLabel = authoritativeBackend ? authoritativeSourceMeta.source : getPvgisSourceLabel(aggregateFetchStatus, currentLang);
-    offgridL2Results.productionFallback = usedFallback || !!authoritativeSourceMeta.fallbackUsed;
+    offgridL2Results.productionSourceLabel = offgridPvProfile.productionSourceLabel
+      || (authoritativeBackend ? authoritativeSourceMeta.source : getPvgisSourceLabel(aggregateFetchStatus, currentLang));
+    offgridL2Results.productionFallback = offgridPvProfile.productionFallback;
+    offgridL2Results.productionDispatchProfile = offgridPvProfile.productionDispatchProfile;
+    offgridL2Results.productionDispatchMetadata = {
+      productionSeriesSource: offgridPvProfile.productionSeriesSource,
+      annualKwh: Math.round(offgridPvProfile.annualKwh),
+      hasRealHourlyProduction: offgridPvProfile.hasRealHourlyProduction,
+      dispatchBus: offgridPvProfile.dispatchBus,
+      resolution: offgridPvProfile.resolution,
+      missingHours: offgridPvProfile.missingHours,
+      synthetic: offgridPvProfile.synthetic
+    };
     offgridL2Results.loadSource = offgridLoadProfile.loadSource || offgridLoadProfile.mode;
     offgridL2Results.loadMode = offgridLoadProfile.mode;
+    offgridL2Results.synthetic = !!(offgridL2Results.synthetic || offgridPvProfile.synthetic);
+    offgridL2Results.methodologyNote = offgridPvProfile.hasRealHourlyProduction && offgridLoadProfile.hasRealHourlyLoad
+      ? 'real-pv-and-real-load-hourly-dispatch-pre-feasibility'
+      : offgridL2Results.methodologyNote;
     offgridL2Results.parityAvailable = engineParity?.intentionalDifference === true;
+    offgridL2Results.fieldGuaranteeReadiness = evaluateOffgridFieldGuaranteeReadiness({
+      productionProfile: offgridPvProfile,
+      loadProfile: offgridLoadProfile,
+      battery: batteryConfig,
+      generator: generatorConfig,
+      dispatchOptions
+    });
+    offgridL2Results.fieldGuaranteeCandidate = offgridL2Results.fieldGuaranteeReadiness.phase1Ready;
+    offgridL2Results.fieldGuaranteeReady = false;
 
     // batterySummary köprüsü — mevcut finansal tablo + BESS renderer'ı çalışmaya devam etsin
     batterySummary = {
@@ -1001,9 +1083,10 @@ export async function runCalculation() {
     batteryReplaceCost,
     annualLoadGrowth: Number(state.annualLoadGrowth) || 0,
     annualGeneratorCost,
-    // H3: Jeneratör kWh × (alternativeCost - fuelCost) tasarrufu finansal tabloya eklenir
+    // Off-grid jeneratör, PV+BESS tasarrufu değil yedek enerji maliyetidir.
+    // Yakıt gideri expenses içinde kalır; jeneratör kWh ayrıca tasarruf olarak kredilendirilmez.
     annualGeneratorKwh,
-    generatorAlternativeCostPerKwh: state.scenarioKey === 'off-grid' ? effectiveSavingsTariff : 0,
+    generatorAlternativeCostPerKwh: 0,
     generatorFuelCostPerKwh
   });
   const yearlyTable = financial.rows;
@@ -1024,7 +1107,10 @@ export async function runCalculation() {
   yearlyTable.forEach(y => {
     const df = Math.pow(1 + discountRate, y.year);
     lcoeCostSum += (y.expenses || 0) / df;
-    lcoeEnergySum += y.energy / df;
+    const deliveredEnergyForLcoe = state.scenarioKey === 'off-grid'
+      ? (y.selfConsumptionKwh || y.compensatedConsumptionKwh || 0)
+      : y.energy;
+    lcoeEnergySum += deliveredEnergyForLcoe / df;
   });
   const lcoe = lcoeEnergySum > 0 ? Number((lcoeCostSum / lcoeEnergySum).toFixed(2)) : null;
 
@@ -1163,7 +1249,24 @@ export async function runCalculation() {
   if (results.offgridL2Results?.generatorCapexMissing) {
     results.calculationWarnings.push('Off-grid jeneratör etkin ancak jeneratör CAPEX girilmemiş; finansal sonuçlar jeneratör yatırımını eksik gösterebilir.');
   }
+  if (results.offgridL2Results?.fieldGuaranteeReadiness?.status === 'blocked') {
+    const firstBlocker = results.offgridL2Results.fieldGuaranteeReadiness.blockers?.[0] || 'Faz 1 saha garanti girdileri eksik.';
+    results.calculationWarnings.push(`Off-grid saha garantisi kapalı: ${firstBlocker}`);
+  }
   results.evidenceGovernance = buildEvidenceRegistry(state, results);
+  if (results.offgridL2Results) {
+    results.offgridL2Results.fieldEvidenceGate = buildOffgridFieldEvidenceGate(results.evidenceGovernance, results);
+    results.offgridL2Results.fieldGuaranteeCandidate = !!(
+      results.offgridL2Results.fieldGuaranteeReadiness?.phase1Ready
+      && results.offgridL2Results.fieldEvidenceGate.phase2Ready
+    );
+    results.offgridL2Results.fieldGuaranteeReady = false;
+    if (results.offgridL2Results.fieldEvidenceGate.status === 'blocked') {
+      const firstEvidenceBlocker = results.offgridL2Results.fieldEvidenceGate.blockers?.[0]
+        || 'Faz 2 saha kanıt girdileri eksik.';
+      results.calculationWarnings.push(`Off-grid saha kanıt kapısı kapalı: ${firstEvidenceBlocker}`);
+    }
+  }
   results.tariffSourceGovernance = buildTariffSourceGovernance(tariffModel, results.evidenceGovernance);
   if (results.tariffSourceGovernance.warning) results.calculationWarnings.push(results.tariffSourceGovernance.warning);
   results.quoteReadiness = buildQuoteReadiness({ state, results, tariffModel, evidenceGovernance: results.evidenceGovernance });

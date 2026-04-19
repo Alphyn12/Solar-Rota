@@ -377,4 +377,9 @@ const fakeHourly8760 = new Array(8760).fill(1.0); // 1 kWh/h = 8760 kWh/year
 const realProfileResult = simulateHourlyEnergy(syntheticMonthly, syntheticLoad, { hourlyLoad8760: fakeHourly8760 });
 assert.ok(Math.abs(realProfileResult.annualLoad - 8760) < 1, 'Real hourly profile annual load should equal sum of provided data');
 
+const fakeHourlyProduction8760 = new Array(8760).fill(0.5); // 4380 kWh/year
+const realPvResult = simulateHourlyEnergy(syntheticMonthly, syntheticLoad, { hourlyProduction8760: fakeHourlyProduction8760 });
+assert.ok(Math.abs(realPvResult.annualProduction - 4380) < 1, 'Real hourly PV profile annual production should equal sum of provided data');
+assert.equal(Math.round(realPvResult.monthly.reduce((sum, row) => sum + row.production, 0)), 4380);
+
 console.log('calc-core tests passed');

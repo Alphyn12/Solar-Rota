@@ -46,7 +46,9 @@ const STRING_LIMITS = {
   tariffSourceCheckedAt: 40,
   scenarioKey: 40,
   scenarioSelectedAt: 40,
-  enginePreference: 40
+  enginePreference: 40,
+  offgridPvHourlySource: 120,
+  hourlyProductionSource: 120
 };
 
 const BOOLEAN_KEYS = new Set([
@@ -54,7 +56,8 @@ const BOOLEAN_KEYS = new Set([
   'billAnalysisEnabled', 'evEnabled', 'heatPumpEnabled', 'taxEnabled',
   'cableLossEnabled', 'osmShadowEnabled', 'hasBilateralContract',
   'hasSignedCustomerBillData', 'quoteInputsVerified', 'quoteReadyApproved',
-  'multiRoof', 'tariffIncludesTax', 'satelliteEnhancementEnabled'
+  'multiRoof', 'tariffIncludesTax', 'satelliteEnhancementEnabled',
+  'offgridFieldGuaranteeMode'
 ]);
 
 const OBJECT_KEYS = new Set([
@@ -66,7 +69,8 @@ const OBJECT_KEYS = new Set([
 ]);
 
 const ARRAY_KEYS = new Set([
-  'roofSections', 'monthlyConsumption', 'hourlyConsumption8760', 'bomItems',
+  'roofSections', 'monthlyConsumption', 'hourlyConsumption8760', 'hourlyProduction8760',
+  'offgridPvHourly8760', 'offgridCriticalLoad8760', 'criticalLoad8760', 'bomItems',
   'glareTargets', 'proposalRevisions',
   'auditLog'
 ]);
@@ -136,7 +140,9 @@ function cleanPlainValue(value, depth = 0) {
 function sanitizeArray(key, value) {
   if (!Array.isArray(value)) return undefined;
   if (key === 'monthlyConsumption') return value.slice(0, 12).map(v => clampNumber(v, 0, 1000000, 0));
-  if (key === 'hourlyConsumption8760') {
+  if (key === 'hourlyConsumption8760' || key === 'hourlyProduction8760'
+    || key === 'offgridPvHourly8760' || key === 'offgridCriticalLoad8760'
+    || key === 'criticalLoad8760') {
     if (value.length !== 8760) return undefined;
     return value.map(v => clampNumber(v, 0, 1000000, 0));
   }

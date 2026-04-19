@@ -254,6 +254,9 @@ export function simulateHourlyEnergy(monthlyProduction, monthlyLoad, options = {
   const hourlyLoad8760 = Array.isArray(options.hourlyLoad8760) && options.hourlyLoad8760.length >= 8760
     ? options.hourlyLoad8760.slice(0, 8760).map(v => Math.max(0, Number(v) || 0))
     : null;
+  const hourlyProduction8760 = Array.isArray(options.hourlyProduction8760) && options.hourlyProduction8760.length >= 8760
+    ? options.hourlyProduction8760.slice(0, 8760).map(v => Math.max(0, Number(v) || 0))
+    : null;
   let hourlyCursor = 0;
   let annualProduction = 0;
   let annualLoad = 0;
@@ -269,11 +272,17 @@ export function simulateHourlyEnergy(monthlyProduction, monthlyLoad, options = {
     const hourlySlice = hourlyLoad8760
       ? hourlyLoad8760.slice(hourlyCursor, hourlyCursor + days * 24)
       : null;
+    const productionSlice = hourlyProduction8760
+      ? hourlyProduction8760.slice(hourlyCursor, hourlyCursor + days * 24)
+      : null;
     hourlyCursor += days * 24;
     const monthLoad = hourlySlice
       ? hourlySlice.reduce((a, b) => a + b, 0)
       : Math.max(0, Number(monthlyLoad[monthIdx]) || 0);
-    const dayProduction = Math.max(0, Number(production) || 0) / days;
+    const monthProduction = productionSlice
+      ? productionSlice.reduce((a, b) => a + b, 0)
+      : Math.max(0, Number(production) || 0);
+    const dayProduction = monthProduction / days;
     const dayLoad = monthLoad / days;
 
     let monthSelf = 0;
@@ -282,7 +291,9 @@ export function simulateHourlyEnergy(monthlyProduction, monthlyLoad, options = {
 
     for (let d = 0; d < days; d++) {
       for (let h = 0; h < 24; h++) {
-        const p = dayProduction * solarProfile[h];
+        const p = productionSlice
+          ? (productionSlice[d * 24 + h] || 0)
+          : dayProduction * solarProfile[h];
         const l = hourlySlice
           ? (hourlySlice[d * 24 + h] || 0)
           : dayLoad * getLoadProfile(options.loadProfileKey || options.tariffType)[h];
@@ -307,14 +318,14 @@ export function simulateHourlyEnergy(monthlyProduction, monthlyLoad, options = {
       }
     }
 
-    annualProduction += Math.max(0, Number(production) || 0);
+    annualProduction += monthProduction;
     annualLoad += monthLoad;
     directSelfConsumption += monthSelf;
     gridExport += monthExport;
     gridImport += monthImport;
 
     return {
-      production: Math.round(production),
+      production: Math.round(monthProduction),
       load: Math.round(monthLoad),
       selfConsumption: Math.round(monthSelf),
       gridExport: Math.round(monthExport),
@@ -601,8 +612,8 @@ export function computeFinancialTable({
     const exportE = degradedEnergy * yearExportRatio;
     const paidExportE = netMeteringEnabled ? exportE : 0;
     const compensatedConsumptionE = selfE + offsetE;
-    // H3: Jeneratör net tasarrufu = generatorKwh × (alternativeCost - fuelCost)
-    // Jeneratör alternatif kaynağın yerini aldığında sağladığı fark değer kredilendirilir.
+    // Optional avoided-cost credit for externally modeled generator displacement.
+    // Main off-grid PV+BESS flow passes 0 here; generator fuel remains an expense.
     const netGenSavingsPerKwh = Math.max(0, generatorAlternativeCostPerKwh - generatorFuelCostPerKwh);
     const yearGeneratorSavings = annualGeneratorKwh * netGenSavingsPerKwh
       * Math.pow(1 + tariffModel.annualPriceIncrease, year - 1);

@@ -171,7 +171,12 @@ window.state = {
     supplierQuote: { type: 'supplierQuote', status: 'missing', ref: '', issuedAt: null, validUntil: null },
     tariffSource: { type: 'tariffSource', status: 'verified', ref: 'EPDK/SKTT-2026-local', checkedAt: DEFAULT_TARIFF_SOURCE_CHECKED_AT, sourceUrl: 'https://www.epdk.gov.tr/Detay/Icerik/16-38/son-kaynak-tedarik-tarifesi-sktt-ile-ilgili-bil' },
     regulationSource: { type: 'regulationSource', status: 'verified', ref: TURKEY_REGULATORY_VERSION, checkedAt: DEFAULT_REGULATION_SOURCE_CHECKED_AT, sourceUrl: 'https://www.epdk.gov.tr/detay/icerik/3-0-0-1160/elektrik-piyasasinda-lisanssiz-elektrik-uretimi-' },
-    gridApplication: { type: 'gridApplication', status: 'missing', ref: '', checkedAt: null }
+    gridApplication: { type: 'gridApplication', status: 'missing', ref: '', checkedAt: null },
+    offgridPvProduction: { type: 'offgridPvProduction', status: 'missing', ref: '', checkedAt: null },
+    offgridLoadProfile: { type: 'offgridLoadProfile', status: 'missing', ref: '', checkedAt: null },
+    offgridCriticalLoadProfile: { type: 'offgridCriticalLoadProfile', status: 'missing', ref: '', checkedAt: null },
+    offgridSiteShading: { type: 'offgridSiteShading', status: 'missing', ref: '', checkedAt: null },
+    offgridEquipmentDatasheets: { type: 'offgridEquipmentDatasheets', status: 'missing', ref: '', checkedAt: null }
   },
   financing: {
     principal: null,
@@ -234,6 +239,10 @@ window.state = {
   offgridGeneratorFuelCostPerKwh: 8,
   offgridGeneratorCapexTry: 0,
   offgridBadWeatherLevel: '',
+  offgridPvHourly8760: null,
+  offgridPvHourlySource: '',
+  offgridCriticalLoad8760: null,
+  offgridFieldGuaranteeMode: false,
   offgridBatteryMaxChargeKw: null,
   offgridBatteryMaxDischargeKw: null,
   offgridInverterAcKw: null,
@@ -995,7 +1004,7 @@ function handleHourlyCsvUpload(event) {
   const reader = new FileReader();
   reader.onload = (e) => {
     // Use setTimeout to allow the browser to paint the loading state first
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         if (statusEl) statusEl.textContent = '⏳ CSV parse ediliyor...';
         const text = e.target.result || '';
@@ -1027,13 +1036,21 @@ function handleHourlyCsvUpload(event) {
         window.state.hourlyProfileSource = 'hourly-uploaded';
         const annual = Math.round(values.slice(0, 8760).reduce((a, b) => a + b, 0));
         const peak = Math.max(...values.slice(0, 8760)).toFixed(2);
+        let evidenceNote = '';
+        if (window.state.scenarioKey === 'off-grid') {
+          const evidenceResult = await attachEvidenceFile(window.state, 'offgridLoadProfile', file, currentUser());
+          evidenceNote = evidenceResult.ok
+            ? ` | Kanıt SHA: ${evidenceResult.metadata.sha256.slice(0, 12)}`
+            : ` | Kanıt kaydedilemedi: ${evidenceResult.errors.join(' ')}`;
+        }
         if (statusEl) {
           statusEl.style.display = '';
           statusEl.style.color = 'var(--accent, #22c55e)';
-          statusEl.textContent = `✓ ${i18n.t('onGridFlow.hourlyUploadSuccess')} | Yıllık: ${annual.toLocaleString()} kWh | Pik: ${peak} kWh/h`;
+          statusEl.textContent = `✓ ${i18n.t('onGridFlow.hourlyUploadSuccess')} | Yıllık: ${annual.toLocaleString()} kWh | Pik: ${peak} kWh/h${evidenceNote}`;
         }
         if (clearBtn) clearBtn.style.display = '';
         updateOnGridAssumptions();
+        renderEvidenceFileStatus();
         persistState();
       } catch (err) {
         // On error: clear uploaded data, fall back to synthetic
@@ -1070,6 +1087,181 @@ function clearHourlyCsvUpload() {
   if (clearBtn) clearBtn.style.display = 'none';
   updateOnGridAssumptions();
   persistState();
+}
+
+function parseSingleColumn8760Csv(text) {
+  if (!String(text || '').trim()) throw new Error('Dosya boş veya okunamadı.');
+  const rows = String(text).trim().split(/\r?\n/);
+  const values = [];
+  let skippedHeader = false;
+  let firstBadRow = null;
+  for (let i = 0; i < rows.length; i++) {
+    const cell = rows[i].split(/[,;\t]/)[0].trim();
+    if (!cell) continue;
+    const n = Number(cell);
+    if (!Number.isFinite(n)) {
+      if (!skippedHeader && values.length === 0) { skippedHeader = true; continue; }
+      if (firstBadRow === null) firstBadRow = { row: i + 1, value: cell };
+      continue;
+    }
+    if (n < 0) throw new Error(`Satır ${i + 1}: negatif değer kabul edilmez (${cell}).`);
+    values.push(n);
+  }
+  if (firstBadRow && values.length < 8760) {
+    throw new Error(`Satır ${firstBadRow.row}: sayısal olmayan değer "${firstBadRow.value}". Format: tek kolon, 8760 sayı satırı.`);
+  }
+  if (values.length < 8760) throw new Error(`Yetersiz veri: 8760 satır gerekli, ${values.length} geçerli satır bulundu.`);
+  return values.slice(0, 8760);
+}
+
+function setCsvStatus(statusId, clearId, ok, message) {
+  const statusEl = document.getElementById(statusId);
+  if (statusEl) {
+    statusEl.style.display = '';
+    statusEl.style.color = ok ? 'var(--accent, #22c55e)' : 'var(--danger, #ef4444)';
+    statusEl.textContent = message;
+  }
+  const clearBtn = document.getElementById(clearId);
+  if (clearBtn) clearBtn.style.display = ok ? '' : 'none';
+}
+
+function loadOffgrid8760Csv(event, { stateKey, sourceKey, evidenceType, inputId, statusId, clearId, successLabel }) {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+  setCsvStatus(statusId, clearId, true, '⏳ Dosya okunuyor...');
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const values = parseSingleColumn8760Csv(e.target.result || '');
+      window.state[stateKey] = values;
+      if (stateKey === 'hourlyConsumption8760') window.state.hourlyProfileSource = 'hourly-uploaded';
+      if (sourceKey) window.state[sourceKey] = file.name || successLabel;
+      const annual = Math.round(values.reduce((a, b) => a + b, 0));
+      const peak = Math.max(...values).toFixed(2);
+      let evidenceNote = '';
+      if (evidenceType) {
+        const evidenceResult = await attachEvidenceFile(window.state, evidenceType, file, currentUser());
+        evidenceNote = evidenceResult.ok
+          ? ` | Kanıt SHA: ${evidenceResult.metadata.sha256.slice(0, 12)}`
+          : ` | Kanıt kaydedilemedi: ${evidenceResult.errors.join(' ')}`;
+      }
+      setCsvStatus(statusId, clearId, true, `✓ ${successLabel} | Yıllık: ${annual.toLocaleString()} kWh | Pik: ${peak} kWh/h${evidenceNote}`);
+      renderEvidenceFileStatus();
+      persistState();
+    } catch (err) {
+      window.state[stateKey] = null;
+      if (sourceKey) window.state[sourceKey] = '';
+      const input = document.getElementById(inputId);
+      if (input) input.value = '';
+      setCsvStatus(statusId, clearId, false, `✗ ${err.message}`);
+    }
+  };
+  reader.onerror = () => setCsvStatus(statusId, clearId, false, '✗ Dosya okunamadı. Lütfen tekrar deneyin.');
+  reader.readAsText(file);
+}
+
+function handleOffgridPvCsvUpload(event) {
+  loadOffgrid8760Csv(event, {
+    stateKey: 'offgridPvHourly8760',
+    sourceKey: 'offgridPvHourlySource',
+    evidenceType: 'offgridPvProduction',
+    inputId: 'offgrid-pv-csv-upload',
+    statusId: 'offgrid-pv-csv-status',
+    clearId: 'offgrid-pv-csv-clear',
+    successLabel: 'PV 8760 profili yüklendi'
+  });
+}
+
+function handleOffgridLoadCsvUpload(event) {
+  loadOffgrid8760Csv(event, {
+    stateKey: 'hourlyConsumption8760',
+    evidenceType: 'offgridLoadProfile',
+    inputId: 'offgrid-load-csv-upload',
+    statusId: 'offgrid-load-csv-status',
+    clearId: 'offgrid-load-csv-clear',
+    successLabel: 'Toplam yük 8760 profili yüklendi'
+  });
+}
+
+function clearOffgridLoadCsvUpload() {
+  window.state.hourlyConsumption8760 = null;
+  window.state.hourlyProfileSource = 'synthetic';
+  const input = document.getElementById('offgrid-load-csv-upload');
+  if (input) input.value = '';
+  const statusEl = document.getElementById('offgrid-load-csv-status');
+  if (statusEl) { statusEl.style.display = 'none'; statusEl.textContent = ''; }
+  const clearBtn = document.getElementById('offgrid-load-csv-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  persistState();
+}
+
+function clearOffgridPvCsvUpload() {
+  window.state.offgridPvHourly8760 = null;
+  window.state.offgridPvHourlySource = '';
+  const input = document.getElementById('offgrid-pv-csv-upload');
+  if (input) input.value = '';
+  const statusEl = document.getElementById('offgrid-pv-csv-status');
+  if (statusEl) { statusEl.style.display = 'none'; statusEl.textContent = ''; }
+  const clearBtn = document.getElementById('offgrid-pv-csv-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  persistState();
+}
+
+function handleOffgridCriticalCsvUpload(event) {
+  loadOffgrid8760Csv(event, {
+    stateKey: 'offgridCriticalLoad8760',
+    evidenceType: 'offgridCriticalLoadProfile',
+    inputId: 'offgrid-critical-csv-upload',
+    statusId: 'offgrid-critical-csv-status',
+    clearId: 'offgrid-critical-csv-clear',
+    successLabel: 'Kritik yük 8760 profili yüklendi'
+  });
+}
+
+function clearOffgridCriticalCsvUpload() {
+  window.state.offgridCriticalLoad8760 = null;
+  const input = document.getElementById('offgrid-critical-csv-upload');
+  if (input) input.value = '';
+  const statusEl = document.getElementById('offgrid-critical-csv-status');
+  if (statusEl) { statusEl.style.display = 'none'; statusEl.textContent = ''; }
+  const clearBtn = document.getElementById('offgrid-critical-csv-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  persistState();
+}
+
+async function handleOffgridEvidenceFileUpload(event, evidenceType, statusId) {
+  const input = event?.target;
+  const file = input?.files?.[0];
+  const statusEl = document.getElementById(statusId);
+  if (!file) return;
+  if (statusEl) {
+    statusEl.style.display = '';
+    statusEl.style.color = 'var(--text-muted)';
+    statusEl.textContent = 'Kanıt dosyası parmak izi alınıyor...';
+  }
+  try {
+    const result = await attachEvidenceFile(window.state, evidenceType, file, currentUser());
+    if (!result.ok) {
+      if (statusEl) {
+        statusEl.style.color = 'var(--danger, #ef4444)';
+        statusEl.textContent = `Kanıt kaydedilemedi: ${result.errors.join(' ')}`;
+      }
+      return;
+    }
+    renderEvidenceFileStatus();
+    persistState();
+    if (statusEl) {
+      statusEl.style.color = 'var(--accent, #22c55e)';
+      statusEl.textContent = `Kanıt eklendi: ${result.metadata.name} | SHA: ${result.metadata.sha256.slice(0, 12)}`;
+    }
+  } catch (error) {
+    if (statusEl) {
+      statusEl.style.color = 'var(--danger, #ef4444)';
+      statusEl.textContent = `Kanıt dosyası kaydedilemedi: ${error.message}`;
+    }
+  } finally {
+    if (input) input.value = '';
+  }
 }
 
 function fillOnGridMonthlyFromAnnual(annualKwh) {
@@ -1487,7 +1679,11 @@ function syncEnterpriseInputsFromState() {
 }
 
 function renderEvidenceFileStatus() {
-  const rows = ['customerBill', 'supplierQuote', 'tariffSource'].map(type => {
+  const types = ['customerBill', 'supplierQuote', 'tariffSource'];
+  if (window.state.scenarioKey === 'off-grid') {
+    types.push('offgridPvProduction', 'offgridLoadProfile', 'offgridCriticalLoadProfile', 'offgridSiteShading', 'offgridEquipmentDatasheets');
+  }
+  const rows = types.map(type => {
     const files = window.state.evidence?.[type]?.files || [];
     const latest = files[files.length - 1];
     return `${type}: ${latest ? `${latest.name} · ${Math.round((latest.size || 0) / 1024)} KB · ${String(latest.sha256 || '').slice(0, 12)}` : 'dosya yok'}`;
@@ -2156,6 +2352,13 @@ window.setOnGridInputMode = setOnGridInputMode;
 window.fillOnGridMonthlyFromAnnual = fillOnGridMonthlyFromAnnual;
 window.handleHourlyCsvUpload = handleHourlyCsvUpload;
 window.clearHourlyCsvUpload = clearHourlyCsvUpload;
+window.handleOffgridPvCsvUpload = handleOffgridPvCsvUpload;
+window.handleOffgridLoadCsvUpload = handleOffgridLoadCsvUpload;
+window.clearOffgridLoadCsvUpload = clearOffgridLoadCsvUpload;
+window.clearOffgridPvCsvUpload = clearOffgridPvCsvUpload;
+window.handleOffgridCriticalCsvUpload = handleOffgridCriticalCsvUpload;
+window.clearOffgridCriticalCsvUpload = clearOffgridCriticalCsvUpload;
+window.handleOffgridEvidenceFileUpload = handleOffgridEvidenceFileUpload;
 window.updateProposalGovernanceInput = updateProposalGovernanceInput;
 window.updateUserIdentityInput = updateUserIdentityInput;
 window.attachEvidenceFromInput = attachEvidenceFromInput;

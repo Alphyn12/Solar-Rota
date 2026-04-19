@@ -1177,6 +1177,41 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             </div>
           </div>
 
+          <div id="offgrid-field-data-section" style="margin-bottom:14px;padding:10px 12px;background:rgba(6,182,212,0.05);border:1px solid rgba(6,182,212,0.18);border-radius:8px">
+            <div style="font-size:0.75rem;font-weight:600;color:var(--text);margin-bottom:6px" data-i18n="offgridL2.fieldDataTitle">Saha Verisi (Garanti Hazırlığı)</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.pv8760Upload">Gerçek PV üretimi 8760 CSV</span>
+                <input type="file" id="offgrid-pv-csv-upload" accept=".csv,.txt" onchange="handleOffgridPvCsvUpload(event)" style="margin-top:4px;width:100%">
+                <button type="button" id="offgrid-pv-csv-clear" onclick="clearOffgridPvCsvUpload()" style="display:none;margin-top:4px" data-i18n="onGridFlow.hourlyUploadClear">Saatlik veriyi sil</button>
+                <div id="offgrid-pv-csv-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.load8760Upload">Gerçek toplam yük 8760 CSV</span>
+                <input type="file" id="offgrid-load-csv-upload" accept=".csv,.txt" onchange="handleOffgridLoadCsvUpload(event)" style="margin-top:4px;width:100%">
+                <button type="button" id="offgrid-load-csv-clear" onclick="clearOffgridLoadCsvUpload()" style="display:none;margin-top:4px" data-i18n="onGridFlow.hourlyUploadClear">Saatlik veriyi sil</button>
+                <div id="offgrid-load-csv-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.critical8760Upload">Gerçek kritik yük 8760 CSV</span>
+                <input type="file" id="offgrid-critical-csv-upload" accept=".csv,.txt" onchange="handleOffgridCriticalCsvUpload(event)" style="margin-top:4px;width:100%">
+                <button type="button" id="offgrid-critical-csv-clear" onclick="clearOffgridCriticalCsvUpload()" style="display:none;margin-top:4px" data-i18n="onGridFlow.hourlyUploadClear">Saatlik veriyi sil</button>
+                <div id="offgrid-critical-csv-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.shadingEvidenceUpload">Saha gölge kanıtı</span>
+                <input type="file" id="offgrid-shading-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridSiteShading', 'offgrid-shading-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-shading-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.datasheetEvidenceUpload">Ekipman datasheet / üretici kanıtı</span>
+                <input type="file" id="offgrid-datasheet-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridEquipmentDatasheets', 'offgrid-datasheet-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-datasheet-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+            </div>
+            <div style="font-size:0.68rem;color:var(--text-muted);margin-top:6px" data-i18n="offgridL2.fieldDataHint">Faz 1 için üç gerçek 8760 seri gerekir. Faz 2 için bu dosyaların SHA-256 kanıtı, saha gölge kanıtı ve ekipman datasheet kanıtı gerekir.</div>
+          </div>
+
           <!-- Cihaz Listesi (Gelişmiş Mod) -->
           <div id="offgrid-device-section" style="margin-bottom:14px">
             <div style="font-size:0.75rem;font-weight:600;color:var(--text);margin-bottom:8px" data-i18n="offgridL2.deviceListTitle">Cihaz Listesi (İsteğe Bağlı)</div>
@@ -1296,9 +1331,9 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
               style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.85rem;width:100%"
               onchange="updateOffgridL2Settings()">
               <option value=""         data-i18n="offgridL2.badWeatherNone">Simüle etme</option>
-              <option value="light"    data-i18n="offgridL2.badWeatherLight">Hafif (−%30 PV, 3 bulutlu gün)</option>
-              <option value="moderate" data-i18n="offgridL2.badWeatherModerate">Orta (−%55 PV, 5 ardışık gün)</option>
-              <option value="severe"   data-i18n="offgridL2.badWeatherSevere">Şiddetli (−%75 PV, Karadeniz/Dağ kışı)</option>
+              <option value="light"    data-i18n="offgridL2.badWeatherLight">Hafif (5 gün, PV %15'e düşer)</option>
+              <option value="moderate" data-i18n="offgridL2.badWeatherModerate">Orta (10 gün, PV %5'e düşer)</option>
+              <option value="severe"   data-i18n="offgridL2.badWeatherSevere">Şiddetli (15 gün, PV sıfır)</option>
             </select>
           </div>
         </div>
@@ -2181,7 +2216,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <span class="fin-val positive" id="fin-irr">-</span>
     </div>
     <div class="fin-row">
-      <span class="fin-label">Normalleştirilmiş Maliyet (LCOE) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Levelized Cost of Energy — 25 yıl boyunca üretilen her kWh'in toplam maliyeti.</span></span></span>
+      <span class="fin-label">Normalleştirilmiş Maliyet (LCOE) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Levelized Cost of Energy — on-grid için üretilen kWh, off-grid için PV+BESS ile yüke teslim edilen kWh bazlı iskonto edilmiş maliyet.</span></span></span>
       <span class="fin-val" id="fin-lcoe">-</span>
     </div>
     <div class="fin-row" id="fin-om-row">
@@ -2278,7 +2313,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div style="background:rgba(100,116,139,0.05);border:1px solid rgba(100,116,139,0.2);border-radius:8px;padding:12px">
       <div style="font-size:0.72rem;color:var(--text-muted);line-height:1.55">
         <div style="font-weight:600;margin-bottom:4px" data-i18n="offgridL2.methodologyTitle">Metodoloji Notu</div>
-        <div data-i18n="offgridL2.methodologyBody">Bu sonuçlar sentetik 8760-saat dispatch ön değerlendirmesidir. Kritik yük önceliği ve jeneratör desteği basitleştirilmiş model üzerinden hesaplanmıştır. Gerçek off-grid fizibilite analizi için saha ölçümü, yük ölçeri ve detaylı enerji analizi gereklidir.</div>
+        <div data-i18n="offgridL2.methodologyBody">Bu sonuçlar sentetik 8760-saat dispatch ön değerlendirmesidir. PV üretim saatleri aylık üretimin tipik güneş profiline dağıtılmasıyla türetilir; kritik yük önceliği ve jeneratör desteği basitleştirilmiş model üzerinden hesaplanır. Gerçek off-grid fizibilite analizi için saha ölçümü, yük ölçeri ve detaylı enerji analizi gereklidir.</div>
         <div id="offgrid-l2-version" style="margin-top:4px;font-size:0.65rem;opacity:0.5"></div>
         <div id="offgrid-l2-load-mode" style="margin-top:2px;font-size:0.65rem;opacity:0.5"></div>
       </div>

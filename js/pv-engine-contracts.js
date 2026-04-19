@@ -150,6 +150,12 @@ export function buildPvEngineRequest(state = {}) {
       dailyConsumptionKwh: finite(state.dailyConsumption, 0),
       monthlyConsumptionKwh: Array.isArray(state.monthlyConsumption) ? state.monthlyConsumption.map(v => Math.max(0, finite(v, 0))).slice(0, 12) : null,
       hourlyConsumption8760: normalizeHourlyProfile(state.hourlyConsumption8760),
+      hourlyProduction8760: state.scenarioKey === 'off-grid'
+        ? (normalizeHourlyProfile(state.offgridPvHourly8760) || normalizeHourlyProfile(state.hourlyProduction8760))
+        : null,
+      offgridCriticalLoad8760: state.scenarioKey === 'off-grid'
+        ? (normalizeHourlyProfile(state.offgridCriticalLoad8760) || normalizeHourlyProfile(state.criticalLoad8760))
+        : null,
       offgridDevices: state.scenarioKey === 'off-grid' && Array.isArray(state.offgridDevices) ? state.offgridDevices : [],
       offgridCriticalFraction: state.scenarioKey === 'off-grid' ? finite(state.offgridCriticalFraction, 0.3) : null
     },
@@ -159,8 +165,12 @@ export function buildPvEngineRequest(state = {}) {
       generatorFuelCostPerKwh: finite(state.offgridGeneratorFuelCostPerKwh, 0),
       generatorCapexTry: finite(state.offgridGeneratorCapexTry, 0),
       badWeatherLevel: state.offgridBadWeatherLevel || '',
+      fieldGuaranteeMode: !!state.offgridFieldGuaranteeMode,
+      productionSourcePriority: ['offgridPvHourly8760', 'hourlyProduction8760', 'monthlyProductionDerivedSynthetic8760'],
       loadSourcePriority: ['hourlyConsumption8760', 'offgridDevices', 'dailyConsumptionSyntheticProfile'],
-      dispatchLevel: 'L2'
+      fieldEvidenceRequired: ['offgridPvProduction', 'offgridLoadProfile', 'offgridCriticalLoadProfile', 'offgridSiteShading', 'offgridEquipmentDatasheets'],
+      dispatchLevel: 'L2',
+      fieldGuaranteeGate: 'OFFGRID-FIELD-GATE-2026.04-v2'
     } : null,
     tariff: {
       tariffType: state.tariffType || 'residential',

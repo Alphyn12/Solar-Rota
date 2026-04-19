@@ -146,6 +146,109 @@ function sum(arr) {
   return arr.reduce((a, b) => a + Math.max(0, Number(b) || 0), 0);
 }
 
+export function buildOffgridPvDispatchProfile(options = {}) {
+  const realHourly = isComplete8760(options.realHourlyPv8760)
+    ? clone8760(options.realHourlyPv8760)
+    : null;
+  if (realHourly) {
+    return {
+      pvHourly8760: realHourly,
+      annualKwh: sum(realHourly),
+      hasRealHourlyProduction: true,
+      productionDispatchProfile: 'real-hourly-pv-8760',
+      productionSeriesSource: options.source || 'user-supplied-real-hourly-pv',
+      productionSourceLabel: options.sourceLabel || 'Real hourly PV 8760',
+      productionFallback: false,
+      fallbackUsed: false,
+      resolution: 'hourly',
+      missingHours: 0,
+      dispatchBus: 'ac-load-bus-kwh',
+      synthetic: false
+    };
+  }
+
+  const fallbackHourly = Array.isArray(options.fallbackHourlyRows)
+    ? options.fallbackHourlyRows.map(row => typeof row === 'number' ? row : row?.production)
+    : [];
+  const fallbackComplete = isComplete8760(fallbackHourly);
+  const pvHourly8760 = fallbackComplete ? clone8760(fallbackHourly) : new Array(HOURS_PER_YEAR).fill(0);
+  return {
+    pvHourly8760,
+    annualKwh: sum(pvHourly8760),
+    hasRealHourlyProduction: false,
+    productionDispatchProfile: fallbackComplete
+      ? 'monthly-production-derived-synthetic-8760'
+      : 'missing-production-zero-profile',
+    productionSeriesSource: options.fallbackSource || 'monthly-production-derived-synthetic-8760',
+    productionSourceLabel: options.fallbackSourceLabel || 'Monthly-derived synthetic 8760',
+    productionFallback: !!options.fallbackUsed || !fallbackComplete,
+    fallbackUsed: !!options.fallbackUsed || !fallbackComplete,
+    resolution: 'hourly',
+    missingHours: fallbackComplete ? 0 : HOURS_PER_YEAR,
+    dispatchBus: 'ac-load-bus-kwh',
+    synthetic: true
+  };
+}
+
+export function evaluateOffgridFieldGuaranteeReadiness({
+  productionProfile = {},
+  loadProfile = {},
+  battery = {},
+  generator = {},
+  dispatchOptions = {}
+} = {}) {
+  const blockers = [];
+  const limitations = [];
+  const satisfied = [];
+
+  if (productionProfile.hasRealHourlyProduction) {
+    satisfied.push('real-hourly-pv-8760');
+  } else {
+    blockers.push('Gerçek 8760 saatlik PV üretim serisi yok; dispatch aylık üretimden türetilmiş sentetik profil kullanıyor.');
+  }
+
+  if (loadProfile.hasRealHourlyLoad) {
+    satisfied.push('real-hourly-load-8760');
+  } else {
+    blockers.push('Gerçek 8760 saatlik saha yük profili yok; yük cihaz kütüphanesi veya günlük tüketimden sentetik üretiliyor.');
+  }
+
+  if (loadProfile.criticalLoadBasis === 'real-hourly-critical-load') {
+    satisfied.push('real-hourly-critical-load');
+  } else {
+    blockers.push('Kritik yük saatlik ölçülmüş/kanıtlı ayrı profil değil; kritik kapsama garanti metriği olamaz.');
+  }
+
+  if (Number.isFinite(Number(battery.maxChargePowerKw)) && Number.isFinite(Number(battery.maxDischargePowerKw))) {
+    satisfied.push('battery-charge-discharge-power-limits');
+  } else {
+    blockers.push('Batarya şarj/deşarj güç limitleri datasheet seviyesinde tanımlı değil.');
+  }
+
+  if (Number.isFinite(Number(dispatchOptions.inverterAcLimitKw))) {
+    satisfied.push('inverter-ac-limit');
+  } else {
+    blockers.push('İnverter AC limiti açık tanımlı değil.');
+  }
+
+  limitations.push('Batarya yaşlanması, sıcaklık derating ve ayrı charge/discharge efficiency henüz garanti dispatchine bağlanmadı.');
+  if (generator?.enabled) {
+    limitations.push('Jeneratör yakıt eğrisi, minimum yük oranı, start/stop ve bakım saatleri henüz datasheet bazlı modellenmedi.');
+  }
+
+  const phase1Ready = blockers.length === 0;
+  return {
+    version: 'OFFGRID-FIELD-GATE-2026.04-v1',
+    status: phase1Ready ? 'phase-1-input-ready' : 'blocked',
+    phase1Ready,
+    fieldGuaranteeReady: false,
+    guaranteeLevel: phase1Ready ? 'engineering-input-ready-not-field-guarantee' : 'pre-feasibility-only',
+    blockers,
+    limitations,
+    satisfied
+  };
+}
+
 function buildDeviceSummary(validDevices) {
   let criticalDeviceCount = 0;
   const deviceSummary = validDevices.map(device => {
@@ -413,10 +516,12 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
   let socSumKwh = 0;
 
   let autonomousDays = 0;
+  let autonomousDaysWithGenerator = 0;
   const hourly8760 = [];
 
   const N = Math.min(pvHourly8760.length, loadHourly8760.length, criticalLoadHourly8760.length, HOURS_PER_YEAR);
   let dailyUnmet = 0;
+  let dailyUnmetWithGenerator = 0;
   let dailyLoad = 0;
 
   for (let i = 0; i < N; i++) {
@@ -529,15 +634,18 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
     const finalUnmetCritical = Math.max(0, remainingCriticalDeficit - genToCritical);
     unmetLoadKwh += finalUnmet;
     unmetCriticalLoadKwh += finalUnmetCritical;
-    dailyUnmet += finalUnmet;
-    dailyLoad  += load;
+    dailyUnmet += remainingTotalDeficit;
+    dailyUnmetWithGenerator += finalUnmet;
+    dailyLoad += load;
 
     if (i % 24 === 23) {
       // Göreceli eşik: günlük yükün %1'i veya minimum 1 Wh
       const autonomyThreshold = Math.max(0.001, dailyLoad * 0.01);
       if (dailyUnmet < autonomyThreshold) autonomousDays++;
+      if (dailyUnmetWithGenerator < autonomyThreshold) autonomousDaysWithGenerator++;
       dailyUnmet = 0;
-      dailyLoad  = 0;
+      dailyUnmetWithGenerator = 0;
+      dailyLoad = 0;
     }
 
     minSocKwh = Math.min(minSocKwh, soc);
@@ -573,6 +681,7 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
   const solarBatteryCriticalCoverage = annualCriticalLoad > 0 ? Math.min(1, pvBatteryCriticalServedKwh / annualCriticalLoad) : 1;
 
   const autonomousDaysPct = (autonomousDays / 365) * 100;
+  const autonomousDaysWithGeneratorPct = (autonomousDaysWithGenerator / 365) * 100;
   const cyclesPerYear = usableCap > 0 ? totalChargedKwh / usableCap : 0;
   const averageSocKwh = N > 0 ? socSumKwh / N : 0;
 
@@ -608,6 +717,8 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
     // Özerklik
     autonomousDays,
     autonomousDaysPct,
+    autonomousDaysWithGenerator,
+    autonomousDaysWithGeneratorPct,
 
     // Jeneratör
     generatorRunHours,
@@ -746,6 +857,8 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     // Özerklik ve batarya
     autonomousDays: normalDispatch.autonomousDays,
     autonomousDaysPct: normalDispatch.autonomousDaysPct,
+    autonomousDaysWithGenerator: normalDispatch.autonomousDaysWithGenerator,
+    autonomousDaysWithGeneratorPct: normalDispatch.autonomousDaysWithGeneratorPct,
     cyclesPerYear: normalDispatch.cyclesPerYear,
     minimumSoc: normalDispatch.minimumSocPct,
     averageSoc: normalDispatch.averageSocPct,

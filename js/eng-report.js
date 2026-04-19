@@ -358,18 +358,24 @@ ${escapeHtml(report('batteryInstalledCost'))}: ${money(bm.batteryCost)}${offGrid
   <div class="formula-card">
     <div class="formula-title">${escapeHtml(i18n.t('offGrid.preFeasibilityOnly'))}</div>
     <div class="formula-body">${escapeHtml(i18n.t('offgridL2.productionSource'))}: ${escapeHtml(L.productionSourceLabel || L.productionSource || '—')}
+${escapeHtml(i18n.t('offgridL2.productionDispatchSynthetic'))} (${escapeHtml(L.productionDispatchProfile || 'monthly-production-derived-synthetic-8760')})
 ${escapeHtml(i18n.t('offgridL2.loadSourceLabel'))}: ${escapeHtml(L.loadSource || L.loadMode || '—')}
 ${escapeHtml(i18n.t('offgridL2.dispatchLabel'))}: ${escapeHtml(L.dispatchType || 'synthetic-8760-dispatch')}
 ${escapeHtml(i18n.t('offgridL2.pvBessCoverageLabel'))}: ${((L.pvBatteryLoadCoverage ?? L.totalLoadCoverage) * 100).toFixed(1)}%
 ${escapeHtml(i18n.t('offgridL2.totalCoverageWithGeneratorLabel'))}: ${(L.totalLoadCoverage * 100).toFixed(1)}%
 ${escapeHtml(i18n.t('offgridL2.pvBessCriticalCoverageLabel'))}: ${((L.pvBatteryCriticalCoverage ?? L.criticalLoadCoverage) * 100).toFixed(1)}%
 ${escapeHtml(i18n.t('offgridL2.criticalCoverageWithGeneratorLabel'))}: ${(L.criticalLoadCoverage * 100).toFixed(1)}%
+${escapeHtml(i18n.t('offgridL2.resultAutonomousDays'))}: ${L.autonomousDays ?? '—'} ${escapeHtml(yearUnit)}; ${escapeHtml(i18n.t('offgridL2.resultAutonomousDaysWithGenerator'))}: ${L.autonomousDaysWithGenerator ?? '—'} ${escapeHtml(yearUnit)}
 ${escapeHtml(i18n.t('offgridL2.unmetLabel'))}: ${fmt(L.unmetLoadKwh || 0)} kWh/${escapeHtml(yearUnit)}
 ${escapeHtml(i18n.t('offgridL2.curtailedLabel'))}: ${fmt(L.curtailedPvKwh || 0)} kWh/${escapeHtml(yearUnit)}
 ${escapeHtml(i18n.t('offgridL2.generatorLabel'))}: ${fmt(L.generatorEnergyKwh || L.generatorKwh || 0)} kWh/${escapeHtml(yearUnit)}; ${escapeHtml(i18n.t('offgridL2.generatorCapex'))}: ${money(L.generatorCapex || 0)}
 ${escapeHtml(i18n.t('offgridL2.minSocLabel'))}: ${L.minimumSoc != null ? (L.minimumSoc * 100).toFixed(1) + '%' : '—'}; ${escapeHtml(i18n.t('offgridL2.avgSocLabel'))}: ${L.averageSoc != null ? (L.averageSoc * 100).toFixed(1) + '%' : '—'}
 ${escapeHtml(i18n.t('offgridL2.inverterLimitLabel'))}: ${L.inverterAcLimitKw || '—'} kW; ${escapeHtml(i18n.t('offgridL2.batteryPowerLimitLabel'))}: ${L.batteryMaxChargeKw || '—'} / ${L.batteryMaxDischargeKw || '—'} kW
 ${escapeHtml(i18n.t('offgridL2.powerLimitedLabel'))}: ${fmt(L.inverterPowerLimitedKwh || 0)} kWh (${L.inverterPowerLimitHours || 0} h)
+${escapeHtml(i18n.t('offgridL2.fieldGuaranteeStatus'))}: ${escapeHtml(i18n.t(L.fieldGuaranteeReadiness?.phase1Ready ? 'offgridL2.fieldGuaranteePhase1Ready' : 'offgridL2.fieldGuaranteeBlocked'))}
+${(L.fieldGuaranteeReadiness?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
+${escapeHtml(i18n.t('offgridL2.fieldEvidenceStatus'))}: ${escapeHtml(i18n.t(L.fieldEvidenceGate?.phase2Ready ? 'offgridL2.fieldEvidenceReady' : 'offgridL2.fieldEvidenceBlocked'))}
+${(L.fieldEvidenceGate?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
 
 ${escapeHtml(i18n.t('offGrid.notFeasibilityAnalysis'))}</div>
     <div class="formula-note">${escapeHtml(i18n.t('offGrid.syntheticDispatchNote'))}</div>
@@ -433,6 +439,9 @@ export function renderEngCalcPanel() {
     return converted.toLocaleString(currency === 'USD' ? 'en-US' : activeLocale, { maximumFractionDigits: 0 }) + ' ' + currency;
   };
   const lcoeValue = Number.parseFloat(r.lcoe);
+  const lcoeShortNote = state.scenarioKey === 'off-grid'
+    ? report('lcoeShortNoteOffGrid')
+    : report('lcoeShortNote');
   const co2Value = Number.parseFloat(r.co2Savings);
   const paybackValue = Number(r.simplePaybackYear || r.paybackYear || 0);
 
@@ -467,7 +476,7 @@ export function renderEngCalcPanel() {
         <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
           <div style="color:var(--text-muted);margin-bottom:4px">LCOE (${escapeHtml(report('lcoeTitle'))})</div>
           <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--accent)">${Number.isFinite(lcoeValue) ? lcoeValue.toFixed(2) : '—'} TL/kWh</strong></div>
-          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${escapeHtml(report('lcoeShortNote'))}</div>
+          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${escapeHtml(lcoeShortNote)}</div>
         </div>
         <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
           <div style="color:var(--text-muted);margin-bottom:4px">${escapeHtml(report('performanceRatio'))} (PR)</div>

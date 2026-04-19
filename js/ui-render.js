@@ -250,7 +250,7 @@ function renderBESSResults(bess) {
   // Faz-4 Fix-14: Show autonomy metrics when available (off-grid scenario)
   const autonomyHtml = (bess.autonomousDaysPct != null)
     ? `<span>${escapeHtml(i18n.t('offGrid.autonomousDaysNote'))}: <strong>${bess.autonomousDaysPct}%</strong> (${bess.autonomousDays} gün/yıl)</span>
-    <span>${escapeHtml(i18n.t('offGrid.nightCoverageNote'))}: <strong>${Number(bess.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh/${escapeHtml(i18n.t('units.year'))}</strong></span>`
+    <span>${escapeHtml(i18n.t('offgridL2.unmetLabel'))}: <strong>${Number(bess.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh/${escapeHtml(i18n.t('units.year'))}</strong></span>`
     : '';
   const offgridPowerHtml = isOffGrid
     ? `<span>${escapeHtml(i18n.t('offgridL2.batteryPowerLimitLabel'))}: <strong>${bess.batteryMaxChargeKw || '—'} / ${bess.batteryMaxDischargeKw || '—'} kW</strong></span>
@@ -352,6 +352,12 @@ function renderOffgridL2Results(offgridL2Results, state) {
         .replace('{totalDrop}', totalDrop).replace('{resilient}', resilient)
         .replace('{risk}', risk);
       const windowDay = bw.worstWindowDayOfYear;
+      const windowCoveragePart = Number.isFinite(Number(bw.windowCoverage))
+        ? `<span>${escapeHtml(i18n.t('offgridL2.badWeatherWindowCoverage'))}: <strong style="color:var(--text)">${(Number(bw.windowCoverage) * 100).toFixed(1)}%</strong></span>`
+        : '';
+      const windowCriticalCoveragePart = Number.isFinite(Number(bw.windowCriticalCoverage))
+        ? `<span>${escapeHtml(i18n.t('offgridL2.badWeatherWindowCriticalCoverage'))}: <strong style="color:var(--text)">${(Number(bw.windowCriticalCoverage) * 100).toFixed(1)}%</strong></span>`
+        : '';
       const windowPart = windowDay
         ? `<span style="color:var(--text-muted);font-size:0.72rem">${escapeHtml(i18n.t('offgridL2.badWeatherWindowDay') || 'En kötü pencere: gün')} ${windowDay}</span>`
         : '';
@@ -363,6 +369,8 @@ function renderOffgridL2Results(offgridL2Results, state) {
           <span>${escapeHtml(i18n.t('offgridL2.badWeatherLevel'))}: <strong style="color:var(--text)">${escapeHtml(i18n.t(levelKey))}</strong></span>
           <span>${escapeHtml(i18n.t('offgridL2.criticalDropLabel'))}: <strong style="color:#EF4444">−${critDrop}%</strong></span>
           <span>${escapeHtml(i18n.t('offgridL2.totalDropLabel'))}: <strong style="color:#F59E0B">−${totalDrop}%</strong></span>
+          ${windowCoveragePart}
+          ${windowCriticalCoveragePart}
           ${windowPart}
         </div>
         <div style="font-size:0.72rem;color:var(--text-muted);font-style:italic">${escapeHtml(narrative)}</div>
@@ -399,6 +407,7 @@ function renderOffgridL2Results(offgridL2Results, state) {
       L.batteryMaxChargeKw != null || L.batteryMaxDischargeKw != null ? stat(i18n.t('offgridL2.batteryPowerLimitLabel'), `${L.batteryMaxChargeKw ?? '—'} / ${L.batteryMaxDischargeKw ?? '—'} kW`, '#8B5CF6') : '',
       (L.inverterPowerLimitedKwh || 0) > 0 ? stat(i18n.t('offgridL2.powerLimitedLabel'), `${Math.round(L.inverterPowerLimitedKwh).toLocaleString(locale)} kWh (${L.inverterPowerLimitHours || 0} h)`, '#EF4444') : '',
       L.autonomousDays != null ? stat(i18n.t('offgridL2.resultAutonomousDays'), `${L.autonomousDays} gün (${L.autonomousDaysPct != null ? L.autonomousDaysPct.toFixed(1) : '—'}%)`, '#22C55E') : '',
+      L.generatorEnabled && L.autonomousDaysWithGenerator != null ? stat(i18n.t('offgridL2.resultAutonomousDaysWithGenerator'), `${L.autonomousDaysWithGenerator} gün (${L.autonomousDaysWithGeneratorPct != null ? L.autonomousDaysWithGeneratorPct.toFixed(1) : '—'}%)`, '#F59E0B') : '',
       L.cyclesPerYear != null ? stat(i18n.t('offgridL2.resultCyclesPerYear'), L.cyclesPerYear.toFixed(0), 'var(--text-muted)') : '',
     ].filter(Boolean);
     extMetricsBody.innerHTML = items.join('');
@@ -434,7 +443,7 @@ function renderOffgridL2Results(offgridL2Results, state) {
     const unmetKwh = Math.round(L.unmetLoadKwh || 0);
     if (unmetKwh > 10) {
       const msg = i18n.t(L.generatorEnabled
-        ? 'offgridL2.genNarrativeUnmet'
+        ? 'offgridL2.genNarrativeUnmetWithGenerator'
         : 'offgridL2.honestUnmetWarning')
         .replace('{unmet}', unmetKwh.toLocaleString(locale));
       unmetWarnEl.style.display = '';
@@ -454,6 +463,9 @@ function renderOffgridL2Results(offgridL2Results, state) {
     const dispatchLabel = L.dispatchType === 'hourly-8760-dispatch'
       ? i18n.t('offgridL2.dispatchHourly')
       : i18n.t('offgridL2.syntheticDispatch');
+    const productionDispatchText = L.productionDispatchProfile === 'real-hourly-pv-8760'
+      ? i18n.t('offgridL2.productionDispatchReal')
+      : i18n.t('offgridL2.productionDispatchSynthetic');
     const parityText = L.parityAvailable
       ? `<span style="color:#22C55E">✓ ${escapeHtml(i18n.t('offgridL2.parityAvailable'))}</span>`
       : `<span style="color:#94A3B8">${escapeHtml(i18n.t('offgridL2.parityNotAvailable'))}</span>`;
@@ -464,10 +476,21 @@ function renderOffgridL2Results(offgridL2Results, state) {
     sourceTransEl.innerHTML = `
       <div style="font-size:0.72rem;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:10px;align-items:center">
         <span>${escapeHtml(i18n.t('offgridL2.productionSource'))}: <strong style="color:var(--text)">${escapeHtml(prodSource)}</strong>${fallbackBadge}</span>
+        <span>${escapeHtml(productionDispatchText)}</span>
         <span>${escapeHtml(i18n.t('offgridL2.loadSourceLabel'))}: <strong style="color:var(--text)">${escapeHtml(loadSrc)}</strong></span>
         <span>${escapeHtml(i18n.t('offgridL2.dispatchLabel'))}: <strong style="color:var(--text)">${escapeHtml(dispatchLabel)}</strong></span>
         ${parityText}
       </div>
+      ${L.fieldGuaranteeReadiness ? `
+      <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldGuaranteeReadiness.phase1Ready ? '#22C55E' : '#F59E0B'}">
+        ${escapeHtml(i18n.t('offgridL2.fieldGuaranteeStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldGuaranteeReadiness.phase1Ready ? 'offgridL2.fieldGuaranteePhase1Ready' : 'offgridL2.fieldGuaranteeBlocked'))}</strong>
+        ${L.fieldGuaranteeReadiness.blockers?.length ? ` — ${escapeHtml(L.fieldGuaranteeReadiness.blockers[0])}` : ''}
+      </div>` : ''}
+      ${L.fieldEvidenceGate ? `
+      <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldEvidenceGate.phase2Ready ? '#22C55E' : '#F59E0B'}">
+        ${escapeHtml(i18n.t('offgridL2.fieldEvidenceStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldEvidenceGate.phase2Ready ? 'offgridL2.fieldEvidenceReady' : 'offgridL2.fieldEvidenceBlocked'))}</strong>
+        ${L.fieldEvidenceGate.blockers?.length ? ` — ${escapeHtml(L.fieldEvidenceGate.blockers[0])}` : ''}
+      </div>` : ''}
       <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;font-size:0.68rem;color:var(--text-muted)">
         <span>⚗ ${escapeHtml(i18n.t('offgridL2.honestSyntheticNote'))}</span>
         <span>📊 ${escapeHtml(i18n.t('offgridL2.honestPreFeasibility'))}</span>
@@ -1163,6 +1186,8 @@ export function downloadPDF() {
     kpis.push(
       [pdfSafeText(i18n.t('offgridL2.pvBessCoverageLabel')), `${((L.pvBatteryLoadCoverage ?? L.totalLoadCoverage) * 100).toFixed(1)}%`],
       [pdfSafeText(i18n.t('offgridL2.totalCoverageWithGeneratorLabel')), `${(L.totalLoadCoverage * 100).toFixed(1)}%`],
+      [pdfSafeText(i18n.t('offgridL2.resultAutonomousDays')), `${L.autonomousDays ?? '—'} ${yearUnit}`],
+      ...(L.generatorEnabled ? [[pdfSafeText(i18n.t('offgridL2.resultAutonomousDaysWithGenerator')), `${L.autonomousDaysWithGenerator ?? '—'} ${yearUnit}`]] : []),
       [pdfSafeText(i18n.t('offgridL2.generatorLabel')), `${Math.round(L.generatorEnergyKwh || L.generatorKwh || 0).toLocaleString(dateLocale)} kWh`],
       [pdfSafeText(i18n.t('offgridL2.unmetLabel')), `${Math.round(L.unmetLoadKwh || 0).toLocaleString(dateLocale)} kWh`]
     );
