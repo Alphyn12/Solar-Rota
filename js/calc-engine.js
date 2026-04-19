@@ -6,7 +6,6 @@ import {
   PANEL_TYPES, BATTERY_MODELS, PSH_FALLBACK, CITY_SUMMER_TEMPS,
   MONTH_WEIGHTS, INVERTER_TYPES, HEAT_PUMP_DATA, HOURLY_SOLAR_PROFILE
 } from './data.js';
-import { calculateBomTotal, getActiveBomCategories, selectBomItems } from './bom.js';
 import {
   METHODOLOGY_VERSION, PVGIS_LOSS_PARAM, buildTariffModel, calcIRR,
   calculateEVLoad, calculateHeatPumpLoad, calculateSystemLayout,
@@ -363,13 +362,8 @@ export async function runCalculation() {
   });
   const tempLoss = fallbackTempAdjustment.lossRate;
 
-  // Kablo kaybı entegrasyonu
-  let cableLossFactor = 1.0;
-  let cableLossPct = 0;
-  if (state.cableLossEnabled && state.cableLoss) {
-    cableLossPct = state.cableLoss.totalLossPct || 0;
-    cableLossFactor = 1 - cableLossPct / 100;
-  }
+  const cableLossFactor = 1.0;
+  const cableLossPct = 0;
   // Faz-3 Fix-12: OSM shadow seasonal weighting.
   // OSM-derived shadowFactorPct is computed without solar geometry (no sun elevation angle).
   // In winter the sun is low (~25°) → shadows are 3-4× longer than in summer (~60°).
@@ -648,23 +642,16 @@ export async function runCalculation() {
   const invPrices = invType.pricePerKWp;
   const invUnit = systemPower < 10 ? invPrices.lt10 : systemPower < 50 ? invPrices.lt50 : invPrices.gt50;
 
-  const costOverrides = state.costOverridesEnabled ? (state.costOverrides || {}) : {};
-  const pickOverride = (key, fallback) => Number.isFinite(Number(costOverrides[key])) ? Number(costOverrides[key]) : fallback;
-  const panelPricePerWatt = pickOverride('panelPricePerWatt', panel.pricePerWatt);
-  const invUnitEffective = pickOverride('inverterPerKwp', invUnit);
-  const mountingPerKwp = pickOverride('mountingPerKwp', 2200);
-  const dcCablePerKwp = pickOverride('dcCablePerKwp', 600);
-  const acElecPerKwp = pickOverride('acElecPerKwp', 900);
-  const laborPerKwp = pickOverride('laborPerKwp', 1800);
-  const defaultPermit = systemPower < 5 ? 8000 : systemPower < 10 ? 6000 : systemPower < 20 ? 5000 : 4000;
-  const permitCost  = pickOverride('permitFixed', defaultPermit);
-  // FIX-6: KDV/VAT accuracy — Law 7456/2023 (July 2023) reduced KDV on solar PV
-  // panels/modules to 0%. Other components (inverter, mounting, cable, labor,
-  // permit) remain at the standard 20% rate. The override key 'kdvRate' now
-  // sets the non-panel rate; to override the panel rate separately use
-  // 'panelKdvRate'. Backend _frontend_default_capex also updated to match.
-  const nonPanelKdvRate = Number.isFinite(costOverrides.kdvRate) ? costOverrides.kdvRate : 0.20;
-  const panelKdvRate    = Number.isFinite(costOverrides.panelKdvRate) ? costOverrides.panelKdvRate : 0.00;
+  const panelPricePerWatt = panel.pricePerWatt;
+  const invUnitEffective = invUnit;
+  const mountingPerKwp = 2200;
+  const dcCablePerKwp = 600;
+  const acElecPerKwp = 900;
+  const laborPerKwp = 1800;
+  const permitCost = systemPower < 5 ? 8000 : systemPower < 10 ? 6000 : systemPower < 20 ? 5000 : 4000;
+  // Law 7456/2023: solar panels 0% KDV, other components 20%
+  const nonPanelKdvRate = 0.20;
+  const panelKdvRate    = 0.00;
 
   const panelCost   = systemPower * 1000 * panelPricePerWatt;
   const inverterCost= systemPower * invUnitEffective;
@@ -677,16 +664,6 @@ export async function runCalculation() {
   const kdv         = panelCost * panelKdvRate + nonPanelSubtotal * nonPanelKdvRate;
   const kdvRate     = subtotal > 0 ? kdv / subtotal : 0; // blended rate, used downstream for display
   let solarCost     = subtotal + kdv;
-  const bomTotalsForSystem = Array.isArray(state.bomItems) && state.bomItems.length
-    ? calculateBomTotal(selectBomItems(state.bomItems, state.bomSelection || {}, { activeCategories: getActiveBomCategories(state) }), {
-        wp: systemPower * 1000,
-        kwp: systemPower,
-        fixed: 1,
-        meter: Math.max(20, systemPower * 10),
-        day: Math.max(1, Math.ceil(systemPower / 5))
-      })
-    : null;
-  if (bomTotalsForSystem) state.bomTotals = bomTotalsForSystem;
 
   let tariffModel = buildTariffModel(state);
   let tariff = tariffModel.importRate || 7.16;
@@ -1200,8 +1177,7 @@ export async function runCalculation() {
       generator: generatorCapexVal,
       generatorCapex: generatorCapexVal,
       totalWithBattery: Math.round(solarCost + batteryCostVal),
-      totalWithBatteryAndGenerator: Math.round(totalCost),
-      bom: bomTotalsForSystem || state.bomTotals || null
+      totalWithBatteryAndGenerator: Math.round(totalCost)
     },
     generatorCapex: Math.round(generatorCapexVal),
     financialCostBasis: Math.round(financialCostBasis),

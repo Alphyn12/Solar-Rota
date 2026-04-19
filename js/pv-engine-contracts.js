@@ -79,9 +79,7 @@ function normalizeHourlyProfile(values) {
 export function buildPvEngineRequest(state = {}) {
   const panel = PANEL_TYPES[state.panelType || 'mono'] || PANEL_TYPES.mono;
   const inverter = INVERTER_TYPES[state.inverterType || 'string'] || INVERTER_TYPES.string;
-  const cableLossPct = state.cableLossEnabled && state.cableLoss
-    ? Math.max(0, finite(state.cableLoss.totalLossPct, 0))
-    : 0;
+  const cableLossPct = 0;
   const layoutSnapshot = buildLayoutSnapshot(state);
   return {
     schema: PV_ENGINE_CONTRACT_VERSION,
@@ -142,7 +140,7 @@ export function buildPvEngineRequest(state = {}) {
       browserModel: 'PVGIS/JS hybrid or local PSH fallback',
       backendModel: 'pvlib-backed when available, deterministic fallback otherwise',
       notes: [
-        'Panel, inverter, cable-loss and scenario fields are passed explicitly to avoid hidden default drift.',
+        'Panel, inverter and scenario fields are passed explicitly to avoid hidden default drift.',
         'pvlib-backed production may intentionally differ from browser PVGIS/JS because it uses hourly solar position, transposition and temperature modeling.'
       ]
     },
@@ -210,7 +208,7 @@ export function buildEngineSourceMeta({ engine = 'js-local', usedFallback = fals
     pvlibBacked: false,
     fallbackUsed: !!usedFallback,
     notes: [
-      'Panel wattage, panel area, inverter efficiency, bifacial gain, and cable-loss assumptions are passed explicitly in the engine request.',
+      'Panel wattage, panel area, inverter efficiency and bifacial gain are passed explicitly in the engine request.',
       'Browser PVGIS/JS and backend pvlib are different production models; any remaining divergence should be explained by engine metadata, not hidden defaults.',
       'Downstream financial, report, audit and export layers must use one authoritative production source for the completed run.'
     ]

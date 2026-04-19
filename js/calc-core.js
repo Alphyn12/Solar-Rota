@@ -705,7 +705,6 @@ export function detectCalculationWarnings(results) {
   if (!isFinite(results.totalCost) || results.totalCost <= 0) warnings.push('Toplam maliyet geçersiz.');
   if (Number(results.pr) > 95) warnings.push('PR %95 üzerinde; ışınım/kayıp varsayımlarını kontrol edin.');
   if (Number(results.cf) > 30) warnings.push('Kapasite faktörü PV için olağan dışı yüksek.');
-  if (Number(results.cableLossPct) > 3) warnings.push('Kablo kaybı %3 üzerinde; kesit ve mesafe kontrol edilmeli.');
   if (results.usedFallback) warnings.push('PVGIS verisi alınamadı; fallback PSH hesabı düşük güven seviyesidir.');
   if (results.netMeteringEnabled && results.nmMetrics?.unpaidGridExport > 0) warnings.push('Üretim fazlasının bir kısmı ödeme hesabına alınmadı; ihracat sınırı uygulanıyor.');
   if (results.tariffModel?.effectiveRegime === 'sktt' && !results.tariffModel?.skttRate) warnings.push('SKTT seçili ancak SKTT birim fiyatı tanımlı değil.');

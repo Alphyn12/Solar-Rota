@@ -53,7 +53,6 @@ export function renderEngReport() {
   const azimuthPct  = (r.azimuthLossEnergy / maxRef * 100).toFixed(1);
   const bifacialPct = (r.bifacialGainEnergy / maxRef * 100).toFixed(1);
   const soilingPct  = (r.soilingLoss / maxRef * 100).toFixed(1);
-  const cablePct    = r.cableLossPct ? r.cableLossPct.toFixed(1) : '0.0';
   const cb          = r.costBreakdown;
   const totalEnergy25y = r.yearlyTable.reduce((s, y) => s + y.energy, 0);
   const gov = r.proposalGovernance || {};
@@ -112,8 +111,7 @@ ${escapeHtml(report('panelCountFormula'))}
   <div class="formula-card">
     <div class="formula-title">${escapeHtml(report('inverterTitle'))}: ${escapeHtml(r.inverterType ? r.inverterType.charAt(0).toUpperCase() + r.inverterType.slice(1) : 'String')} — ${escapeHtml(report('inverterEfficiency'))} %${r.inverterEfficiency || '97'}</div>
     <div class="formula-body">${escapeHtml(report('inverterEfficiency'))} = %${r.inverterEfficiency || '97'}
-E_AC = E_DC × η_inv = ${fmt(r.annualEnergy / (r.inverterEfficiency/100 || 0.97) * (r.inverterEfficiency/100 || 0.97))} kWh × ${r.inverterEfficiency || '97'}% = ${fmt(r.annualEnergy)} kWh/${escapeHtml(yearUnit)}${r.cableLossPct > 0 ? `\n\n${escapeHtml(report('cableLoss'))}: %${cablePct}
-E_net = E_AC × (1 − %${cablePct}) = ${fmt(r.annualEnergy)} kWh/${escapeHtml(yearUnit)}` : ''}</div>
+E_AC = E_DC × η_inv = ${fmt(r.annualEnergy / (r.inverterEfficiency/100 || 0.97) * (r.inverterEfficiency/100 || 0.97))} kWh × ${r.inverterEfficiency || '97'}% = ${fmt(r.annualEnergy)} kWh/${escapeHtml(yearUnit)}</div>
     <div class="formula-note">${escapeHtml(report('inverterNote'))}</div>
   </div>
 
@@ -140,7 +138,7 @@ GHI: ${state.ghi} kWh/m²/${escapeHtml(yearUnit)}${r.usedFallback ? `\n⚠ ${esc
     4. ${escapeHtml(i18n.t('report.lossWaterfall'))}
   </div>
   <div class="formula-card">
-    <div class="formula-title">${escapeHtml(report('lossEquationTitle'))}: E_net = E_gross × (1−shading) × (1−soiling) × k_bifacial × η_inv${r.cableLossPct > 0 ? ' × (1−cable)' : ''}${r.usedFallback ? ' × (1+α×ΔT) × k_azimuth' : ''}</div>
+    <div class="formula-title">${escapeHtml(report('lossEquationTitle'))}: E_net = E_gross × (1−shading) × (1−soiling) × k_bifacial × η_inv${r.usedFallback ? ' × (1+α×ΔT) × k_azimuth' : ''}</div>
     <div class="loss-waterfall">
       <div class="loss-row">
         <div class="loss-label">${escapeHtml(report('pvgisGrossProduction'))}${r.usedFallback ? ' (Fallback)' : ''}</div>
@@ -157,11 +155,6 @@ GHI: ${state.ghi} kWh/m²/${escapeHtml(yearUnit)}${r.usedFallback ? `\n⚠ ${esc
         <div class="loss-bar-wrap"><div class="loss-bar-fill negative" style="width:${soilingPct}%"></div></div>
         <div class="loss-val negative">−${fmt(r.soilingLoss)} kWh</div>
       </div>
-      ${r.cableLossPct > 0 ? `<div class="loss-row">
-        <div class="loss-label">− ${escapeHtml(report('cableLoss'))} (%${cablePct})</div>
-        <div class="loss-bar-wrap"><div class="loss-bar-fill negative" style="width:${cablePct}%"></div></div>
-        <div class="loss-val negative">−${fmt(r.cableLoss || 0)} kWh</div>
-      </div>` : ''}
       ${r.usedFallback ? `<div class="loss-row">
         <div class="loss-label">− ${escapeHtml(report('temperatureLoss'))} (${r.avgSummerTemp}°C, α=${(p.tempCoeff*100).toFixed(3)}%/°C)</div>
         <div class="loss-bar-wrap"><div class="loss-bar-fill negative" style="width:${tempPct}%"></div></div>

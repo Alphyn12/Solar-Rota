@@ -11,8 +11,6 @@ const STATIC_ASSETS = [
   '/js/app.js',
   '/js/bill-analysis.js',
   '/js/backend-config.js',
-  '/js/bom.js',
-  '/js/cable-loss.js',
   '/js/calc-core.js',
   '/js/calc-engine.js',
   '/js/offgrid-dispatch.js',

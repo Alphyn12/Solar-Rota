@@ -52,17 +52,17 @@ const STRING_LIMITS = {
 };
 
 const BOOLEAN_KEYS = new Set([
-  'batteryEnabled', 'netMeteringEnabled', 'omEnabled', 'costOverridesEnabled',
+  'batteryEnabled', 'netMeteringEnabled', 'omEnabled',
   'billAnalysisEnabled', 'evEnabled', 'heatPumpEnabled', 'taxEnabled',
-  'cableLossEnabled', 'osmShadowEnabled', 'hasBilateralContract',
+  'osmShadowEnabled', 'hasBilateralContract',
   'hasSignedCustomerBillData', 'quoteInputsVerified', 'quoteReadyApproved',
   'multiRoof', 'tariffIncludesTax', 'satelliteEnhancementEnabled',
   'offgridFieldGuaranteeMode'
 ]);
 
 const OBJECT_KEYS = new Set([
-  'battery', 'ev', 'heatPump', 'tax', 'costOverrides', 'cableLoss',
-  'roofGeometry', 'osmShadow', 'bomSelection', 'bomCommercials', 'financing',
+  'battery', 'ev', 'heatPump', 'tax',
+  'roofGeometry', 'osmShadow', 'financing',
   'maintenanceContract', 'gridApplicationChecklist', 'proposalApproval', 'evidence',
   'userIdentity', 'scenarioContext', 'engineContext', 'exchangeRate',
   'satelliteEnhancement'
@@ -70,7 +70,7 @@ const OBJECT_KEYS = new Set([
 
 const ARRAY_KEYS = new Set([
   'roofSections', 'monthlyConsumption', 'hourlyConsumption8760', 'hourlyProduction8760',
-  'offgridPvHourly8760', 'offgridCriticalLoad8760', 'criticalLoad8760', 'bomItems',
+  'offgridPvHourly8760', 'offgridCriticalLoad8760', 'criticalLoad8760',
   'glareTargets', 'proposalRevisions',
   'auditLog'
 ]);

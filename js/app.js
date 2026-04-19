@@ -15,7 +15,6 @@ import { calculateBatteryMetrics, calculateNMMetrics } from './calc-engine.js';
 import { renderHourlyProfile, setHourlySeason } from './hourly-profile.js';
 import { toggleBillBlock, onBillToggle, onBillInput, billQuickFill, billClear } from './bill-analysis.js';
 import { buildInverterCards, selectInverter } from './inverter.js';
-import { updateCableLoss, toggleCableLossBlock, onCableLossToggle } from './cable-loss.js';
 import { calculateStructural } from './structural.js';
 import { toggleEVBlock, onEVToggle, updateEVInput } from './ev-charging.js';
 import { toggleHeatPumpBlock, onHeatPumpToggle, updateHeatPumpInput } from './heat-pump.js';
@@ -28,7 +27,6 @@ import { showHeatmapCard, toggleHeatmapAnimation, setHeatmapMonth } from './heat
 import { i18n, switchLanguage } from './i18n.js';
 import { initRoofDrawing } from './roof-geometry.js';
 import { toggleOSMShadow, refreshOSMShadowAnalysis } from './osm-shadow.js';
-import { initBomBuilder, selectBomItem } from './bom.js';
 import { initExchangeRateService, refreshExchangeRate, setManualUsdTryRate, convertTry } from './exchange-rate.js';
 import { appendAuditEntry } from './audit-log.js';
 import { attachEvidenceFile } from './evidence-files.js';
@@ -77,6 +75,59 @@ function switchCurrency(currency) {
   window.renderExchangeRateStatus?.();
 }
 window.switchCurrency = switchCurrency;
+
+// ── Ayarlar Paneli & Tema ────────────────────────────────────
+function openSettings() {
+  const panel = document.getElementById('settings-panel');
+  const overlay = document.getElementById('settings-overlay');
+  if (!panel) return;
+  panel.style.display = 'block';
+  overlay.style.display = 'block';
+  requestAnimationFrame(() => { panel.style.transform = 'translateX(0)'; });
+  syncSettingsPanel();
+}
+
+function closeSettings() {
+  const panel = document.getElementById('settings-panel');
+  const overlay = document.getElementById('settings-overlay');
+  if (!panel) return;
+  panel.style.transform = 'translateX(100%)';
+  overlay.style.display = 'none';
+  setTimeout(() => { panel.style.display = 'none'; }, 300);
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem('guneshesap_theme_v1', theme); } catch {}
+  syncSettingsPanel();
+}
+
+function initTheme() {
+  try {
+    const saved = localStorage.getItem('guneshesap_theme_v1');
+    if (saved === 'light' || saved === 'dark') {
+      document.documentElement.setAttribute('data-theme', saved);
+    }
+  } catch {}
+}
+
+function syncSettingsPanel() {
+  const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+  document.getElementById('theme-dark-btn')?.classList.toggle('active', theme === 'dark');
+  document.getElementById('theme-light-btn')?.classList.toggle('active', theme === 'light');
+  const lang = window._currentLang || 'tr';
+  document.querySelectorAll('#settings-panel .lang-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.lang === lang)
+  );
+  const cur = window.state?.displayCurrency || 'TRY';
+  document.querySelectorAll('#settings-panel .currency-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.currency === cur)
+  );
+}
+
+window.openSettings = openSettings;
+window.closeSettings = closeSettings;
+window.setTheme = setTheme;
 
 // ═══════════════════════════════════════════════════════════
 // STATE
@@ -153,19 +204,6 @@ window.state = {
   omEnabled: true,
   omRate: 1.2,
   insuranceRate: 0.5,
-  costOverridesEnabled: false,
-  costOverrides: {},
-  bomItems: [],
-  bomSelection: {},
-  bomTotals: null,
-  bomCommercials: {
-    marginRate: 0.18,
-    contingencyRate: 0.05,
-    supplierQuoteState: 'not-requested',
-    supplierQuoteRef: '',
-    supplierQuoteDate: null,
-    supplierQuoteValidUntil: null
-  },
   evidence: {
     customerBill: { type: 'customerBill', status: 'missing', ref: '', checkedAt: null },
     supplierQuote: { type: 'supplierQuote', status: 'missing', ref: '', issuedAt: null, validUntil: null },
@@ -210,8 +248,6 @@ window.state = {
   // Faz B
   billAnalysisEnabled: false,
   monthlyConsumption: null,
-  cableLossEnabled: false,
-  cableLoss: null,
   // Faz C
   evEnabled: false,
   ev: null,
@@ -506,8 +542,6 @@ document.addEventListener('DOMContentLoaded', () => {
       updateTariffType(tariffType);
     });
   });
-
-  // BOM builder ilk açılışta initBomBuilder() ile başlatılır (HTML onclick)
 
   const input = document.getElementById('city-search');
   const list = document.getElementById('autocomplete-list');
@@ -2026,7 +2060,6 @@ function validateStep5() {
   const tariffInput = document.getElementById('tariff-input');
   if (tariffInput) window.state.tariff = parseFloat(tariffInput.value) || 7.16;
   updateTariffAssumptions();
-  updateCostOverrides();
   goToStep(6);
   const calcBtn = document.getElementById('calc-btn') || document.querySelector('[onclick*="validateStep5"]');
   if (calcBtn) { calcBtn.disabled = true; calcBtn.style.opacity = '0.6'; }
@@ -2288,30 +2321,6 @@ function onOMToggle(checked) {
   if (inputs) inputs.style.display = checked ? 'block' : 'none';
 }
 
-function toggleCostOverridesBlock() {
-  const tog = document.getElementById('cost-toggle');
-  if (tog) { tog.checked = !tog.checked; onCostOverridesToggle(tog.checked); }
-}
-
-function onCostOverridesToggle(checked) {
-  window.state.costOverridesEnabled = checked;
-  const block = document.getElementById('cost-overrides-block');
-  if (block) block.style.display = checked ? 'block' : 'none';
-}
-
-function updateCostOverrides() {
-  const read = (id, fallback) => parseFloat(document.getElementById(id)?.value) || fallback;
-  window.state.costOverrides = {
-    panelPricePerWatt: read('cost-panel-watt', 0),
-    inverterPerKwp: read('cost-inverter-kwp', 0),
-    mountingPerKwp: read('cost-mounting-kwp', 0),
-    dcCablePerKwp: read('cost-dc-kwp', 0),
-    acElecPerKwp: read('cost-ac-kwp', 0),
-    laborPerKwp: read('cost-labor-kwp', 0),
-    permitFixed: read('cost-permit-fixed', 0),
-    kdvRate: read('cost-kdv-rate', 20) / 100
-  };
-}
 
 // ═══════════════════════════════════════════════════════════
 // PWA
@@ -2321,6 +2330,8 @@ if ('serviceWorker' in navigator) {
 }
 
 window.addEventListener('load', () => {
+  initTheme();
+  syncSettingsPanel();
   updateTilt(window.state.tilt ?? 33);
   updateShading(window.state.shadingFactor ?? 10);
   setTimeout(() => {
@@ -2389,9 +2400,6 @@ window.toggleNMBlock = toggleNMBlock;
 window.onNMToggle = onNMToggle;
 window.toggleOMBlock = toggleOMBlock;
 window.onOMToggle = onOMToggle;
-window.toggleCostOverridesBlock = toggleCostOverridesBlock;
-window.onCostOverridesToggle = onCostOverridesToggle;
-window.updateCostOverrides = updateCostOverrides;
 window.selectScenario = selectScenario;
 window.renderScenarioCards = renderScenarioCards;
 window.updateScenarioUI = updateScenarioUI;
@@ -2417,8 +2425,6 @@ window.clearRoofDrawing = function() {
 };
 window.toggleOSMShadow = toggleOSMShadow;
 window.refreshOSMShadowAnalysis = refreshOSMShadowAnalysis;
-window.initBomBuilder = initBomBuilder;
-window.selectBomItem = selectBomItem;
 window.refreshExchangeRate = refreshExchangeRate;
 window.setManualUsdTryRate = setManualUsdTryRate;
 

@@ -19,10 +19,10 @@ const STATE_KEYS = [
   'sellableExportCapKwh', 'expenseEscalationRate', 'contractedPowerKw',
   'contractedTariff', 'skttTariff', 'exportTariff', 'annualPriceIncrease',
   'discountRate', 'tariffIncludesTax', 'tariffSourceDate', 'tariffSourceCheckedAt',
-  'omEnabled', 'omRate', 'insuranceRate', 'costOverridesEnabled', 'costOverrides',
-  'bomSelection', 'bomCommercials', 'evidence', 'financing', 'maintenanceContract',
+  'omEnabled', 'omRate', 'insuranceRate',
+  'evidence', 'financing', 'maintenanceContract',
   'gridApplicationChecklist', 'proposalApproval', 'proposalRevisions',
-  'billAnalysisEnabled', 'monthlyConsumption', 'cableLossEnabled', 'cableLoss',
+  'billAnalysisEnabled', 'monthlyConsumption',
   'evEnabled', 'ev', 'heatPumpEnabled', 'heatPump', 'taxEnabled', 'tax',
   'hasSignedCustomerBillData', 'quoteInputsVerified', 'quoteReadyApproved',
   'userIdentity', 'auditLog'

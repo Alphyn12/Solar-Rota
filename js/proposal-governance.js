@@ -76,10 +76,7 @@ export function createApprovalBasisSnapshot(state = {}) {
       tariffSourceCheckedAt: state.tariffSourceCheckedAt || null
     },
     commercial: {
-      costOverridesEnabled: !!state.costOverridesEnabled,
-      costOverrides: state.costOverrides || null,
-      bomSelection: state.bomSelection || null,
-      bomCommercials: state.bomCommercials || null,
+      bomCommercials: null,
       displayCurrency: state.displayCurrency || 'TRY',
       usdToTry: state.usdToTry ?? null
     },
