@@ -22,6 +22,8 @@
   "scenario": {
     "label": "Senaryo",
     "gridLabel": "Sistem senaryonuzu seçin",
+    "headline": "Güneş enerjisi sistem türünüzü seçin",
+    "subline": "İhtiyacınıza uygun hesaplama akışını başlatmak için sistem tipinizi belirleyin",
     "fallbackLabel": "Senaryo",
     "selectedToast": "akışı seçildi."
   },
@@ -29,7 +31,8 @@
     "onGrid": {
       "label": "On-Grid",
       "shortLabel": "On-grid",
-      "description": "Fatura tasarrufu, öz tüketim, ihracat geliri, ROI ve teklif hazırlığı.",
+      "description": "Şebekeye bağlı sistem. Fatura tasarrufu, öz tüketim, ihracat geliri ve ROI hesabı.",
+      "forWhom": "Ev, iş yeri veya ticari tesis için uygundur",
       "workflowLabel": "Şebeke bağlantılı teklif akışı",
       "resultFrame": "Şebeke bağlantılı tasarruf ve teklif hazırlığı",
       "nextAction": "Quote-ready onaydan önce saha, fatura kanıtı, tarife kaynağı ve tedarikçi teklifini doğrulayın.",
@@ -38,7 +41,8 @@
     "offGrid": {
       "label": "Off-Grid",
       "shortLabel": "Off-grid",
-      "description": "Kritik yükler, batarya kapasitesi ve sentetik dispatch kapsamı.",
+      "description": "Şebekeden bağımsız sistem. Batarya kapasitesi, kritik yük otonomisi ve dispatch analizi.",
+      "forWhom": "Bağ evi, kırsal alan, karavan, tekne veya uzak saha için uygundur",
       "workflowLabel": "Off-grid ön fizibilite ve batarya dispatch akışı",
       "resultFrame": "Off-grid ön fizibilite boyutlandırması",
       "nextAction": "Teklif onayından önce kritik yükleri tanımlayın ve otonomiyi saha kanıtıyla doğrulayın.",

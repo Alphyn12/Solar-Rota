@@ -22,6 +22,8 @@
   "scenario": {
     "label": "Scenario",
     "gridLabel": "Choose your system scenario",
+    "headline": "Choose your solar system type",
+    "subline": "Select the system type that matches your needs to start the right calculation flow",
     "fallbackLabel": "Scenario",
     "selectedToast": "workflow selected."
   },
@@ -29,7 +31,8 @@
     "onGrid": {
       "label": "On-Grid",
       "shortLabel": "On-grid",
-      "description": "Bill savings, self-consumption, export revenue, ROI, and proposal readiness.",
+      "description": "Grid-connected solar. Bill savings, self-consumption, export revenue, and ROI analysis.",
+      "forWhom": "Suitable for homes, offices, and commercial facilities",
       "workflowLabel": "Grid-connected proposal workflow",
       "resultFrame": "Grid-connected savings and proposal readiness",
       "nextAction": "Validate the site, bill evidence, tariff source, and supplier quote before quote-ready approval.",
@@ -38,7 +41,8 @@
     "offGrid": {
       "label": "Off-Grid",
       "shortLabel": "Off-grid",
-      "description": "Critical loads, battery capacity, and synthetic dispatch coverage.",
+      "description": "Grid-independent solar. Battery capacity, critical load autonomy, and dispatch analysis.",
+      "forWhom": "Suitable for rural properties, caravans, boats, and remote sites",
       "workflowLabel": "Off-grid pre-feasibility and battery dispatch workflow",
       "resultFrame": "Off-grid pre-feasibility sizing",
       "nextAction": "Define critical loads and validate autonomy with field evidence before proposal approval.",

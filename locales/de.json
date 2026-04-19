@@ -22,6 +22,8 @@
   "scenario": {
     "label": "Szenario",
     "gridLabel": "System-Szenario auswählen",
+    "headline": "Wählen Sie Ihren Solarsystemtyp",
+    "subline": "Wählen Sie den passenden Systemtyp, um den richtigen Berechnungsablauf zu starten",
     "fallbackLabel": "Szenario",
     "selectedToast": "Workflow ausgewählt."
   },
@@ -29,7 +31,8 @@
     "onGrid": {
       "label": "On-Grid",
       "shortLabel": "On-grid",
-      "description": "Rechnungseinsparung, Eigenverbrauch, Einspeiseertrag, ROI und Angebotsreife.",
+      "description": "Netzgekoppeltes Solar. Rechnungseinsparung, Eigenverbrauch, Einspeiseertrag und ROI.",
+      "forWhom": "Geeignet für Wohngebäude, Büros und Gewerbeimmobilien",
       "workflowLabel": "Netzgekoppelter Angebots-Workflow",
       "resultFrame": "Netzgekoppelte Einsparung und Angebotsreife",
       "nextAction": "Standort, Rechnungsnachweis, Tarifquelle und Lieferantenangebot vor Quote-ready-Freigabe prüfen.",
@@ -38,7 +41,8 @@
     "offGrid": {
       "label": "Off-Grid",
       "shortLabel": "Off-grid",
-      "description": "Kritische Lasten, Batteriekapazität und synthetische Dispatch-Deckung.",
+      "description": "Netzunabhängiges Solar. Batteriekapazität, kritische Lastautonomie und Dispatch-Analyse.",
+      "forWhom": "Geeignet für Ferienhäuser, Wohnmobile, Boote und abgelegene Standorte",
       "workflowLabel": "Off-grid-Vorprüfung und Batterie-Dispatch-Workflow",
       "resultFrame": "Off-grid-Vorprüfung der Systemauslegung",
       "nextAction": "Kritische Lasten definieren und Autonomie mit Felddaten vor Angebotsfreigabe validieren.",

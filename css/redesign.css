@@ -111,29 +111,56 @@
   line-height: 1.65;
 }
 
+/* ── Scenario Select Headline & Subline ── */
+.scenario-grid-wrap {
+  width: 100%;
+  max-width: 760px;
+  padding: 0 16px;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+.scenario-select-headline {
+  font-family: var(--font-display);
+  font-size: clamp(1.15rem, 3vw, 1.55rem);
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+.scenario-select-subline {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin-bottom: 28px;
+  line-height: 1.55;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* ── Scenario Card Grid in Step 1 ── */
 #step-1 .scenario-card-grid {
   display: grid;
-  grid-template-columns: repeat(3,1fr);
-  gap: 14px;
+  grid-template-columns: repeat(2,1fr);
+  gap: 20px;
   margin: 0 auto 28px;
-  max-width: 840px;
+  max-width: 720px;
   text-align: left;
 }
-@media(max-width:720px){ #step-1 .scenario-card-grid { grid-template-columns:repeat(2,1fr) } }
-@media(max-width:480px){ #step-1 .scenario-card-grid { grid-template-columns:1fr } }
+@media(max-width:560px){ #step-1 .scenario-card-grid { grid-template-columns:1fr; gap:14px } }
 
 #step-1 .scenario-choice-card {
   background: rgba(255,255,255,.035);
   border: 2px solid rgba(255,255,255,.08);
   border-radius: var(--radius-lg);
-  padding: 22px 18px;
+  padding: 28px 24px;
   cursor: pointer;
   transition: border-color .25s, transform .35s cubic-bezier(.34,1.56,.64,1), background .25s, box-shadow .3s;
-  min-height: 172px;
+  min-height: 220px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   position: relative;
   overflow: hidden;
 }
@@ -141,59 +168,78 @@
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 2px;
+  height: 3px;
   background: linear-gradient(90deg,transparent,var(--card-color,var(--primary)),transparent);
   opacity: 0;
   transition: opacity .3s;
 }
 #step-1 .scenario-choice-card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-6px);
   border-color: var(--card-color,var(--primary));
   background: rgba(255,255,255,.06);
-  box-shadow: 0 14px 40px rgba(0,0,0,.45), 0 0 0 1px var(--card-color,var(--primary));
+  box-shadow: 0 16px 48px rgba(0,0,0,.5), 0 0 0 1px var(--card-color,var(--primary));
 }
 #step-1 .scenario-choice-card:hover::after { opacity: 1 }
 #step-1 .scenario-choice-card.selected {
   border-color: var(--card-color,var(--primary));
-  background: rgba(245,158,11,.07);
-  box-shadow: 0 0 32px rgba(245,158,11,.2), 0 0 0 1px rgba(245,158,11,.3);
+  background: color-mix(in srgb, var(--card-color,var(--primary)) 10%, transparent);
+  box-shadow: 0 0 40px color-mix(in srgb, var(--card-color,var(--primary)) 25%, transparent), 0 0 0 1px color-mix(in srgb, var(--card-color,var(--primary)) 40%, transparent);
   animation: cardGlowPulse 3s ease-in-out infinite;
 }
 #step-1 .scenario-choice-card .scenario-card-icon {
-  width: 56px; height: 56px;
-  border-radius: 12px;
+  width: 72px; height: 72px;
+  border-radius: 16px;
   background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.12);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
   margin-bottom: 4px;
 }
 #step-1 .scenario-choice-card .scenario-card-icon .scenario-svg-icon,
 #step-1 .scenario-choice-card .scenario-card-icon svg {
-  width: 44px; height: 44px;
+  width: 56px; height: 56px;
 }
 #step-1 .scenario-card-desc {
-  font-size: .74rem; color: var(--text-muted); line-height: 1.5;
+  font-size: .80rem; color: var(--text-muted); line-height: 1.55; flex: 1;
 }
-#step-1 .scenario-choice-card strong {
+#step-1 .scenario-card-title {
   font-family: var(--font-display);
-  font-size: .95rem; font-weight: 700; color: var(--text);
-  line-height: 1.3;
+  font-size: 1.18rem; font-weight: 800; color: var(--text);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 #step-1 .scenario-choice-card span {
-  font-size: .76rem; color: var(--text-muted); line-height: 1.5;
+  font-size: .80rem; color: var(--text-muted); line-height: 1.55;
 }
-#step-1 .scenario-choice-kicker {
-  font-size: .64rem!important;
-  color: var(--card-color,var(--primary))!important;
-  text-transform: uppercase; font-weight: 800; letter-spacing: .06em;
+#step-1 .scenario-card-for-whom {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: .76rem !important;
+  color: var(--card-color,var(--primary)) !important;
+  opacity: 0.85;
+  line-height: 1.45;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+#step-1 .scenario-card-for-whom svg {
+  color: var(--card-color,var(--primary));
+  opacity: 0.8;
+  margin-top: 2px;
 }
 #step-1 .scenario-choice-card .panel-check {
-  position: absolute; top: 10px; right: 10px;
+  position: absolute; top: 12px; right: 12px;
 }
 #step-1 .scenario-choice-card.selected .panel-check {
   display: flex;
   background: var(--card-color,var(--primary));
+}
+@media(max-width:560px){
+  #step-1 .scenario-choice-card { min-height: 180px; padding: 22px 18px; }
+  #step-1 .scenario-choice-card .scenario-card-icon { width: 60px; height: 60px; }
+  #step-1 .scenario-choice-card .scenario-card-icon svg { width: 46px; height: 46px; }
+  #step-1 .scenario-card-title { font-size: 1.05rem; }
 }
 
 /* Hero continue button */

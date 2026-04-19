@@ -564,20 +564,27 @@ function initScenarioExperience() {
 function renderScenarioCards() {
   const wrap = document.getElementById('scenario-card-grid');
   if (!wrap) return;
-  wrap.innerHTML = listScenarioDefinitions().map(rawScenario => {
-    const scenario = localizeScenarioDefinition(rawScenario, key => i18n.t(key));
-    const icon = SCENARIO_ICONS?.[scenario.key] || '';
-    const color = SCENARIO_COLORS?.[scenario.key] || 'var(--primary)';
-    return `
+  const VISIBLE_SCENARIOS = ['on-grid', 'off-grid'];
+  wrap.innerHTML = listScenarioDefinitions()
+    .filter(s => VISIBLE_SCENARIOS.includes(s.key))
+    .map(rawScenario => {
+      const scenario = localizeScenarioDefinition(rawScenario, key => i18n.t(key));
+      const icon = SCENARIO_ICONS?.[scenario.key] || '';
+      const color = SCENARIO_COLORS?.[scenario.key] || 'var(--primary)';
+      const forWhom = i18n.t(`scenarios.${scenario.key === 'on-grid' ? 'onGrid' : 'offGrid'}.forWhom`);
+      const forWhomHtml = forWhom && forWhom !== `scenarios.${scenario.key === 'on-grid' ? 'onGrid' : 'offGrid'}.forWhom`
+        ? `<span class="scenario-card-for-whom"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;margin-top:1px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>${forWhom}</span>`
+        : '';
+      return `
     <button type="button" class="scenario-choice-card${window.state.scenarioKey === scenario.key ? ' selected' : ''}"
             data-scenario-key="${scenario.key}"
             style="--card-color:${color}">
       <div class="scenario-card-icon">${icon}</div>
-      <span class="scenario-choice-kicker">${scenario.workflowLabel}</span>
-      <strong>${scenario.label}</strong>
+      <strong class="scenario-card-title">${scenario.label}</strong>
       <span class="scenario-card-desc">${scenario.description}</span>
+      ${forWhomHtml}
     </button>`;
-  }).join('');
+    }).join('');
   wrap.querySelectorAll('[data-scenario-key]').forEach(btn => {
     btn.addEventListener('click', () => selectScenario(btn.dataset.scenarioKey));
   });
