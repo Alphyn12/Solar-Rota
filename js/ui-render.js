@@ -126,7 +126,7 @@ export function renderResults() {
   }
   document.getElementById('fin-payback').textContent = r.grossSimplePaybackYear ? Number(r.grossSimplePaybackYear).toFixed(1) + ` ${i18n.t('units.year')}` : `>25 ${i18n.t('units.year')}`;
   const discountedPaybackEl = document.getElementById('fin-discounted-payback');
-  if (discountedPaybackEl) discountedPaybackEl.textContent = r.discountedPaybackYear ? r.discountedPaybackYear + ` ${i18n.t('units.year')}` : `>25 ${i18n.t('units.year')}`;
+  if (discountedPaybackEl) discountedPaybackEl.textContent = r.discountedPaybackYear != null ? r.discountedPaybackYear + ` ${i18n.t('units.year')}` : `>25 ${i18n.t('units.year')}`;
   document.getElementById('fin-total').textContent = money(r.npvTotal);
   document.getElementById('fin-roi').textContent = r.roi + '%';
   document.getElementById('fin-irr').textContent = r.irr === 'N/A' ? 'N/A' : r.irr + '%';
@@ -1378,7 +1378,7 @@ export function downloadPDF() {
   doc.setFont('helvetica', 'normal');
   r.yearlyTable.slice(0, 25).forEach(yr => {
     if (row > 275) { doc.addPage(); doc.setFillColor(15,23,42); doc.rect(0,0,210,297,'F'); row = 15; }
-    if (yr.year === r.paybackYear) { doc.setFillColor(16,185,129,50); doc.rect(13, row-4, 182, 6, 'F'); }
+    if (yr.year === Math.round(Number(r.grossSimplePaybackYear || r.paybackYear))) { doc.setFillColor(16,185,129,50); doc.rect(13, row-4, 182, 6, 'F'); }
     doc.setTextColor(241, 245, 249);
     const vals = [yr.year+'', yr.energy.toLocaleString(dateLocale), moneyRate(yr.effectiveImportRate || yr.rate, 'kWh'),
       money(yr.savings), money(yr.expenses),

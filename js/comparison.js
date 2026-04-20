@@ -219,7 +219,7 @@ export function runComparison() {
         <tr><td>${ct('comparison.totalCost')}</td>${results.map(r => `<td>${money(r.totalCost)}${r.isCustom ? ' *' : ''}</td>`).join('')}</tr>
         <tr><td>${ct('comparison.payback')}</td>${results.map(r => `<td style="color:${parseFloat(r.paybackYear) === bestPayback ? '#10B981' : 'inherit'};font-weight:${parseFloat(r.paybackYear) === bestPayback ? '700' : '400'}">${ct('comparison.paybackYears').replace('{n}', r.paybackYear)}${parseFloat(r.paybackYear) === bestPayback ? ' ✓' : ''}</td>`).join('')}</tr>
         <tr><td>${ct('comparison.projectNpv')}</td>${results.map(r => `<td>${money(r.npv)}</td>`).join('')}</tr>
-        <tr><td>${ct('comparison.lcoe')}</td>${results.map(r => `<td>${moneyRate(r.compensatedLcoe || r.lcoe, 'kWh')}</td>`).join('')}</tr>
+        <tr><td>${ct('comparison.lcoe')}</td>${results.map(r => `<td>${(r.compensatedLcoe != null || r.lcoe != null) ? moneyRate(r.compensatedLcoe ?? r.lcoe, 'kWh') : '—'}</td>`).join('')}</tr>
       </tbody>
     </table>
     <p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px">${ct('comparison.footnote')}</p>

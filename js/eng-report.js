@@ -24,7 +24,7 @@ export function renderEngReport() {
   if (!r) return;
   const p   = PANEL_TYPES[state.panelType];
   const body = document.getElementById('eng-report-body');
-  const lcoeValue = Number.parseFloat(r.lcoe);
+  const lcoeValue = r.lcoe != null ? Number.parseFloat(r.lcoe) : null;
   const activeLocale = localeTag();
   const fmt  = v => Math.round(v).toLocaleString(activeLocale);
   const money = v => {
@@ -213,7 +213,7 @@ ${escapeHtml(i18n.t('onGridResult.financialBasis'))}: ${money(r.financialCostBas
 ${escapeHtml(report('totalLifetimeExpenses'))}: ${money(r.totalExpenses25y)}
 ${escapeHtml(report('discountRate'))}: %${(r.discountRate*100).toFixed(0)}
 
-LCOE = ${r.compensatedLcoe ? moneyRate(r.compensatedLcoe, 'kWh') + ' (ekonomik)' : moneyRate(r.lcoe, 'kWh')}</div>
+LCOE = ${r.compensatedLcoe != null ? moneyRate(r.compensatedLcoe, 'kWh') + ' (ekonomik)' : r.lcoe != null ? moneyRate(r.lcoe, 'kWh') : '—'}</div>
     <div class="formula-note">${escapeHtml(report('userTariff'))}: ${moneyRate(r.tariff, 'kWh')} (${escapeHtml(state.tariffType)}). ${escapeHtml(report('lcoeNote'))} ${escapeHtml(i18n.t('onGridResult.lcoeLabel'))}.${r.compensatedLcoe ? ` Tüm üretim bazlı LCOE: ${moneyRate(r.lcoe, 'kWh')}` : ''}</div>
   </div>
   <div class="formula-card">
@@ -274,8 +274,8 @@ ${escapeHtml(report('totalProduction25y'))}: ${fmt(totalEnergy25y)} kWh</div>
         <thead><tr><th>${escapeHtml(report('year'))}</th><th>${escapeHtml(report('production'))} (kWh)</th><th>${escapeHtml(report('tariff'))}</th><th>${escapeHtml(report('savings'))}</th><th>${escapeHtml(report('expenses'))}</th><th>Net</th><th>${escapeHtml(report('cumulative'))}</th><th>NPV</th></tr></thead>
         <tbody>
           ${r.yearlyTable.map(y => `
-          <tr ${y.year === r.paybackYear ? 'class="payback-row"' : ''}>
-            <td>${y.year}${y.year === r.paybackYear ? ' ✓' : ''}</td>
+          <tr ${y.year === Math.round(Number(r.grossSimplePaybackYear || r.paybackYear)) ? 'class="payback-row"' : ''}>
+            <td>${y.year}${y.year === Math.round(Number(r.grossSimplePaybackYear || r.paybackYear)) ? ' ✓' : ''}</td>
             <td>${fmt(y.energy)}</td>
             <td>${y.effectiveImportRate || y.rate}</td>
             <td>${money(y.savings)}</td>
@@ -439,7 +439,7 @@ export function renderEngCalcPanel() {
     const converted = currency === 'USD' ? (Number(v) || 0) / usdToTry : (Number(v) || 0);
     return converted.toLocaleString(currency === 'USD' ? 'en-US' : activeLocale, { maximumFractionDigits: 0 }) + ' ' + currency;
   };
-  const lcoeValue = Number.parseFloat(r.lcoe);
+  const lcoeValue = r.lcoe != null ? Number.parseFloat(r.lcoe) : null;
   const lcoeShortNote = state.scenarioKey === 'off-grid'
     ? report('lcoeShortNoteOffGrid')
     : report('lcoeShortNote');

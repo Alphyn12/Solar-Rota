@@ -1020,7 +1020,7 @@ export async function runCalculation() {
       let nightLoad = 0, nightBatt = 0;
       (normalDispatch.hourly8760 || []).forEach((row, i) => {
         if (NIGHT_H.has(i % 24)) {
-          nightLoad += row.loadKwh     || 0;
+          nightLoad += row.load        || 0;
           nightBatt += row.batteryDischarge || 0;
         }
       });

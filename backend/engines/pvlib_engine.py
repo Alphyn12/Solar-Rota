@@ -44,7 +44,7 @@ def _system_power_kwp(request: EngineRequest) -> tuple[float, int]:
 
     panel_watt = panel_watt_peak(request)
     panel_area = panel_area_m2(request)
-    usable_area = max(0, request.roof.areaM2) * 0.75
+    usable_area = max(0, request.roof.areaM2) * max(0.1, min(1.0, request.roof.usableRoofRatio))
     panel_count = int(usable_area // panel_area)
     return panel_count * panel_watt / 1000, panel_count
 

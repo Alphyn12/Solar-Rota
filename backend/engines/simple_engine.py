@@ -216,6 +216,9 @@ def calculate_production(request: EngineRequest) -> Dict[str, object]:
         annual_energy = base_energy * shading_factor * soiling_factor * inverter_factor * orientation_factor * bifacial_factor * wiring_factor
     monthly = [round(annual_energy * weight) for weight in MONTH_WEIGHTS]
 
+    if use_section_geometry:
+        bifacial_factor = 1 + _bifacial_base_gain * (1 - _clamp(shading_pct, 0, 80) / 200)
+
     losses = {
         "baseEnergyKwh": round(base_energy),
         "orientationFactor": round(orientation_factor, 4),
