@@ -113,6 +113,44 @@ const cableLossRequest = buildPvEngineRequest({
 assert.equal(cableLossRequest.system.cableLossPct, 1.75);
 assert.equal(cableLossRequest.system.wiringMismatchPct, 1.75);
 
+const onGridTariffRequest = buildPvEngineRequest({
+  scenarioKey: 'on-grid',
+  lat: 39.9,
+  lon: 32.8,
+  roofArea: 40,
+  tariff: 5,
+  tariffInputMode: 'net-plus-fee',
+  distributionFee: 1.2
+});
+assert.equal(onGridTariffRequest.tariff.importRateTryKwh, 5);
+assert.equal(onGridTariffRequest.tariff.tariffInputMode, 'net-plus-fee');
+assert.equal(onGridTariffRequest.tariff.distributionFeeTryKwh, 1.2);
+
+const offgridNoGeneratorRequest = buildPvEngineRequest({
+  scenarioKey: 'off-grid',
+  lat: 39.9,
+  lon: 32.8,
+  roofArea: 40,
+  offgridCalculationMode: 'advanced',
+  offgridGeneratorEnabled: false
+});
+assert.equal(offgridNoGeneratorRequest.offgrid.generatorEnabled, false);
+assert.equal(offgridNoGeneratorRequest.offgrid.calculationMode, 'advanced');
+assert.equal(offgridNoGeneratorRequest.offgrid.fieldRevalidationRequired.includes('offgridGeneratorServiceRecord'), false);
+assert.ok(offgridNoGeneratorRequest.offgrid.fieldRevalidationSkipped.includes('offgridGeneratorServiceRecord'));
+
+const offgridGeneratorRequest = buildPvEngineRequest({
+  scenarioKey: 'off-grid',
+  lat: 39.9,
+  lon: 32.8,
+  roofArea: 40,
+  offgridGeneratorEnabled: true,
+  offgridGeneratorKw: 5
+});
+assert.equal(offgridGeneratorRequest.offgrid.generatorEnabled, true);
+assert.ok(offgridGeneratorRequest.offgrid.fieldRevalidationRequired.includes('offgridGeneratorServiceRecord'));
+assert.equal(offgridGeneratorRequest.offgrid.fieldRevalidationSkipped.length, 0);
+
 const missingCoordinateRequest = buildPvEngineRequest({ lat: null, lon: undefined, results: { systemPower: 5 } });
 assert.equal(missingCoordinateRequest.site.lat, null);
 assert.equal(missingCoordinateRequest.site.lon, null);

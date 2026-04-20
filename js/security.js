@@ -47,6 +47,7 @@ const STRING_LIMITS = {
   scenarioKey: 40,
   scenarioSelectedAt: 40,
   enginePreference: 40,
+  offgridCalculationMode: 20,
   offgridPvHourlySource: 120,
   hourlyProductionSource: 120
 };
@@ -83,6 +84,7 @@ const ENUM_VALUES = {
   exportSettlementMode: new Set(['auto', 'hourly', 'monthly']),
   scenarioKey: new Set(['on-grid', 'off-grid', 'agricultural-irrigation', 'heat-pump', 'flexible-mobile', 'ev-charging']),
   enginePreference: new Set(['auto', 'js-local', 'pvgis-hybrid-js', 'python-backend', 'pvlib-service']),
+  offgridCalculationMode: new Set(['basic', 'advanced']),
   displayCurrency: new Set(['TRY', 'USD']),
   inverterType: new Set(['string', 'micro', 'optimizer'])
 };

@@ -295,11 +295,11 @@ assert.equal(noVatRecoveryTreatment.financialCostBasis, 120000);
 
 // --- Tariff Input Mode / Distribution Fee Tests ---
 
-// net-plus-fee mode: buildTariffModel uses s.tariff which app.js already adds fee to
-// We test buildTariffModel directly: tariffInputMode and distributionFee are passed through
+// net-plus-fee mode: state.tariff remains the base import tariff; buildTariffModel
+// adds distributionFee only to effectiveImportRate.
 const tariffNetPlusFee = buildTariffModel({
   tariffType: 'residential',
-  tariff: 6.0,           // 5.0 base + 1.0 fee, pre-summed by app.js
+  tariff: 5.0,
   distributionFee: 1.0,
   tariffInputMode: 'net-plus-fee',
   annualPriceIncrease: 0,
@@ -307,8 +307,7 @@ const tariffNetPlusFee = buildTariffModel({
 });
 assert.equal(tariffNetPlusFee.tariffInputMode, 'net-plus-fee');
 assert.equal(tariffNetPlusFee.distributionFee, 1.0);
-// importRate should be 6.0 (base + fee already in tariff)
-assert.equal(tariffNetPlusFee.importRate, 6.0);
+assert.equal(tariffNetPlusFee.importRate, 5.0);
 
 // gross mode: distributionFee should be zeroed out in model (app.js does not add fee)
 const tariffGross = buildTariffModel({
@@ -329,7 +328,7 @@ assert.equal(tariffNetPlusFee.exportRate, 0);
 assert.equal(tariffGross.exportRate, 0);
 
 // effectiveImportRate = importRate + distributionFee in net-plus-fee mode
-assert.equal(tariffNetPlusFee.effectiveImportRate, 7.0, 'net-plus-fee: effectiveImportRate = importRate + distributionFee');
+assert.equal(tariffNetPlusFee.effectiveImportRate, 6.0, 'net-plus-fee: effectiveImportRate = importRate + distributionFee');
 // gross mode: effectiveImportRate = importRate (no fee added)
 assert.equal(tariffGross.effectiveImportRate, 6.0, 'gross mode: effectiveImportRate = importRate');
 

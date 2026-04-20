@@ -200,7 +200,99 @@ textarea {
   }
 
   #app-header {
-    padding: 9px 10px;
+    padding: 0;
+  }
+
+  .header-brand {
+    box-sizing: border-box;
+    max-width: 100%;
+    padding: 8px 10px !important;
+    overflow: hidden;
+  }
+
+  .header-steps-row {
+    box-sizing: border-box;
+    max-width: 100%;
+    padding: 6px 10px !important;
+    overflow: hidden;
+  }
+
+  .header-inner {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 96px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .header-brand .header-inner {
+    min-height: auto;
+    padding: 0;
+  }
+
+  .header-steps-row .header-inner {
+    display: block;
+    min-height: auto;
+    padding: 0;
+  }
+
+  .logo {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .logo-icon {
+    height: 38px !important;
+    max-width: 48px !important;
+  }
+
+  .logo-text {
+    max-width: 122px;
+    font-size: 1rem !important;
+  }
+
+  .logo-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-actions {
+    flex: 0 0 auto;
+    min-width: 0;
+    gap: 6px;
+    margin-left: 0;
+  }
+
+  .header-lang-btn {
+    width: 30px;
+    padding: 0;
+  }
+
+  .header-steps-center {
+    order: 3;
+    flex: 1 0 100%;
+    width: 100%;
+    max-width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .header-steps-center::-webkit-scrollbar {
+    display: none;
+  }
+
+  .header-steps-center .step-dots {
+    min-width: max-content;
+    justify-content: flex-start;
+    padding-right: 8px;
   }
 
   .header-top {

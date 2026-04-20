@@ -91,6 +91,8 @@ class TariffInput(FlexibleModel):
     tariffRegime: str = "auto"
     importRateTryKwh: float = 0
     exportRateTryKwh: float = 0
+    tariffInputMode: str = "net-plus-fee"
+    distributionFeeTryKwh: float = 0
     contractedPowerKw: float = 0
     annualPriceIncrease: float = 0.12
     discountRate: float = 0.18

@@ -14,6 +14,8 @@ function getLoadSeasonForMonth(monthIdx) {
 }
 
 export const OFFGRID_DISPATCH_VERSION = 'OGD-2026.04-v1.1';
+export const OFFGRID_FIELD_MODEL_VERSION = 'OGD-FIELD-MODEL-2026.04-v3';
+export const OFFGRID_ACCURACY_VERSION = 'OGD-ACCURACY-2026.04-v1';
 
 const HOURS_PER_YEAR = 8760;
 const MONTH_DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
@@ -33,6 +35,20 @@ export const BAD_WEATHER_PV_FACTORS = {
   light:    BAD_WEATHER_CONFIG.light.pvFactor,
   moderate: BAD_WEATHER_CONFIG.moderate.pvFactor,
   severe:   BAD_WEATHER_CONFIG.severe.pvFactor
+};
+
+export const OFFGRID_STRESS_SCENARIOS = [
+  { key: 'low-pv-year', label: 'Low PV year', pvFactor: 0.90, loadFactor: 1.00, criticalLoadFactor: 1.00, batteryEol: false },
+  { key: 'load-growth', label: 'Load growth', pvFactor: 1.00, loadFactor: 1.15, criticalLoadFactor: 1.15, batteryEol: false },
+  { key: 'battery-eol', label: 'Battery end-of-life', pvFactor: 1.00, loadFactor: 1.00, criticalLoadFactor: 1.00, batteryEol: true },
+  { key: 'combined-design-stress', label: 'Combined design stress', pvFactor: 0.85, loadFactor: 1.15, criticalLoadFactor: 1.15, batteryEol: true }
+];
+
+const DEFAULT_FIELD_MODEL_THRESHOLDS = {
+  criticalCoverageMin: 0.999,
+  totalCoverageMin: 0.98,
+  unmetCriticalMaxKwh: 1,
+  generatorCriticalPeakReservePct: 0.10
 };
 
 // Cihaz kategorisi başına 24 saatlik şablonlar (her biri normalize edilir, toplamları ≈1.0)
@@ -144,6 +160,69 @@ function clone8760(arr) {
 
 function sum(arr) {
   return arr.reduce((a, b) => a + Math.max(0, Number(b) || 0), 0);
+}
+
+function scale8760(arr, factor = 1) {
+  const f = Math.max(0, Number(factor) || 0);
+  return Array.from({ length: HOURS_PER_YEAR }, (_, i) => Math.max(0, Number(arr?.[i]) || 0) * f);
+}
+
+function scaleCritical8760(critical, load, factor = 1) {
+  const f = Math.max(0, Number(factor) || 0);
+  return Array.from({ length: HOURS_PER_YEAR }, (_, i) => {
+    const scaledCritical = Math.max(0, Number(critical?.[i]) || 0) * f;
+    const scaledLoad = Math.max(0, Number(load?.[i]) || 0);
+    return Math.min(scaledLoad, scaledCritical);
+  });
+}
+
+function scaleOptional8760(arr, factor = 1) {
+  return isComplete8760(arr) ? scale8760(arr, factor) : null;
+}
+
+function eolBatteryConfig(battery = {}) {
+  const usable = Math.max(0, Number(battery.usableCapacityKwh) || 0);
+  const eolUsable = usable * 0.80;
+  const reservePct = usable > 0 ? Math.max(0, Math.min(0.5, (Number(battery.socReserveKwh) || 0) / usable)) : 0;
+  const initialPct = usable > 0 ? Math.max(reservePct, Math.min(1, (Number(battery.initialSocKwh) || 0) / usable)) : reservePct;
+  const eff = Math.max(0.5, Math.min(1, (Number(battery.efficiency) || 0.92) - 0.03));
+  const scaledPower = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n * 0.90 : value;
+  };
+  return {
+    ...battery,
+    usableCapacityKwh: eolUsable,
+    efficiency: eff,
+    socReserveKwh: eolUsable * reservePct,
+    initialSocKwh: eolUsable * initialPct,
+    maxChargePowerKw: scaledPower(battery.maxChargePowerKw ?? battery.maxChargeKw),
+    maxDischargePowerKw: scaledPower(battery.maxDischargePowerKw ?? battery.maxDischargeKw)
+  };
+}
+
+function dispatchSummaryForStress(key, scenario, dispatch, peakCriticalKw) {
+  return {
+    key,
+    label: scenario.label || key,
+    pvFactor: scenario.pvFactor,
+    loadFactor: scenario.loadFactor,
+    criticalLoadFactor: scenario.criticalLoadFactor,
+    batteryEol: !!scenario.batteryEol,
+    totalLoadCoverage: dispatch.totalLoadCoverage,
+    criticalLoadCoverage: dispatch.criticalLoadCoverage,
+    pvBatteryLoadCoverage: dispatch.solarBatteryLoadCoverage,
+    pvBatteryCriticalCoverage: dispatch.solarBatteryCriticalCoverage,
+    unmetLoadKwh: dispatch.unmetLoadKwh,
+    unmetCriticalKwh: dispatch.unmetCriticalLoadKwh,
+    generatorKwh: dispatch.generatorToLoadKwh,
+    generatorRunHours: dispatch.generatorRunHours,
+    minimumSocPct: dispatch.minimumSocPct,
+    batteryChargeLimitedKwh: dispatch.batteryChargeLimitedKwh,
+    batteryDischargeLimitedKwh: dispatch.batteryDischargeLimitedKwh,
+    inverterPowerLimitedKwh: dispatch.inverterPowerLimitedLoadKwh,
+    peakCriticalKw
+  };
 }
 
 export function buildOffgridPvDispatchProfile(options = {}) {
@@ -315,6 +394,149 @@ function fallbackPeakFromEnergy(totalHourly8760, criticalHourly8760) {
   return {
     hourlyPeakKw8760: totalHourly8760.map(v => Math.max(0, Number(v) || 0)),
     criticalPeakKw8760: criticalHourly8760.map(v => Math.max(0, Number(v) || 0))
+  };
+}
+
+function clampScore(value) {
+  return Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+}
+
+function uncertaintyForScore(score, tier) {
+  if (tier === 'field-validated') return { lowPct: 3, highPct: 8 };
+  if (score >= 85) return { lowPct: 5, highPct: 12 };
+  if (score >= 75) return { lowPct: 8, highPct: 18 };
+  if (score >= 65) return { lowPct: 12, highPct: 28 };
+  if (score >= 55) return { lowPct: 20, highPct: 40 };
+  if (score >= 45) return { lowPct: 30, highPct: 55 };
+  return { lowPct: 40, highPct: 70 };
+}
+
+export function buildOffgridAccuracyAssessment({
+  productionProfile = {},
+  loadProfile = {},
+  battery = {},
+  generator = {},
+  dispatchOptions = {},
+  calculationMode = 'basic',
+  badWeatherEnabled = false
+} = {}) {
+  const factors = [];
+  const blockers = [];
+  let score = 20;
+
+  const add = (points, key, note) => {
+    score += points;
+    factors.push({ key, points, note });
+  };
+  const penalize = (points, key, note) => {
+    score -= points;
+    factors.push({ key, points: -Math.abs(points), note });
+  };
+
+  if (productionProfile.hasRealHourlyProduction) {
+    add(25, 'real-hourly-pv', 'Gerçek 8760 PV üretim serisi kullanıldı.');
+  } else if (productionProfile.productionDispatchProfile === 'monthly-production-derived-synthetic-8760') {
+    add(10, 'synthetic-hourly-pv', 'PV saatleri aylık üretimden sentetik 8760 profile dağıtıldı.');
+    blockers.push('Gerçek 8760 PV üretimi yok; üretim saat içi dağılımı sentetik.');
+  } else {
+    blockers.push('Dispatch için güvenilir PV saatlik serisi yok.');
+  }
+
+  if (productionProfile.productionFallback || productionProfile.fallbackUsed) {
+    penalize(5, 'production-fallback', 'Canlı/authoritative üretim yerine fallback üretim kullanıldı.');
+  }
+
+  if (loadProfile.hasRealHourlyLoad) {
+    add(24, 'real-hourly-load', 'Gerçek 8760 toplam yük profili kullanıldı.');
+  } else if (loadProfile.mode === 'device-list') {
+    add(14, 'device-library-load', 'Cihaz kütüphanesi ve manuel cihazlar sentetik saatlik yüke çevrildi.');
+    blockers.push('Cihaz kütüphanesi gerçek sayaç profili değildir; kullanım saatleri kullanıcı beyanına dayanır.');
+  } else {
+    add(8, 'daily-kwh-load', 'Günlük toplam tüketim varsayılan profil ile 8760 saate dağıtıldı.');
+    blockers.push('Gerçek yük profili veya cihaz envanteri yok; günlük tüketim varsayılan profil ile dağıtıldı.');
+  }
+
+  if (loadProfile.criticalLoadBasis === 'real-hourly-critical-load') {
+    add(14, 'real-critical-load', 'Kritik yük ayrı 8760 seriyle verildi.');
+  } else if (loadProfile.criticalLoadBasis === 'device-critical-flags') {
+    add(8, 'device-critical-flags', 'Kritik yük cihaz işaretlerinden türetildi.');
+    blockers.push('Kritik yük önceliği cihaz işaretlerine dayanır; kritik yük saha ölçümü değildir.');
+  } else if (loadProfile.criticalLoadBasis === 'fraction-of-real-hourly-load') {
+    add(7, 'critical-fraction-real-load', 'Gerçek toplam yükten kritik oran türetildi.');
+    blockers.push('Kritik yük ayrı ölçülmedi; toplam yükten oranla türetildi.');
+  } else {
+    add(4, 'critical-fraction-synthetic', 'Kritik yük oran varsayımıyla türetildi.');
+    blockers.push('Kritik yük gerçek cihaz/saha profili değil; oran varsayımı kullanıldı.');
+  }
+
+  if (Number.isFinite(Number(battery.maxChargePowerKw ?? battery.maxChargeKw))) {
+    add(3, 'battery-charge-limit', 'Batarya şarj kW limiti dispatch içine girdi.');
+  } else {
+    blockers.push('Batarya şarj kW limiti eksik; şarj gücü sınırsız varsayılabilir.');
+  }
+  if (Number.isFinite(Number(battery.maxDischargePowerKw ?? battery.maxDischargeKw))) {
+    add(3, 'battery-discharge-limit', 'Batarya deşarj kW limiti dispatch içine girdi.');
+  } else {
+    blockers.push('Batarya deşarj kW limiti eksik; pik yük yeterliliği olduğundan iyi görünebilir.');
+  }
+  if (Number.isFinite(Number(dispatchOptions.inverterAcLimitKw))) {
+    add(3, 'inverter-ac-limit', 'İnverter AC limiti ve surge varsayımı uygulandı.');
+  } else {
+    blockers.push('İnverter AC limiti eksik; güç limiti kaynaklı unmet yük kaçabilir.');
+  }
+  if (badWeatherEnabled) add(3, 'bad-weather-dispatch', 'Kötü hava penceresi dispatch yeniden çözülerek test edildi.');
+
+  const generatorEnabled = !!(generator && generator.enabled && Number(generator.capacityKw) > 0);
+  if (generatorEnabled && Number(generator.fuelCostPerKwh) > 0) {
+    add(2, 'generator-cost', 'Jeneratör enerji ve yakıt maliyeti dispatch sonucuna bağlı.');
+  } else if (generatorEnabled) {
+    blockers.push('Jeneratör etkin ama yakıt maliyeti eksik veya sıfır; ekonomi olduğundan iyi görünebilir.');
+  }
+
+  let tier = 'basic-synthetic';
+  if (loadProfile.mode === 'device-list') tier = 'device-library';
+  if (productionProfile.hasRealHourlyProduction || loadProfile.hasRealHourlyLoad) tier = 'advanced-hourly';
+  if (
+    productionProfile.hasRealHourlyProduction &&
+    loadProfile.hasRealHourlyLoad &&
+    loadProfile.criticalLoadBasis === 'real-hourly-critical-load' &&
+    Number.isFinite(Number(battery.maxChargePowerKw ?? battery.maxChargeKw)) &&
+    Number.isFinite(Number(battery.maxDischargePowerKw ?? battery.maxDischargeKw)) &&
+    Number.isFinite(Number(dispatchOptions.inverterAcLimitKw))
+  ) {
+    tier = 'field-input-ready';
+  }
+
+  if (calculationMode === 'advanced' && tier === 'basic-synthetic') {
+    blockers.push('İleri mod seçildi ama gerçek 8760 veya cihaz envanteri girilmedi; sonuç basit sentetik seviyede kaldı.');
+    penalize(4, 'advanced-request-missing-data', 'İleri mod için beklenen veri seti eksik.');
+  }
+
+  const accuracyScore = clampScore(score);
+  const uncertainty = uncertaintyForScore(accuracyScore, tier);
+  const confidenceLevel = accuracyScore >= 85 ? 'high'
+    : accuracyScore >= 70 ? 'medium-high'
+    : accuracyScore >= 55 ? 'medium'
+    : accuracyScore >= 40 ? 'low'
+    : 'very-low';
+
+  return {
+    version: OFFGRID_ACCURACY_VERSION,
+    calculationMode,
+    tier,
+    accuracyScore,
+    confidenceLevel,
+    expectedUncertaintyPct: uncertainty,
+    errorIsNotBounded: true,
+    interpretation: accuracyScore >= 85
+      ? 'Saatlik girdiler güçlü; yine de saha kabul ve operasyon kanıtı olmadan garanti değildir.'
+      : accuracyScore >= 65
+        ? 'Mühendislik ön tasarımına yaklaşır; kritik yük ve kötü hava kararları için saha verisi gerekir.'
+        : accuracyScore >= 50
+          ? 'Ön fizibilite için kullanılabilir; batarya/jeneratör yeterliliğinde çift haneli sapma beklenebilir.'
+          : 'Kaba ön fizibilite; dispatch sonucu karar değil, veri toplama yönlendirmesidir.',
+    factors,
+    blockers: [...new Set(blockers)]
   };
 }
 
@@ -669,8 +891,8 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
     });
   }
 
-  const annualTotalLoad = loadHourly8760.slice(0, N).reduce((a, b) => a + Math.max(0, Number(b) || 0), 0);
-  const annualCriticalLoad = criticalLoadHourly8760.slice(0, N).reduce((a, b) => a + Math.max(0, Number(b) || 0), 0);
+  const annualTotalLoad = hourly8760.reduce((a, h) => a + Math.max(0, Number(h.loadKwh) || 0), 0);
+  const annualCriticalLoad = hourly8760.reduce((a, h) => a + Math.max(0, Number(h.criticalKwh) || 0), 0);
 
   const totalServed = directPvToLoadKwh + batteryToLoadKwh + generatorToLoadKwh;
   const totalLoadCoverage = annualTotalLoad > 0 ? Math.min(1, totalServed / annualTotalLoad) : 1;
@@ -808,10 +1030,121 @@ export function runBadWeatherScenario(normalDispatchResult, pvHourly8760, loadHo
   };
 }
 
+export function runOffgridStressScenarios({
+  pvHourly8760 = [],
+  loadHourly8760 = [],
+  criticalHourly8760 = [],
+  battery = {},
+  generator = {},
+  dispatchOptions = {},
+  scenarios = OFFGRID_STRESS_SCENARIOS
+} = {}) {
+  const results = [];
+  const loadPeakBase = isComplete8760(dispatchOptions.loadPeakKw8760) ? dispatchOptions.loadPeakKw8760 : loadHourly8760;
+  const criticalPeakBase = isComplete8760(dispatchOptions.criticalPeakKw8760) ? dispatchOptions.criticalPeakKw8760 : criticalHourly8760;
+
+  for (const scenario of scenarios) {
+    const pv = scale8760(pvHourly8760, scenario.pvFactor);
+    const load = scale8760(loadHourly8760, scenario.loadFactor);
+    const critical = scaleCritical8760(criticalHourly8760, load, scenario.criticalLoadFactor);
+    const batteryForScenario = scenario.batteryEol ? eolBatteryConfig(battery) : { ...battery };
+    const scenarioOptions = {
+      ...dispatchOptions,
+      loadPeakKw8760: scaleOptional8760(loadPeakBase, scenario.loadFactor),
+      criticalPeakKw8760: scaleOptional8760(criticalPeakBase, scenario.criticalLoadFactor)
+    };
+    const dispatch = runOffgridDispatch(pv, load, critical, batteryForScenario, generator, scenarioOptions);
+    const peakCriticalKw = Math.max(...(scenarioOptions.criticalPeakKw8760 || critical).map(v => Math.max(0, Number(v) || 0)));
+    results.push(dispatchSummaryForStress(scenario.key, scenario, dispatch, peakCriticalKw));
+  }
+
+  const worstCritical = results.reduce((acc, row) => !acc || row.criticalLoadCoverage < acc.criticalLoadCoverage ? row : acc, null);
+  const worstTotal = results.reduce((acc, row) => !acc || row.totalLoadCoverage < acc.totalLoadCoverage ? row : acc, null);
+  const maxUnmetCritical = results.reduce((acc, row) => !acc || row.unmetCriticalKwh > acc.unmetCriticalKwh ? row : acc, null);
+  const generatorCapacityKw = Math.max(0, Number(generator?.capacityKw) || 0);
+  const maxCriticalPeakKw = results.reduce((max, row) => Math.max(max, row.peakCriticalKw || 0), 0);
+  const generatorCriticalPeakReservePct = generatorCapacityKw > 0 && maxCriticalPeakKw > 0
+    ? (generatorCapacityKw / maxCriticalPeakKw) - 1
+    : null;
+
+  return {
+    version: OFFGRID_FIELD_MODEL_VERSION,
+    scenarios: results,
+    worstCriticalScenario: worstCritical,
+    worstTotalScenario: worstTotal,
+    maxUnmetCriticalScenario: maxUnmetCritical,
+    generatorCapacityKw,
+    maxCriticalPeakKw,
+    generatorCriticalPeakReservePct
+  };
+}
+
+export function buildOffgridFieldModelMaturityGate(stressAnalysis = {}, {
+  phase1Ready = false,
+  phase2Ready = false,
+  generator = {},
+  thresholds = DEFAULT_FIELD_MODEL_THRESHOLDS
+} = {}) {
+  const blockers = [];
+  const warnings = [];
+  const scenarios = Array.isArray(stressAnalysis.scenarios) ? stressAnalysis.scenarios : [];
+  const genEnabled = !!(generator && generator.enabled && Number(generator.capacityKw) > 0);
+
+  if (!phase1Ready) blockers.push('Faz 1 saatlik dispatch girdileri tamamlanmadan Faz 3 model olgunluğu kabul edilemez.');
+  if (!phase2Ready) blockers.push('Faz 2 doğrulanmış saha kanıtları tamamlanmadan Faz 3 model olgunluğu kabul edilemez.');
+  if (!scenarios.length) blockers.push('Faz 3 stres senaryoları çalıştırılmadı.');
+
+  scenarios.forEach(row => {
+    if ((row.criticalLoadCoverage ?? 0) < thresholds.criticalCoverageMin) {
+      blockers.push(`${row.key}: kritik yük kapsaması ${(row.criticalLoadCoverage * 100).toFixed(2)}%; eşik ${(thresholds.criticalCoverageMin * 100).toFixed(2)}%.`);
+    }
+    if ((row.unmetCriticalKwh ?? 0) > thresholds.unmetCriticalMaxKwh) {
+      blockers.push(`${row.key}: karşılanamayan kritik yük ${Math.round(row.unmetCriticalKwh)} kWh/yıl; eşik ${thresholds.unmetCriticalMaxKwh} kWh/yıl.`);
+    }
+    if ((row.totalLoadCoverage ?? 0) < thresholds.totalCoverageMin) {
+      blockers.push(`${row.key}: toplam yük kapsaması ${(row.totalLoadCoverage * 100).toFixed(2)}%; eşik ${(thresholds.totalCoverageMin * 100).toFixed(2)}%.`);
+    }
+    if ((row.inverterPowerLimitedKwh || 0) > 0) {
+      warnings.push(`${row.key}: inverter güç limiti ${Math.round(row.inverterPowerLimitedKwh)} kWh/yıl yükü etkiliyor.`);
+    }
+    if ((row.batteryDischargeLimitedKwh || 0) > 0) {
+      warnings.push(`${row.key}: batarya deşarj kW limiti ${Math.round(row.batteryDischargeLimitedKwh)} kWh/yıl yükü etkiliyor.`);
+    }
+  });
+
+  if (genEnabled) {
+    const reserve = stressAnalysis.generatorCriticalPeakReservePct;
+    if (reserve == null || reserve < thresholds.generatorCriticalPeakReservePct) {
+      blockers.push(`Jeneratör kritik pik yük için en az %${Math.round(thresholds.generatorCriticalPeakReservePct * 100)} kapasite payı sağlamıyor.`);
+    }
+  } else if (scenarios.some(row => (row.unmetCriticalKwh || 0) > thresholds.unmetCriticalMaxKwh)) {
+    blockers.push('Jeneratör yokken stres senaryolarında kritik yük karşılanamıyor.');
+  }
+
+  const uniqueBlockers = [...new Set(blockers)];
+  const uniqueWarnings = [...new Set(warnings)];
+  const phase3Ready = uniqueBlockers.length === 0;
+
+  return {
+    version: OFFGRID_FIELD_MODEL_VERSION,
+    status: phase3Ready ? 'phase3-ready' : 'blocked',
+    phase3Ready,
+    stressReady: scenarios.length > 0 && uniqueBlockers.length === 0,
+    fieldGuaranteeReady: false,
+    thresholds,
+    blockers: uniqueBlockers,
+    warnings: uniqueWarnings,
+    worstCriticalScenario: stressAnalysis.worstCriticalScenario || null,
+    worstTotalScenario: stressAnalysis.worstTotalScenario || null,
+    maxUnmetCriticalScenario: stressAnalysis.maxUnmetCriticalScenario || null,
+    generatorCriticalPeakReservePct: stressAnalysis.generatorCriticalPeakReservePct ?? null
+  };
+}
+
 /**
  * Dispatch çıktılarını ui-render.js ve calc-engine.js için paketler.
  */
-export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProfile, generatorConfig, financialInputs = {}, withoutGeneratorDispatch = null) {
+export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProfile, generatorConfig, financialInputs = {}, withoutGeneratorDispatch = null, productionProfile = {}) {
   const capex = Math.max(0, Number(financialInputs.systemCapexTry) || 0);
   const genCapex = Math.max(0, Number(financialInputs.generatorCapexTry) || 0);
   const totalCapex = capex + genCapex;
@@ -825,6 +1158,15 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
   const lifecycleCostAnnual = (totalCapex / 25) + (normalDispatch.generatorFuelCostAnnual || 0) + battReplacementAnnual;
 
   const generatorEnabled = !!(generatorConfig && generatorConfig.enabled && Number(generatorConfig.capacityKw) > 0);
+  const accuracyAssessment = buildOffgridAccuracyAssessment({
+    productionProfile: financialInputs.productionProfile || productionProfile,
+    loadProfile,
+    battery: financialInputs.batteryConfig || {},
+    generator: generatorConfig || {},
+    dispatchOptions: financialInputs.dispatchOptions || {},
+    calculationMode: financialInputs.calculationMode || 'basic',
+    badWeatherEnabled: !!badWeatherDispatch
+  });
 
   return {
     // Dispatch özeti
@@ -897,6 +1239,13 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     systemCapexTry: capex,
     totalCapexTry: totalCapex,
     alternativeEnergyCostPerKwh: Math.max(0, Number(financialInputs.alternativeEnergyCostPerKwh) || 0),
+
+    // Doğruluk / belirsizlik
+    accuracyAssessment,
+    accuracyScore: accuracyAssessment.accuracyScore,
+    accuracyTier: accuracyAssessment.tier,
+    expectedUncertaintyPct: accuracyAssessment.expectedUncertaintyPct,
+    calculationMode: accuracyAssessment.calculationMode,
 
     // Yük profili meta
     loadMode: loadProfile.mode,

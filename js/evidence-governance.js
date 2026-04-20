@@ -5,6 +5,9 @@ import { localizeMessageList, statusLabel } from './output-i18n.js';
 
 export const EVIDENCE_GOVERNANCE_VERSION = 'GH-EVID-2026.04-v1';
 export const OFFGRID_FIELD_EVIDENCE_VERSION = 'GH-OFFGRID-FIELD-EVID-2026.04-v1';
+export const OFFGRID_FIELD_ACCEPTANCE_VERSION = 'GH-OFFGRID-FIELD-ACCEPT-2026.04-v1';
+export const OFFGRID_FIELD_OPERATION_VERSION = 'GH-OFFGRID-FIELD-OPS-2026.04-v1';
+export const OFFGRID_FIELD_REVALIDATION_VERSION = 'GH-OFFGRID-FIELD-REVALIDATE-2026.04-v1';
 
 export const OFFGRID_FIELD_EVIDENCE_REQUIREMENTS = [
   { key: 'offgridPvProduction', label: 'Off-grid PV 8760 production evidence', maxAgeDays: 365 },
@@ -12,6 +15,30 @@ export const OFFGRID_FIELD_EVIDENCE_REQUIREMENTS = [
   { key: 'offgridCriticalLoadProfile', label: 'Off-grid critical load 8760 evidence', maxAgeDays: 365 },
   { key: 'offgridSiteShading', label: 'Off-grid site shading evidence', maxAgeDays: 365 },
   { key: 'offgridEquipmentDatasheets', label: 'Off-grid equipment datasheet evidence', maxAgeDays: 365 }
+];
+
+export const OFFGRID_FIELD_ACCEPTANCE_REQUIREMENTS = [
+  { key: 'offgridCommissioningReport', label: 'Off-grid commissioning report', maxAgeDays: 90 },
+  { key: 'offgridAcceptanceTest', label: 'Off-grid site acceptance test', maxAgeDays: 90 },
+  { key: 'offgridMonitoringCalibration', label: 'Off-grid monitoring and meter calibration', maxAgeDays: 90 },
+  { key: 'offgridAsBuiltDocs', label: 'Off-grid as-built drawings and protection settings', maxAgeDays: 365 },
+  { key: 'offgridWarrantyOandM', label: 'Off-grid warranty terms and O&M plan', maxAgeDays: 365 }
+];
+
+export const OFFGRID_FIELD_OPERATION_REQUIREMENTS = [
+  { key: 'offgridTelemetry30Day', label: 'Off-grid first 30-day telemetry export', maxAgeDays: 45 },
+  { key: 'offgridPerformanceBaseline', label: 'Off-grid measured performance baseline', maxAgeDays: 365 },
+  { key: 'offgridMaintenanceLog', label: 'Off-grid maintenance log', maxAgeDays: 120 },
+  { key: 'offgridIncidentLog', label: 'Off-grid incident and outage log', maxAgeDays: 120 },
+  { key: 'offgridRemoteMonitoringSla', label: 'Off-grid remote monitoring SLA', maxAgeDays: 365 }
+];
+
+export const OFFGRID_FIELD_REVALIDATION_REQUIREMENTS = [
+  { key: 'offgridAnnualRevalidation', label: 'Off-grid annual field revalidation report', maxAgeDays: 365 },
+  { key: 'offgridBatteryHealthReport', label: 'Off-grid battery SOH and health report', maxAgeDays: 180 },
+  { key: 'offgridGeneratorServiceRecord', label: 'Off-grid generator service and fuel record', maxAgeDays: 180, generatorOnly: true },
+  { key: 'offgridFirmwareSettingsBackup', label: 'Off-grid firmware and settings backup', maxAgeDays: 365 },
+  { key: 'offgridCustomerSignoff', label: 'Off-grid customer operating sign-off', maxAgeDays: 365 }
 ];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -189,6 +216,33 @@ export function buildEvidenceRegistry(state = {}, results = {}, { today = curren
       checkedAt: evidence.offgridEquipmentDatasheets?.checkedAt || null,
       sourceLabel: 'Off-grid equipment datasheet evidence'
     });
+    OFFGRID_FIELD_ACCEPTANCE_REQUIREMENTS.forEach(req => {
+      registry[req.key] = normalizeEvidenceRecord(evidence[req.key], {
+        type: req.key,
+        status: evidence[req.key]?.status || 'missing',
+        ref: evidence[req.key]?.ref || '',
+        checkedAt: evidence[req.key]?.checkedAt || null,
+        sourceLabel: req.label
+      });
+    });
+    OFFGRID_FIELD_OPERATION_REQUIREMENTS.forEach(req => {
+      registry[req.key] = normalizeEvidenceRecord(evidence[req.key], {
+        type: req.key,
+        status: evidence[req.key]?.status || 'missing',
+        ref: evidence[req.key]?.ref || '',
+        checkedAt: evidence[req.key]?.checkedAt || null,
+        sourceLabel: req.label
+      });
+    });
+    OFFGRID_FIELD_REVALIDATION_REQUIREMENTS.forEach(req => {
+      registry[req.key] = normalizeEvidenceRecord(evidence[req.key], {
+        type: req.key,
+        status: evidence[req.key]?.status || 'missing',
+        ref: evidence[req.key]?.ref || '',
+        checkedAt: evidence[req.key]?.checkedAt || null,
+        sourceLabel: req.label
+      });
+    });
   }
 
   const validation = validateEvidenceRegistry(registry, { today });
@@ -242,6 +296,206 @@ export function buildOffgridFieldEvidenceGate(evidenceGovernance = {}, results =
     phase2Ready,
     fieldGuaranteeReady: false,
     requiredEvidenceKeys,
+    blockers: uniqueBlockers,
+    warnings: uniqueWarnings,
+    records: Object.fromEntries(requiredEvidenceKeys.map(key => {
+      const record = registry[key] || {};
+      return [key, {
+        status: record.status || 'missing',
+        validationStatus: record.validationStatus || 'unvalidated',
+        ref: record.ref || '',
+        checkedAt: record.checkedAt || record.issuedAt || null,
+        fileCount: Array.isArray(record.files) ? record.files.length : 0,
+        hasValidatedFile: hasValidatedFile(record)
+      }];
+    }))
+  };
+}
+
+export function buildOffgridFieldAcceptanceGate(evidenceGovernance = {}, results = {}, { today = currentDateIso() } = {}) {
+  const registry = evidenceGovernance.registry || evidenceGovernance || {};
+  const offgrid = results.offgridL2Results || {};
+  const blockers = [];
+  const warnings = [];
+  const requiredEvidenceKeys = OFFGRID_FIELD_ACCEPTANCE_REQUIREMENTS.map(item => item.key);
+
+  if (offgrid.fieldGuaranteeReadiness?.phase1Ready !== true) {
+    blockers.push('Faz 1 saatlik dispatch girdileri tamamlanmadan Faz 4 saha kabul kapısı açılamaz.');
+  }
+  if (offgrid.fieldEvidenceGate?.phase2Ready !== true) {
+    blockers.push('Faz 2 doğrulanmış saha kanıtları tamamlanmadan Faz 4 saha kabul kapısı açılamaz.');
+  }
+  if (offgrid.fieldModelMaturityGate?.phase3Ready !== true) {
+    blockers.push('Faz 3 stres/model olgunluğu tamamlanmadan Faz 4 saha kabul kapısı açılamaz.');
+  }
+
+  OFFGRID_FIELD_ACCEPTANCE_REQUIREMENTS.forEach(req => {
+    const record = registry[req.key] || {};
+    if (record.status !== 'verified' || record.validationStatus === 'rejected') {
+      blockers.push(`${req.key}: doğrulanmış saha kabul kanıtı yok.`);
+    }
+    if (!hasValidatedFile(record)) {
+      blockers.push(`${req.key}: doğrulanmış dosya eki ve SHA-256 parmak izi yok.`);
+    }
+    if (isEvidenceExpired(record, { today })) {
+      blockers.push(`${req.key}: kanıt geçerlilik tarihi dolmuş.`);
+    }
+    if (record.status === 'verified' && !isEvidenceFresh(record, { today, maxAgeDays: req.maxAgeDays })) {
+      blockers.push(`${req.key}: kaynak kontrol tarihi ${req.maxAgeDays} günden eski veya eksik.`);
+    }
+  });
+
+  if (!offgrid.fieldStressAnalysis?.scenarios?.length) {
+    warnings.push('Faz 4 kabul dosyası, Faz 3 stres senaryosu özeti olmadan eksik kalır.');
+  }
+  if (offgrid.generatorEnabled && (offgrid.generatorCapexMissing || !offgrid.generatorCapacityKw)) {
+    warnings.push('Jeneratör içeren saha kabulünde jeneratör kapasite ve yatırım kaydı ayrıca doğrulanmalıdır.');
+  }
+
+  const uniqueBlockers = [...new Set(blockers)];
+  const uniqueWarnings = [...new Set(warnings)];
+  const phase4Ready = uniqueBlockers.length === 0;
+  return {
+    version: OFFGRID_FIELD_ACCEPTANCE_VERSION,
+    status: phase4Ready ? 'phase4-ready' : 'blocked',
+    phase4Ready,
+    fieldGuaranteeReady: phase4Ready,
+    requiredEvidenceKeys,
+    blockers: uniqueBlockers,
+    warnings: uniqueWarnings,
+    records: Object.fromEntries(requiredEvidenceKeys.map(key => {
+      const record = registry[key] || {};
+      return [key, {
+        status: record.status || 'missing',
+        validationStatus: record.validationStatus || 'unvalidated',
+        ref: record.ref || '',
+        checkedAt: record.checkedAt || record.issuedAt || null,
+        fileCount: Array.isArray(record.files) ? record.files.length : 0,
+        hasValidatedFile: hasValidatedFile(record)
+      }];
+    }))
+  };
+}
+
+export function buildOffgridFieldOperationGate(evidenceGovernance = {}, results = {}, { today = currentDateIso() } = {}) {
+  const registry = evidenceGovernance.registry || evidenceGovernance || {};
+  const offgrid = results.offgridL2Results || {};
+  const blockers = [];
+  const warnings = [];
+  const requiredEvidenceKeys = OFFGRID_FIELD_OPERATION_REQUIREMENTS.map(item => item.key);
+
+  if (offgrid.fieldAcceptanceGate?.phase4Ready !== true) {
+    blockers.push('Faz 4 saha kabul kapısı tamamlanmadan Faz 5 garanti operasyon kapısı açılamaz.');
+  }
+
+  OFFGRID_FIELD_OPERATION_REQUIREMENTS.forEach(req => {
+    const record = registry[req.key] || {};
+    if (record.status !== 'verified' || record.validationStatus === 'rejected') {
+      blockers.push(`${req.key}: doğrulanmış operasyon/izleme kanıtı yok.`);
+    }
+    if (!hasValidatedFile(record)) {
+      blockers.push(`${req.key}: doğrulanmış dosya eki ve SHA-256 parmak izi yok.`);
+    }
+    if (isEvidenceExpired(record, { today })) {
+      blockers.push(`${req.key}: kanıt geçerlilik tarihi dolmuş.`);
+    }
+    if (record.status === 'verified' && !isEvidenceFresh(record, { today, maxAgeDays: req.maxAgeDays })) {
+      blockers.push(`${req.key}: kaynak kontrol tarihi ${req.maxAgeDays} günden eski veya eksik.`);
+    }
+  });
+
+  const telemetry = registry.offgridTelemetry30Day || {};
+  if (telemetry.status === 'verified' && !telemetry.notes) {
+    warnings.push('30 günlük telemetri dosyası var; PR/availability/critical-load-event özeti ayrıca not edilmelidir.');
+  }
+  const baseline = registry.offgridPerformanceBaseline || {};
+  if (baseline.status === 'verified' && !baseline.notes) {
+    warnings.push('Ölçülen performans baseline dosyası var; garanti eşiği ve sapma toleransı ayrıca not edilmelidir.');
+  }
+
+  const uniqueBlockers = [...new Set(blockers)];
+  const uniqueWarnings = [...new Set(warnings)];
+  const phase5Ready = uniqueBlockers.length === 0;
+  return {
+    version: OFFGRID_FIELD_OPERATION_VERSION,
+    status: phase5Ready ? 'phase5-ready' : 'blocked',
+    phase5Ready,
+    activeGuaranteeReady: phase5Ready,
+    fieldGuaranteeReady: phase5Ready,
+    requiredEvidenceKeys,
+    blockers: uniqueBlockers,
+    warnings: uniqueWarnings,
+    records: Object.fromEntries(requiredEvidenceKeys.map(key => {
+      const record = registry[key] || {};
+      return [key, {
+        status: record.status || 'missing',
+        validationStatus: record.validationStatus || 'unvalidated',
+        ref: record.ref || '',
+        checkedAt: record.checkedAt || record.issuedAt || null,
+        fileCount: Array.isArray(record.files) ? record.files.length : 0,
+        hasValidatedFile: hasValidatedFile(record)
+      }];
+    }))
+  };
+}
+
+export function buildOffgridFieldRevalidationGate(evidenceGovernance = {}, results = {}, { today = currentDateIso() } = {}) {
+  const registry = evidenceGovernance.registry || evidenceGovernance || {};
+  const offgrid = results.offgridL2Results || {};
+  const blockers = [];
+  const warnings = [];
+  const generatorEnabled = !!offgrid.generatorEnabled;
+  const effectiveRequirements = OFFGRID_FIELD_REVALIDATION_REQUIREMENTS
+    .filter(req => !req.generatorOnly || generatorEnabled);
+  const skippedEvidenceKeys = OFFGRID_FIELD_REVALIDATION_REQUIREMENTS
+    .filter(req => req.generatorOnly && !generatorEnabled)
+    .map(req => req.key);
+  const requiredEvidenceKeys = effectiveRequirements.map(item => item.key);
+
+  if (offgrid.fieldOperationGate?.phase5Ready !== true) {
+    blockers.push('Faz 5 aktif izleme/operasyon kapısı tamamlanmadan Faz 6 revalidasyon kapısı açılamaz.');
+  }
+
+  effectiveRequirements.forEach(req => {
+    const record = registry[req.key] || {};
+    if (record.status !== 'verified' || record.validationStatus === 'rejected') {
+      blockers.push(`${req.key}: doğrulanmış revalidasyon/yenileme kanıtı yok.`);
+    }
+    if (!hasValidatedFile(record)) {
+      blockers.push(`${req.key}: doğrulanmış dosya eki ve SHA-256 parmak izi yok.`);
+    }
+    if (isEvidenceExpired(record, { today })) {
+      blockers.push(`${req.key}: kanıt geçerlilik tarihi dolmuş.`);
+    }
+    if (record.status === 'verified' && !isEvidenceFresh(record, { today, maxAgeDays: req.maxAgeDays })) {
+      blockers.push(`${req.key}: kaynak kontrol tarihi ${req.maxAgeDays} günden eski veya eksik.`);
+    }
+  });
+
+  if (!generatorEnabled) {
+    warnings.push('Jeneratör kapalı olduğu için jeneratör servis/yakıt revalidasyon kaydı zorunlu tutulmadı.');
+  }
+  const batteryHealth = registry.offgridBatteryHealthReport || {};
+  if (batteryHealth.status === 'verified' && !batteryHealth.notes) {
+    warnings.push('Batarya sağlık raporu var; SOH yüzdesi, kapasite testi ve garanti eşiği not edilmelidir.');
+  }
+  const annual = registry.offgridAnnualRevalidation || {};
+  if (annual.status === 'verified' && !annual.notes) {
+    warnings.push('Yıllık revalidasyon raporu var; ölçülen kapsama/SOC/jeneratör sapma özeti ayrıca not edilmelidir.');
+  }
+
+  const uniqueBlockers = [...new Set(blockers)];
+  const uniqueWarnings = [...new Set(warnings)];
+  const phase6Ready = uniqueBlockers.length === 0;
+  return {
+    version: OFFGRID_FIELD_REVALIDATION_VERSION,
+    status: phase6Ready ? 'phase6-ready' : 'blocked',
+    phase6Ready,
+    renewalReady: phase6Ready,
+    activeGuaranteeReady: phase6Ready,
+    fieldGuaranteeReady: phase6Ready,
+    requiredEvidenceKeys,
+    skippedEvidenceKeys,
     blockers: uniqueBlockers,
     warnings: uniqueWarnings,
     records: Object.fromEntries(requiredEvidenceKeys.map(key => {
@@ -446,6 +700,11 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       productionDispatchMetadata: results.offgridL2Results.productionDispatchMetadata || null,
       loadSource: results.offgridL2Results.loadSource || null,
       loadMode: results.offgridL2Results.loadMode || null,
+      calculationMode: results.offgridL2Results.calculationMode || null,
+      accuracyScore: results.offgridL2Results.accuracyScore ?? null,
+      accuracyTier: results.offgridL2Results.accuracyTier || null,
+      expectedUncertaintyPct: results.offgridL2Results.expectedUncertaintyPct || null,
+      accuracyAssessment: results.offgridL2Results.accuracyAssessment || null,
       dispatchType: results.offgridL2Results.dispatchType || null,
       generatorEnabled: !!results.offgridL2Results.generatorEnabled,
       generatorCapacityKw: results.offgridL2Results.generatorCapacityKw ?? null,
@@ -486,6 +745,27 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       feasibilityNotGuaranteed: results.offgridL2Results.feasibilityNotGuaranteed !== false,
       fieldGuaranteeReadiness: results.offgridL2Results.fieldGuaranteeReadiness || null,
       fieldEvidenceGate: results.offgridL2Results.fieldEvidenceGate || null,
+      fieldStressAnalysis: results.offgridL2Results.fieldStressAnalysis ? {
+        version: results.offgridL2Results.fieldStressAnalysis.version || null,
+        worstCriticalScenario: results.offgridL2Results.fieldStressAnalysis.worstCriticalScenario || null,
+        worstTotalScenario: results.offgridL2Results.fieldStressAnalysis.worstTotalScenario || null,
+        maxUnmetCriticalScenario: results.offgridL2Results.fieldStressAnalysis.maxUnmetCriticalScenario || null,
+        generatorCriticalPeakReservePct: results.offgridL2Results.fieldStressAnalysis.generatorCriticalPeakReservePct ?? null,
+        scenarios: (results.offgridL2Results.fieldStressAnalysis.scenarios || []).map(row => ({
+          key: row.key,
+          totalLoadCoverage: row.totalLoadCoverage,
+          criticalLoadCoverage: row.criticalLoadCoverage,
+          unmetLoadKwh: row.unmetLoadKwh,
+          unmetCriticalKwh: row.unmetCriticalKwh,
+          batteryEol: !!row.batteryEol,
+          pvFactor: row.pvFactor,
+          loadFactor: row.loadFactor
+        }))
+      } : null,
+      fieldModelMaturityGate: results.offgridL2Results.fieldModelMaturityGate || null,
+      fieldAcceptanceGate: results.offgridL2Results.fieldAcceptanceGate || null,
+      fieldOperationGate: results.offgridL2Results.fieldOperationGate || null,
+      fieldRevalidationGate: results.offgridL2Results.fieldRevalidationGate || null,
       fieldGuaranteeCandidate: !!results.offgridL2Results.fieldGuaranteeCandidate,
       fieldGuaranteeReady: !!results.offgridL2Results.fieldGuaranteeReady,
       dispatchVersion: results.offgridL2Results.dispatchVersion || null

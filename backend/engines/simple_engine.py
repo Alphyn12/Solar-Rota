@@ -139,6 +139,37 @@ def system_power_from_layout_snapshot(request: EngineRequest) -> tuple[float, in
     return None
 
 
+def layout_sections_from_snapshot(request: EngineRequest) -> list[dict]:
+    snap = layout_snapshot(request)
+    sections = snap.get("sections") if snap else None
+    if not isinstance(sections, list):
+        return []
+
+    panel_watt = panel_watt_peak(request)
+    normalized = []
+    for section in sections:
+        if section and hasattr(section, "model_dump"):
+            section = section.model_dump()
+        if not isinstance(section, dict):
+            continue
+        panel_count = int(round(float(section.get("panelCount") or 0)))
+        system_power_kwp = float(section.get("systemPowerKwp") or 0)
+        if system_power_kwp <= 0 and panel_count > 0:
+            system_power_kwp = panel_count * panel_watt / 1000
+        if system_power_kwp <= 0:
+            continue
+        normalized.append(
+            {
+                "systemPowerKwp": system_power_kwp,
+                "panelCount": panel_count,
+                "tiltDeg": float(section.get("tiltDeg") if section.get("tiltDeg") is not None else request.roof.tiltDeg),
+                "azimuthDeg": float(section.get("azimuthDeg") if section.get("azimuthDeg") is not None else request.roof.azimuthDeg),
+                "shadingPct": float(section.get("shadingPct") if section.get("shadingPct") is not None else request.roof.shadingPct),
+            }
+        )
+    return normalized
+
+
 def calculate_production(request: EngineRequest) -> Dict[str, object]:
     panel_type = request.system.panelType
     panel_watt = panel_watt_peak(request)
@@ -152,27 +183,48 @@ def calculate_production(request: EngineRequest) -> Dict[str, object]:
         system_power_kwp = panel_count * panel_watt / 1000
 
     psh = _annual_ghi_to_psh(request.site.ghi, request.site.cityName)
-    base_energy = system_power_kwp * psh * 365
-    shading_factor = 1 - _clamp(request.roof.shadingPct, 0, 80) / 100
     soiling_factor = 1 - _clamp(request.roof.soilingPct, 0, 50) / 100
     inverter_factor = inverter_efficiency(request)
-    orientation_factor = _tilt_factor(request.roof.tiltDeg) * _azimuth_factor(request.roof.azimuthDeg)
     bifacial_factor = 1 + bifacial_gain(request)
     wiring_factor = cable_loss_factor(request)
+    sections = layout_sections_from_snapshot(request)
+    use_section_geometry = bool(sections)
 
-    annual_energy = base_energy * shading_factor * soiling_factor * inverter_factor * orientation_factor * bifacial_factor * wiring_factor
+    if use_section_geometry:
+        base_energy = 0.0
+        annual_energy = 0.0
+        orientation_weighted = 0.0
+        shading_weighted = 0.0
+        for section in sections:
+            section_power = section["systemPowerKwp"]
+            section_base = section_power * psh * 365
+            section_orientation = _tilt_factor(section["tiltDeg"]) * _azimuth_factor(section["azimuthDeg"])
+            section_shading_factor = 1 - _clamp(section["shadingPct"], 0, 80) / 100
+            base_energy += section_base
+            annual_energy += section_base * section_shading_factor * soiling_factor * inverter_factor * section_orientation * bifacial_factor * wiring_factor
+            orientation_weighted += section_orientation * section_power
+            shading_weighted += section["shadingPct"] * section_power
+        orientation_factor = orientation_weighted / max(system_power_kwp, 1e-9)
+        shading_pct = shading_weighted / max(system_power_kwp, 1e-9)
+    else:
+        base_energy = system_power_kwp * psh * 365
+        shading_pct = request.roof.shadingPct
+        shading_factor = 1 - _clamp(shading_pct, 0, 80) / 100
+        orientation_factor = _tilt_factor(request.roof.tiltDeg) * _azimuth_factor(request.roof.azimuthDeg)
+        annual_energy = base_energy * shading_factor * soiling_factor * inverter_factor * orientation_factor * bifacial_factor * wiring_factor
     monthly = [round(annual_energy * weight) for weight in MONTH_WEIGHTS]
 
     losses = {
         "baseEnergyKwh": round(base_energy),
         "orientationFactor": round(orientation_factor, 4),
-        "shadingPct": request.roof.shadingPct,
+        "shadingPct": round(shading_pct, 3),
         "soilingPct": request.roof.soilingPct,
         "inverterEfficiency": inverter_factor,
         "bifacialFactor": bifacial_factor,
         "wiringLossPct": round((1 - wiring_factor) * 100, 3),
         "modelCompleteness": "deterministic backend fallback aligned to frontend panel/inverter contract; pvlib hourly model chain preferred when available",
         "layoutSnapshotUsed": bool(snapshot_power),
+        "layoutSectionGeometryUsed": use_section_geometry,
         "layoutSnapshot": layout_snapshot(request),
         "parityNotes": [
             "Panel wattage, panel area, inverter efficiency, bifacial gain, and cable loss are read from the shared request contract when present.",

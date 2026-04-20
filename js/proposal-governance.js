@@ -76,7 +76,10 @@ export function createApprovalBasisSnapshot(state = {}) {
       tariffSourceCheckedAt: state.tariffSourceCheckedAt || null
     },
     commercial: {
-      bomCommercials: null,
+      costOverridesEnabled: !!state.costOverridesEnabled,
+      costOverrides: state.costOverrides || null,
+      bomSelection: state.bomSelection || null,
+      bomCommercials: state.bomCommercials || null,
       displayCurrency: state.displayCurrency || 'TRY',
       usdToTry: state.usdToTry ?? null
     },
@@ -109,6 +112,10 @@ export function createAssumptionLedger(state = {}, results = {}) {
   const exchange = state.exchangeRate || {};
   const evidence = results.evidenceGovernance?.registry || {};
   const offgridFieldGate = results.offgridL2Results?.fieldEvidenceGate || {};
+  const offgridModelGate = results.offgridL2Results?.fieldModelMaturityGate || {};
+  const offgridAcceptanceGate = results.offgridL2Results?.fieldAcceptanceGate || {};
+  const offgridOperationGate = results.offgridL2Results?.fieldOperationGate || {};
+  const offgridRevalidationGate = results.offgridL2Results?.fieldRevalidationGate || {};
   return {
     version: PROPOSAL_GOVERNANCE_VERSION,
     generatedAt: nowIso(),
@@ -168,6 +175,34 @@ export function createAssumptionLedger(state = {}, results = {}) {
           value: offgridFieldGate.status || 'not-evaluated',
           confidence: offgridFieldGate.phase2Ready ? 'medium' : 'low',
           sourceLabel: offgridFieldGate.version || 'missing',
+          sourceDate: null
+        },
+        {
+          key: 'offgrid.fieldModelMaturityGate',
+          value: offgridModelGate.status || 'not-evaluated',
+          confidence: offgridModelGate.phase3Ready ? 'medium' : 'low',
+          sourceLabel: offgridModelGate.version || 'missing',
+          sourceDate: null
+        },
+        {
+          key: 'offgrid.fieldAcceptanceGate',
+          value: offgridAcceptanceGate.status || 'not-evaluated',
+          confidence: offgridAcceptanceGate.phase4Ready ? 'high' : 'low',
+          sourceLabel: offgridAcceptanceGate.version || 'missing',
+          sourceDate: null
+        },
+        {
+          key: 'offgrid.fieldOperationGate',
+          value: offgridOperationGate.status || 'not-evaluated',
+          confidence: offgridOperationGate.phase5Ready ? 'high' : 'low',
+          sourceLabel: offgridOperationGate.version || 'missing',
+          sourceDate: null
+        },
+        {
+          key: 'offgrid.fieldRevalidationGate',
+          value: offgridRevalidationGate.status || 'not-evaluated',
+          confidence: offgridRevalidationGate.phase6Ready ? 'high' : 'low',
+          sourceLabel: offgridRevalidationGate.version || 'missing',
           sourceDate: null
         },
         {

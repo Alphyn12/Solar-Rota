@@ -279,6 +279,14 @@ function renderOffgridL2Results(offgridL2Results, state) {
 
   const L = offgridL2Results;
   const locale = localeTag();
+  const accuracy = L.accuracyAssessment || null;
+  const uncertainty = accuracy?.expectedUncertaintyPct || L.expectedUncertaintyPct || null;
+  const uncertaintyText = uncertainty
+    ? `±${Number(uncertainty.lowPct || 0).toFixed(0)}-${Number(uncertainty.highPct || 0).toFixed(0)}%`
+    : '—';
+  const accuracyColor = (L.accuracyScore || 0) >= 80 ? '#22C55E'
+    : (L.accuracyScore || 0) >= 60 ? '#F59E0B'
+    : '#EF4444';
 
   // Dispatch özeti kartları
   const dispatchGrid = document.getElementById('offgrid-dispatch-grid');
@@ -397,6 +405,7 @@ function renderOffgridL2Results(offgridL2Results, state) {
     const items = [
       stat(i18n.t('offgridL2.resultTotalLoad'), `${Math.round(L.annualTotalLoadKwh || 0).toLocaleString(locale)} kWh/yıl`, 'var(--text)'),
       L.annualCriticalLoadKwh > 0 ? stat(i18n.t('offgridL2.resultCriticalLoad'), `${Math.round(L.annualCriticalLoadKwh).toLocaleString(locale)} kWh/yıl`, '#EF4444') : '',
+      L.accuracyScore != null ? stat(i18n.t('offgridL2.accuracyScoreLabel'), `${L.accuracyScore}/100 · ${uncertaintyText}`, accuracyColor) : '',
       stat(i18n.t('offgridL2.pvBessCoverageLabel'), `${((L.pvBatteryLoadCoverage ?? L.totalLoadCoverage) * 100).toFixed(1)}%`, '#22C55E'),
       stat(i18n.t('offgridL2.pvBessCriticalCoverageLabel'), `${((L.pvBatteryCriticalCoverage ?? L.criticalLoadCoverage) * 100).toFixed(1)}%`, '#22C55E'),
       stat(i18n.t('offgridL2.directPvLabel'), `${Math.round(L.directPvKwh || 0).toLocaleString(locale)} kWh/yıl`, '#F59E0B'),
@@ -472,8 +481,30 @@ function renderOffgridL2Results(offgridL2Results, state) {
     const fallbackBadge = L.productionFallback
       ? `<span style="background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 6px;font-size:0.68rem;margin-left:4px">${escapeHtml(i18n.t('offgridL2.fallbackUsed'))}</span>`
       : `<span style="background:rgba(34,197,94,0.12);color:#22C55E;border:1px solid rgba(34,197,94,0.25);border-radius:4px;padding:1px 6px;font-size:0.68rem;margin-left:4px">${escapeHtml(i18n.t('offgridL2.liveData'))}</span>`;
+    const tierLabel = i18n.t(`offgridL2.accuracyTier_${accuracy?.tier || L.accuracyTier || 'basic-synthetic'}`);
+    const modeLabel = i18n.t(`offgridL2.calculationMode_${accuracy?.calculationMode || L.calculationMode || 'basic'}`);
+    const mainAccuracyBlocker = accuracy?.blockers?.[0] || '';
     sourceTransEl.style.display = '';
     sourceTransEl.innerHTML = `
+      ${accuracy ? `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:8px">
+        <div style="background:rgba(15,23,42,0.35);border:1px solid rgba(148,163,184,0.14);border-radius:8px;padding:8px">
+          <div style="font-size:0.66rem;color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.accuracyScoreLabel'))}</div>
+          <div style="font-size:1rem;font-weight:800;color:${accuracyColor}">${L.accuracyScore}/100</div>
+        </div>
+        <div style="background:rgba(15,23,42,0.35);border:1px solid rgba(148,163,184,0.14);border-radius:8px;padding:8px">
+          <div style="font-size:0.66rem;color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.expectedUncertaintyLabel'))}</div>
+          <div style="font-size:1rem;font-weight:800;color:${accuracyColor}">${escapeHtml(uncertaintyText)}</div>
+        </div>
+        <div style="background:rgba(15,23,42,0.35);border:1px solid rgba(148,163,184,0.14);border-radius:8px;padding:8px">
+          <div style="font-size:0.66rem;color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.calculationModeLabel'))}</div>
+          <div style="font-size:0.82rem;font-weight:700;color:var(--text)">${escapeHtml(modeLabel)} · ${escapeHtml(tierLabel)}</div>
+        </div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.45">
+        ${escapeHtml(accuracy.interpretation || i18n.t('offgridL2.accuracyInterpretationFallback'))}
+        ${mainAccuracyBlocker ? `<br><span style="color:#F59E0B">${escapeHtml(mainAccuracyBlocker)}</span>` : ''}
+      </div>` : ''}
       <div style="font-size:0.72rem;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:10px;align-items:center">
         <span>${escapeHtml(i18n.t('offgridL2.productionSource'))}: <strong style="color:var(--text)">${escapeHtml(prodSource)}</strong>${fallbackBadge}</span>
         <span>${escapeHtml(productionDispatchText)}</span>
@@ -490,6 +521,26 @@ function renderOffgridL2Results(offgridL2Results, state) {
       <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldEvidenceGate.phase2Ready ? '#22C55E' : '#F59E0B'}">
         ${escapeHtml(i18n.t('offgridL2.fieldEvidenceStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldEvidenceGate.phase2Ready ? 'offgridL2.fieldEvidenceReady' : 'offgridL2.fieldEvidenceBlocked'))}</strong>
         ${L.fieldEvidenceGate.blockers?.length ? ` — ${escapeHtml(L.fieldEvidenceGate.blockers[0])}` : ''}
+      </div>` : ''}
+      ${L.fieldModelMaturityGate ? `
+      <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldModelMaturityGate.phase3Ready ? '#22C55E' : '#F59E0B'}">
+        ${escapeHtml(i18n.t('offgridL2.fieldModelStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldModelMaturityGate.phase3Ready ? 'offgridL2.fieldModelReady' : 'offgridL2.fieldModelBlocked'))}</strong>
+        ${L.fieldModelMaturityGate.blockers?.length ? ` — ${escapeHtml(L.fieldModelMaturityGate.blockers[0])}` : ''}
+      </div>` : ''}
+      ${L.fieldAcceptanceGate ? `
+      <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldAcceptanceGate.phase4Ready ? '#22C55E' : '#F59E0B'}">
+        ${escapeHtml(i18n.t('offgridL2.fieldAcceptanceStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldAcceptanceGate.phase4Ready ? 'offgridL2.fieldAcceptanceReady' : 'offgridL2.fieldAcceptanceBlocked'))}</strong>
+        ${L.fieldAcceptanceGate.blockers?.length ? ` — ${escapeHtml(L.fieldAcceptanceGate.blockers[0])}` : ''}
+      </div>` : ''}
+      ${L.fieldOperationGate ? `
+      <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldOperationGate.phase5Ready ? '#22C55E' : '#F59E0B'}">
+        ${escapeHtml(i18n.t('offgridL2.fieldOperationStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldOperationGate.phase5Ready ? 'offgridL2.fieldOperationReady' : 'offgridL2.fieldOperationBlocked'))}</strong>
+        ${L.fieldOperationGate.blockers?.length ? ` — ${escapeHtml(L.fieldOperationGate.blockers[0])}` : ''}
+      </div>` : ''}
+      ${L.fieldRevalidationGate ? `
+      <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldRevalidationGate.phase6Ready ? '#22C55E' : '#F59E0B'}">
+        ${escapeHtml(i18n.t('offgridL2.fieldRevalidationStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldRevalidationGate.phase6Ready ? 'offgridL2.fieldRevalidationReady' : 'offgridL2.fieldRevalidationBlocked'))}</strong>
+        ${L.fieldRevalidationGate.blockers?.length ? ` — ${escapeHtml(L.fieldRevalidationGate.blockers[0])}` : ''}
       </div>` : ''}
       <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;font-size:0.68rem;color:var(--text-muted)">
         <span>⚗ ${escapeHtml(i18n.t('offgridL2.honestSyntheticNote'))}</span>
@@ -831,7 +882,7 @@ function renderWarningsAndAudit(state, r) {
       : i18n.t('audit.selfConsumptionSurplus');
   const L2 = isOffGrid ? r.offgridL2Results : null;
   const energyBalanceValue = L2
-    ? `${i18n.t('offgridL2.pvBessCoverageLabel')}: ${((L2.pvBatteryLoadCoverage ?? L2.totalLoadCoverage) * 100).toFixed(1)}% / ${i18n.t('offgridL2.generatorLabel')}: ${Math.round(L2.generatorEnergyKwh || L2.generatorKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.unservedLoad')}: ${Math.round(L2.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.curtailedPv')}: ${Math.round(L2.curtailedPvKwh || 0).toLocaleString(localeTag())} kWh`
+    ? `${i18n.t('offgridL2.pvBessCoverageLabel')}: ${((L2.pvBatteryLoadCoverage ?? L2.totalLoadCoverage) * 100).toFixed(1)}% / ${i18n.t('offgridL2.accuracyScoreLabel')}: ${L2.accuracyScore ?? '—'}/100 / ${i18n.t('offgridL2.generatorLabel')}: ${Math.round(L2.generatorEnergyKwh || L2.generatorKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.unservedLoad')}: ${Math.round(L2.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.curtailedPv')}: ${Math.round(L2.curtailedPvKwh || 0).toLocaleString(localeTag())} kWh`
     : state.netMeteringEnabled
     ? `${Math.round(r.nmMetrics?.directSelfConsumedEnergy || r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh direct / offset ${Math.round(r.nmMetrics?.importOffsetEnergy || 0).toLocaleString(localeTag())} kWh / paid ${Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString(localeTag())} kWh / total ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag())} kWh`
     : isOffGrid
@@ -1186,6 +1237,7 @@ export function downloadPDF() {
     kpis.push(
       [pdfSafeText(i18n.t('offgridL2.pvBessCoverageLabel')), `${((L.pvBatteryLoadCoverage ?? L.totalLoadCoverage) * 100).toFixed(1)}%`],
       [pdfSafeText(i18n.t('offgridL2.totalCoverageWithGeneratorLabel')), `${(L.totalLoadCoverage * 100).toFixed(1)}%`],
+      [pdfSafeText(i18n.t('offgridL2.accuracyScoreLabel')), `${L.accuracyScore ?? '—'} / 100${L.expectedUncertaintyPct ? ` (${Number(L.expectedUncertaintyPct.lowPct || 0).toFixed(0)}-${Number(L.expectedUncertaintyPct.highPct || 0).toFixed(0)}%)` : ''}`],
       [pdfSafeText(i18n.t('offgridL2.resultAutonomousDays')), `${L.autonomousDays ?? '—'} ${yearUnit}`],
       ...(L.generatorEnabled ? [[pdfSafeText(i18n.t('offgridL2.resultAutonomousDaysWithGenerator')), `${L.autonomousDaysWithGenerator ?? '—'} ${yearUnit}`]] : []),
       [pdfSafeText(i18n.t('offgridL2.generatorLabel')), `${Math.round(L.generatorEnergyKwh || L.generatorKwh || 0).toLocaleString(dateLocale)} kWh`],

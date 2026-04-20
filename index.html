@@ -6,8 +6,8 @@
 <title>Solar Rota | Profesyonel GES Mühendislik Aracı</title>
 <meta name="description" content="Solar Rota ile Türkiye için senaryo bazlı güneş paneli enerji ve yatırım hesaplaması yapın."/>
 <link rel="manifest" href="/manifest.json"/>
-<link rel="icon" type="image/png" href="logo_solarrota.png" sizes="any"/>
-<link rel="apple-touch-icon" href="logo_solarrota.png"/>
+<link rel="icon" type="image/png" href="new_logo.png" sizes="any"/>
+<link rel="apple-touch-icon" href="new_logo.png"/>
 <meta name="theme-color" content="#F59E0B"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" integrity="sha384-NZLkVuBRMEeB4VeZz27WwTRvlhec30biQ8Xx7zG7JJnkvEKRg5qi6BNbEXo9ydwv" crossorigin="anonymous"/>
@@ -97,7 +97,7 @@ body>main{z-index:auto}
 .header-inner{max-width:1280px;margin:0 auto}
 .header-brand{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border-subtle)}
 .header-steps-row{padding:10px 24px}
-.logo{display:flex;align-items:center}
+.logo{display:flex;align-items:center;gap:10px}
 .logo-icon{height:168px;width:auto;max-width:360px;object-fit:contain;border-radius:12px;filter:drop-shadow(0 0 12px rgba(245,158,11,0.45));animation:logoGlow 3s ease-in-out infinite alternate;}
 @keyframes logoGlow{0%{filter:drop-shadow(0 0 8px rgba(245,158,11,0.35))}100%{filter:drop-shadow(0 0 22px rgba(245,158,11,0.75))}}
 .header-actions{display:flex;align-items:center;gap:10px}
@@ -105,6 +105,9 @@ body>main{z-index:auto}
 .header-icon-btn:hover{background:var(--primary);color:#000;border-color:var(--primary)}
 .header-icon-btn.icon-only{width:40px;padding:0;justify-content:center}
 .header-icon-btn svg{flex-shrink:0}
+.header-lang-switcher{display:flex;align-items:center;gap:4px}
+.header-lang-btn{height:32px;padding:0 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface-light);color:var(--text-muted);cursor:pointer;font-size:0.72rem;font-weight:700;font-family:var(--font-body);transition:all 0.2s}
+.header-lang-btn:hover,.header-lang-btn.active{background:var(--primary);border-color:var(--primary);color:#000}
 
 /* Leaflet.Draw pro overrides */
 .leaflet-draw-toolbar a{background-color:rgba(15,23,42,0.92)!important;border-color:rgba(71,85,105,0.6)!important;color:#F1F5F9!important;backdrop-filter:blur(8px);}
@@ -122,7 +125,7 @@ body>main{z-index:auto}
 .roof-tool-btn:hover{border-color:#F59E0B;background:rgba(245,158,11,0.12);color:#F59E0B}
 .roof-tool-btn.active{border-color:#F59E0B;background:rgba(245,158,11,0.18);color:#F59E0B}
 .roof-tool-btn.danger:hover{border-color:#EF4444;background:rgba(239,68,68,0.12);color:#EF4444}
-.logo-text{font-family:var(--font-display);font-size:1.6rem;font-weight:800;letter-spacing:-0.03em;background:linear-gradient(135deg,var(--primary) 0%,#FCD34D 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.logo-text{font-family:var(--font-display);font-size:1.6rem;font-weight:800;letter-spacing:0;background:linear-gradient(135deg,var(--primary) 0%,#FCD34D 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 .logo-tagline{font-size:0.7rem;color:var(--text-muted);margin-left:2px;letter-spacing:0.02em}
 
 /* ── STEP DOTS ── */
@@ -362,11 +365,17 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   <div class="header-brand">
     <div class="header-inner">
       <div class="logo">
-        <img src="logo_solarrota.png" class="logo-icon" alt="Solar Rota"/>
+        <img src="new_logo.png" class="logo-icon" alt="Solar Rota"/>
+        <div class="logo-text">Solar Rota</div>
       </div>
       <div class="header-actions">
         <div id="exchange-rate-status-header"
              style="font-size:0.68rem;color:var(--text-muted);white-space:nowrap;line-height:1.4;text-align:right;cursor:default;padding-right:4px">
+        </div>
+        <div class="header-lang-switcher" aria-label="Dil seçimi">
+          <button class="header-lang-btn lang-btn" data-lang="tr" onclick="switchLanguage('tr')">TR</button>
+          <button class="header-lang-btn lang-btn" data-lang="en" onclick="switchLanguage('en')">EN</button>
+          <button class="header-lang-btn lang-btn" data-lang="de" onclick="switchLanguage('de')">DE</button>
         </div>
         <button class="header-icon-btn" id="dashboard-btn" onclick="openDashboard()" style="display:none">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
@@ -542,7 +551,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
   <!-- Continue button -->
   <div class="hero-cta-wrap">
-    <button class="btn btn-primary hero-cta-btn" id="step1-continue-btn" onclick="validateStep1()" style="display:none">
+    <button class="btn btn-primary hero-cta-btn" id="step1-continue-btn" onclick="validateStep1()" style="display:inline-flex">
       <span data-i18n-text>Sonraki Adım</span>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
     </button>
@@ -1215,6 +1224,20 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <span data-i18n="offgridL2.sectionTitle">Off-Grid Level 2 Ayarları</span>
           </div>
 
+          <!-- Hesap Seviyesi -->
+          <div style="margin-bottom:14px">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px" data-i18n="offgridL2.calculationModeLabel">Hesap Seviyesi</div>
+            <select id="offgrid-calculation-mode"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.85rem;width:100%"
+              onchange="updateOffgridL2Settings()">
+              <option value="basic" data-i18n="offgridL2.calculationModeBasic">Basit: günlük tüketim / cihaz listesi</option>
+              <option value="advanced" data-i18n="offgridL2.calculationModeAdvanced">İleri: 8760 CSV ve saha kanıtları</option>
+            </select>
+            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.calculationModeHint">
+              Basit mod hızlı ön fizibilite verir. İleri modda 8760 PV, toplam yük ve kritik yük dosyaları puanı yükseltir.
+            </div>
+          </div>
+
           <!-- Otonom Hedef Seçici -->
           <div style="margin-bottom:14px">
             <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px" data-i18n="offgridL2.autonomyGoalLabel">Otonom Hedef</div>
@@ -1272,8 +1295,83 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
                 <input type="file" id="offgrid-datasheet-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridEquipmentDatasheets', 'offgrid-datasheet-evidence-status')" style="margin-top:4px;width:100%">
                 <div id="offgrid-datasheet-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
               </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.commissioningEvidenceUpload">Devreye alma raporu</span>
+                <input type="file" id="offgrid-commissioning-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridCommissioningReport', 'offgrid-commissioning-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-commissioning-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.acceptanceEvidenceUpload">Saha kabul testi</span>
+                <input type="file" id="offgrid-acceptance-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridAcceptanceTest', 'offgrid-acceptance-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-acceptance-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.monitoringEvidenceUpload">İzleme / sayaç kalibrasyon kanıtı</span>
+                <input type="file" id="offgrid-monitoring-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridMonitoringCalibration', 'offgrid-monitoring-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-monitoring-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.asBuiltEvidenceUpload">As-built proje / koruma ayarları</span>
+                <input type="file" id="offgrid-asbuilt-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridAsBuiltDocs', 'offgrid-asbuilt-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-asbuilt-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.warrantyEvidenceUpload">Garanti şartları / O&M planı</span>
+                <input type="file" id="offgrid-warranty-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridWarrantyOandM', 'offgrid-warranty-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-warranty-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.telemetryEvidenceUpload">30 günlük telemetri exportu</span>
+                <input type="file" id="offgrid-telemetry-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridTelemetry30Day', 'offgrid-telemetry-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-telemetry-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.performanceEvidenceUpload">Ölçülen performans baseline</span>
+                <input type="file" id="offgrid-performance-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridPerformanceBaseline', 'offgrid-performance-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-performance-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.maintenanceEvidenceUpload">Bakım kayıtları</span>
+                <input type="file" id="offgrid-maintenance-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridMaintenanceLog', 'offgrid-maintenance-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-maintenance-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.incidentEvidenceUpload">Olay / kesinti kayıtları</span>
+                <input type="file" id="offgrid-incident-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridIncidentLog', 'offgrid-incident-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-incident-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.monitoringSlaEvidenceUpload">Uzaktan izleme SLA</span>
+                <input type="file" id="offgrid-monitoring-sla-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridRemoteMonitoringSla', 'offgrid-monitoring-sla-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-monitoring-sla-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.annualRevalidationEvidenceUpload">Yıllık saha revalidasyon raporu</span>
+                <input type="file" id="offgrid-annual-revalidation-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridAnnualRevalidation', 'offgrid-annual-revalidation-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-annual-revalidation-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.batteryHealthEvidenceUpload">Batarya SOH / sağlık raporu</span>
+                <input type="file" id="offgrid-battery-health-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridBatteryHealthReport', 'offgrid-battery-health-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-battery-health-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.generatorServiceEvidenceUpload">Jeneratör servis / yakıt kaydı</span>
+                <input type="file" id="offgrid-generator-service-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridGeneratorServiceRecord', 'offgrid-generator-service-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-generator-service-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.firmwareBackupEvidenceUpload">Firmware / ayar yedeği</span>
+                <input type="file" id="offgrid-firmware-backup-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridFirmwareSettingsBackup', 'offgrid-firmware-backup-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-firmware-backup-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
+              <label style="font-size:0.7rem;color:var(--text-muted);display:block">
+                <span data-i18n="offgridL2.customerSignoffEvidenceUpload">Müşteri işletme onayı</span>
+                <input type="file" id="offgrid-customer-signoff-evidence-upload" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv" onchange="handleOffgridEvidenceFileUpload(event, 'offgridCustomerSignoff', 'offgrid-customer-signoff-evidence-status')" style="margin-top:4px;width:100%">
+                <div id="offgrid-customer-signoff-evidence-status" style="display:none;margin-top:4px;font-size:0.68rem"></div>
+              </label>
             </div>
-            <div style="font-size:0.68rem;color:var(--text-muted);margin-top:6px" data-i18n="offgridL2.fieldDataHint">Faz 1 için üç gerçek 8760 seri gerekir. Faz 2 için bu dosyaların SHA-256 kanıtı, saha gölge kanıtı ve ekipman datasheet kanıtı gerekir.</div>
+            <div style="font-size:0.68rem;color:var(--text-muted);margin-top:6px" data-i18n="offgridL2.fieldDataHint">Faz 1 için üç gerçek 8760 seri gerekir. Faz 2 için SHA-256 saha kanıtları gerekir. Faz 4 için kabul dosyaları, Faz 5 için aktif izleme ve bakım kayıtları, Faz 6 için periyodik revalidasyon kanıtları gerekir.</div>
           </div>
 
           <!-- Cihaz Listesi (Gelişmiş Mod) -->

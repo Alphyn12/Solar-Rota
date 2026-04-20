@@ -1,10 +1,11 @@
-// v23: Stabilized test coverage and complete module precache list.
-const CACHE_NAME = 'solarRota-v23';
+// v24: Precache active brand logo asset.
+const CACHE_NAME = 'solarRota-v24';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/new_logo.png',
   '/css/components.css',
   '/css/redesign.css',
   '/css/mobile.css',

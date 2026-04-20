@@ -200,6 +200,37 @@ def test_backend_uses_frontend_layout_snapshot_for_authoritative_sizing():
     assert data["losses"]["layoutSnapshotUsed"] is True
 
 
+def test_backend_simple_engine_uses_layout_section_geometry():
+    from backend.engines.simple_engine import calculate_production
+    from backend.models.engine_contracts import EngineRequest
+
+    sectioned = sample_request()
+    sectioned["roof"]["shadingPct"] = 0
+    sectioned["system"]["layoutSnapshot"] = {
+        "authoritativeSizing": True,
+        "panelCount": 20,
+        "chosenSystemPowerKwp": 8.6,
+        "sections": [
+            {"areaM2": 40, "panelCount": 10, "systemPowerKwp": 4.3, "tiltDeg": 33, "azimuthDeg": 180, "shadingPct": 0},
+            {"areaM2": 40, "panelCount": 10, "systemPowerKwp": 4.3, "tiltDeg": 33, "azimuthDeg": 0, "shadingPct": 50},
+        ],
+    }
+    single_geometry = sample_request()
+    single_geometry["roof"]["shadingPct"] = 0
+    single_geometry["system"]["layoutSnapshot"] = {
+        "authoritativeSizing": True,
+        "panelCount": 20,
+        "chosenSystemPowerKwp": 8.6,
+        "sections": [],
+    }
+
+    sectioned_result = calculate_production(EngineRequest(**sectioned))
+    single_result = calculate_production(EngineRequest(**single_geometry))
+
+    assert sectioned_result["losses"]["layoutSectionGeometryUsed"] is True
+    assert sectioned_result["production"]["annualEnergyKwh"] < single_result["production"]["annualEnergyKwh"]
+
+
 def test_fix3_self_consumption_target_caps_self_consumed_energy():
     """FIX-3: Backend self-consumption must be <= annual_energy * scenario_target.
     Before the fix, self_consumed = min(annual_energy, annual_load) which could
@@ -238,6 +269,23 @@ def test_fix3_om_cost_escalates_year_over_year():
     assert payload["financial"]["npv25Try"] is not None
     # Simple payback should be positive
     assert payload["financial"]["simplePaybackYears"] > 0
+
+
+def test_backend_on_grid_financial_uses_distribution_fee_once():
+    from backend.services.financial_service import build_financial_payload
+    from backend.models.engine_contracts import EngineRequest
+
+    request_data = sample_request()
+    request_data["tariff"]["importRateTryKwh"] = 5
+    request_data["tariff"]["exportRateTryKwh"] = 0
+    request_data["tariff"]["tariffInputMode"] = "net-plus-fee"
+    request_data["tariff"]["distributionFeeTryKwh"] = 1
+    req = EngineRequest(**request_data)
+    payload = build_financial_payload(req, {"annualEnergyKwh": 10000, "systemPowerKwp": 8.6})
+
+    assert payload["financial"]["financialSavingsRateTryKwh"] == 6
+    assert payload["financial"]["annualSavingsTry"] == 34800
+    assert payload["financial"]["financialBasis"] == "grid-import-tariff-plus-distribution-fee"
 
 
 def test_fix6_kdv_split_panel_zero_nonpanel_twenty():

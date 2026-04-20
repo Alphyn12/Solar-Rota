@@ -79,8 +79,19 @@ function normalizeHourlyProfile(values) {
 export function buildPvEngineRequest(state = {}) {
   const panel = PANEL_TYPES[state.panelType || 'mono'] || PANEL_TYPES.mono;
   const inverter = INVERTER_TYPES[state.inverterType || 'string'] || INVERTER_TYPES.string;
-  const cableLossPct = 0;
+  const cableLossPct = state.cableLossEnabled
+    ? Math.max(0, finite(state.cableLoss?.totalLossPct ?? state.cableLossPct ?? state.cableLoss, 0))
+    : 0;
   const layoutSnapshot = buildLayoutSnapshot(state);
+  const offgridGeneratorEnabled = !!state.offgridGeneratorEnabled;
+  const fieldRevalidationRequired = [
+    'offgridAnnualRevalidation',
+    'offgridBatteryHealthReport',
+    ...(offgridGeneratorEnabled ? ['offgridGeneratorServiceRecord'] : []),
+    'offgridFirmwareSettingsBackup',
+    'offgridCustomerSignoff'
+  ];
+  const fieldRevalidationSkipped = offgridGeneratorEnabled ? [] : ['offgridGeneratorServiceRecord'];
   return {
     schema: PV_ENGINE_CONTRACT_VERSION,
     requestedEngine: state.enginePreference || 'auto',
@@ -158,7 +169,8 @@ export function buildPvEngineRequest(state = {}) {
       offgridCriticalFraction: state.scenarioKey === 'off-grid' ? finite(state.offgridCriticalFraction, 0.3) : null
     },
     offgrid: state.scenarioKey === 'off-grid' ? {
-      generatorEnabled: !!state.offgridGeneratorEnabled,
+      calculationMode: state.offgridCalculationMode || 'basic',
+      generatorEnabled: offgridGeneratorEnabled,
       generatorKw: finite(state.offgridGeneratorKw, 0),
       generatorFuelCostPerKwh: finite(state.offgridGeneratorFuelCostPerKwh, 0),
       generatorCapexTry: finite(state.offgridGeneratorCapexTry, 0),
@@ -167,14 +179,23 @@ export function buildPvEngineRequest(state = {}) {
       productionSourcePriority: ['offgridPvHourly8760', 'hourlyProduction8760', 'monthlyProductionDerivedSynthetic8760'],
       loadSourcePriority: ['hourlyConsumption8760', 'offgridDevices', 'dailyConsumptionSyntheticProfile'],
       fieldEvidenceRequired: ['offgridPvProduction', 'offgridLoadProfile', 'offgridCriticalLoadProfile', 'offgridSiteShading', 'offgridEquipmentDatasheets'],
+      fieldModelStressRequired: ['low-pv-year', 'load-growth', 'battery-eol', 'combined-design-stress'],
+      fieldAcceptanceRequired: ['offgridCommissioningReport', 'offgridAcceptanceTest', 'offgridMonitoringCalibration', 'offgridAsBuiltDocs', 'offgridWarrantyOandM'],
+      fieldOperationRequired: ['offgridTelemetry30Day', 'offgridPerformanceBaseline', 'offgridMaintenanceLog', 'offgridIncidentLog', 'offgridRemoteMonitoringSla'],
+      fieldRevalidationRequired,
+      fieldRevalidationSkipped,
       dispatchLevel: 'L2',
-      fieldGuaranteeGate: 'OFFGRID-FIELD-GATE-2026.04-v2'
+      fieldGuaranteeGate: 'OFFGRID-FIELD-GATE-2026.04-v6'
     } : null,
     tariff: {
       tariffType: state.tariffType || 'residential',
       tariffRegime: state.tariffRegime || 'auto',
       importRateTryKwh: finite(state.tariff, 0),
       exportRateTryKwh: state.scenarioKey === 'off-grid' ? 0 : finite(state.exportTariff, 0),
+      tariffInputMode: state.tariffInputMode || 'net-plus-fee',
+      distributionFeeTryKwh: (state.scenarioKey === 'on-grid' && state.tariffInputMode !== 'gross')
+        ? Math.max(0, finite(state.distributionFee, 0))
+        : 0,
       offGridCostPerKwhTry: state.scenarioKey === 'off-grid' ? nullableFinite(state.offGridCostPerKwh) : null,
       contractedPowerKw: finite(state.contractedPowerKw, 0),
       annualPriceIncrease: finite(state.annualPriceIncrease, 0.12),

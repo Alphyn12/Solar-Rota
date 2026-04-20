@@ -369,6 +369,14 @@ ${escapeHtml(i18n.t('offgridL2.fieldGuaranteeStatus'))}: ${escapeHtml(i18n.t(L.f
 ${(L.fieldGuaranteeReadiness?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
 ${escapeHtml(i18n.t('offgridL2.fieldEvidenceStatus'))}: ${escapeHtml(i18n.t(L.fieldEvidenceGate?.phase2Ready ? 'offgridL2.fieldEvidenceReady' : 'offgridL2.fieldEvidenceBlocked'))}
 ${(L.fieldEvidenceGate?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
+${escapeHtml(i18n.t('offgridL2.fieldModelStatus'))}: ${escapeHtml(i18n.t(L.fieldModelMaturityGate?.phase3Ready ? 'offgridL2.fieldModelReady' : 'offgridL2.fieldModelBlocked'))}
+${(L.fieldModelMaturityGate?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
+${escapeHtml(i18n.t('offgridL2.fieldAcceptanceStatus'))}: ${escapeHtml(i18n.t(L.fieldAcceptanceGate?.phase4Ready ? 'offgridL2.fieldAcceptanceReady' : 'offgridL2.fieldAcceptanceBlocked'))}
+${(L.fieldAcceptanceGate?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
+${escapeHtml(i18n.t('offgridL2.fieldOperationStatus'))}: ${escapeHtml(i18n.t(L.fieldOperationGate?.phase5Ready ? 'offgridL2.fieldOperationReady' : 'offgridL2.fieldOperationBlocked'))}
+${(L.fieldOperationGate?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
+${escapeHtml(i18n.t('offgridL2.fieldRevalidationStatus'))}: ${escapeHtml(i18n.t(L.fieldRevalidationGate?.phase6Ready ? 'offgridL2.fieldRevalidationReady' : 'offgridL2.fieldRevalidationBlocked'))}
+${(L.fieldRevalidationGate?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
 
 ${escapeHtml(i18n.t('offGrid.notFeasibilityAnalysis'))}</div>
     <div class="formula-note">${escapeHtml(i18n.t('offGrid.syntheticDispatchNote'))}</div>

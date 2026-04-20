@@ -214,7 +214,22 @@ window.state = {
     offgridLoadProfile: { type: 'offgridLoadProfile', status: 'missing', ref: '', checkedAt: null },
     offgridCriticalLoadProfile: { type: 'offgridCriticalLoadProfile', status: 'missing', ref: '', checkedAt: null },
     offgridSiteShading: { type: 'offgridSiteShading', status: 'missing', ref: '', checkedAt: null },
-    offgridEquipmentDatasheets: { type: 'offgridEquipmentDatasheets', status: 'missing', ref: '', checkedAt: null }
+    offgridEquipmentDatasheets: { type: 'offgridEquipmentDatasheets', status: 'missing', ref: '', checkedAt: null },
+    offgridCommissioningReport: { type: 'offgridCommissioningReport', status: 'missing', ref: '', checkedAt: null },
+    offgridAcceptanceTest: { type: 'offgridAcceptanceTest', status: 'missing', ref: '', checkedAt: null },
+    offgridMonitoringCalibration: { type: 'offgridMonitoringCalibration', status: 'missing', ref: '', checkedAt: null },
+    offgridAsBuiltDocs: { type: 'offgridAsBuiltDocs', status: 'missing', ref: '', checkedAt: null },
+    offgridWarrantyOandM: { type: 'offgridWarrantyOandM', status: 'missing', ref: '', checkedAt: null },
+    offgridTelemetry30Day: { type: 'offgridTelemetry30Day', status: 'missing', ref: '', checkedAt: null },
+    offgridPerformanceBaseline: { type: 'offgridPerformanceBaseline', status: 'missing', ref: '', checkedAt: null },
+    offgridMaintenanceLog: { type: 'offgridMaintenanceLog', status: 'missing', ref: '', checkedAt: null },
+    offgridIncidentLog: { type: 'offgridIncidentLog', status: 'missing', ref: '', checkedAt: null },
+    offgridRemoteMonitoringSla: { type: 'offgridRemoteMonitoringSla', status: 'missing', ref: '', checkedAt: null },
+    offgridAnnualRevalidation: { type: 'offgridAnnualRevalidation', status: 'missing', ref: '', checkedAt: null },
+    offgridBatteryHealthReport: { type: 'offgridBatteryHealthReport', status: 'missing', ref: '', checkedAt: null },
+    offgridGeneratorServiceRecord: { type: 'offgridGeneratorServiceRecord', status: 'missing', ref: '', checkedAt: null },
+    offgridFirmwareSettingsBackup: { type: 'offgridFirmwareSettingsBackup', status: 'missing', ref: '', checkedAt: null },
+    offgridCustomerSignoff: { type: 'offgridCustomerSignoff', status: 'missing', ref: '', checkedAt: null }
   },
   financing: {
     principal: null,
@@ -268,6 +283,7 @@ window.state = {
   quoteReadyApproved: false,
   // Off-Grid Level 2 ayarları
   offgridDevices: [],
+  offgridCalculationMode: 'basic',
   offgridCriticalFraction: 0.3,
   offgridAutonomyGoal: 'reliability',
   offgridGeneratorEnabled: false,
@@ -799,6 +815,8 @@ function syncScenarioControls() {
     const fracValEl = document.getElementById('offgrid-critical-fraction-val');
     if (fracEl) { fracEl.value = Math.round((Number(s.offgridCriticalFraction) || 0.3) * 100); }
     if (fracValEl) fracValEl.textContent = (fracEl ? fracEl.value : 30) + '%';
+    const calcModeEl = document.getElementById('offgrid-calculation-mode');
+    if (calcModeEl) calcModeEl.value = s.offgridCalculationMode || 'basic';
     const goalEl = document.getElementById('offgrid-autonomy-goal');
     if (goalEl) goalEl.value = s.offgridAutonomyGoal || 'reliability';
     const genEnabledEl = document.getElementById('offgrid-generator-enabled');
@@ -859,9 +877,7 @@ function selectScenario(key) {
   syncScenarioControls();
   persistState();
   showToast(`${window.state.scenarioContext?.label || i18n.t('scenario.fallbackLabel')} ${i18n.t('scenario.selectedToast')}`, 'success');
-  // Adım 1'de "Devam Et" butonunu göster
-  const continueBtn = document.getElementById('step1-continue-btn');
-  if (continueBtn) continueBtn.style.display = 'flex';
+  setTimeout(() => validateStep1(), 450);
 }
 
 function useGeolocation() {
@@ -1432,10 +1448,9 @@ function updateTariffAssumptions() {
   s.tariffInputMode = document.getElementById('tariff-input-mode')?.value || s.tariffInputMode || 'net-plus-fee';
   s.tariffSourceType = document.getElementById('tariff-source-type')?.value || s.tariffSourceType || 'manual';
   s.costSourceType = document.getElementById('cost-source-type')?.value || s.costSourceType || 'catalog';
-  // Distribution fee: only add when mode is net-plus-fee (separate entry), not gross (already included)
-  const feeToAdd = (s.scenarioKey === 'on-grid' && s.tariffInputMode !== 'gross')
-    ? Math.max(0, Number(s.distributionFee) || 0) : 0;
-  s.tariff = importTariffBase + feeToAdd;
+  // Keep state.tariff as the import tariff entered by the user. buildTariffModel
+  // combines it with distributionFee for net-plus-fee mode.
+  s.tariff = importTariffBase;
   // Disable distribution fee field when gross mode to prevent user confusion
   const distFeeInput = document.getElementById('distribution-fee-input');
   const distFeeLabel = document.getElementById('distribution-fee-label');
@@ -1715,7 +1730,28 @@ function syncEnterpriseInputsFromState() {
 function renderEvidenceFileStatus() {
   const types = ['customerBill', 'supplierQuote', 'tariffSource'];
   if (window.state.scenarioKey === 'off-grid') {
-    types.push('offgridPvProduction', 'offgridLoadProfile', 'offgridCriticalLoadProfile', 'offgridSiteShading', 'offgridEquipmentDatasheets');
+    types.push(
+      'offgridPvProduction',
+      'offgridLoadProfile',
+      'offgridCriticalLoadProfile',
+      'offgridSiteShading',
+      'offgridEquipmentDatasheets',
+      'offgridCommissioningReport',
+      'offgridAcceptanceTest',
+      'offgridMonitoringCalibration',
+      'offgridAsBuiltDocs',
+      'offgridWarrantyOandM',
+      'offgridTelemetry30Day',
+      'offgridPerformanceBaseline',
+      'offgridMaintenanceLog',
+      'offgridIncidentLog',
+      'offgridRemoteMonitoringSla',
+      'offgridAnnualRevalidation',
+      'offgridBatteryHealthReport',
+      'offgridGeneratorServiceRecord',
+      'offgridFirmwareSettingsBackup',
+      'offgridCustomerSignoff'
+    );
   }
   const rows = types.map(type => {
     const files = window.state.evidence?.[type]?.files || [];
@@ -2436,6 +2472,8 @@ const _escHtml = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;
 
 function updateOffgridL2Settings() {
   const s = window.state;
+  const calcModeEl = document.getElementById('offgrid-calculation-mode');
+  s.offgridCalculationMode = calcModeEl ? calcModeEl.value : 'basic';
   const fracEl = document.getElementById('offgrid-critical-fraction');
   s.offgridCriticalFraction = fracEl ? Number(fracEl.value) / 100 : 0.3;
   const goalEl = document.getElementById('offgrid-autonomy-goal');

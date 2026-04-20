@@ -13,6 +13,12 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
     annual_energy = float(production.get("annualEnergyKwh") or 0)
     annual_load = annual_load_kwh(request)
     import_rate = max(0, request.tariff.importRateTryKwh or 0)
+    distribution_fee = (
+        0
+        if getattr(request.tariff, "tariffInputMode", "net-plus-fee") == "gross"
+        else max(0, float(getattr(request.tariff, "distributionFeeTryKwh", 0) or 0))
+    )
+    effective_import_rate = import_rate + distribution_fee
     export_rate = max(0, request.tariff.exportRateTryKwh or 0)
 
     scenario_key = request.scenario.key
@@ -22,16 +28,16 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
     financial_import_rate = (
         off_grid_cost
         if scenario_key == "off-grid" and off_grid_cost > 0
-        else import_rate * 2.5
+        else effective_import_rate * 2.5
         if scenario_key == "off-grid"
-        else import_rate
+        else effective_import_rate
     )
     financial_basis = (
         "off-grid-user-alternative-energy-cost"
         if scenario_key == "off-grid" and off_grid_cost > 0
         else "off-grid-grid-tariff-times-2_5-proxy"
         if scenario_key == "off-grid"
-        else "grid-import-tariff"
+        else "grid-import-tariff-plus-distribution-fee" if distribution_fee > 0 else "grid-import-tariff"
     )
     self_consumption_target = {
         "off-grid": 0.90,

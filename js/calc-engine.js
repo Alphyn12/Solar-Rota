@@ -16,7 +16,14 @@ import {
 } from './calc-core.js';
 import { buildQuoteReadiness } from './turkey-regulation.js';
 import { buildProposalGovernance } from './proposal-governance.js';
-import { buildEvidenceRegistry, buildOffgridFieldEvidenceGate, buildTariffSourceGovernance } from './evidence-governance.js';
+import {
+  buildEvidenceRegistry,
+  buildOffgridFieldAcceptanceGate,
+  buildOffgridFieldEvidenceGate,
+  buildOffgridFieldOperationGate,
+  buildOffgridFieldRevalidationGate,
+  buildTariffSourceGovernance
+} from './evidence-governance.js';
 import { hasCompleteHourlyProfile8760, hasMeaningfulMonthlyConsumption } from './consumption-evidence.js';
 import { buildPvEngineRequest } from './pv-engine-contracts.js';
 import { sourceMetaForCurrentCalculation } from './solar-engine-adapter.js';
@@ -24,8 +31,10 @@ import { scenarioSourceQualityNote } from './scenario-workflows.js';
 import {
   buildOffgridLoadProfile,
   buildOffgridPvDispatchProfile,
+  buildOffgridFieldModelMaturityGate,
   evaluateOffgridFieldGuaranteeReadiness,
   runOffgridDispatch,
+  runOffgridStressScenarios,
   runBadWeatherScenario,
   buildOffgridResults
 } from './offgrid-dispatch.js';
@@ -362,8 +371,10 @@ export async function runCalculation() {
   });
   const tempLoss = fallbackTempAdjustment.lossRate;
 
-  const cableLossFactor = 1.0;
-  const cableLossPct = 0;
+  const cableLossPct = state.cableLossEnabled
+    ? Math.max(0, Math.min(50, Number(state.cableLoss?.totalLossPct ?? state.cableLossPct ?? state.cableLoss) || 0))
+    : 0;
+  const cableLossFactor = 1 - cableLossPct / 100;
   // Faz-3 Fix-12: OSM shadow seasonal weighting.
   // OSM-derived shadowFactorPct is computed without solar geometry (no sun elevation angle).
   // In winter the sun is low (~25°) → shadows are 3-4× longer than in summer (~60°).
@@ -546,7 +557,8 @@ export async function runCalculation() {
     tempLossEnergy = Math.max(0, Math.round((Number(bl.dcAnnualKwh || adjustedEnergy) || adjustedEnergy) - adjustedEnergy));
     azimuthLossEnergy = 0;
     bifacialGainEnergy = state.panelType === 'bifacial' ? Math.max(0, Math.round(adjustedEnergy * 0.05)) : 0;
-    totalCableLoss = Math.max(0, Math.round(Number(bl.clippingKwh || 0)));
+    const backendCableLossPct = Math.max(0, Number(bl.wiringLossPct ?? bl.wiringMismatchPct ?? cableLossPct) || 0);
+    totalCableLoss = Math.max(0, Math.round(pvgisRawEnergy * backendCableLossPct / 100));
     effectiveShadingFactor = Number(bl.shadingPct ?? state.shadingFactor ?? effectiveShadingFactor);
     const banner = document.getElementById('fallback-banner');
     if (banner) banner.style.display = 'none';
@@ -880,9 +892,14 @@ export async function runCalculation() {
         generatorCapexTry: Math.max(0, Number(state.offgridGeneratorCapexTry) || 0),
         batteryCapexTry: battCapexForLifecycle,
         batteryLifetimeYears: battLifetimeYears,
-        weatherScenario: weatherLevel
+        weatherScenario: weatherLevel,
+        productionProfile: offgridPvProfile,
+        batteryConfig: batteryConfig,
+        dispatchOptions,
+        calculationMode: state.offgridCalculationMode || 'basic'
       },
-      withoutGeneratorDispatch
+      withoutGeneratorDispatch,
+      offgridPvProfile
     );
     // Üretim kaynağı şeffaflığını off-grid sonucuna ekle
     offgridL2Results.productionSource = authoritativeSourceMeta.source || aggregateFetchStatus;
@@ -910,6 +927,14 @@ export async function runCalculation() {
       productionProfile: offgridPvProfile,
       loadProfile: offgridLoadProfile,
       battery: batteryConfig,
+      generator: generatorConfig,
+      dispatchOptions
+    });
+    offgridL2Results.fieldStressAnalysis = runOffgridStressScenarios({
+      pvHourly8760: pvHourly,
+      loadHourly8760: offgridLoadProfile.totalHourly8760,
+      criticalHourly8760: offgridLoadProfile.criticalHourly8760,
+      battery: batteryConfigSteady,
       generator: generatorConfig,
       dispatchOptions
     });
@@ -1225,6 +1250,11 @@ export async function runCalculation() {
   if (results.offgridL2Results?.generatorCapexMissing) {
     results.calculationWarnings.push('Off-grid jeneratör etkin ancak jeneratör CAPEX girilmemiş; finansal sonuçlar jeneratör yatırımını eksik gösterebilir.');
   }
+  if (results.offgridL2Results?.accuracyScore != null && results.offgridL2Results.accuracyScore < 60) {
+    const band = results.offgridL2Results.expectedUncertaintyPct;
+    const bandText = band ? ` Beklenen belirsizlik bandı yaklaşık ±${Math.round(band.lowPct)}-${Math.round(band.highPct)}%.` : '';
+    results.calculationWarnings.push(`Off-grid doğruluk puanı düşük: ${results.offgridL2Results.accuracyScore}/100.${bandText}`);
+  }
   if (results.offgridL2Results?.fieldGuaranteeReadiness?.status === 'blocked') {
     const firstBlocker = results.offgridL2Results.fieldGuaranteeReadiness.blockers?.[0] || 'Faz 1 saha garanti girdileri eksik.';
     results.calculationWarnings.push(`Off-grid saha garantisi kapalı: ${firstBlocker}`);
@@ -1232,15 +1262,65 @@ export async function runCalculation() {
   results.evidenceGovernance = buildEvidenceRegistry(state, results);
   if (results.offgridL2Results) {
     results.offgridL2Results.fieldEvidenceGate = buildOffgridFieldEvidenceGate(results.evidenceGovernance, results);
+    results.offgridL2Results.fieldModelMaturityGate = buildOffgridFieldModelMaturityGate(results.offgridL2Results.fieldStressAnalysis, {
+      phase1Ready: !!results.offgridL2Results.fieldGuaranteeReadiness?.phase1Ready,
+      phase2Ready: !!results.offgridL2Results.fieldEvidenceGate.phase2Ready,
+      generator: {
+        enabled: !!results.offgridL2Results.generatorEnabled,
+        capacityKw: results.offgridL2Results.generatorCapacityKw
+      }
+    });
     results.offgridL2Results.fieldGuaranteeCandidate = !!(
       results.offgridL2Results.fieldGuaranteeReadiness?.phase1Ready
       && results.offgridL2Results.fieldEvidenceGate.phase2Ready
+      && results.offgridL2Results.fieldModelMaturityGate.phase3Ready
     );
-    results.offgridL2Results.fieldGuaranteeReady = false;
+    results.offgridL2Results.fieldAcceptanceGate = buildOffgridFieldAcceptanceGate(results.evidenceGovernance, results);
+    results.offgridL2Results.fieldOperationGate = buildOffgridFieldOperationGate(results.evidenceGovernance, results);
+    results.offgridL2Results.fieldRevalidationGate = buildOffgridFieldRevalidationGate(results.evidenceGovernance, results);
+    results.offgridL2Results.fieldGuaranteeReady = !!(
+      results.offgridL2Results.fieldGuaranteeCandidate
+      && results.offgridL2Results.fieldAcceptanceGate.phase4Ready
+      && results.offgridL2Results.fieldOperationGate.phase5Ready
+      && results.offgridL2Results.fieldRevalidationGate.phase6Ready
+    );
+    if (results.offgridL2Results.fieldGuaranteeReady && results.offgridL2Results.accuracyAssessment) {
+      results.offgridL2Results.accuracyAssessment = {
+        ...results.offgridL2Results.accuracyAssessment,
+        tier: 'field-validated',
+        accuracyScore: Math.max(results.offgridL2Results.accuracyAssessment.accuracyScore || 0, 95),
+        confidenceLevel: 'high',
+        expectedUncertaintyPct: { lowPct: 3, highPct: 8 },
+        interpretation: 'Saha girdileri, kabul, operasyon ve revalidasyon kapıları tamamlandı; bu bant yine de performans garantisinin sözleşme koşullarına bağlı olduğunu varsayar.'
+      };
+      results.offgridL2Results.accuracyScore = results.offgridL2Results.accuracyAssessment.accuracyScore;
+      results.offgridL2Results.accuracyTier = results.offgridL2Results.accuracyAssessment.tier;
+      results.offgridL2Results.expectedUncertaintyPct = results.offgridL2Results.accuracyAssessment.expectedUncertaintyPct;
+    }
     if (results.offgridL2Results.fieldEvidenceGate.status === 'blocked') {
       const firstEvidenceBlocker = results.offgridL2Results.fieldEvidenceGate.blockers?.[0]
         || 'Faz 2 saha kanıt girdileri eksik.';
       results.calculationWarnings.push(`Off-grid saha kanıt kapısı kapalı: ${firstEvidenceBlocker}`);
+    }
+    if (results.offgridL2Results.fieldModelMaturityGate.status === 'blocked') {
+      const firstModelBlocker = results.offgridL2Results.fieldModelMaturityGate.blockers?.[0]
+        || 'Faz 3 stres/model olgunluğu eksik.';
+      results.calculationWarnings.push(`Off-grid saha model olgunluğu kapalı: ${firstModelBlocker}`);
+    }
+    if (results.offgridL2Results.fieldAcceptanceGate.status === 'blocked') {
+      const firstAcceptanceBlocker = results.offgridL2Results.fieldAcceptanceGate.blockers?.[0]
+        || 'Faz 4 saha kabul kanıtları eksik.';
+      results.calculationWarnings.push(`Off-grid saha kabul kapısı kapalı: ${firstAcceptanceBlocker}`);
+    }
+    if (results.offgridL2Results.fieldOperationGate.status === 'blocked') {
+      const firstOperationBlocker = results.offgridL2Results.fieldOperationGate.blockers?.[0]
+        || 'Faz 5 operasyon/izleme kanıtları eksik.';
+      results.calculationWarnings.push(`Off-grid garanti operasyon kapısı kapalı: ${firstOperationBlocker}`);
+    }
+    if (results.offgridL2Results.fieldRevalidationGate.status === 'blocked') {
+      const firstRevalidationBlocker = results.offgridL2Results.fieldRevalidationGate.blockers?.[0]
+        || 'Faz 6 periyodik revalidasyon kanıtları eksik.';
+      results.calculationWarnings.push(`Off-grid garanti revalidasyon kapısı kapalı: ${firstRevalidationBlocker}`);
     }
   }
   results.tariffSourceGovernance = buildTariffSourceGovernance(tariffModel, results.evidenceGovernance);

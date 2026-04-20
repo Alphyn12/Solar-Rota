@@ -6,8 +6,11 @@ import { describe, it } from 'node:test';
 import {
   buildOffgridLoadProfile,
   buildOffgridPvDispatchProfile,
+  buildOffgridAccuracyAssessment,
+  buildOffgridFieldModelMaturityGate,
   evaluateOffgridFieldGuaranteeReadiness,
   runOffgridDispatch,
+  runOffgridStressScenarios,
   runBadWeatherScenario,
   buildOffgridResults,
   BAD_WEATHER_PV_FACTORS,
@@ -327,6 +330,16 @@ describe('runOffgridDispatch — kritik yük önceliği', () => {
     assert.equal(result.unmetCriticalLoadKwh, 0);
     assert.equal(result.criticalLoadCoverage, 1);
   });
+
+  it('kritik yük girdisi toplam yükten büyükse kapsama paydasını saatlik clamp ile hesaplar', () => {
+    const pv = makeFlatPvHourly(8760 * 2);
+    const load = makeLoadHourly(1);
+    const impossibleCritical = makeLoadHourly(3);
+    const result = runOffgridDispatch(pv, load, impossibleCritical, DEFAULT_BATTERY, NO_GENERATOR, {});
+    assert.equal(result.hourly8760[0].criticalKwh, load[0]);
+    assert.equal(result.unmetCriticalLoadKwh, 0);
+    assert.equal(result.criticalLoadCoverage, 1);
+  });
 });
 
 // ── 5. runOffgridDispatch: Unmet Load Birikmesi ──────────────────────────────
@@ -502,6 +515,8 @@ describe('buildOffgridResults', () => {
     assert.ok(result.dispatchVersion.startsWith('OGD-'), 'dispatchVersion başlangıcı');
     assert.equal(typeof result.pvBatteryLoadCoverage, 'number');
     assert.equal(typeof result.minimumSoc, 'number');
+    assert.equal(typeof result.accuracyScore, 'number');
+    assert.equal(result.accuracyAssessment.tier, 'basic-synthetic');
   });
 
   it('badWeatherScenario null olabilir', () => {
@@ -512,6 +527,101 @@ describe('buildOffgridResults', () => {
     const loadProfile = buildOffgridLoadProfile([], { fallbackDailyKwh: 8, criticalFraction: 0.4 });
     const result = buildOffgridResults(normal, null, loadProfile, { enabled: false }, { systemCapexTry: 50000, alternativeEnergyCostPerKwh: 15 });
     assert.equal(result.badWeatherScenario, null);
+  });
+});
+
+describe('buildOffgridAccuracyAssessment', () => {
+  it('basit sentetik mod düşük puan ve geniş belirsizlik bandı üretir', () => {
+    const productionProfile = buildOffgridPvDispatchProfile({
+      fallbackHourlyRows: makeLoadHourly(8).map(production => ({ production })),
+      fallbackUsed: true
+    });
+    const loadProfile = buildOffgridLoadProfile([], { fallbackDailyKwh: 8, criticalFraction: 0.5 });
+    const assessment = buildOffgridAccuracyAssessment({
+      productionProfile,
+      loadProfile,
+      battery: {},
+      dispatchOptions: {},
+      calculationMode: 'basic'
+    });
+    assert.equal(assessment.tier, 'basic-synthetic');
+    assert.ok(assessment.accuracyScore < 60);
+    assert.ok(assessment.expectedUncertaintyPct.highPct >= 40);
+    assert.equal(assessment.errorIsNotBounded, true);
+  });
+
+  it('gerçek PV, gerçek yük, gerçek kritik yük ve güç limitleri puanı yükseltir', () => {
+    const productionProfile = buildOffgridPvDispatchProfile({ realHourlyPv8760: makeLoadHourly(10) });
+    const loadProfile = buildOffgridLoadProfile([], {
+      hourlyLoad8760: makeLoadHourly(8),
+      criticalHourly8760: makeLoadHourly(3),
+      hourlyLoadSource: 'field-meter-load'
+    });
+    const assessment = buildOffgridAccuracyAssessment({
+      productionProfile,
+      loadProfile,
+      battery: { maxChargePowerKw: 5, maxDischargePowerKw: 5 },
+      dispatchOptions: { inverterAcLimitKw: 5 },
+      calculationMode: 'advanced',
+      badWeatherEnabled: true
+    });
+    assert.equal(assessment.tier, 'field-input-ready');
+    assert.ok(assessment.accuracyScore >= 85);
+    assert.ok(assessment.expectedUncertaintyPct.highPct <= 12);
+  });
+});
+
+// ── 9b. Faz 3 saha model olgunluğu ───────────────────────────────────────────
+describe('runOffgridStressScenarios / buildOffgridFieldModelMaturityGate', () => {
+  it('dört zorunlu stres senaryosunu üretir', () => {
+    const pv = makeFlatPvHourly(8760 * 3);
+    const load = makeLoadHourly(12);
+    const critical = makeLoadHourly(4);
+    const stress = runOffgridStressScenarios({
+      pvHourly8760: pv,
+      loadHourly8760: load,
+      criticalHourly8760: critical,
+      battery: { usableCapacityKwh: 20, efficiency: 0.92, socReserveKwh: 2, initialSocKwh: 10, maxChargePowerKw: 10, maxDischargePowerKw: 10 },
+      generator: NO_GENERATOR,
+      dispatchOptions: {}
+    });
+    assert.equal(stress.scenarios.length, 4);
+    assert.ok(stress.scenarios.some(row => row.key === 'combined-design-stress'));
+    assert.ok(stress.worstCriticalScenario);
+  });
+
+  it('Faz 3 kapısı stres altında kritik yük karşılanmazsa bloklar', () => {
+    const pv = makeDaytimePvHourly(2);
+    const load = makeLoadHourly(20);
+    const critical = makeLoadHourly(10);
+    const stress = runOffgridStressScenarios({
+      pvHourly8760: pv,
+      loadHourly8760: load,
+      criticalHourly8760: critical,
+      battery: { usableCapacityKwh: 2, efficiency: 0.9, socReserveKwh: 0.2, initialSocKwh: 0.2, maxChargePowerKw: 1, maxDischargePowerKw: 1 },
+      generator: NO_GENERATOR,
+      dispatchOptions: {}
+    });
+    const gate = buildOffgridFieldModelMaturityGate(stress, { phase1Ready: true, phase2Ready: true, generator: NO_GENERATOR });
+    assert.equal(gate.phase3Ready, false);
+    assert.ok(gate.blockers.some(item => item.includes('kritik yük')));
+  });
+
+  it('faz 1+2 ve stres eşikleri sağlanırsa faz 3 ready olur ama saha garantisi vermez', () => {
+    const pv = makeFlatPvHourly(8760 * 6);
+    const load = makeLoadHourly(12);
+    const critical = makeLoadHourly(4);
+    const stress = runOffgridStressScenarios({
+      pvHourly8760: pv,
+      loadHourly8760: load,
+      criticalHourly8760: critical,
+      battery: { usableCapacityKwh: 50, efficiency: 0.94, socReserveKwh: 5, initialSocKwh: 25, maxChargePowerKw: 20, maxDischargePowerKw: 20 },
+      generator: NO_GENERATOR,
+      dispatchOptions: {}
+    });
+    const gate = buildOffgridFieldModelMaturityGate(stress, { phase1Ready: true, phase2Ready: true, generator: NO_GENERATOR });
+    assert.equal(gate.phase3Ready, true);
+    assert.equal(gate.fieldGuaranteeReady, false);
   });
 });
 
