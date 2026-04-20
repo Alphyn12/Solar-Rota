@@ -68,8 +68,12 @@ def main():
             assert card_box and card_box["width"] <= 390, card_box
             assert card_box["height"] >= 64, card_box
 
+            assert page.locator(".header-lang-btn").count() == 0
+            assert page.locator("#exchange-rate-status-header").count() == 0
+            page.click('[data-testid="open-settings"]')
             page.click('[data-lang="en"]')
             page.wait_for_function("document.querySelector('.hero-title')?.textContent.includes('Design your solar energy system')")
+            page.click("#settings-close-btn")
             page.click('.scenario-choice-card[data-scenario-key="on-grid"]')
             page.click("#step1-continue-btn")
             page.wait_for_function("document.getElementById('step-2')?.classList.contains('active')")

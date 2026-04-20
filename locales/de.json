@@ -2,7 +2,10 @@
   "app": {
     "title": "Solar Rota",
     "subtitle": "Türkei Solarrechner",
-    "tagline": "Professionelles Solar-Engineering-Tool"
+    "tagline": "Professionelles Solar-Engineering-Tool",
+    "headerTagline": "Solarplanung und Machbarkeitsstudio",
+    "headerAssurance": "Engineering-Tool mit Fokus Türkei",
+    "homeAria": "Solar Rota Hauptinhalt"
   },
   "nav": {
     "step1": "Szenario",

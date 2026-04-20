@@ -290,6 +290,7 @@ def desktop_backend_flow(browser, base_url):
     assert crm_download.value.suggested_filename.startswith("solar-rota-crm-lead-")
 
     page.click('button:has-text("Hesabı Kaydet")')
+    page.click('[data-testid="open-settings"]')
     page.click("#dashboard-btn")
     assert page.locator("#dashboard-modal").evaluate("el => getComputedStyle(el).display") == "flex"
     assert "Ankara" in page.locator("#dashboard-body").inner_text()

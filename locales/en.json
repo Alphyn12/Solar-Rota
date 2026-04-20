@@ -2,7 +2,10 @@
   "app": {
     "title": "Solar Rota",
     "subtitle": "Turkey Solar Panel Calculator",
-    "tagline": "Professional Solar Engineering Tool"
+    "tagline": "Professional Solar Engineering Tool",
+    "headerTagline": "Solar design and feasibility studio",
+    "headerAssurance": "Engineering tool focused on Turkey",
+    "homeAria": "Solar Rota main content"
   },
   "nav": {
     "step1": "Scenario",

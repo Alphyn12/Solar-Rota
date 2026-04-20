@@ -32,6 +32,9 @@ def main():
             page = ctx.new_page()
             page.goto(f"{base_url}/index.html")
             page.wait_for_load_state("networkidle")
+            assert page.locator(".header-lang-btn").count() == 0
+            assert page.locator("#exchange-rate-status-header").count() == 0
+            page.click('[data-testid="open-settings"]')
             page.click('[data-lang="en"]')
             page.wait_for_function("document.querySelector('.hero-title')?.textContent.includes('Design your solar energy system')")
             page.wait_for_function("document.querySelector('.scenario-select-headline')?.textContent === 'Choose your solar system type'")
@@ -40,7 +43,8 @@ def main():
             assert page.locator('.step-dot[data-step="1"]').get_attribute("aria-label") == "1. step: Scenario"
             assert page.locator('.step-dot[data-step="7"] .step-dot-label').inner_text() == "Results"
             assert page.locator('.step-dots').get_attribute("aria-label") == "Form steps"
-            assert page.locator('.header-lang-btn[data-lang="en"]').get_attribute("aria-pressed") == "true"
+            assert page.locator('#settings-panel .lang-btn[data-lang="en"]').get_attribute("aria-pressed") == "true"
+            page.click("#settings-close-btn")
             assert page.locator('.scenario-choice-card[data-scenario-key="on-grid"] strong').inner_text() == "On-Grid"
             assert "Bill savings" in page.locator('.scenario-choice-card[data-scenario-key="on-grid"] .scenario-card-desc').inner_text()
             assert page.locator("#geolocation-btn svg").count() == 1
@@ -52,6 +56,7 @@ def main():
             page.reload()
             page.wait_for_load_state("networkidle")
             page.wait_for_function("document.querySelector('.hero-title')?.textContent.includes('Design your solar energy system')")
+            page.click('[data-testid="open-settings"]')
             page.click('[data-lang="de"]')
             page.wait_for_function("document.querySelector('.hero-title')?.textContent.includes('Planen Sie Ihr Solarsystem')")
             assert page.evaluate("localStorage.getItem('guneshesap_lang')") == "de"

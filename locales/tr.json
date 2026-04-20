@@ -2,7 +2,10 @@
   "app": {
     "title": "Solar Rota",
     "subtitle": "Türkiye Güneş Paneli Hesaplayıcı",
-    "tagline": "Profesyonel GES Mühendislik Aracı"
+    "tagline": "Profesyonel GES Mühendislik Aracı",
+    "headerTagline": "GES tasarım ve fizibilite stüdyosu",
+    "headerAssurance": "Türkiye odaklı mühendislik aracı",
+    "homeAria": "Solar Rota ana içerik"
   },
   "nav": {
     "step1": "Senaryo",

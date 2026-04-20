@@ -29,11 +29,11 @@ textarea {
 
 @media (max-width: 900px) {
   :root {
-    --header-h: 112px;
+    --header-h: 118px;
   }
 
   #app-header {
-    padding: 10px 14px;
+    padding: 0;
   }
 
   .header-top {
@@ -46,13 +46,14 @@ textarea {
   }
 
   .logo-icon {
-    width: 34px;
-    height: 34px;
+    width: auto;
+    height: 56px;
+    max-width: 180px;
     flex: 0 0 auto;
   }
 
   .logo-text {
-    font-size: 1.18rem;
+    font-size: 1.45rem;
     letter-spacing: 0;
     white-space: nowrap;
   }
@@ -63,6 +64,10 @@ textarea {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .brand-assurance {
+    display: none;
   }
 
   .header-utility-bar {
@@ -196,7 +201,7 @@ textarea {
 
 @media (max-width: 720px) {
   :root {
-    --header-h: 122px;
+    --header-h: 118px;
   }
 
   #app-header {
@@ -245,13 +250,13 @@ textarea {
   }
 
   .logo-icon {
-    height: 38px !important;
-    max-width: 48px !important;
+    height: 52px !important;
+    max-width: 168px !important;
   }
 
   .logo-text {
-    max-width: 122px;
-    font-size: 1rem !important;
+    max-width: 156px;
+    font-size: 1.22rem !important;
   }
 
   .logo-text {
