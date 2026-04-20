@@ -214,7 +214,7 @@ ${escapeHtml(report('totalLifetimeExpenses'))}: ${money(r.totalExpenses25y)}
 ${escapeHtml(report('discountRate'))}: %${(r.discountRate*100).toFixed(0)}
 
 LCOE = ${moneyRate(r.lcoe, 'kWh')}</div>
-    <div class="formula-note">${escapeHtml(report('userTariff'))}: ${moneyRate(r.tariff, 'kWh')} (${escapeHtml(state.tariffType)}). ${escapeHtml(report('lcoeNote'))} ${escapeHtml(i18n.t('onGridResult.lcoeLabel'))}.</div>
+    <div class="formula-note">${escapeHtml(report('userTariff'))}: ${moneyRate(r.tariff, 'kWh')} (${escapeHtml(state.tariffType)}). ${escapeHtml(report('lcoeNote'))} ${escapeHtml(i18n.t('onGridResult.lcoeLabel'))}.${r.compensatedLcoe ? ` Compensated LCOE: ${moneyRate(r.compensatedLcoe, 'kWh')}` : ''}</div>
   </div>
   <div class="formula-card">
     <div class="formula-title">IRR — ${escapeHtml(report('irrTitle'))} (${escapeHtml(report('rootSearch'))})</div>
@@ -277,7 +277,7 @@ ${escapeHtml(report('totalProduction25y'))}: ${fmt(totalEnergy25y)} kWh</div>
           <tr ${y.year === r.paybackYear ? 'class="payback-row"' : ''}>
             <td>${y.year}${y.year === r.paybackYear ? ' ✓' : ''}</td>
             <td>${fmt(y.energy)}</td>
-            <td>${y.rate}</td>
+            <td>${y.effectiveImportRate || y.rate}</td>
             <td>${money(y.savings)}</td>
             <td style="color:var(--danger)">${y.expenses > 0 ? '-' + money(y.expenses) : '0'}</td>
             <td>${money(y.netCashFlow)}</td>

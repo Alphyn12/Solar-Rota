@@ -645,6 +645,7 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       parityAvailable: results.engineParity?.intentionalDifference === true,
       parityDeltaPct: results.engineParity?.intentionalDifference === true ? (results.engineParity.deltaPct ?? null) : null,
       hourlyProfileSource: results.hourlyProfileSource || state.hourlyProfileSource || 'synthetic',
+      productionProfileSource: results.productionProfileSource || 'monthly-derived-synthetic-pv',
       shadowQuality: results.shadowQuality || state.shadingQuality || 'user-estimate',
       tariffInputMode: results.tariffInputMode || state.tariffInputMode || 'net-plus-fee',
       tariffSourceType: results.tariffSourceType || state.tariffSourceType || 'manual',
@@ -662,16 +663,23 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       approvalState: gov.approval?.state || null
     },
     financialSummary: {
-      cumulativeNetPaybackYear: results.simplePaybackYear || null,
+      cumulativeNetPaybackYear: results.cumulativeNetPaybackYear || results.simplePaybackYear || null,
+      grossSimplePaybackYear: results.grossSimplePaybackYear || null,
+      netSimplePaybackYear: results.netSimplePaybackYear || null,
       discountedPaybackYear: results.discountedPaybackYear || null,
       roi: results.roi || null,
       npvTotal: results.npvTotal || null,
       irr: results.irr || null,
       lcoe: results.lcoe || null,
+      compensatedLcoe: results.compensatedLcoe || null,
       annualSavings: results.annualSavings || null,
+      firstYearGrossSavings: results.firstYearGrossSavings || null,
+      firstYearNetCashFlow: results.firstYearNetCashFlow || null,
       financialSavingsRate: results.financialSavingsRate || results.tariff || null,
       financialSavingsBasis: results.financialSavingsBasis || (isOffGrid ? 'off-grid-alternative-energy-cost' : 'grid-import-tariff'),
       totalCost: results.totalCost || null,
+      financialCostBasis: results.financialCostBasis || results.totalCost || null,
+      paybackBasis: 'cumulative-net-cash-flow',
       financing: gov.financing || null,
       maintenance: gov.maintenance || null,
       bomCommercials: gov.bomCommercials || null
@@ -690,7 +698,15 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       authoritativeFinancialBasis: results.authoritativeFinancialBasis || 'frontend-8760-financial-model',
       settlementProvisional: !!results.settlementProvisional,
       settlementAssumptionBasis: results.settlementAssumptionBasis || null,
-      compensationSummary: results.compensationSummary || null
+      compensationSummary: results.compensationSummary || null,
+      enterpriseQuoteGate: {
+        officialTariffSource: (results.tariffSourceType || state.tariffSourceType) === 'official',
+        hourlyConsumption8760: Array.isArray(state.hourlyConsumption8760) && state.hourlyConsumption8760.length >= 8760,
+        hourlyProduction8760: ['backend-pvlib-hourly', 'pvgis-seriescalc-hourly', 'user-hourly-pv-normalized-to-authoritative-annual'].includes(results.productionProfileSource),
+        supplierQuoteValidUntil: !!(evidenceRegistry.supplierQuote?.validUntil || state.bomCommercials?.supplierQuoteValidUntil),
+        regulationSourceFresh: !(results.quoteReadiness?.blockers || []).some(item => String(item).includes('Regülasyon kaynak kontrol tarihi')),
+        productionLimitExceeded: !!results.compensationSummary?.productionLimitExceeded
+      }
     } : null,
     offGridL2: isOffGrid && results.offgridL2Results ? {
       productionSource: results.offgridL2Results.productionSource || null,

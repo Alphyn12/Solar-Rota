@@ -279,6 +279,7 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
         monthly_kwh = (ac_w.resample("ME").sum() / 1000).round(2).tolist()
     except Exception:
         monthly_kwh = (ac_w.resample("M").sum() / 1000).round(2).tolist()
+    hourly_kwh = (ac_w / 1000).round(5).tolist()
     annual_kwh = float(sum(monthly_kwh))
     poa_annual = weighted_poa_annual
     effective_poa_annual = weighted_effective_poa_annual
@@ -311,12 +312,14 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
         "production": {
             "annualEnergyKwh": round(annual_kwh),
             "monthlyEnergyKwh": monthly_kwh,
+            "hourlyEnergyKwh": hourly_kwh,
             "systemPowerKwp": round(system_power_kwp, 3),
             "panelCount": panel_count,
             "psh": round(annual_kwh / max(system_power_kwp * 365, 1), 3),
             "capacityFactorPct": round(capacity_factor, 2),
             "annual_kwh": round(annual_kwh, 2),
             "monthly_kwh": monthly_kwh,
+            "hourly_kwh": hourly_kwh,
             "engine_used": "pvlib-backed",
             "engine_quality": "engineering-mvp",
             "confidence_level": "high",

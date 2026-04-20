@@ -145,6 +145,7 @@ export function buildExportCompensationPolicy(state = {}) {
     ? (settlementDate && settlementDate >= SETTLEMENT_CHANGE_DATE ? 'hourly' : 'monthly')
     : settlementMode;
   const annualConsumptionKwh = Math.max(0, finiteNumber(state.annualConsumptionKwh, finiteNumber(state.dailyConsumption) * 365));
+  const annualProductionKwh = Math.max(0, finiteNumber(state.annualProductionKwh, 0));
   const previousYearConsumptionKwh = Math.max(0, finiteNumber(state.previousYearConsumptionKwh, annualConsumptionKwh));
   const currentYearConsumptionKwh = Math.max(0, finiteNumber(state.currentYearConsumptionKwh, annualConsumptionKwh));
   const userCap = Number(state.sellableExportCapKwh);
@@ -152,6 +153,8 @@ export function buildExportCompensationPolicy(state = {}) {
   const annualSellableExportCapKwh = hasManualCap
     ? Math.max(0, userCap)
     : Math.max(annualConsumptionKwh, previousYearConsumptionKwh, currentYearConsumptionKwh);
+  const productionToConsumptionLimitKwh = annualConsumptionKwh > 0 ? annualConsumptionKwh * 2 : null;
+  const productionLimitExceeded = !!(productionToConsumptionLimitKwh && annualProductionKwh > productionToConsumptionLimitKwh);
 
   return {
     version: TURKEY_REGULATORY_VERSION,
@@ -167,6 +170,10 @@ export function buildExportCompensationPolicy(state = {}) {
         : 'monthly-netting-import-offset-then-surplus-compensation',
     annualSellableExportCapKwh,
     capBasis: hasManualCap ? 'manual' : 'max(current/previous/annual consumption)',
+    annualProductionKwh,
+    productionToConsumptionLimitKwh,
+    productionLimitExceeded,
+    productionLimitBasis: productionToConsumptionLimitKwh ? 'annual-production-vs-2x-associated-consumption-check' : null,
     paidBatteryExportAllowed: false,
     sources: TURKEY_REGULATORY_SOURCES,
     lifecycle: TARIFF_DATA_LIFECYCLE
@@ -267,6 +274,11 @@ export function applyExportCompensation(monthly, policy = {}) {
 
 export function buildQuoteReadiness({ state = {}, results = {}, tariffModel = null, evidenceGovernance = null } = {}) {
   const blockers = [];
+  const policy = tariffModel?.exportCompensationPolicy || {};
+  const tariffSourceType = tariffModel?.tariffSourceType || state.tariffSourceType || 'manual';
+  const evidenceRegistry = evidenceGovernance?.registry || {};
+  const validationWarnings = evidenceGovernance?.validation?.warnings || [];
+  const hasHourlyConsumptionProfile = Array.isArray(state.hourlyConsumption8760) && state.hourlyConsumption8760.length >= 8760;
   if (state.exportSettlementMode === 'auto' && !state.settlementDate) {
     blockers.push('SETTLEMENT_DATE_MISSING: Mahsuplaşma modu Otomatik seçiliyken sistem devreye alma tarihi girilmesi zorunludur.');
   }
@@ -276,7 +288,21 @@ export function buildQuoteReadiness({ state = {}, results = {}, tariffModel = nu
   if (!hasMeaningfulConsumptionEvidence(state)) blockers.push('Müşteri fatura/tüketim verisi doğrulanmadı.');
   if (!tariffModel?.regulation?.effectiveRegime) blockers.push('Tarife rejimi belirlenemedi.');
   if (tariffModel?.regulation?.warnings?.length) blockers.push(...tariffModel.regulation.warnings);
-  if (!tariffModel?.exportCompensationPolicy?.sources?.length) blockers.push('İhracat mahsuplaşma kaynağı kayıtlı değil.');
+  if (!policy.sources?.length) blockers.push('İhracat mahsuplaşma kaynağı kayıtlı değil.');
+  if (policy.productionLimitExceeded) {
+    blockers.push('Yıllık üretim ilişkili tüketimin 2 katı kontrolünü aşıyor; satılabilir fazla enerji için dağıtım şirketi/regülasyon uygunluğu doğrulanmalı.');
+  }
+  if (
+    policy.interval === 'hourly' &&
+    results.productionProfileSource !== 'backend-pvlib-hourly' &&
+    results.productionProfileSource !== 'pvgis-seriescalc-hourly' &&
+    results.productionProfileSource !== 'user-hourly-pv-normalized-to-authoritative-annual'
+  ) {
+    blockers.push('Saatlik mahsuplaşma seçili ancak PV üretim profili sentetik; ticari teklif için saatlik PV üretim kaynağı doğrulanmalı.');
+  }
+  if (policy.interval === 'hourly' && !hasHourlyConsumptionProfile) {
+    blockers.push('Saatlik mahsuplaşma seçili ancak tüketim profili 8760 saatlik veri değil; ticari teklif için saatlik tüketim kaynağı doğrulanmalı.');
+  }
   if (state.proposalApproval?.state !== 'approved') blockers.push('Proposal onay durumu approved değil.');
   if (!state.proposalApproval?.approvalRecord?.immutable) blockers.push('Immutable onay kaydı yok.');
   if (state.bomCommercials?.supplierQuoteState !== 'received') blockers.push('Tedarikçi BOM teklifi alınmadı.');
@@ -287,9 +313,13 @@ export function buildQuoteReadiness({ state = {}, results = {}, tariffModel = nu
     blockers.push('Şebeke başvuru kontrol listesi oluşturulmadı.');
   }
   if (!tariffModel?.sourceDate || !tariffModel?.sourceLabel) blockers.push('Tarife kaynak tarihi/etiketi eksik.');
-  // Tariff source type check
-  const tariffSourceType = tariffModel?.tariffSourceType || state.tariffSourceType || 'manual';
-  if (tariffSourceType === 'estimate') blockers.push('Tarife tahmini/varsayılan olarak girildi — ticari teklif için resmi kaynak doğrulaması gerekli.');
+  if (tariffSourceType !== 'official') blockers.push('Tarife resmi kaynakla doğrulanmadı — ticari teklif için official tariff source zorunlu.');
+  if (evidenceRegistry.supplierQuote?.status === 'verified' && !evidenceRegistry.supplierQuote?.validUntil) {
+    blockers.push('Tedarikçi BOM teklifinin geçerlilik tarihi yok; enterprise quote-ready için geçerli teklif tarihi zorunlu.');
+  }
+  if (validationWarnings.some(item => String(item).includes('regulationSource'))) {
+    blockers.push('Regülasyon kaynak kontrol tarihi eski veya eksik; enterprise quote-ready için güncel regülasyon kaynağı zorunlu.');
+  }
   // Shadow quality check
   const shadowQuality = state.shadingQuality || 'user-estimate';
   if (shadowQuality === 'unknown') blockers.push('Gölge veri kalitesi bilinmiyor — ticari teklif için mühendislik değerlendirmesi gerekli.');

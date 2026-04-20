@@ -357,6 +357,10 @@ assert.equal(feeModel.effectiveImportRate, 7.0);
 assert.equal(feeFinancial.rows[0].savings, 3500, 'distribution fee included in savings');
 // row.rate should still show base importRate (5.00), not effective rate
 assert.equal(feeFinancial.rows[0].rate, '5.00', 'row.rate shows importRate (display), not effectiveImportRate');
+assert.equal(feeFinancial.rows[0].effectiveImportRate, '7.00', 'row.effectiveImportRate shows the rate used in savings');
+assert.equal(feeFinancial.rows[0].rateBasis, 'import-plus-distribution-fee');
+assert.equal(Number(feeFinancial.grossSimplePaybackYear.toFixed(2)), 2.86);
+assert.equal(feeFinancial.cumulativeNetPaybackYear, feeFinancial.simplePaybackYear);
 
 // tariffSourceType is passed through
 const tariffOfficial = buildTariffModel({ tariff: 5, tariffSourceType: 'official', annualPriceIncrease: 0, discountRate: 0 });

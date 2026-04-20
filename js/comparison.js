@@ -7,6 +7,7 @@ import {
   buildTariffModel,
   calculateSystemLayout,
   computeFinancialTable,
+  resolveTaxTreatment,
   simulateHourlyEnergy
 } from './calc-core.js';
 
@@ -111,7 +112,17 @@ export function runComparison() {
     const panelCostComp = systemPower * 1000 * panel.pricePerWatt;
     const nonPanelCostComp = systemPower * invUnit + systemPower * (2200 + 600 + 900 + 1800) + 5000;
     const kdvComp = nonPanelCostComp * 0.20;
-    const totalCost = customPrice || Math.round(panelCostComp + nonPanelCostComp + kdvComp);
+    const estimatedGrossCost = Math.round(panelCostComp + nonPanelCostComp + kdvComp);
+    const totalCost = customPrice || estimatedGrossCost;
+    const taxTreatment = customPrice
+      ? null
+      : resolveTaxTreatment({
+          grossTotalCost: estimatedGrossCost,
+          solarKdv: kdvComp,
+          taxEnabled: state.taxEnabled,
+          tax: state.tax
+        });
+    const financialCostBasis = Math.round(taxTreatment?.financialCostBasis ?? totalCost);
 
     const monthlyData = (r.monthlyData || []).map(v => Math.round((Number(v) || 0) * (annualEnergy / Math.max(r.annualEnergy, 1))));
     const monthlyLoad = Array.isArray(r.monthlyLoad)
@@ -143,7 +154,7 @@ export function runComparison() {
       annualEnergy,
       hourlySummary,
       batterySummary: null,
-      totalCost,
+      totalCost: financialCostBasis,
       tariffModel: financialTariffModel,
       panel,
       annualOMCost,
@@ -155,7 +166,7 @@ export function runComparison() {
       annualGeneratorCost: isOffGridScenario ? (r.offgridL2Results?.generatorFuelCostAnnual || 0) : 0
     });
 
-    let lcoeCostSum = totalCost;
+    let lcoeCostSum = financialCostBasis;
     let lcoeEnergySum = 0;
     financial.rows.forEach(y => {
       const df = Math.pow(1 + tariffModel.discountRate, y.year);
@@ -171,6 +182,7 @@ export function runComparison() {
       panelCount, systemPower: systemPower.toFixed(2),
       annualEnergy: annualEnergy.toLocaleString('tr-TR'),
       totalCost,
+      financialCostBasis,
       paybackYear: financial.paybackYear || '>25',
       npv: Math.round(financial.projectNPV),
       lcoe,

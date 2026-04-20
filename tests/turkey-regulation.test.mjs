@@ -113,6 +113,14 @@ const policy = buildExportCompensationPolicy({
 assert.equal(policy.interval, 'hourly');
 assert.equal(policy.annualSellableExportCapKwh, 2000);
 
+const productionLimitPolicy = buildExportCompensationPolicy({
+  annualConsumptionKwh: 1000,
+  annualProductionKwh: 2300,
+  settlementDate: '2026-05-01'
+});
+assert.equal(productionLimitPolicy.productionToConsumptionLimitKwh, 2000);
+assert.equal(productionLimitPolicy.productionLimitExceeded, true);
+
 const provisionalPolicy = buildExportCompensationPolicy({
   annualConsumptionKwh: 1000,
   exportSettlementMode: 'auto'
@@ -129,6 +137,43 @@ const readiness = buildQuoteReadiness({
 assert.equal(readiness.status, 'not-quote-ready');
 assert.ok(readiness.blockers.some(b => b.includes('PVGIS')));
 assert.ok(readiness.blockers.some(b => b.includes('Proposal')));
+
+const hourlySyntheticPvReadiness = buildQuoteReadiness({
+  state: { exportSettlementMode: 'hourly', roofGeometry: {}, quoteInputsVerified: true, hasSignedCustomerBillData: true, proposalApproval: { state: 'approved', approvalRecord: { immutable: true } }, costSourceType: 'bom-verified', tariffSourceType: 'official', gridApplicationChecklist: { applicationPrepared: true, connectionOpinionReceived: true, projectApproved: true, meterBidirectional: true, acceptanceScheduled: true } },
+  results: { usedFallback: false, calculationWarnings: [], productionProfileSource: 'monthly-derived-synthetic-pv' },
+  tariffModel: { sourceDate: '2026-04-01', sourceLabel: 'official', tariffSourceType: 'official', regulation: { effectiveRegime: 'pst', warnings: [] }, exportCompensationPolicy: { interval: 'hourly', sources: [{}] } },
+  evidenceGovernance: { registry: { supplierQuote: { status: 'verified' } } }
+});
+assert.ok(hourlySyntheticPvReadiness.blockers.some(b => b.includes('PV üretim profili sentetik')));
+assert.ok(hourlySyntheticPvReadiness.blockers.some(b => b.includes('tüketim profili 8760')));
+
+const manualTariffReadiness = buildQuoteReadiness({
+  state: { roofGeometry: {}, quoteInputsVerified: true, hasSignedCustomerBillData: true, proposalApproval: { state: 'approved', approvalRecord: { immutable: true } }, bomCommercials: { supplierQuoteState: 'received' }, costSourceType: 'bom-verified', tariffSourceType: 'manual', shadingQuality: 'site-verified', gridApplicationChecklist: { bill: { done: true } } },
+  results: { usedFallback: false, calculationWarnings: [], productionProfileSource: 'pvgis-seriescalc-hourly' },
+  tariffModel: { sourceDate: '2026-04-01', sourceLabel: 'manual', tariffSourceType: 'manual', regulation: { effectiveRegime: 'pst', warnings: [] }, exportCompensationPolicy: { interval: 'monthly', sources: [{}] } },
+  evidenceGovernance: { validation: { status: 'complete', warnings: [] }, registry: { supplierQuote: { status: 'verified', validUntil: '2026-05-01' } } }
+});
+assert.ok(manualTariffReadiness.blockers.some(b => b.includes('official tariff source')));
+
+const enterpriseReady = buildQuoteReadiness({
+  state: {
+    exportSettlementMode: 'hourly',
+    roofGeometry: {},
+    quoteInputsVerified: true,
+    hasSignedCustomerBillData: true,
+    hourlyConsumption8760: new Array(8760).fill(1),
+    proposalApproval: { state: 'approved', approvalRecord: { immutable: true } },
+    bomCommercials: { supplierQuoteState: 'received' },
+    costSourceType: 'bom-verified',
+    tariffSourceType: 'official',
+    shadingQuality: 'site-verified',
+    gridApplicationChecklist: { bill: { done: true }, project: { done: true } }
+  },
+  results: { usedFallback: false, calculationWarnings: [], productionProfileSource: 'backend-pvlib-hourly' },
+  tariffModel: { sourceDate: '2026-04-01', sourceLabel: 'official', tariffSourceType: 'official', regulation: { effectiveRegime: 'pst', warnings: [] }, exportCompensationPolicy: { interval: 'hourly', sources: [{}] } },
+  evidenceGovernance: { validation: { status: 'complete', warnings: [] }, registry: { supplierQuote: { status: 'verified', validUntil: '2026-05-01' } } }
+});
+assert.equal(enterpriseReady.status, 'quote-ready');
 
 const missingSettlementReadiness = buildQuoteReadiness({
   state: { exportSettlementMode: 'auto', settlementDate: '' },

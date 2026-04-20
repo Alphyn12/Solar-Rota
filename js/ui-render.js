@@ -593,23 +593,27 @@ function onGridConfidenceAssessment(state, r) {
 
   // Tariff source quality
   const tariffSourceType = r.tariffSourceType || state.tariffSourceType || 'manual';
-  const tariffIsBlocker = tariffSourceType === 'estimate';
-  const tariffIsWarning = tariffSourceType === 'manual';
+  const tariffIsBlocker = tariffSourceType !== 'official';
   if (tariffIsBlocker) missing.push(i18n.t('warnings.manualTariff'));
 
   let score = 100 - missing.length * 10;
   if (r.usedFallback) score -= 25;
   if (r.authoritativeEngineSource?.pvlibBacked) score += 5;
   // Graduated deductions for soft-warnings (don't add to missing list)
-  if (tariffIsWarning) score -= 5;
   if ((r.hourlyProfileSource || state.hourlyProfileSource) === 'synthetic') score -= 5;
+  const productionProfileSource = r.productionProfileSource || 'monthly-derived-synthetic-pv';
+  const hasHourlyPvProfile = productionProfileSource === 'backend-pvlib-hourly'
+    || productionProfileSource === 'pvgis-seriescalc-hourly'
+    || productionProfileSource === 'user-hourly-pv-normalized-to-authoritative-annual';
+  if (!hasHourlyPvProfile) score -= 5;
   if (shadowQuality === 'user-estimate') score -= 5;
   score = Math.max(0, Math.min(100, score));
 
   // quoteCandidate requires: no fallback, score ≥ 82, ≤1 missing, bom-verified cost, official/manual tariff, shadow ≠ unknown
   const isQuoteCandidate = !r.usedFallback && score >= 82 && missing.length <= 1
     && costSourceType === 'bom-verified'
-    && tariffSourceType !== 'estimate'
+    && tariffSourceType === 'official'
+    && hasHourlyPvProfile
     && shadowQuality !== 'unknown'
     && shadowQuality !== 'user-estimate';
 
@@ -665,6 +669,17 @@ function renderOnGridResultLayers(state, r) {
   };
   const profileSourceText = profileSourceLabels[profileSourceKey] || profileSourceLabels.synthetic;
   const profileSourceClass = profileSourceKey === 'hourly-uploaded' ? 'data-source-good' : profileSourceKey === 'monthly-derived' ? 'data-source-ok' : 'data-source-warn';
+  const productionProfileSourceKey = r.productionProfileSource || 'monthly-derived-synthetic-pv';
+  const productionProfileLabels = {
+    'backend-pvlib-hourly': 'Backend pvlib hourly 8760',
+    'pvgis-seriescalc-hourly': 'PVGIS seriescalc hourly 8760',
+    'user-hourly-pv-normalized-to-authoritative-annual': 'User hourly PV 8760',
+    'monthly-derived-synthetic-pv': 'Monthly-derived synthetic PV'
+  };
+  const productionProfileText = productionProfileLabels[productionProfileSourceKey] || productionProfileSourceKey;
+  const productionProfileClass = productionProfileSourceKey === 'backend-pvlib-hourly' || productionProfileSourceKey === 'pvgis-seriescalc-hourly' || productionProfileSourceKey === 'user-hourly-pv-normalized-to-authoritative-annual'
+    ? 'data-source-good'
+    : 'data-source-warn';
 
   // Shadow quality display
   const shadowQuality = assessment.shadowQuality;
@@ -743,6 +758,7 @@ function renderOnGridResultLayers(state, r) {
         <div class="on-grid-result-metric"><strong>${r.ysp} kWh/kWp</strong><span>${escapeHtml(i18n.t('onGridResult.specificYield'))}</span></div>
         <div class="on-grid-result-metric"><strong>${escapeHtml(usageProfileText)}</strong><span>${escapeHtml(i18n.t('onGridResult.loadProfile'))}</span></div>
         <div class="on-grid-result-metric"><strong><span class="${profileSourceClass}">${escapeHtml(profileSourceText)}</span></strong><span>${escapeHtml(i18n.t('onGridResult.profileSourceLabel'))}</span></div>
+        <div class="on-grid-result-metric"><strong><span class="${productionProfileClass}">${escapeHtml(productionProfileText)}</span></strong><span>${escapeHtml(i18n.t('offgridL2.productionSource'))}</span></div>
         <div class="on-grid-result-metric"><strong><span class="${shadowClass}">${escapeHtml(shadowText)}</span></strong><span>${escapeHtml(i18n.t('onGridResult.shadowQualityLabel'))}</span></div>
       </div>
     </section>
@@ -770,6 +786,7 @@ function renderOnGridResultLayers(state, r) {
       <div class="on-grid-data-source-table">
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.engine'))}</span><span>${escapeHtml(engineMode)}</span></div>
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.profileSourceLabel'))}</span><span class="${profileSourceClass}">${escapeHtml(profileSourceText)}</span></div>
+        <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('offgridL2.productionSource'))}</span><span class="${productionProfileClass}">${escapeHtml(productionProfileText)}</span></div>
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.tariffSourceLabel'))}</span><span class="${tariffSourceClass}">${escapeHtml(tariffSourceText)}</span></div>
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.shadowQualityLabel'))}</span><span class="${shadowClass}">${escapeHtml(shadowText)}</span></div>
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.costConfidenceLabel'))}</span><span class="${costSourceClass}">${escapeHtml(costSourceText)}</span></div>
@@ -1326,7 +1343,7 @@ export function downloadPDF() {
     if (row > 275) { doc.addPage(); doc.setFillColor(15,23,42); doc.rect(0,0,210,297,'F'); row = 15; }
     if (yr.year === r.paybackYear) { doc.setFillColor(16,185,129,50); doc.rect(13, row-4, 182, 6, 'F'); }
     doc.setTextColor(241, 245, 249);
-    const vals = [yr.year+'', yr.energy.toLocaleString(dateLocale), moneyRate(yr.rate, 'kWh'),
+    const vals = [yr.year+'', yr.energy.toLocaleString(dateLocale), moneyRate(yr.effectiveImportRate || yr.rate, 'kWh'),
       money(yr.savings), money(yr.expenses),
       money(yr.netCashFlow), money(yr.cumulative)];
     vals.forEach((v, i) => doc.text(v, xCols[i], row));

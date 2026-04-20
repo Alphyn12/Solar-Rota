@@ -106,6 +106,7 @@ def test_pvlib_engine_contract_when_available():
     assert data["engineSource"]["source"] == "pvlib-backed"
     assert data["engineSource"]["pvlibBacked"] is True
     assert data["production"]["engine_used"] == "pvlib-backed"
+    assert len(data["production"]["hourlyEnergyKwh"]) == 8760
     assert data["losses"]["transpositionModel"] == "pvlib.irradiance.haydavies"
     assert data["losses"]["temperatureModel"].startswith("pvlib.sapm_cell")
 

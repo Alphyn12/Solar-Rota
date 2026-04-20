@@ -634,6 +634,8 @@ export function computeFinancialTable({
       year,
       energy: Math.round(degradedEnergy),
       rate: electricityPriceDisplay.toFixed(2),
+      effectiveImportRate: electricityPrice.toFixed(2),
+      rateBasis: (tariffModel.distributionFee ?? 0) > 0 ? 'import-plus-distribution-fee' : 'import-rate',
       exportRate: escalatedExportRate.toFixed(2),
       selfConsumptionKwh: Math.round(selfE),
       importOffsetKwh: Math.round(offsetE),
@@ -652,12 +654,19 @@ export function computeFinancialTable({
   const projectNPV = discountedCashFlow - totalCost;
   const cumulativeSavings = rows.reduce((s, row) => s + row.savings, 0);
   const totalNetCashFlow = rows.reduce((s, row) => s + row.netCashFlow, 0);
+  const firstYearGrossSavings = rows[0]?.savings || 0;
+  const firstYearNetCashFlow = rows[0]?.netCashFlow || 0;
+  const grossSimplePaybackYear = totalCost > 0 && firstYearGrossSavings > 0 ? totalCost / firstYearGrossSavings : 0;
+  const netSimplePaybackYear = totalCost > 0 && firstYearNetCashFlow > 0 ? totalCost / firstYearNetCashFlow : 0;
   const roi = totalCost > 0 ? ((totalNetCashFlow - totalCost) / totalCost) * 100 : 0;
 
   return {
     rows,
     paybackYear,
     simplePaybackYear: paybackYear,
+    cumulativeNetPaybackYear: paybackYear,
+    grossSimplePaybackYear,
+    netSimplePaybackYear,
     discountedPaybackYear,
     totalExpenses25y,
     discountedCashFlow,

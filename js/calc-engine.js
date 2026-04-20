@@ -67,6 +67,16 @@ function monthlyFromHourly8760(hourly) {
   return normalizeMonthlyProductionToAnnual(monthly, monthly.reduce((sum, value) => sum + value, 0));
 }
 
+function normalizeHourlyProductionToAnnual(hourly, annualTarget) {
+  const complete = completeHourlyArray(hourly);
+  if (!complete) return null;
+  const total = complete.reduce((sum, value) => sum + value, 0);
+  const target = Math.max(0, Number(annualTarget) || 0);
+  if (total <= 0 || target <= 0) return null;
+  const scale = target / total;
+  return complete.map(value => value * scale);
+}
+
 // ── Merkezi loading state yönetimi ──────────────────────────────────────────
 let _activeMsgInterval = null;
 let _calcFinalized = false;
@@ -395,7 +405,7 @@ export async function runCalculation() {
     const secPower = Number(sec.systemPower) || secPC * panel.wattPeak / 1000;
     if (secPower <= 0) return null;
 
-    let rawEnergy = null, rawMonthly = null, rawPoa = null, usedFallback = false;
+    let rawEnergy = null, rawMonthly = null, rawPoa = null, rawHourly = null, usedFallback = false;
     let pvgisFetchStatus = PVGIS_FETCH_STATUS.FALLBACK_USED;
     let pvgisUserMessage = null;
 
@@ -406,7 +416,13 @@ export async function runCalculation() {
         : null;
       const fetchResult = await fetchPVGISLive(
         { lat: state.lat, lon: state.lon, peakpower: secPower, loss: PVGIS_LOSS_PARAM, angle: sec.tilt, aspect: pvgisAzimut },
-        { retries: 3, lang: (typeof window !== 'undefined' && window._currentLang) || 'tr', backendProxyUrl, proxyFirst: true }
+        {
+          retries: 3,
+          lang: (typeof window !== 'undefined' && window._currentLang) || 'tr',
+          backendProxyUrl,
+          proxyFirst: true,
+          includeHourly: state.scenarioKey === 'on-grid'
+        }
       );
       pvgisFetchStatus = fetchResult.fetchStatus;
       pvgisUserMessage = fetchResult.userMessage;
@@ -414,6 +430,7 @@ export async function runCalculation() {
         rawEnergy  = fetchResult.rawEnergy;
         rawPoa     = fetchResult.rawPoa;
         rawMonthly = fetchResult.rawMonthly;
+        rawHourly  = completeHourlyArray(fetchResult.rawHourly);
       }
     }
 
@@ -475,6 +492,7 @@ export async function runCalculation() {
     return {
       panelCount: secPC, systemPower: secPower,
       annualEnergy: adjustedE, monthlyData: monthly,
+      hourlyProduction8760: rawHourly ? normalizeHourlyProductionToAnnual(rawHourly, adjustedE) : null,
       pvgisRawEnergy: rawEnergy, pvgisPoa: rawPoa, usedFallback,
       pvgisFetchStatus, pvgisUserMessage,
       shadingLoss:    rawEnergy * (effectiveShadingFactor / 100),
@@ -514,6 +532,10 @@ export async function runCalculation() {
   let pvgisRawEnergy= validSections.reduce((s, r) => s + r.pvgisRawEnergy, 0);
   const pvgisPoaWeighted = validSections.reduce((s, r) => s + (Number(r.pvgisPoa) || 0) * r.systemPower, 0);
   let pvgisPoa = systemPower > 0 ? pvgisPoaWeighted / systemPower : 0;
+  const pvgisHourlySections = validSections.map(r => r.hourlyProduction8760).filter(h => Array.isArray(h) && h.length === 8760);
+  let pvgisHourlyProduction8760 = pvgisHourlySections.length === validSections.length
+    ? new Array(8760).fill(0).map((_, hour) => pvgisHourlySections.reduce((sum, hourly) => sum + (Number(hourly[hour]) || 0), 0))
+    : null;
   let shadingLoss   = validSections.reduce((s, r) => s + r.shadingLoss, 0);
   let tempLossEnergy= validSections.reduce((s, r) => s + r.tempLossEnergy, 0);
   let azimuthLossEnergy   = validSections.reduce((s, r) => s + r.azimuthLossEnergy, 0);
@@ -540,6 +562,8 @@ export async function runCalculation() {
   const authoritativeBackend = authoritativeOverride?.engineSource?.pvlibBacked && !authoritativeOverride?.fallbackUsed && !authoritativeOverride?.engineSource?.fallbackUsed
     ? authoritativeOverride
     : null;
+  let ongridHourlyProduction8760 = null;
+  let ongridProductionProfileSource = 'monthly-derived-synthetic-pv';
   if (authoritativeBackend) {
     const bp = authoritativeBackend.production || {};
     const bl = authoritativeBackend.losses || {};
@@ -560,6 +584,11 @@ export async function runCalculation() {
     const backendCableLossPct = Math.max(0, Number(bl.wiringLossPct ?? bl.wiringMismatchPct ?? cableLossPct) || 0);
     totalCableLoss = Math.max(0, Math.round(pvgisRawEnergy * backendCableLossPct / 100));
     effectiveShadingFactor = Number(bl.shadingPct ?? state.shadingFactor ?? effectiveShadingFactor);
+    const backendHourly = completeHourlyArray(bp.hourlyEnergyKwh || bp.hourly_kwh || bp.hourlyProduction8760);
+    if (backendHourly) {
+      ongridHourlyProduction8760 = normalizeHourlyProductionToAnnual(backendHourly, adjustedEnergy);
+      ongridProductionProfileSource = 'backend-pvlib-hourly';
+    }
     const banner = document.getElementById('fallback-banner');
     if (banner) banner.style.display = 'none';
   }
@@ -575,6 +604,17 @@ export async function runCalculation() {
     monthlyData = monthlyFromHourly8760(offgridRealPvHourly);
     usedFallback = false;
     pvgisRawEnergy = Math.round(adjustedEnergy);
+  }
+  if (state.scenarioKey === 'on-grid' && !ongridHourlyProduction8760 && pvgisHourlyProduction8760) {
+    ongridHourlyProduction8760 = normalizeHourlyProductionToAnnual(pvgisHourlyProduction8760, adjustedEnergy);
+    if (ongridHourlyProduction8760) ongridProductionProfileSource = 'pvgis-seriescalc-hourly';
+  }
+  const userOngridPvHourly = state.scenarioKey === 'on-grid'
+    ? (completeHourlyArray(state.onGridPvHourly8760) || completeHourlyArray(state.hourlyProduction8760))
+    : null;
+  if (state.scenarioKey === 'on-grid' && !ongridHourlyProduction8760 && userOngridPvHourly) {
+    ongridHourlyProduction8760 = normalizeHourlyProductionToAnnual(userOngridPvHourly, adjustedEnergy);
+    if (ongridHourlyProduction8760) ongridProductionProfileSource = 'user-hourly-pv-normalized-to-authoritative-annual';
   }
 
   // Faz-4 Fix-15: PVGIS annual uncertainty ≈ ±7.6% at 1σ (interannual variability +
@@ -717,7 +757,8 @@ export async function runCalculation() {
 
   tariffModel = buildTariffModel({
     ...state,
-    annualConsumptionKwh: monthlyLoad.reduce((a, b) => a + b, 0)
+    annualConsumptionKwh: monthlyLoad.reduce((a, b) => a + b, 0),
+    annualProductionKwh: adjustedEnergy
   });
   tariff = tariffModel.importRate || tariffModel.pstRate || 7.16;
   const annualPriceIncrease = tariffModel.annualPriceIncrease;
@@ -748,7 +789,7 @@ export async function runCalculation() {
     tariffType: state.tariffType,
     loadProfileKey: state.usageProfile || state.onGridUsageProfile,
     hourlyLoad8760,
-    hourlyProduction8760: offgridRealPvHourly,
+    hourlyProduction8760: state.scenarioKey === 'off-grid' ? offgridRealPvHourly : ongridHourlyProduction8760,
     exportPolicy: tariffModel.exportCompensationPolicy,
     previousYearConsumptionKwh: state.previousYearConsumptionKwh,
     currentYearConsumptionKwh: state.currentYearConsumptionKwh,
@@ -1099,6 +1140,8 @@ export async function runCalculation() {
   const firstYearNetCashFlow = financial.rows[0]?.netCashFlow ?? Math.round(annualSavings - annualOMCost - annualInsurance);
   const paybackYear = financial.paybackYear;
   const discountedPaybackYear = financial.discountedPaybackYear;
+  const grossSimplePaybackYear = financial.grossSimplePaybackYear || 0;
+  const netSimplePaybackYear = financial.netSimplePaybackYear || 0;
   const totalExpenses25y = financial.totalExpenses25y;
   const npvTotal = financial.projectNPV;
   const roi = financial.roi;
@@ -1106,6 +1149,7 @@ export async function runCalculation() {
 
   let lcoeCostSum = financialCostBasis;
   let lcoeEnergySum = 0;
+  let compensatedLcoeEnergySum = 0;
   yearlyTable.forEach(y => {
     const df = Math.pow(1 + discountRate, y.year);
     lcoeCostSum += (y.expenses || 0) / df;
@@ -1113,8 +1157,13 @@ export async function runCalculation() {
       ? (y.selfConsumptionKwh || y.compensatedConsumptionKwh || 0)
       : y.energy;
     lcoeEnergySum += deliveredEnergyForLcoe / df;
+    const compensatedEnergyForLcoe = state.scenarioKey === 'off-grid'
+      ? deliveredEnergyForLcoe
+      : (Number(y.compensatedConsumptionKwh) || 0) + (Number(y.paidExportKwh) || 0);
+    compensatedLcoeEnergySum += compensatedEnergyForLcoe / df;
   });
   const lcoe = lcoeEnergySum > 0 ? Number((lcoeCostSum / lcoeEnergySum).toFixed(2)) : null;
+  const compensatedLcoe = compensatedLcoeEnergySum > 0 ? Number((lcoeCostSum / compensatedLcoeEnergySum).toFixed(2)) : null;
 
   const ysp  = systemPower > 0 ? (adjustedEnergy / systemPower).toFixed(0) : 0;
   const cf   = systemPower > 0 ? ((adjustedEnergy / (systemPower * 8760)) * 100).toFixed(1) : 0;
@@ -1148,7 +1197,11 @@ export async function runCalculation() {
     grossAnnualSavingsPreDegradation: Math.round(grossAnnualSavingsPreDegradation),
     firstYearGrossSavings: Math.round(firstYearGrossSavings),
     firstYearNetCashFlow: Math.round(firstYearNetCashFlow),
-    paybackYear, simplePaybackYear: financial.simplePaybackYear, discountedPaybackYear,
+    paybackYear, simplePaybackYear: financial.simplePaybackYear,
+    cumulativeNetPaybackYear: financial.cumulativeNetPaybackYear,
+    grossSimplePaybackYear: grossSimplePaybackYear ? Number(grossSimplePaybackYear.toFixed(2)) : 0,
+    netSimplePaybackYear: netSimplePaybackYear ? Number(netSimplePaybackYear.toFixed(2)) : 0,
+    discountedPaybackYear,
     npvTotal: Math.round(npvTotal), discountedCashFlow: Math.round(financial.discountedCashFlow), roi: roi.toFixed(1),
     co2Savings: co2Savings.toFixed(2), trees, monthlyData,
     tempLoss: (tempLoss * 100).toFixed(2), pr: (pr * 100).toFixed(1),
@@ -1168,7 +1221,7 @@ export async function runCalculation() {
     cableLoss: Math.round(totalCableLoss),
     cableLossPct,
     osmShadowFactor,
-    ysp, cf, irr, lcoe,
+    ysp, cf, irr, lcoe, compensatedLcoe,
     tariff, annualPriceIncrease, discountRate, tariffModel,
     financialSavingsRate: effectiveSavingsTariff,
     financialSavingsBasis: financialTariffModel.financialBasis || 'grid-import-tariff',
@@ -1185,6 +1238,9 @@ export async function runCalculation() {
       annualPhysicalExportKwh: nmMetrics.annualGridExport,
       settlementInterval: tariffModel.exportCompensationPolicy?.interval || null,
       annualExportCapKwh: tariffModel.exportCompensationPolicy?.annualSellableExportCapKwh ?? null,
+      annualProductionKwh: Math.round(adjustedEnergy),
+      productionToConsumptionLimitKwh: tariffModel.exportCompensationPolicy?.productionToConsumptionLimitKwh ?? null,
+      productionLimitExceeded: !!tariffModel.exportCompensationPolicy?.productionLimitExceeded,
       provisional: !!tariffModel.exportCompensationPolicy?.provisional
     },
     yearlyTable,
@@ -1232,6 +1288,9 @@ export async function runCalculation() {
     backendEngineResponse: authoritativeBackend ? null : undefined,
     backendCalculationMode: authoritativeBackend ? null : undefined,
     hourlySummary: hourlySummaryRaw,
+    productionProfileSource: state.scenarioKey === 'off-grid'
+      ? (offgridRealPvHourly ? offgridRealPvSource : 'monthly-derived-synthetic-pv')
+      : ongridProductionProfileSource,
     batterySummary,
     monthlyLoad,
     evLoad,

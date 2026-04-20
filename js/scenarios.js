@@ -132,19 +132,22 @@ function computeSensitivityNpv(r, state, overrides = {}) {
     paidGridExport:       (r.batterySummary.paidGridExport       || 0) * em
   } : r.batterySummary;
 
+  const baseCost = Number(r.financialCostBasis || r.totalCost) || 0;
+  const costMultiplier = overrides.costMultiplier ?? 1;
+  const annualOMCost = overrides.costMultiplier != null ? r.annualOMCost * costMultiplier : r.annualOMCost;
+  const annualInsurance = overrides.costMultiplier != null ? r.annualInsurance * costMultiplier : r.annualInsurance;
+  const inverterReplaceCost = overrides.costMultiplier != null ? r.inverterReplaceCost * costMultiplier : r.inverterReplaceCost;
   const financial = computeFinancialTable({
     annualEnergy: r.annualEnergy * em,
     hourlySummary: scaledHourlySummary,
     batterySummary: scaledBatterySummary,
-    totalCost: overrides.costMultiplier != null
-      ? r.totalCost * overrides.costMultiplier
-      : r.totalCost,
+    totalCost: baseCost * costMultiplier,
     tariffModel: financialTariffModel,
     panel,
-    annualOMCost: r.annualOMCost,
-    annualInsurance: r.annualInsurance,
+    annualOMCost,
+    annualInsurance,
     inverterLifetime: r.inverterLifetime || 12,
-    inverterReplaceCost: r.inverterReplaceCost,
+    inverterReplaceCost,
     netMeteringEnabled: state.netMeteringEnabled,
     exportRateOverride: state.netMeteringEnabled && state.scenarioKey !== 'off-grid' ? tariffModel.exportRate : 0,
     annualGeneratorCost: state.scenarioKey === 'off-grid' ? (r.offgridL2Results?.generatorFuelCostAnnual || 0) : 0
@@ -231,7 +234,7 @@ function computeMonteCarloBands(r, state, iterations = 500) {
 }
 
 function computeScenario(r, inflationRate, state) {
-  const totalCost = r.totalCost;
+  const totalCost = Number(r.financialCostBasis || r.totalCost) || 0;
   const panel = window._appData?.PANEL_TYPES?.[state.panelType] ||
     { degradation: 0.0045, firstYearDeg: 0.02 };
   const tariffModel = buildTariffModel({

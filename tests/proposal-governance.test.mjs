@@ -5,6 +5,7 @@ import {
   calculateBomCommercials,
   calculateFinancingModel,
   createApprovalBasisHash,
+  createAssumptionLedger,
   createProposalRevision,
   diffProposalRevisions,
   isGridChecklistComplete
@@ -141,6 +142,18 @@ const approvedBasisState = {
 const initialApproval = buildApprovalWorkflow(approvedBasisState, { score: 90 });
 assert.equal(initialApproval.state, 'approved');
 assert.equal(initialApproval.approvalRecord.basisHash, createApprovalBasisHash(approvedBasisState));
+
+const pvlibLedger = createAssumptionLedger({}, {
+  usedFallback: false,
+  calculationMode: 'python-pvlib-backed',
+  authoritativeProduction: { source: 'pvlib-backed' },
+  authoritativeEngineSource: { source: 'pvlib-backed', provider: 'python-pvlib', pvlibBacked: true, confidence: 'high' },
+  tariffModel: { sourceDate: '2026-04-01' }
+});
+const productionLedgerEntry = pvlibLedger.entries.find(entry => entry.key === 'production.dataSource');
+assert.equal(productionLedgerEntry.value, 'pvlib-backed');
+assert.equal(productionLedgerEntry.sourceLabel, 'python-pvlib');
+assert.equal(productionLedgerEntry.confidence, 'high');
 
 for (const mutate of [
   state => { state.roofArea = 120; state.results.systemPower = 50; },

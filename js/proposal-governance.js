@@ -116,15 +116,25 @@ export function createAssumptionLedger(state = {}, results = {}) {
   const offgridAcceptanceGate = results.offgridL2Results?.fieldAcceptanceGate || {};
   const offgridOperationGate = results.offgridL2Results?.fieldOperationGate || {};
   const offgridRevalidationGate = results.offgridL2Results?.fieldRevalidationGate || {};
+  const productionSource = results.authoritativeProduction?.source
+    || results.authoritativeEngineSource?.source
+    || results.engineSource?.source
+    || results.calculationMode
+    || (results.usedFallback ? 'fallback-psh' : 'pvgis-live');
+  const productionConfidence = results.authoritativeEngineSource?.confidence
+    || (results.authoritativeEngineSource?.pvlibBacked ? 'medium-high' : results.usedFallback ? 'low' : 'medium');
+  const productionSourceLabel = results.authoritativeEngineSource?.provider
+    || results.pvgisSourceLabel
+    || (results.usedFallback ? 'Local PSH fallback' : 'PVGIS API');
   return {
     version: PROPOSAL_GOVERNANCE_VERSION,
     generatedAt: nowIso(),
     entries: [
       {
         key: 'production.dataSource',
-        value: results.usedFallback ? 'fallback-psh' : 'pvgis-live',
-        confidence: results.usedFallback ? 'low' : 'medium',
-        sourceLabel: results.usedFallback ? 'Local PSH fallback' : 'PVGIS API',
+        value: productionSource,
+        confidence: productionConfidence,
+        sourceLabel: productionSourceLabel,
         sourceDate: results.usedFallback ? results.methodologyVersion : tariff.sourceDate || null
       },
       {

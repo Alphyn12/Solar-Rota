@@ -40,6 +40,19 @@ const VALID_PVGIS_BODY = {
   }
 };
 
+const VALID_SERIES_BODY = {
+  outputs: {
+    hourly: Array.from({ length: 8760 }, (_, i) => {
+      const date = new Date(Date.UTC(2025, 0, 1, i));
+      const yyyy = date.getUTCFullYear();
+      const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(date.getUTCDate()).padStart(2, '0');
+      const hh = String(date.getUTCHours()).padStart(2, '0');
+      return { time: `${yyyy}${mm}${dd}:${hh}10`, P: i % 24 >= 8 && i % 24 <= 16 ? 1000 : 0 };
+    })
+  }
+};
+
 const PARAMS = { lat: 39, lon: 32, peakpower: 5, loss: 0, angle: 30, aspect: 0 };
 
 // ── 1. Başarılı canlı veri ───────────────────────────────────────────────────
@@ -66,6 +79,17 @@ describe('fetchPVGISLive — başarılı canlı veri', () => {
     const fetchImpl = makeMockFetch([{ ok: true, body: VALID_PVGIS_BODY }]);
     const result = await fetchPVGISLive(PARAMS, { fetchImpl, timeoutMs: 5000, retryDelaysMs: [0,0,0] });
     assert.equal(result.attemptCount, 1);
+  });
+
+  it('includeHourly=true ise PVGIS seriescalc saatlik 8760 profilini ekler', async () => {
+    const fetchImpl = makeMockFetch([
+      { ok: true, body: VALID_PVGIS_BODY },
+      { ok: true, body: VALID_SERIES_BODY }
+    ]);
+    const result = await fetchPVGISLive(PARAMS, { fetchImpl, timeoutMs: 5000, retryDelaysMs: [0,0,0], includeHourly: true, hourlyTimeoutMs: 5000 });
+    assert.equal(result.fetchStatus, PVGIS_FETCH_STATUS.LIVE_SUCCESS);
+    assert.equal(result.rawHourly.length, 8760);
+    assert.ok(result.rawHourly.some(v => v > 0));
   });
 });
 
@@ -186,6 +210,39 @@ describe('fetchPVGISLive — proxy-first: proxy başarılı, direkt PVGIS denenm
     assert.equal(result.fetchStatus, PVGIS_FETCH_STATUS.PROXY_SUCCESS);
     assert.equal(result.rawEnergy, 1100);
     assert.equal(pvgisCallCount, 0, 'Direkt PVGIS çağrılmamalı — proxy yeterli');
+  });
+
+  it('proxy başarılı + includeHourly=true ise sadece seriescalc saatlik profil için çağrılır', async () => {
+    const calls = [];
+    const fetchImpl = async (url) => {
+      calls.push(String(url));
+      if (String(url).includes('seriescalc')) {
+        return { ok: true, status: 200, json: async () => VALID_SERIES_BODY };
+      }
+      if (String(url).includes('re.jrc') && String(url).includes('PVcalc')) {
+        throw new Error('Should not call direct PVcalc after proxy success');
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, rawEnergy: 1100, rawPoa: 1600, rawMonthly: null })
+      };
+    };
+    const result = await fetchPVGISLive(PARAMS, {
+      fetchImpl,
+      timeoutMs: 5000,
+      retries: 2,
+      retryDelaysMs: [0, 0],
+      backendProxyUrl: 'http://localhost:5000/api/pvgis-proxy',
+      proxyFirst: true,
+      includeHourly: true,
+      hourlyTimeoutMs: 5000
+    });
+    assert.equal(result.fetchStatus, PVGIS_FETCH_STATUS.PROXY_SUCCESS);
+    assert.equal(result.rawEnergy, 1100);
+    assert.equal(result.rawHourly.length, 8760);
+    assert.ok(calls.some(url => url.includes('seriescalc')));
+    assert.ok(!calls.some(url => url.includes('PVcalc') && url.includes('re.jrc')));
   });
 });
 

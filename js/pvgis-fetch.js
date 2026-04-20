@@ -18,10 +18,21 @@ const PVGIS_ENDPOINTS = [
   'https://re.jrc.ec.europa.eu/api/PVcalc',
 ];
 
+const PVGIS_SERIES_ENDPOINTS = [
+  'https://re.jrc.ec.europa.eu/api/v5_3/seriescalc',
+  'https://re.jrc.ec.europa.eu/api/v5_2/seriescalc',
+  'https://re.jrc.ec.europa.eu/api/seriescalc',
+];
+
 const PROXY_TIMEOUT_MS             = 15000; // backend 22 s alır; 15 s proxy için makul üst sınır
 const DEFAULT_TIMEOUT_MS           = 20000; // direkt PVGIS başına (3 deneme × 20 s = max ~67 s)
 export const CALC_TOTAL_TIMEOUT_MS = 55000; // tüm hesaplama için hard upper limit
 const DEFAULT_RETRY_DELAYS_MS = [0, 2500, 5000];
+const COMMON_YEAR_MONTH_DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
+const MONTH_START_HOURS = COMMON_YEAR_MONTH_DAYS.reduce((acc, days, index) => {
+  acc.push(index === 0 ? 0 : acc[index - 1] + COMMON_YEAR_MONTH_DAYS[index - 1] * 24);
+  return acc;
+}, []);
 
 function classifyError(e) {
   const msg = (e?.message || String(e)).toLowerCase();
@@ -86,6 +97,7 @@ async function _tryBackendProxy(backendProxyUrl, baseParams, fetchImpl, timeoutM
       rawEnergy: ey,
       rawPoa: data.rawPoa || data['H(i)_y'] || null,
       rawMonthly: data.rawMonthly || null,
+      rawHourly: data.rawHourly || null,
       endpointUsed: backendProxyUrl,
     };
   } catch {
@@ -93,6 +105,68 @@ async function _tryBackendProxy(backendProxyUrl, baseParams, fetchImpl, timeoutM
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+function parsePvgisHourIndex(time) {
+  const text = String(time || '');
+  const compact = text.match(/^(\d{4})(\d{2})(\d{2}):?(\d{2})/);
+  if (compact) {
+    const month = Number(compact[2]);
+    const day = Number(compact[3]);
+    const hour = Math.min(23, Number(compact[4]));
+    if (month === 2 && day === 29) return null;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= COMMON_YEAR_MONTH_DAYS[month - 1]) {
+      return MONTH_START_HOURS[month - 1] + (day - 1) * 24 + hour;
+    }
+  }
+  const d = new Date(text);
+  if (!Number.isNaN(d.getTime())) {
+    const month = d.getUTCMonth() + 1;
+    const day = d.getUTCDate();
+    const hour = d.getUTCHours();
+    if (month === 2 && day === 29) return null;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= COMMON_YEAR_MONTH_DAYS[month - 1]) {
+      return MONTH_START_HOURS[month - 1] + (day - 1) * 24 + hour;
+    }
+  }
+  return null;
+}
+
+function hourlyRowsToTypical8760(rows) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const sums = new Array(8760).fill(0);
+  const counts = new Array(8760).fill(0);
+  rows.forEach((row, fallbackIndex) => {
+    const idx = parsePvgisHourIndex(row.time || row.Time || row.timestamp) ?? (rows.length >= 8760 ? fallbackIndex % 8760 : null);
+    if (idx == null || idx < 0 || idx >= 8760) return;
+    const watts = Number(row.P ?? row.PV ?? row.p ?? row.power ?? 0);
+    if (!Number.isFinite(watts) || watts < 0) return;
+    sums[idx] += watts / 1000;
+    counts[idx] += 1;
+  });
+  if (!counts.some(Boolean)) return null;
+  return sums.map((sum, index) => counts[index] > 0 ? sum / counts[index] : 0);
+}
+
+async function fetchPVGISHourlySeries(baseParams, fetchImpl, timeoutMs) {
+  if (typeof fetchImpl !== 'function') return null;
+  const seriesParams = `${baseParams}&pvcalculation=1&localtime=1`;
+  for (const endpoint of PVGIS_SERIES_ENDPOINTS) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetchImpl(`${endpoint}?${seriesParams}`, { signal: ctrl.signal, credentials: 'omit', cache: 'no-store' });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const hourly = hourlyRowsToTypical8760(data.outputs?.hourly);
+      if (hourly && hourly.length === 8760 && hourly.some(v => v > 0)) return hourly;
+    } catch {
+      // Hourly PVGIS is optional; annual/monthly PVcalc remains the authority.
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return null;
 }
 
 /**
@@ -110,6 +184,7 @@ async function _tryBackendProxy(backendProxyUrl, baseParams, fetchImpl, timeoutM
  *   backendProxyUrl?: string|null,
  *   proxyFirst?: boolean,
  *   fetchImpl?: Function,
+ *   includeHourly?: boolean,
  *   lang?: string
  * }} options
  */
@@ -121,6 +196,8 @@ export async function fetchPVGISLive(params, options = {}) {
     backendProxyUrl = null,
     proxyFirst = true,
     fetchImpl = globalThis.fetch,
+    includeHourly = false,
+    hourlyTimeoutMs = 25000,
     lang = 'tr'
   } = options;
 
@@ -131,8 +208,11 @@ export async function fetchPVGISLive(params, options = {}) {
   if (backendProxyUrl && proxyFirst && typeof fetchImpl === 'function') {
     const proxyResult = await _tryBackendProxy(backendProxyUrl, baseParams, fetchImpl, PROXY_TIMEOUT_MS);
     if (proxyResult) {
+      const rawHourly = proxyResult.rawHourly
+        || (includeHourly ? await fetchPVGISHourlySeries(baseParams, fetchImpl, hourlyTimeoutMs) : null);
       return {
         ...proxyResult,
+        rawHourly,
         attemptCount: 1,
         errorType: null,
         errorMessage: null,
@@ -190,6 +270,7 @@ export async function fetchPVGISLive(params, options = {}) {
         rawEnergy: ey,
         rawPoa,
         rawMonthly,
+        rawHourly: includeHourly ? await fetchPVGISHourlySeries(baseParams, fetchImpl, hourlyTimeoutMs) : null,
         endpointUsed: endpoint,
         attemptCount,
         errorType: null,
@@ -210,8 +291,11 @@ export async function fetchPVGISLive(params, options = {}) {
   if (backendProxyUrl && !proxyFirst && typeof fetchImpl === 'function') {
     const proxyResult = await _tryBackendProxy(backendProxyUrl, baseParams, fetchImpl, PROXY_TIMEOUT_MS);
     if (proxyResult) {
+      const rawHourly = proxyResult.rawHourly
+        || (includeHourly ? await fetchPVGISHourlySeries(baseParams, fetchImpl, hourlyTimeoutMs) : null);
       return {
         ...proxyResult,
+        rawHourly,
         attemptCount: attemptCount + 1,
         errorType: null,
         errorMessage: null,
