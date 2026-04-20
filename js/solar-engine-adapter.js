@@ -27,7 +27,7 @@ export function createSolarEngineContext(state = {}) {
 }
 
 export async function resolveExternalEngine(state = {}, options = {}) {
-  if (!isBackendModeEnabled(state)) return null;
+  if (!isBackendModeEnabled(state, options)) return null;
   try {
     return await callPythonEngineeringBackend(state, options);
   } catch (error) {

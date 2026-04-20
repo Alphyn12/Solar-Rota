@@ -171,12 +171,23 @@ assert.match(scenarioSourceQualityNote('heat-pump', 'pvgis-live'), /PVGIS-based/
 assert.match(scenarioSourceQualityNote('heat-pump', 'python-backend'), /Python backend pvlib-ready/);
 assert.equal(normalizePvEngineResponse({ usedFallback: true }).engineSource.source, 'local simplified');
 
+const defaultAutoBackend = await resolveExternalEngine(
+  { enginePreference: 'auto', scenarioKey: 'on-grid' },
+  {
+    fetchImpl: async () => {
+      throw new Error('fetch should not be called unless auto backend discovery is opted in');
+    }
+  }
+);
+assert.equal(defaultAutoBackend, null);
+
 const failedBackend = await resolveExternalEngine(
   { enginePreference: 'auto', scenarioKey: 'on-grid' },
   {
     endpoint: 'http://127.0.0.1:9/api/pv/calculate',
     timeoutMs: 5,
-    fetchImpl: async () => { throw new Error('backend down'); }
+    fetchImpl: async () => { throw new Error('backend down'); },
+    autoDiscover: true
   }
 );
 assert.equal(failedBackend.failed, true);
@@ -185,6 +196,7 @@ assert.equal(failedBackend.fallbackEngineSource.source, 'PVGIS-based');
 const blockedInvalidSiteBackend = await resolveExternalEngine(
   { enginePreference: 'auto', scenarioKey: 'on-grid', lat: null, lon: null },
   {
+    autoDiscover: true,
     fetchImpl: async () => {
       throw new Error('fetch should not be called for invalid coordinates');
     }

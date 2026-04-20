@@ -28,11 +28,13 @@ const PROXY_TIMEOUT_MS             = 15000; // backend 22 s alır; 15 s proxy i�
 const DEFAULT_TIMEOUT_MS           = 20000; // direkt PVGIS başına (3 deneme × 20 s = max ~67 s)
 export const CALC_TOTAL_TIMEOUT_MS = 55000; // tüm hesaplama için hard upper limit
 const DEFAULT_RETRY_DELAYS_MS = [0, 2500, 5000];
+const PVGIS_HTTP_OUTAGE_COOLDOWN_MS = 5 * 60 * 1000;
 const COMMON_YEAR_MONTH_DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
 const MONTH_START_HOURS = COMMON_YEAR_MONTH_DAYS.reduce((acc, days, index) => {
   acc.push(index === 0 ? 0 : acc[index - 1] + COMMON_YEAR_MONTH_DAYS[index - 1] * 24);
   return acc;
 }, []);
+let pvgisHttpOutageUntil = 0;
 
 function classifyError(e) {
   const msg = (e?.message || String(e)).toLowerCase();
@@ -156,7 +158,10 @@ async function fetchPVGISHourlySeries(baseParams, fetchImpl, timeoutMs) {
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const res = await fetchImpl(`${endpoint}?${seriesParams}`, { signal: ctrl.signal, credentials: 'omit', cache: 'no-store' });
-      if (!res.ok) continue;
+      if (!res.ok) {
+        if ([429, 500, 502, 503, 504].includes(res.status)) break;
+        continue;
+      }
       const data = await res.json();
       const hourly = hourlyRowsToTypical8760(data.outputs?.hourly);
       if (hourly && hourly.length === 8760 && hourly.some(v => v > 0)) return hourly;
@@ -185,6 +190,9 @@ async function fetchPVGISHourlySeries(baseParams, fetchImpl, timeoutMs) {
  *   proxyFirst?: boolean,
  *   fetchImpl?: Function,
  *   includeHourly?: boolean,
+ *   retryHttpErrors?: boolean,
+ *   logFetchDiagnostics?: boolean,
+ *   useOutageCooldown?: boolean,
  *   lang?: string
  * }} options
  */
@@ -198,6 +206,9 @@ export async function fetchPVGISLive(params, options = {}) {
     fetchImpl = globalThis.fetch,
     includeHourly = false,
     hourlyTimeoutMs = 25000,
+    retryHttpErrors = false,
+    logFetchDiagnostics = false,
+    useOutageCooldown = typeof window !== 'undefined',
     lang = 'tr'
   } = options;
 
@@ -220,7 +231,22 @@ export async function fetchPVGISLive(params, options = {}) {
       };
     }
     // Proxy failed — fall through to direct PVGIS
-    console.info('[pvgis-fetch] Backend proxy unavailable — trying direct PVGIS');
+    if (logFetchDiagnostics) console.info('[pvgis-fetch] Backend proxy unavailable — trying direct PVGIS');
+  }
+
+  if (useOutageCooldown && Date.now() < pvgisHttpOutageUntil) {
+    return {
+      fetchStatus: PVGIS_FETCH_STATUS.FALLBACK_USED,
+      rawEnergy: null,
+      rawPoa: null,
+      rawMonthly: null,
+      rawHourly: null,
+      endpointUsed: null,
+      attemptCount: 0,
+      errorType: 'service-cooldown',
+      errorMessage: 'PVGIS temporarily skipped after recent service error',
+      userMessage: buildUserMessage('http-error', lang)
+    };
   }
 
   // ── Tier 2: Direct PVGIS endpoints ──────────────────────────────────────────
@@ -246,8 +272,12 @@ export async function fetchPVGISLive(params, options = {}) {
       if (!res.ok) {
         lastError = `HTTP ${res.status}`;
         lastErrorType = 'http-error';
-        console.warn('[pvgis-fetch] HTTP error:', res.status, 'attempt', attempt + 1);
-        continue;
+        if (useOutageCooldown && [429, 500, 502, 503, 504].includes(res.status)) {
+          pvgisHttpOutageUntil = Date.now() + PVGIS_HTTP_OUTAGE_COOLDOWN_MS;
+        }
+        if (logFetchDiagnostics) console.warn('[pvgis-fetch] HTTP error:', res.status, 'attempt', attempt + 1);
+        if (retryHttpErrors && attempt < retries - 1) continue;
+        break;
       }
 
       const data = await res.json();
@@ -281,7 +311,7 @@ export async function fetchPVGISLive(params, options = {}) {
       const etype = classifyError(e);
       lastError = e?.message || String(e);
       lastErrorType = etype;
-      console.warn('[pvgis-fetch] Attempt', attempt + 1, 'failed:', etype, '-', e?.message);
+      if (logFetchDiagnostics) console.warn('[pvgis-fetch] Attempt', attempt + 1, 'failed:', etype, '-', e?.message);
     } finally {
       clearTimeout(timer);
     }

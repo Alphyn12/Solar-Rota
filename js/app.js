@@ -48,6 +48,24 @@ window._appData = { PANEL_TYPES, BATTERY_MODELS, COMPASS_DIRS, INVERTER_TYPES, M
 // the structural-check branch in calc-engine.js dead code. Wire it up here.
 window.calculateStructural = calculateStructural;
 
+function installThirdPartyConsoleNoiseGuard() {
+  if (window.__solarRotaConsoleNoiseGuardInstalled) return;
+  window.__solarRotaConsoleNoiseGuardInstalled = true;
+  const isAutofillOverlayNoise = value => {
+    const text = String(value?.filename || value?.message || value?.stack || value || '');
+    return text.includes('bootstrap-autofill-overlay.js')
+      || (text.includes("Failed to execute 'insertBefore'") && text.includes('AutofillInlineMenuContentService'));
+  };
+  window.addEventListener('error', event => {
+    if (isAutofillOverlayNoise(event)) event.preventDefault();
+  }, true);
+  window.addEventListener('unhandledrejection', event => {
+    if (isAutofillOverlayNoise(event.reason)) event.preventDefault();
+  }, true);
+}
+
+installThirdPartyConsoleNoiseGuard();
+
 // BUG-12 fix: Never fall back to currentDateIso() — a missing sourceDate should be null so
 // the governance blocker ("Tarife kaynak kontrol tarihi eksik") fires correctly instead of
 // being silently masked by today's date.
@@ -142,7 +160,7 @@ window.state = {
   panelType: 'mono',
   inverterType: 'string',
   results: null,
-  enginePreference: 'auto',
+  enginePreference: 'pvgis-hybrid-js',
   backendEngineAvailable: null,
   backendEngineLastError: null,
   // Çoklu çatı
@@ -304,6 +322,9 @@ window.state = {
 const persistedProposal = !window.location.hash ? loadProposalState() : null;
 if (persistedProposal?.state) {
   Object.assign(window.state, persistedProposal.state, { results: null, step: 1 });
+  if (window.state.enginePreference === 'auto' && window.GUNESHESAP_ENABLE_BACKEND_AUTO !== true) {
+    window.state.enginePreference = 'pvgis-hybrid-js';
+  }
 }
 
 function persistState() {

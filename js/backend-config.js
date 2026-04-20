@@ -44,7 +44,10 @@ export function buildBackendUrl(path = BACKEND_CONFIG.pvCalculatePath, baseUrl =
   return `${base}${suffix}`;
 }
 
-export function isBackendModeEnabled(state = {}) {
-  const preference = state.enginePreference || 'auto';
-  return ['auto', 'python-backend', 'pvlib-service'].includes(preference);
+export function isBackendModeEnabled(state = {}, options = {}) {
+  const preference = state.enginePreference || 'pvgis-hybrid-js';
+  if (['python-backend', 'pvlib-service'].includes(preference)) return true;
+  if (preference !== 'auto') return false;
+  const windowOptIn = typeof window !== 'undefined' && window.GUNESHESAP_ENABLE_BACKEND_AUTO === true;
+  return !!(state.backendAutoDiscoveryEnabled || options.autoDiscover || windowOptIn);
 }

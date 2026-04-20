@@ -238,6 +238,7 @@ def desktop_backend_flow(browser, base_url):
     install_common_routes(page)
     install_backend_routes(page)
     page.goto(f"{base_url}/index.html", wait_until="networkidle")
+    page.evaluate("window.state.enginePreference = 'python-backend'")
 
     run_click_flow_to_results(
         page,
@@ -317,7 +318,7 @@ def backend_unavailable_fallback_flow(browser, base_url):
         tariff_source_type="manual",
         export_tariff="0",
     )
-    assert page.evaluate("window.state.backendEngineAvailable") is False
+    assert page.evaluate("window.state.backendEngineAvailable") is not True
     assert_on_grid_economics(
         page,
         expected_design_target="fill-roof",

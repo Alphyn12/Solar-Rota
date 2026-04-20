@@ -178,7 +178,7 @@ describe('fetchPVGISLive — retry başarısı', () => {
       { ok: true, body: VALID_PVGIS_BODY }
     ]);
     // Delay sıfır yaparak hız kazanılır (test ortamında)
-    const result = await fetchPVGISLive(PARAMS, { fetchImpl, timeoutMs: 5000, retries: 2, retryDelaysMs: [0,0] });
+    const result = await fetchPVGISLive(PARAMS, { fetchImpl, timeoutMs: 5000, retries: 2, retryDelaysMs: [0,0], retryHttpErrors: true });
     assert.equal(result.fetchStatus, PVGIS_FETCH_STATUS.LIVE_SUCCESS);
     assert.equal(result.attemptCount, 2);
   });

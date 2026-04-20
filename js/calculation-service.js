@@ -8,37 +8,42 @@ import { isAuthoritativeBackendResponse } from './pv-engine-contracts.js';
 // producing a mixed/corrupted result set.
 let _calculationInProgress = false;
 let _calculationAbortController = null;
+let _calculationPromise = null;
 
 export async function runCalculation() {
-  // Abort any in-flight calculation before starting a new one.
-  if (_calculationInProgress && _calculationAbortController) {
-    _calculationAbortController.abort();
-  }
+  if (_calculationInProgress && _calculationPromise) return _calculationPromise;
   _calculationInProgress = true;
   _calculationAbortController = new AbortController();
+  _calculationPromise = runCalculationOnce();
+  return _calculationPromise;
+}
+
+async function runCalculationOnce() {
   const state = window.state || {};
-  state.engineContext = createSolarEngineContext(state);
-  const external = await resolveExternalEngine(state);
-  if (external?.failed) {
-    state.engineContext.externalFailure = external.error;
-    state.backendEngineAvailable = false;
-    state.backendEngineLastError = external.error;
-    window.showToast?.('Python mühendislik servisi hazır değil; PVGIS/JS motoru kullanılıyor.', 'info');
-  } else if (external?.engineSource) {
-    state.backendEngineAvailable = true;
-    state.backendEngineLastError = null;
-    state.engineContext.externalResponse = external;
-  }
-  const backendIsAuthoritative = isAuthoritativeBackendResponse(external);
-  state.authoritativeEngineOverride = backendIsAuthoritative ? external : null;
-  state.authoritativeEngineFallbackReason = backendIsAuthoritative
-    ? null
-    : external?.engineSource?.fallbackUsed
-      ? external?.raw?.fallback_flags?.[0] || external?.losses?.fallbackReason || 'Backend pvlib path returned a fallback result.'
-      : external?.failed
-        ? external.error
-        : null;
+  let external = null;
+  let backendIsAuthoritative = false;
   try {
+    state.engineContext = createSolarEngineContext(state);
+    external = await resolveExternalEngine(state);
+    if (external?.failed) {
+      state.engineContext.externalFailure = external.error;
+      state.backendEngineAvailable = false;
+      state.backendEngineLastError = external.error;
+      window.showToast?.('Python mühendislik servisi hazır değil; PVGIS/JS motoru kullanılıyor.', 'info');
+    } else if (external?.engineSource) {
+      state.backendEngineAvailable = true;
+      state.backendEngineLastError = null;
+      state.engineContext.externalResponse = external;
+    }
+    backendIsAuthoritative = isAuthoritativeBackendResponse(external);
+    state.authoritativeEngineOverride = backendIsAuthoritative ? external : null;
+    state.authoritativeEngineFallbackReason = backendIsAuthoritative
+      ? null
+      : external?.engineSource?.fallbackUsed
+        ? external?.raw?.fallback_flags?.[0] || external?.losses?.fallbackReason || 'Backend pvlib path returned a fallback result.'
+        : external?.failed
+          ? external.error
+          : null;
     const result = await runBrowserCalculation();
     if (external?.engineSource && state.results && !backendIsAuthoritative) {
       state.results.backendEngineSource = external.engineSource;
@@ -54,6 +59,7 @@ export async function runCalculation() {
     state.authoritativeEngineOverride = null;
     _calculationInProgress = false;
     _calculationAbortController = null;
+    _calculationPromise = null;
   }
 }
 
