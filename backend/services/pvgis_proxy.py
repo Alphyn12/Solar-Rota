@@ -60,7 +60,7 @@ async def fetch_pvgis_via_proxy(
         "aspect": aspect,
         "outputformat": "json",
         "pvtechchoice": "crystSi",
-        "mountingplace": "free",
+        "mountingplace": "building",
     }
 
     last_error_type = "unknown"

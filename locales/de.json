@@ -11,7 +11,26 @@
     "step4": "Ausrüstung",
     "step5": "Finanzen",
     "step6": "Berechnen",
-    "step7": "Ergebnisse"
+    "step7": "Ergebnisse",
+    "stepPrefix": "Schritt",
+    "progressAria": "Formularschritte"
+  },
+  "language": {
+    "switcherAria": "Sprachauswahl",
+    "switchTo": "Wechseln zu:",
+    "tr": "Türkisch",
+    "en": "Englisch",
+    "de": "Deutsch"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "theme": "Darstellung",
+    "dark": "🌙 Dunkel",
+    "light": "☀️ Hell",
+    "language": "Sprache",
+    "currency": "Währung",
+    "usdTryRate": "USD / TRY Kurs",
+    "refreshRate": "Kurs aktualisieren"
   },
   "hero": {
     "eyebrow": "Der vollständige Solarrechner für die Türkei",
@@ -31,28 +50,39 @@
     "headline": "Wählen Sie Ihren Solarsystemtyp",
     "subline": "Wählen Sie den passenden Systemtyp, um den richtigen Berechnungsablauf zu starten",
     "fallbackLabel": "Szenario",
-    "selectedToast": "Workflow ausgewählt."
+    "selectedToast": "Workflow ausgewählt.",
+    "defaultContinue": "Weiter",
+    "selectedSummaryTitle": "Ausgewählter Workflow",
+    "summaryBestFor": "Geeignet für",
+    "summaryOutput": "Ergebnis",
+    "summaryNext": "Vor dem Fortfahren"
   },
   "scenarios": {
     "onGrid": {
       "label": "On-Grid",
       "shortLabel": "On-grid",
       "description": "Netzgekoppeltes Solar. Rechnungseinsparung, Eigenverbrauch, Einspeiseertrag und ROI.",
+      "decisionHint": "Für Standorte mit Netzanschluss, wenn Rechnungssenkung und Angebotsvorbereitung im Mittelpunkt stehen.",
       "forWhom": "Geeignet für Wohngebäude, Büros und Gewerbeimmobilien",
       "workflowLabel": "Netzgekoppelter Angebots-Workflow",
       "resultFrame": "Netzgekoppelte Einsparung und Angebotsreife",
       "nextAction": "Standort, Rechnungsnachweis, Tarifquelle und Lieferantenangebot vor Quote-ready-Freigabe prüfen.",
-      "confidenceHint": "Am besten für kommerzielle Angebote, wenn PVGIS, Rechnungsnachweis und Quellenprüfung verifiziert sind."
+      "confidenceHint": "Am besten für kommerzielle Angebote, wenn PVGIS, Rechnungsnachweis und Quellenprüfung verifiziert sind.",
+      "resultCaution": "Angebotstexte sollten bedingt bleiben, bis Standort-, Tarif-, Rechnungs- und Lieferantennachweise geprüft sind.",
+      "primaryCta": "Mit On-Grid fortfahren"
     },
     "offGrid": {
       "label": "Off-Grid",
       "shortLabel": "Off-grid",
       "description": "Netzunabhängiges Solar. Batteriekapazität, kritische Lastautonomie und Dispatch-Analyse.",
+      "decisionHint": "Für Lasten ohne Netzanschluss oder wenn die Netzzuverlässigkeit nicht ausreicht.",
       "forWhom": "Geeignet für Ferienhäuser, Wohnmobile, Boote und abgelegene Standorte",
       "workflowLabel": "Off-grid-Vorprüfung und Batterie-Dispatch-Workflow",
       "resultFrame": "Off-grid-Vorprüfung der Systemauslegung",
       "nextAction": "Kritische Lasten definieren und Autonomie mit Felddaten vor Angebotsfreigabe validieren.",
-      "confidenceHint": "PV-Überschuss wird nicht monetarisiert; Batteriedispatch und Lastnachweis bestimmen die Sicherheit."
+      "confidenceHint": "PV-Überschuss wird nicht monetarisiert; Batteriedispatch und Lastnachweis bestimmen die Sicherheit.",
+      "resultCaution": "Dies ist eine Vorprüfung der Autonomie, keine Feldgarantie und kein finales Off-grid-Design.",
+      "primaryCta": "Mit Off-Grid fortfahren"
     },
     "agriculturalIrrigation": {
       "label": "Landwirtschaftliche Bewässerung",
@@ -156,6 +186,7 @@
     "exchangeLoading": "USD/TRY-Kurs wird geladen...",
     "settlementBadge": "Stündliche Verrechnung",
     "simplePayback": "Kumulierte Netto-Amortisationszeit",
+    "grossSimplePayback": "Einfache Amortisationszeit",
     "discountedPayback": "Diskontierte kumulierte Amortisationszeit",
     "npv": "Projekt-NPV (diskontierter Kapitalwert)",
     "roi": "Kapitalrendite (ROI)",
@@ -292,6 +323,7 @@
     "settlementBasisLabel": "Verrechnungsbasis",
     "settlementProvisional": "Datum fehlt; monatliche Vorannahme",
     "lcoeLabel": "LCOE (kein alleiniger Entscheidungswert)",
+    "compensatedLcoeLabel": "Wirtschaftlicher LCOE (nach Verrechnung)",
     "roughEstimate": "Rough estimate",
     "engineeringEstimate": "Engineering estimate",
     "quoteReadyCandidate": "Quote-ready candidate",
@@ -333,6 +365,20 @@
     "proposalTitle": "Solarenergie- und Investitionsbericht Türkei",
     "technicalTitle": "Solar Rota Technischer Berechnungsbericht",
     "preFeasibilityDisclaimer": "Nur Vor-Machbarkeitsbericht; ersetzt kein finales Angebot, Statikprojekt oder offizielles Genehmigungsdokument.",
+    "trustNoteTitle": "Vertrauensstatus der Ausgabe",
+    "engineeringReportTitle": "Engineering-Berechnungsbericht",
+    "engineeringReportSubtitle": "Methodik, Annahmen und Zwischenprüfungen ansehen.",
+    "engineeringReportBadge": "Annahmen sichtbar",
+    "downloadProposalPdf": "Vorprüfung-PDF herunterladen",
+    "downloadTechnicalPdf": "Technischen Anhang herunterladen",
+    "shareResults": "Ergebniszusammenfassung teilen",
+    "actionsNoteTitle": "Wofür sind diese Ausgaben?",
+    "actionsNote": "Das PDF ist für die Kundenvorprüfung, der technische Anhang für Engineering-Reviews und JSON-Dateien für Integration und CRM-Übergabe.",
+    "exportProposalJson": "Proposal JSON",
+    "exportCrmJson": "CRM JSON",
+    "saveCalculation": "Berechnung speichern",
+    "compareQuotes": "Angebote vergleichen",
+    "recalculate": "Neu berechnen",
     "methodology": "Methodik",
     "calculationMode": "Berechnungsmodus",
     "sourceDate": "Quelldatum",
@@ -491,6 +537,8 @@
     "simplePaybackPreTax": "Erstes Jahr, in dem der kumulierte Netto-Cashflow die Investitionsbasis übersteigt"
   },
   "audit": {
+    "purposeTitle": "Wofür ist dieses Panel?",
+    "purposeBody": "Nutzen Sie es, um fehlende Daten und Nachweise zu erkennen, nicht als finale Freigabe.",
     "warningsTitle": "Berechnungswarnungen",
     "noCriticalAnomalies": "Die Warnprüfungen haben keine kritische Anomalie gefunden.",
     "location": "Standort",
@@ -610,6 +658,7 @@
     "tonsCo2PerYear": "Tonnen CO₂ / Jahr",
     "panelUnit": "Module",
     "treeEquivalent": "Baum-Äquivalent",
+    "perDay": "/Tag",
     "additionalAssumption": "Zusatzannahme",
     "offOrNone": "Aus / keine"
   },
@@ -658,6 +707,7 @@
     "export": "Exportieren",
     "import": "Importieren",
     "clearAll": "Alle löschen",
+    "compareSelected": "Ausgewählte vergleichen",
     "paybackLabel": "Amortisation:",
     "compareTitle": "Vergleichsergebnisse",
     "selectAtLeast2": "Mindestens 2 Berechnungen auswählen.",
@@ -677,6 +727,7 @@
     "metricAzimuth": "Ausrichtung"
   },
   "comparison": {
+    "title": "Angebotsvergleich",
     "scenarioLabel": "Szenario {letter}",
     "panelTypeLabel": "Modultyp",
     "inverterTypeLabel": "Wechselrichtertyp",
@@ -757,11 +808,14 @@
   "common": {
     "yes": "Ja",
     "no": "Nein",
+    "skipToMain": "Zum Hauptinhalt springen",
+    "scrollHint": "Horizontal scrollen, um alle Tabellenspalten zu sehen.",
     "back": "← Zurück",
     "continue": "Weiter",
     "save": "Speichern",
     "cancel": "Abbrechen",
     "close": "Schließen",
+    "remove": "Entfernen",
     "loading": "Lädt...",
     "error": "Fehler",
     "success": "Erfolg",

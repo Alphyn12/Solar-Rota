@@ -575,6 +575,7 @@ export function computeFinancialTable({
   annualEnergy, hourlySummary, batterySummary, totalCost, tariffModel,
   panel, annualOMCost, annualInsurance, inverterLifetime, inverterReplaceCost,
   netMeteringEnabled, exportRateOverride, batteryLifetime = 0, batteryReplaceCost = 0,
+  batteryPriceEscalationRate = 0,
   annualLoadGrowth = 0, annualGeneratorCost = 0,
   annualGeneratorKwh = 0, generatorAlternativeCostPerKwh = 0, generatorFuelCostPerKwh = 0
 }) {
@@ -622,7 +623,7 @@ export function computeFinancialTable({
     const invLife = Math.round(Number(inverterLifetime) || 0);
     if (invLife > 0 && year % invLife === 0) yearExpenses += inverterReplaceCost * Math.pow(1 + (tariffModel.expenseEscalationRate || 0), year - 1);
     const batLife = Math.round(Number(batteryLifetime) || 0);
-    if (batLife > 0 && year % batLife === 0) yearExpenses += batteryReplaceCost * Math.pow(1 + (tariffModel.expenseEscalationRate || 0), year - 1);
+    if (batLife > 0 && year % batLife === 0) yearExpenses += batteryReplaceCost * Math.pow(1 + batteryPriceEscalationRate, year - 1);
     totalExpenses25y += yearExpenses;
     const netCashFlow = yearSavings - yearExpenses;
     const npv = netCashFlow / Math.pow(1 + tariffModel.discountRate, year);
@@ -633,7 +634,7 @@ export function computeFinancialTable({
     rows.push({
       year,
       energy: Math.round(degradedEnergy),
-      rate: electricityPriceDisplay.toFixed(2),
+      rate: electricityPrice.toFixed(2),
       effectiveImportRate: electricityPrice.toFixed(2),
       rateBasis: (tariffModel.distributionFee ?? 0) > 0 ? 'import-plus-distribution-fee' : 'import-rate',
       exportRate: escalatedExportRate.toFixed(2),
@@ -718,6 +719,7 @@ export function detectCalculationWarnings(results) {
   if (results.netMeteringEnabled && results.nmMetrics?.unpaidGridExport > 0) warnings.push('Üretim fazlasının bir kısmı ödeme hesabına alınmadı; ihracat sınırı uygulanıyor.');
   if (results.tariffModel?.effectiveRegime === 'sktt' && !results.tariffModel?.skttRate) warnings.push('SKTT seçili ancak SKTT birim fiyatı tanımlı değil.');
   if (results.tariffModel?.exportRate <= 0 && results.netMeteringEnabled) warnings.push('Şebeke ihracatı açık ancak ihracat birim fiyatı 0 TL/kWh.');
+  if (results.netMeteringEnabled && (results.tariffModel?.exportRate || 0) > (results.tariffModel?.effectiveImportRate || results.tariffModel?.importRate || 0)) warnings.push('İhracat birim fiyatı import tarifesinden yüksek; tarife girişlerini kontrol edin.');
   if (results.tariffModel?.regulation?.warnings?.length) warnings.push(...results.tariffModel.regulation.warnings);
   if (results.tariffModel?.exportCompensationPolicy?.provisional) {
     warnings.push('Mahsuplaşma tarihi eksik; ekonomik sonuç aylık mahsuplaşma varsayımıyla ön fizibilite olarak hesaplandı.');

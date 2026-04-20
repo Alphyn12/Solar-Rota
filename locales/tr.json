@@ -11,7 +11,26 @@
     "step4": "Ekipman",
     "step5": "Finansal",
     "step6": "Hesapla",
-    "step7": "Sonuçlar"
+    "step7": "Sonuçlar",
+    "stepPrefix": "adım",
+    "progressAria": "Form adımları"
+  },
+  "language": {
+    "switcherAria": "Dil seçimi",
+    "switchTo": "Dile geç:",
+    "tr": "Türkçe",
+    "en": "İngilizce",
+    "de": "Almanca"
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "theme": "Tema",
+    "dark": "🌙 Koyu",
+    "light": "☀️ Açık",
+    "language": "Dil",
+    "currency": "Para Birimi",
+    "usdTryRate": "USD / TRY Kuru",
+    "refreshRate": "Kuru güncelle"
   },
   "hero": {
     "eyebrow": "Türkiye'nin en kapsamlı güneş enerji hesaplayıcısı",
@@ -31,28 +50,39 @@
     "headline": "Güneş enerjisi sistem türünüzü seçin",
     "subline": "İhtiyacınıza uygun hesaplama akışını başlatmak için sistem tipinizi belirleyin",
     "fallbackLabel": "Senaryo",
-    "selectedToast": "akışı seçildi."
+    "selectedToast": "akışı seçildi.",
+    "defaultContinue": "Sonraki Adım",
+    "selectedSummaryTitle": "Seçilen akış",
+    "summaryBestFor": "Ne için uygun",
+    "summaryOutput": "Üreteceği çıktı",
+    "summaryNext": "Devam etmeden önce"
   },
   "scenarios": {
     "onGrid": {
       "label": "On-Grid",
       "shortLabel": "On-grid",
       "description": "Şebekeye bağlı sistem. Fatura tasarrufu, öz tüketim, ihracat geliri ve ROI hesabı.",
+      "decisionHint": "Şebeke bağlantısı olan, ana hedefi fatura azaltmak ve teklif hazırlığı yapmak olan tesisler için.",
       "forWhom": "Ev, iş yeri veya ticari tesis için uygundur",
       "workflowLabel": "Şebeke bağlantılı teklif akışı",
       "resultFrame": "Şebeke bağlantılı tasarruf ve teklif hazırlığı",
       "nextAction": "Quote-ready onaydan önce saha, fatura kanıtı, tarife kaynağı ve tedarikçi teklifini doğrulayın.",
-      "confidenceHint": "PVGIS, fatura kanıtı ve kaynak kontrolleri doğrulandığında ticari teklifler için en uygundur."
+      "confidenceHint": "PVGIS, fatura kanıtı ve kaynak kontrolleri doğrulandığında ticari teklifler için en uygundur.",
+      "resultCaution": "Saha, tarife, fatura ve tedarikçi kanıtları doğrulanmadan teklif dili kesinleştirilmemelidir.",
+      "primaryCta": "On-Grid akışına devam et"
     },
     "offGrid": {
       "label": "Off-Grid",
       "shortLabel": "Off-grid",
       "description": "Şebekeden bağımsız sistem. Batarya kapasitesi, kritik yük otonomisi ve dispatch analizi.",
+      "decisionHint": "Şebeke olmayan veya şebeke güvenilirliği yeterli görülmeyen yükler için.",
       "forWhom": "Bağ evi, kırsal alan, karavan, tekne veya uzak saha için uygundur",
       "workflowLabel": "Off-grid ön fizibilite ve batarya dispatch akışı",
       "resultFrame": "Off-grid ön fizibilite boyutlandırması",
       "nextAction": "Teklif onayından önce kritik yükleri tanımlayın ve otonomiyi saha kanıtıyla doğrulayın.",
-      "confidenceHint": "Fazla PV finansal gelire dönüşmez; güveni batarya dispatch ve kritik yük kanıtı belirler."
+      "confidenceHint": "Fazla PV finansal gelire dönüşmez; güveni batarya dispatch ve kritik yük kanıtı belirler.",
+      "resultCaution": "Bu çıktı ön fizibilite otonomi tahminidir; saha garantisi veya final off-grid proje yerine geçmez.",
+      "primaryCta": "Off-Grid akışına devam et"
     },
     "agriculturalIrrigation": {
       "label": "Tarımsal Sulama",
@@ -156,6 +186,7 @@
     "exchangeLoading": "USD/TRY kuru yükleniyor...",
     "settlementBadge": "Saatlik mahsuplaşma",
     "simplePayback": "Kümülatif Net Geri Ödeme Süresi",
+    "grossSimplePayback": "Basit Geri Ödeme Süresi",
     "discountedPayback": "İskontolu Kümülatif Geri Ödeme Süresi",
     "npv": "Proje NPV (iskontolu net bugünkü değer)",
     "roi": "Yatırım Karlılığı (ROI)",
@@ -292,6 +323,7 @@
     "settlementBasisLabel": "Mahsuplaşma bazı",
     "settlementProvisional": "Tarih eksik; aylık varsayım ile ön fizibilite",
     "lcoeLabel": "LCOE (tek başına karar metriği değil)",
+    "compensatedLcoeLabel": "Ekonomik LCOE (mahsup sonrası)",
     "roughEstimate": "Rough estimate",
     "engineeringEstimate": "Engineering estimate",
     "quoteReadyCandidate": "Quote-ready candidate",
@@ -333,6 +365,20 @@
     "proposalTitle": "Türkiye Güneş Paneli Enerji ve Yatırım Raporu",
     "technicalTitle": "Solar Rota Teknik Hesap Raporu",
     "preFeasibilityDisclaimer": "Ön fizibilite raporudur; kesin teklif, statik proje veya resmi izin belgesi yerine geçmez.",
+    "trustNoteTitle": "Çıktı güven durumu",
+    "engineeringReportTitle": "Mühendis Hesap Raporu",
+    "engineeringReportSubtitle": "Yöntem, varsayım ve ara kontrolleri inceleyin.",
+    "engineeringReportBadge": "Varsayımlar açık",
+    "downloadProposalPdf": "Ön Fizibilite PDF İndir",
+    "downloadTechnicalPdf": "Teknik Ek PDF İndir",
+    "shareResults": "Sonuç Özetini Paylaş",
+    "actionsNoteTitle": "Çıktılar ne için?",
+    "actionsNote": "PDF müşteri ön fizibilitesi, Teknik Ek mühendislik kontrolü, JSON çıktıları entegrasyon ve CRM aktarımı içindir.",
+    "exportProposalJson": "Proposal JSON",
+    "exportCrmJson": "CRM JSON",
+    "saveCalculation": "Hesabı Kaydet",
+    "compareQuotes": "Teklif Karşılaştır",
+    "recalculate": "Yeniden Hesapla",
     "methodology": "Metodoloji",
     "calculationMode": "Hesap modu",
     "sourceDate": "Kaynak tarihi",
@@ -491,6 +537,8 @@
     "simplePaybackPreTax": "Kümülatif net nakit akışının yatırım bazını aştığı ilk yıl"
   },
   "audit": {
+    "purposeTitle": "Bu panel ne için?",
+    "purposeBody": "Sonucu onaylamak için değil, hangi veri ve kanıtların doğrulanması gerektiğini görmek için kullanın.",
     "warningsTitle": "Hata yakala uyarıları",
     "noCriticalAnomalies": "Hata yakala modu kritik anomali bulmadı.",
     "location": "Konum",
@@ -610,6 +658,7 @@
     "tonsCo2PerYear": "ton CO₂ / yıl",
     "panelUnit": "adet panel",
     "treeEquivalent": "ağaç eşdeğeri",
+    "perDay": "/gün",
     "additionalAssumption": "ek varsayım",
     "offOrNone": "Kapalı / yok"
   },
@@ -658,6 +707,7 @@
     "export": "Dışa Aktar",
     "import": "İçe Aktar",
     "clearAll": "Tümünü Sil",
+    "compareSelected": "Seçilenleri Karşılaştır",
     "paybackLabel": "Geri ödeme:",
     "compareTitle": "Karşılaştırma Sonuçları",
     "selectAtLeast2": "En az 2 hesap seçin.",
@@ -677,6 +727,7 @@
     "metricAzimuth": "Yön"
   },
   "comparison": {
+    "title": "Teklif Karşılaştırma",
     "scenarioLabel": "Senaryo {letter}",
     "panelTypeLabel": "Panel Tipi",
     "inverterTypeLabel": "İnverter Tipi",
@@ -757,11 +808,14 @@
   "common": {
     "yes": "Evet",
     "no": "Hayır",
+    "skipToMain": "Ana içeriğe geç",
+    "scrollHint": "Tabloyu yatay kaydırarak tüm sütunları görün.",
     "back": "← Geri",
     "continue": "Devam Et",
     "save": "Kaydet",
     "cancel": "İptal",
     "close": "Kapat",
+    "remove": "Kaldır",
     "loading": "Yükleniyor...",
     "error": "Hata",
     "success": "Başarılı",

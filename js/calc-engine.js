@@ -617,14 +617,16 @@ export async function runCalculation() {
     if (ongridHourlyProduction8760) ongridProductionProfileSource = 'user-hourly-pv-normalized-to-authoritative-annual';
   }
 
-  // Faz-4 Fix-15: PVGIS annual uncertainty ≈ ±7.6% at 1σ (interannual variability +
-  // model uncertainty per PVGIS JRC documentation). P90 is the conservative estimate
-  // that investors and banks use; P10 is the optimistic upper band.
+  // PVGIS JRC 1σ uncertainty ≈ ±7.6% (interannual variability + model uncertainty).
+  // PSH fallback uncertainty is significantly larger (±18%) because it relies on
+  // city-level irradiance averages without site-specific weather data.
   //   P90 = P50 × (1 − 1.28 × σ)  → energy exceeded 90% of years
   //   P10 = P50 × (1 + 1.28 × σ)  → energy exceeded only 10% of years
   const _PVGIS_SIGMA = 0.076;
-  const energyP90 = Math.round(adjustedEnergy * (1 - 1.28 * _PVGIS_SIGMA));
-  const energyP10 = Math.round(adjustedEnergy * (1 + 1.28 * _PVGIS_SIGMA));
+  const _FALLBACK_SIGMA = 0.18;
+  const _activeSigma = usedFallback ? _FALLBACK_SIGMA : _PVGIS_SIGMA;
+  const energyP90 = Math.round(adjustedEnergy * (1 - 1.28 * _activeSigma));
+  const energyP10 = Math.round(adjustedEnergy * (1 + 1.28 * _activeSigma));
 
   const authoritativeSourceMeta = offgridRealPvHourly
     ? {
@@ -1133,9 +1135,7 @@ export async function runCalculation() {
     generatorFuelCostPerKwh
   });
   const yearlyTable = financial.rows;
-  const displayAnnualSavings = state.scenarioKey === 'off-grid'
-    ? (financial.rows[0]?.savings || annualSavings)
-    : (financial.rows[0]?.savings || annualSavings);
+  const displayAnnualSavings = financial.rows[0]?.savings || annualSavings;
   const firstYearGrossSavings = financial.rows[0]?.savings ?? Math.round(annualSavings);
   const firstYearNetCashFlow = financial.rows[0]?.netCashFlow ?? Math.round(annualSavings - annualOMCost - annualInsurance);
   const paybackYear = financial.paybackYear;

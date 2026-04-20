@@ -213,7 +213,7 @@ export async function fetchPVGISLive(params, options = {}) {
   } = options;
 
   const { lat, lon, peakpower, loss = 0, angle, aspect } = params;
-  const baseParams = `lat=${lat}&lon=${lon}&peakpower=${peakpower}&loss=${loss}&angle=${angle}&aspect=${aspect}&outputformat=json&pvtechchoice=crystSi&mountingplace=free`;
+  const baseParams = `lat=${lat}&lon=${lon}&peakpower=${peakpower}&loss=${loss}&angle=${angle}&aspect=${aspect}&outputformat=json&pvtechchoice=crystSi&mountingplace=building`;
 
   // ── Tier 1: Backend proxy (preferred, avoids CORS) ──────────────────────────
   if (backendProxyUrl && proxyFirst && typeof fetchImpl === 'function') {

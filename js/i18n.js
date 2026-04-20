@@ -152,6 +152,19 @@ export const i18n = {
       const val = this.t(key);
       if (val !== key) el.title = val;
     });
+    document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+      const key = el.getAttribute('data-i18n-aria-label');
+      const val = this.t(key);
+      if (val !== key) el.setAttribute('aria-label', val);
+    });
+    document.querySelectorAll('.step-dot[data-step]').forEach(el => {
+      const step = el.getAttribute('data-step');
+      const label = this.t(`nav.step${step}`);
+      const prefix = this.t('nav.stepPrefix');
+      if (label !== `nav.step${step}` && prefix !== 'nav.stepPrefix') {
+        el.setAttribute('aria-label', `${step}. ${prefix}: ${label}`);
+      }
+    });
     document.documentElement.lang = this.locale;
     const titleEl = document.querySelector('title');
     if (titleEl) titleEl.textContent = this.t('app.title') + ' — ' + this.t('app.subtitle');
@@ -159,7 +172,13 @@ export const i18n = {
 
   updateLangButtons() {
     document.querySelectorAll('[data-lang]').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.lang === this.locale);
+      const isActive = btn.dataset.lang === this.locale;
+      const languageLabel = this.t(`language.${btn.dataset.lang}`);
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      if (languageLabel !== `language.${btn.dataset.lang}`) {
+        btn.setAttribute('aria-label', `${this.t('language.switchTo')} ${languageLabel}`);
+      }
     });
   },
 

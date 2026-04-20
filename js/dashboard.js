@@ -104,7 +104,7 @@ export function saveCurrentCalculation() {
     panelType: state.panelType,
     annualEnergy: r.annualEnergy,
     totalCost: r.totalCost,
-    paybackYear: r.paybackYear,
+    paybackYear: r.grossSimplePaybackYear ? Number(r.grossSimplePaybackYear).toFixed(1) : r.paybackYear,
     roi: r.roi,
     lcoe: r.lcoe,
     npv: r.npvTotal,

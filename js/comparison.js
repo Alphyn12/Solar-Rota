@@ -105,7 +105,10 @@ export function runComparison() {
     const systemPower = layout.systemPower;
 
     const basePower = Math.max(r.systemPower, 0.001);
-    const annualEnergy = Math.round(r.annualEnergy * (systemPower / basePower) * inv.efficiency / (INVERTER_TYPES[state.inverterType || 'string']?.efficiency || 0.97));
+    const baseBifacialGain = PANEL_TYPES[state.panelType || 'mono']?.bifacialGain ?? 0;
+    const scenarioBifacialGain = panel.bifacialGain ?? 0;
+    const bifacialFactor = (1 + scenarioBifacialGain) / (1 + baseBifacialGain);
+    const annualEnergy = Math.round(r.annualEnergy * (systemPower / basePower) * inv.efficiency / (INVERTER_TYPES[state.inverterType || 'string']?.efficiency || 0.97) * bifacialFactor);
 
     // Maliyet — Law 7456/2023: Solar PV modülleri KDV %0, diğer bileşenler %20
     const invUnit = systemPower < 10 ? inv.pricePerKWp.lt10 : systemPower < 50 ? inv.pricePerKWp.lt50 : inv.pricePerKWp.gt50;
@@ -168,12 +171,15 @@ export function runComparison() {
 
     let lcoeCostSum = financialCostBasis;
     let lcoeEnergySum = 0;
+    let compensatedLcoeEnergySum = 0;
     financial.rows.forEach(y => {
       const df = Math.pow(1 + tariffModel.discountRate, y.year);
       lcoeCostSum += (y.expenses || 0) / df;
       lcoeEnergySum += y.energy / df;
+      compensatedLcoeEnergySum += ((y.compensatedConsumptionKwh || 0) + (y.paidExportKwh || 0)) / df;
     });
     const lcoe = lcoeEnergySum > 0 ? (lcoeCostSum / lcoeEnergySum).toFixed(2) : '—';
+    const compensatedLcoe = compensatedLcoeEnergySum > 0 ? (lcoeCostSum / compensatedLcoeEnergySum).toFixed(2) : null;
 
     return {
       name: ct('comparison.scenarioLabel').replace('{letter}', SCENARIO_LETTERS[idx]),
@@ -183,9 +189,10 @@ export function runComparison() {
       annualEnergy: annualEnergy.toLocaleString('tr-TR'),
       totalCost,
       financialCostBasis,
-      paybackYear: financial.paybackYear || '>25',
+      paybackYear: financial.grossSimplePaybackYear ? Number(financial.grossSimplePaybackYear).toFixed(1) : '>25',
       npv: Math.round(financial.projectNPV),
       lcoe,
+      compensatedLcoe,
       isCustom: !!customPrice
     };
   });
@@ -194,7 +201,7 @@ export function runComparison() {
   const tableEl = document.getElementById('comparison-result-table');
   if (!tableEl) return;
 
-  const bestPayback = Math.min(...results.filter(r => typeof r.paybackYear === 'number').map(r => r.paybackYear));
+  const bestPayback = Math.min(...results.filter(r => r.paybackYear !== '>25').map(r => parseFloat(r.paybackYear)));
 
   tableEl.innerHTML = `
     <table class="comp-table">
@@ -210,9 +217,9 @@ export function runComparison() {
         <tr><td>${ct('comparison.systemKwp')}</td>${results.map(r => `<td>${r.systemPower} kWp</td>`).join('')}</tr>
         <tr><td>${ct('comparison.annualProduction')}</td>${results.map(r => `<td>${r.annualEnergy} kWh</td>`).join('')}</tr>
         <tr><td>${ct('comparison.totalCost')}</td>${results.map(r => `<td>${money(r.totalCost)}${r.isCustom ? ' *' : ''}</td>`).join('')}</tr>
-        <tr><td>${ct('comparison.payback')}</td>${results.map(r => `<td style="color:${r.paybackYear === bestPayback ? '#10B981' : 'inherit'};font-weight:${r.paybackYear === bestPayback ? '700' : '400'}">${ct('comparison.paybackYears').replace('{n}', r.paybackYear)}${r.paybackYear === bestPayback ? ' ✓' : ''}</td>`).join('')}</tr>
+        <tr><td>${ct('comparison.payback')}</td>${results.map(r => `<td style="color:${parseFloat(r.paybackYear) === bestPayback ? '#10B981' : 'inherit'};font-weight:${parseFloat(r.paybackYear) === bestPayback ? '700' : '400'}">${ct('comparison.paybackYears').replace('{n}', r.paybackYear)}${parseFloat(r.paybackYear) === bestPayback ? ' ✓' : ''}</td>`).join('')}</tr>
         <tr><td>${ct('comparison.projectNpv')}</td>${results.map(r => `<td>${money(r.npv)}</td>`).join('')}</tr>
-        <tr><td>${ct('comparison.lcoe')}</td>${results.map(r => `<td>${moneyRate(r.lcoe, 'kWh')}</td>`).join('')}</tr>
+        <tr><td>${ct('comparison.lcoe')}</td>${results.map(r => `<td>${moneyRate(r.compensatedLcoe || r.lcoe, 'kWh')}</td>`).join('')}</tr>
       </tbody>
     </table>
     <p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px">${ct('comparison.footnote')}</p>

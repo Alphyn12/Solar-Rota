@@ -637,6 +637,7 @@ textarea {
     overflow-x: auto;
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
   }
 
   .tech-table th,
@@ -644,6 +645,44 @@ textarea {
   .section-table th,
   .section-table td {
     white-space: nowrap;
+  }
+
+  .ui-scroll-hint {
+    display: block;
+  }
+
+  #offgrid-device-table-wrap,
+  #comparison-result-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  #offgrid-device-table {
+    min-width: 720px;
+  }
+
+  #offgrid-device-table input,
+  #offgrid-device-table select,
+  #offgrid-device-table button {
+    min-height: 36px;
+  }
+
+  .on-grid-data-source-table {
+    display: block;
+  }
+
+  .on-grid-ds-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .on-grid-ds-row > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   #turkey-map-wrap {
@@ -677,6 +716,23 @@ textarea {
   .action-btns .btn {
     width: 100%;
     flex: 1 1 auto;
+  }
+
+  #comparison-modal,
+  #dashboard-modal {
+    align-items: flex-start !important;
+    padding: 10px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

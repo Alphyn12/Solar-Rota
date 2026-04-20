@@ -54,6 +54,7 @@ class RoofInput(FlexibleModel):
     azimuthName: str = "Güney"
     shadingPct: float = 0
     soilingPct: float = 0
+    usableRoofRatio: float = 0.75
     geometry: Optional[Dict[str, Any]] = None
     sections: List[Dict[str, Any]] = Field(default_factory=list)
 

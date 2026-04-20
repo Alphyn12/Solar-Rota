@@ -46,7 +46,7 @@
   --scenario-heatpump:#EC4899;--scenario-mobile:#06B6D4;--scenario-ev:#3B82F6;
   /* Hero */
   --hero-gradient:linear-gradient(135deg,#1C1C1E 0%,#242426 50%,#1C1C1E 100%);
-  --header-h:278px;
+  --header-h:146px;
 }
 [data-theme="light"]{
   --secondary:#F2F2F7;--surface:#FFFFFF;--surface-light:#E5E5EA;
@@ -98,7 +98,7 @@ body>main{z-index:auto}
 .header-brand{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border-subtle)}
 .header-steps-row{padding:10px 24px}
 .logo{display:flex;align-items:center;gap:10px}
-.logo-icon{height:168px;width:auto;max-width:360px;object-fit:contain;border-radius:12px;filter:drop-shadow(0 0 12px rgba(245,158,11,0.45));animation:logoGlow 3s ease-in-out infinite alternate;}
+.logo-icon{height:56px;width:auto;max-width:180px;object-fit:contain;border-radius:12px;filter:drop-shadow(0 0 12px rgba(245,158,11,0.45));animation:logoGlow 3s ease-in-out infinite alternate;}
 @keyframes logoGlow{0%{filter:drop-shadow(0 0 8px rgba(245,158,11,0.35))}100%{filter:drop-shadow(0 0 22px rgba(245,158,11,0.75))}}
 .header-actions{display:flex;align-items:center;gap:10px}
 .header-icon-btn{display:flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface-light);color:var(--text);cursor:pointer;font-size:0.82rem;font-weight:500;font-family:var(--font-body);transition:all 0.2s;white-space:nowrap}
@@ -131,16 +131,78 @@ body>main{z-index:auto}
 /* ── STEP DOTS ── */
 .step-dots-wrap{flex:1}
 .step-dots{display:flex;align-items:center;justify-content:center}
-.step-dot{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;user-select:none}
+.step-dot{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;user-select:none;border:0;background:transparent;color:inherit;font:inherit;padding:0}
 .step-dot-num{width:32px;height:32px;border-radius:50%;background:var(--surface-light);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:0.8rem;font-weight:700;color:var(--text-muted);transition:all var(--transition);}
 .step-dot.active .step-dot-num{background:var(--primary);border-color:var(--primary);color:#000;box-shadow:0 0 16px rgba(245,158,11,0.55);}
 .step-dot.done .step-dot-num{background:var(--success);border-color:var(--success);color:#fff}
+.step-dot:focus-visible{outline:none}
+.step-dot:focus-visible .step-dot-num{outline:3px solid rgba(6,182,212,0.8);outline-offset:3px;box-shadow:0 0 0 6px rgba(6,182,212,0.16)}
 .step-dot-label{font-size:0.62rem;color:var(--text-muted);font-weight:500;white-space:nowrap;transition:color var(--transition)}
 .step-dot.active .step-dot-label{color:var(--primary);font-weight:700}
 .step-dot.done .step-dot-label{color:var(--success)}
 .step-connector{height:2px;width:32px;background:var(--border);transition:background 0.5s ease;margin:0 2px;margin-bottom:18px}
 .step-connector.filled{background:var(--success)}
 @media(max-width:620px){.step-connector{width:12px}.step-dot-label{display:none}.step-dot-num{width:26px;height:26px;font-size:0.7rem}}
+
+.step-hero{min-height:max(0px,calc(100dvh - var(--header-h)));justify-content:flex-start}
+.hero-content{position:relative;z-index:1;text-align:center;padding:24px 16px 16px;max-width:760px}
+.hero-eyebrow{font-size:0.72rem;color:var(--primary);font-weight:800;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px}
+.hero-title{font-family:var(--font-display);font-size:clamp(2rem,5vw,3.35rem);line-height:1.02;letter-spacing:-0.03em;margin-bottom:10px}
+.hero-sub{font-size:0.98rem;color:var(--text-muted);line-height:1.45}
+#step-1 .scenario-card-grid{gap:16px;margin-bottom:14px;max-width:700px}
+#step-1 .scenario-select-subline{margin-bottom:16px}
+#step-1 .scenario-choice-card{min-height:230px;padding:22px 20px;border-radius:14px}
+#step-1 .scenario-choice-card:focus-visible{outline:3px solid rgba(6,182,212,0.85);outline-offset:3px;box-shadow:0 0 0 6px rgba(6,182,212,0.16),0 16px 48px rgba(0,0,0,.42)}
+#step-1 .scenario-choice-card .scenario-card-icon{width:88px;height:88px;border-radius:16px;margin-bottom:4px}
+#step-1 .scenario-choice-card .scenario-card-icon .scenario-svg-icon,
+#step-1 .scenario-choice-card .scenario-card-icon svg{width:70px;height:70px}
+.hero-cta-wrap{position:relative;z-index:1;margin:8px 0 24px;text-align:center}
+.hero-cta-btn:focus-visible{outline:3px solid rgba(6,182,212,0.85);outline-offset:3px}
+.skip-link{position:fixed;top:10px;left:12px;z-index:10000;transform:translateY(-160%);background:var(--primary);color:#000;border-radius:8px;padding:9px 12px;font-weight:800;font-size:.82rem;text-decoration:none;box-shadow:var(--shadow-md);transition:transform .2s ease}
+.skip-link:focus{transform:translateY(0);outline:3px solid rgba(6,182,212,.85);outline-offset:2px}
+.ui-scroll-hint{display:none;color:var(--text-muted);font-size:.72rem;line-height:1.45;margin:6px 0 8px}
+.result-actions-note{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:flex-start;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.22);border-radius:10px;padding:12px 14px;margin-top:18px;font-size:.8rem;line-height:1.5;color:var(--text)}
+.result-actions-note svg{color:var(--primary);margin-top:2px;flex-shrink:0}
+.result-actions-note strong{display:block;color:var(--primary);margin-bottom:2px}
+.result-actions-note span{color:var(--text-muted)}
+.scenario-summary{background:rgba(255,255,255,0.045);border:1px solid var(--border-subtle);border-radius:10px;padding:12px 14px;text-align:left;line-height:1.45}
+.scenario-summary-kicker{font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--primary);margin-bottom:4px}
+.scenario-summary strong{display:block;color:var(--text);font-size:.94rem;margin-bottom:8px}
+.scenario-summary-grid{display:grid;grid-template-columns:max-content 1fr;gap:5px 10px;font-size:.76rem}
+.scenario-summary-grid span{color:var(--text-muted);font-weight:700}
+.scenario-summary-grid em{color:var(--text);font-style:normal}
+.result-trust-note,.audit-purpose-note{background:rgba(6,182,212,0.07);border:1px solid rgba(6,182,212,0.22);border-radius:10px;padding:12px 14px;color:var(--text);font-size:.8rem;line-height:1.55;margin-bottom:16px}
+.result-trust-note strong,.audit-purpose-note strong{color:var(--accent)}
+.result-trust-note span,.audit-purpose-note span{display:block;color:var(--text-muted);margin-top:4px}
+.result-context-main{display:block;color:var(--text)}
+.result-context-caution{display:block;color:var(--text-muted);margin-top:4px}
+.eng-report-title-text{display:flex;flex-direction:column;gap:2px}
+.eng-report-subtitle{font-size:.72rem;font-weight:500;color:var(--text-muted);line-height:1.35}
+@media(max-width:720px){
+  :root{--header-h:122px}
+  .logo-icon{height:42px;max-width:132px}
+  .header-brand{padding:10px 14px}
+  .header-steps-row{padding:8px 12px}
+  .hero-content{padding:14px 14px 12px}
+  .hero-eyebrow{font-size:.62rem;margin-bottom:6px}
+  .hero-title{font-size:clamp(1.55rem,7vw,2.05rem);line-height:1.06;margin-bottom:8px}
+  .hero-sub{font-size:.86rem}
+  #step-1 .scenario-card-grid{grid-template-columns:1fr;gap:8px;margin-bottom:8px}
+  #step-1 .scenario-select-subline{margin-bottom:10px}
+  #step-1 .scenario-choice-card{min-height:0;padding:12px 14px;display:grid;grid-template-columns:58px 1fr;align-items:center;column-gap:12px;row-gap:3px;border-radius:10px}
+  #step-1 .scenario-choice-card .scenario-card-icon{grid-row:span 3;width:58px;height:58px;margin:0;border-radius:12px}
+  #step-1 .scenario-choice-card .scenario-card-icon .scenario-svg-icon,
+  #step-1 .scenario-choice-card .scenario-card-icon svg{width:44px;height:44px}
+  #step-1 .scenario-card-title{font-size:1rem;line-height:1.18}
+  #step-1 .scenario-card-desc{font-size:.76rem;line-height:1.34}
+  #step-1 .scenario-card-for-whom{font-size:.72rem!important;line-height:1.3;margin-top:2px;padding-top:6px}
+  .scenario-grid-wrap{padding:0 12px}
+  .scenario-summary{margin-top:8px;padding:8px 10px;font-size:.74rem}
+  .scenario-summary-grid{grid-template-columns:1fr;gap:3px}
+  .scenario-summary-grid span{margin-top:4px}
+  .hero-cta-wrap{padding:0 12px;margin:8px 0 16px;width:100%}
+  .hero-cta-btn{width:100%;justify-content:center;min-height:44px;border-radius:8px}
+}
 
 /* ── MAIN ── */
 #main-content{max-width:1200px;margin:0 auto;padding:24px 16px 80px}
@@ -358,6 +420,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main-content" data-i18n="common.skipToMain">Ana içeriğe geç</a>
 
 <!-- HEADER -->
 <header id="app-header">
@@ -372,16 +435,17 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
         <div id="exchange-rate-status-header"
              style="font-size:0.68rem;color:var(--text-muted);white-space:nowrap;line-height:1.4;text-align:right;cursor:default;padding-right:4px">
         </div>
-        <div class="header-lang-switcher" aria-label="Dil seçimi">
-          <button class="header-lang-btn lang-btn" data-lang="tr" onclick="switchLanguage('tr')">TR</button>
-          <button class="header-lang-btn lang-btn" data-lang="en" onclick="switchLanguage('en')">EN</button>
-          <button class="header-lang-btn lang-btn" data-lang="de" onclick="switchLanguage('de')">DE</button>
+        <div class="header-lang-switcher" aria-label="Dil seçimi" data-i18n-aria-label="language.switcherAria">
+          <button class="header-lang-btn lang-btn" data-lang="tr" data-testid="lang-tr" onclick="switchLanguage('tr')">TR</button>
+          <button class="header-lang-btn lang-btn" data-lang="en" data-testid="lang-en" onclick="switchLanguage('en')">EN</button>
+          <button class="header-lang-btn lang-btn" data-lang="de" data-testid="lang-de" onclick="switchLanguage('de')">DE</button>
         </div>
         <button class="header-icon-btn" id="dashboard-btn" onclick="openDashboard()" style="display:none">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
           Kayıtlı Hesaplar
         </button>
-        <button class="header-icon-btn icon-only" onclick="openSettings()" title="Ayarlar"
+        <button class="header-icon-btn icon-only" onclick="openSettings()" title="Ayarlar" aria-label="Ayarlar"
+                data-i18n-title="settings.title" data-i18n-aria-label="settings.title"
                 style="border-color:var(--border);position:relative">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
             <circle cx="12" cy="12" r="3"/>
@@ -395,41 +459,41 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   <div class="header-steps-row">
     <div class="header-inner">
       <div class="step-dots-wrap" style="flex:1">
-        <div class="step-dots">
-          <div class="step-dot active" data-step="1" onclick="goToStep(1)">
+        <div class="step-dots" role="navigation" aria-label="Form adımları" data-i18n-aria-label="nav.progressAria">
+          <button type="button" class="step-dot active" data-step="1" data-testid="step-dot-1" aria-controls="step-1" aria-label="1. adım: Senaryo" aria-current="step" onclick="goToStep(1)">
             <span class="step-dot-num">1</span>
             <span class="step-dot-label">Senaryo</span>
-          </div>
+          </button>
           <div class="step-connector" id="conn-1-2"></div>
-          <div class="step-dot" data-step="2" onclick="goToStep(2)">
+          <button type="button" class="step-dot" data-step="2" data-testid="step-dot-2" aria-controls="step-2" aria-label="2. adım: Konum" onclick="goToStep(2)">
             <span class="step-dot-num">2</span>
             <span class="step-dot-label">Konum</span>
-          </div>
+          </button>
           <div class="step-connector" id="conn-2-3"></div>
-          <div class="step-dot" data-step="3" onclick="goToStep(3)">
+          <button type="button" class="step-dot" data-step="3" data-testid="step-dot-3" aria-controls="step-3" aria-label="3. adım: Çatı" onclick="goToStep(3)">
             <span class="step-dot-num">3</span>
             <span class="step-dot-label">Çatı</span>
-          </div>
+          </button>
           <div class="step-connector" id="conn-3-4"></div>
-          <div class="step-dot" data-step="4" onclick="goToStep(4)">
+          <button type="button" class="step-dot" data-step="4" data-testid="step-dot-4" aria-controls="step-4" aria-label="4. adım: Ekipman" onclick="goToStep(4)">
             <span class="step-dot-num">4</span>
             <span class="step-dot-label">Ekipman</span>
-          </div>
+          </button>
           <div class="step-connector" id="conn-4-5"></div>
-          <div class="step-dot" data-step="5" onclick="goToStep(5)">
+          <button type="button" class="step-dot" data-step="5" data-testid="step-dot-5" aria-controls="step-5" aria-label="5. adım: Finansal" onclick="goToStep(5)">
             <span class="step-dot-num">5</span>
             <span class="step-dot-label">Finansal</span>
-          </div>
+          </button>
           <div class="step-connector" id="conn-5-6"></div>
-          <div class="step-dot" data-step="6" onclick="goToStep(6)">
+          <button type="button" class="step-dot" data-step="6" data-testid="step-dot-6" aria-controls="step-6" aria-label="6. adım: Hesapla" onclick="goToStep(6)">
             <span class="step-dot-num">6</span>
             <span class="step-dot-label">Hesapla</span>
-          </div>
+          </button>
           <div class="step-connector" id="conn-6-7"></div>
-          <div class="step-dot" data-step="7" onclick="goToStep(7)">
+          <button type="button" class="step-dot" data-step="7" data-testid="step-dot-7" aria-controls="step-7" aria-label="7. adım: Sonuçlar" onclick="goToStep(7)">
             <span class="step-dot-num">7</span>
             <span class="step-dot-label">Sonuçlar</span>
-          </div>
+          </button>
         </div>
       </div>
     </div>
@@ -438,20 +502,20 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
 <!-- SETTINGS OVERLAY + PANEL -->
 <div id="settings-overlay" onclick="closeSettings()" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px)"></div>
-<div id="settings-panel" style="display:none;position:fixed;top:0;right:0;width:300px;height:100vh;z-index:9999;background:var(--surface);border-left:1px solid var(--border);padding:28px 24px;overflow-y:auto;transform:translateX(100%);transition:transform 0.3s ease;box-shadow:var(--shadow-md)">
+<div id="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-panel-title" style="display:none;position:fixed;top:0;right:0;width:300px;height:100vh;z-index:9999;background:var(--surface);border-left:1px solid var(--border);padding:28px 24px;overflow-y:auto;transform:translateX(100%);transition:transform 0.3s ease;box-shadow:var(--shadow-md)">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px">
-    <span style="font-family:var(--font-display);font-weight:700;font-size:1.05rem;color:var(--text)">Ayarlar</span>
-    <button onclick="closeSettings()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.3rem;line-height:1;padding:4px 6px;border-radius:8px;transition:0.2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
+    <span id="settings-panel-title" style="font-family:var(--font-display);font-weight:700;font-size:1.05rem;color:var(--text)" data-i18n="settings.title">Ayarlar</span>
+    <button id="settings-close-btn" onclick="closeSettings()" aria-label="Kapat" title="Kapat" data-i18n-title="common.close" data-i18n-aria-label="common.close" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.3rem;line-height:1;padding:4px 6px;border-radius:8px;transition:0.2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
   </div>
   <div style="margin-bottom:28px">
-    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600">Tema</div>
+    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600" data-i18n="settings.theme">Tema</div>
     <div style="display:flex;gap:8px">
-      <button class="settings-choice-btn" id="theme-dark-btn" onclick="setTheme('dark')">🌙 Koyu</button>
-      <button class="settings-choice-btn" id="theme-light-btn" onclick="setTheme('light')">☀️ Açık</button>
+      <button class="settings-choice-btn" id="theme-dark-btn" onclick="setTheme('dark')" data-i18n="settings.dark">🌙 Koyu</button>
+      <button class="settings-choice-btn" id="theme-light-btn" onclick="setTheme('light')" data-i18n="settings.light">☀️ Açık</button>
     </div>
   </div>
   <div style="margin-bottom:28px">
-    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600">Dil / Language</div>
+    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600" data-i18n="settings.language">Dil / Language</div>
     <div style="display:flex;gap:8px">
       <button class="settings-choice-btn lang-btn" data-lang="tr" onclick="switchLanguage('tr')">TR</button>
       <button class="settings-choice-btn lang-btn" data-lang="en" onclick="switchLanguage('en')">EN</button>
@@ -459,17 +523,19 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     </div>
   </div>
   <div style="margin-bottom:28px">
-    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600">Para Birimi</div>
+    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600" data-i18n="settings.currency">Para Birimi</div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <button class="settings-choice-btn currency-btn" data-currency="TRY" onclick="switchCurrency('TRY')">₺ TL</button>
       <button class="settings-choice-btn currency-btn" data-currency="USD" onclick="switchCurrency('USD')">$ USD</button>
     </div>
-    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:8px;font-weight:500">USD / TRY Kuru</div>
+    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:8px;font-weight:500" data-i18n="settings.usdTryRate">USD / TRY Kuru</div>
     <div style="display:flex;align-items:center;gap:8px">
       <input type="number" id="usd-try-settings" min="1" step="0.5" value="38.5"
              oninput="setManualUsdTryRate(this.value); const el=document.getElementById('usd-try-input'); if(el){el.value=this.value}"
+             aria-label="USD / TRY Kuru" data-i18n-aria-label="settings.usdTryRate"
              style="flex:1;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface-light);color:var(--text);font-size:0.9rem;font-family:var(--font-body);outline:none"/>
-      <button onclick="refreshExchangeRate()" title="Kuru güncelle"
+      <button onclick="refreshExchangeRate()" title="Kuru güncelle" aria-label="Kuru güncelle"
+              data-i18n-title="settings.refreshRate" data-i18n-aria-label="settings.refreshRate"
               style="width:36px;height:36px;border-radius:9px;border:1px solid var(--border);background:var(--surface-light);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:0.2s;flex-shrink:0"
               onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
@@ -551,7 +617,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
   <!-- Continue button -->
   <div class="hero-cta-wrap">
-    <button class="btn btn-primary hero-cta-btn" id="step1-continue-btn" onclick="validateStep1()" style="display:inline-flex">
+    <button class="btn btn-primary hero-cta-btn" id="step1-continue-btn" data-testid="step1-continue" onclick="validateStep1()" style="display:inline-flex">
       <span data-i18n-text>Sonraki Adım</span>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
     </button>
@@ -1413,6 +1479,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <!-- Cihaz önizleme paneli -->
             <div id="offgrid-device-preview" style="display:none;margin-top:6px;padding:8px 10px;background:rgba(139,92,246,0.04);border:1px solid rgba(139,92,246,0.12);border-radius:6px;font-size:0.72rem;color:var(--text-muted)"></div>
 
+            <div class="ui-scroll-hint" data-i18n="common.scrollHint">Tabloyu yatay kaydırarak tüm sütunları görün.</div>
             <div id="offgrid-device-table-wrap" style="display:none;overflow-x:auto">
               <table style="width:100%;font-size:0.75rem;border-collapse:collapse" id="offgrid-device-table">
                 <thead>
@@ -2072,7 +2139,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
               style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
               oninput="state.insuranceRate=parseFloat(this.value)||0"/>
           </div>
-        </div>
           <div class="form-group" style="margin:0">
             <label style="font-size:0.8rem">Yıllık Yük Artışı (%)
               <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Her yıl tüketiminizin artış oranı. EV veya ısı pompası ekliyorsanız %5–15 girebilirsiniz. Varsayılan %0 (sabit tüketim).</span></span>
@@ -2240,7 +2306,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <span class="fin-val highlight" id="fin-cost">-</span>
     </div>
     <div class="fin-row" style="flex-wrap:wrap;gap:8px">
-      <span class="fin-label" data-i18n="finance.simplePayback">Kümülatif Net Geri Ödeme Süresi</span>
+      <span class="fin-label" data-i18n="finance.grossSimplePayback">Basit Geri Ödeme Süresi</span>
       <div style="display:flex;align-items:center;flex:1;min-width:200px">
         <div class="payback-bar-wrap"><div class="payback-bar-fill" id="payback-bar" style="width:0%"></div></div>
         <span class="fin-val" id="fin-payback" style="white-space:nowrap">-</span>
@@ -2263,7 +2329,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <span class="fin-val positive" id="fin-irr">-</span>
     </div>
     <div class="fin-row">
-      <span class="fin-label">Normalleştirilmiş Maliyet (LCOE) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Levelized Cost of Energy — on-grid için üretilen kWh, off-grid için PV+BESS ile yüke teslim edilen kWh bazlı iskonto edilmiş maliyet.</span></span></span>
+      <span class="fin-label">Normalleştirilmiş Maliyet (LCOE) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">On-grid için ekonomik açıdan faydalı kWh (öz-tüketim + mahsuplanan ihracat) bazlı iskonto edilmiş maliyet; off-grid için PV+BESS ile yüke teslim edilen kWh bazlı.</span></span></span>
       <span class="fin-val" id="fin-lcoe">-</span>
     </div>
     <div class="fin-row" id="fin-om-row">
@@ -2442,6 +2508,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
   <div class="card" style="margin-top:16px">
     <div class="card-title">Teknik Detaylar</div>
+    <div class="ui-scroll-hint" data-i18n="common.scrollHint">Tabloyu yatay kaydırarak tüm sütunları görün.</div>
     <table class="tech-table">
       <thead><tr><th>Parametre</th><th>Değer</th></tr></thead>
       <tbody id="tech-table-body"></tbody>
@@ -2482,46 +2549,56 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div class="eng-report-header" id="eng-report-toggle" onclick="toggleEngReport()">
       <div class="eng-report-title">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
-        Mühendis Hesap Raporu
-        <span style="font-size:0.7rem;font-weight:400;color:var(--text-muted);background:rgba(245,158,11,0.1);border-radius:4px;padding:2px 8px;border:1px solid rgba(245,158,11,0.2)">Tüm formüller açık</span>
+        <span class="eng-report-title-text">
+          <span data-i18n="report.engineeringReportTitle">Mühendis Hesap Raporu</span>
+          <span class="eng-report-subtitle" data-i18n="report.engineeringReportSubtitle">Yöntem, varsayım ve ara kontrolleri inceleyin.</span>
+        </span>
+        <span style="font-size:0.7rem;font-weight:400;color:var(--text-muted);background:rgba(245,158,11,0.1);border-radius:4px;padding:2px 8px;border:1px solid rgba(245,158,11,0.2)" data-i18n="report.engineeringReportBadge">Varsayımlar açık</span>
       </div>
       <svg class="eng-chevron" id="eng-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
     </div>
     <div class="eng-report-body" id="eng-report-body"></div>
   </div>
 
+  <div class="result-actions-note">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    <div>
+      <strong data-i18n="report.actionsNoteTitle">Çıktılar ne için?</strong>
+      <span data-i18n="report.actionsNote">PDF müşteri ön fizibilitesi, Teknik Ek mühendislik kontrolü, JSON çıktıları entegrasyon ve CRM aktarımı içindir.</span>
+    </div>
+  </div>
   <div class="action-btns">
-    <button class="btn btn-primary" onclick="downloadPDF()">
+    <button class="btn btn-primary" data-testid="download-proposal-pdf" onclick="downloadPDF()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
-      PDF Rapor İndir
+      <span data-i18n="report.downloadProposalPdf">Ön Fizibilite PDF İndir</span>
     </button>
-    <button class="btn btn-outline" onclick="downloadTechnicalPDF()">
+    <button class="btn btn-outline" data-testid="download-technical-pdf" onclick="downloadTechnicalPDF()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6"/><path d="M9 16h6"/><path d="M9 8h6"/><path d="M5 3h14v18H5z"/></svg>
-      Teknik PDF İndir
+      <span data-i18n="report.downloadTechnicalPdf">Teknik Ek PDF İndir</span>
     </button>
-    <button class="btn btn-secondary" onclick="shareResults()">
+    <button class="btn btn-secondary" data-testid="share-results" onclick="shareResults()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-      Sonucu Paylaş
+      <span data-i18n="report.shareResults">Sonuç Özetini Paylaş</span>
     </button>
-    <button class="btn btn-secondary" onclick="exportProposalHandoff()">
+    <button class="btn btn-secondary" data-testid="export-proposal-json" onclick="exportProposalHandoff()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Proposal JSON
+      <span data-i18n="report.exportProposalJson">Proposal JSON</span>
     </button>
-    <button class="btn btn-secondary" onclick="exportCrmLead()">
+    <button class="btn btn-secondary" data-testid="export-crm-json" onclick="exportCrmLead()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5M8 17h8"/></svg>
-      CRM JSON
+      <span data-i18n="report.exportCrmJson">CRM JSON</span>
     </button>
-    <button class="btn btn-success" onclick="saveCurrentCalculation()">
+    <button class="btn btn-success" data-testid="save-calculation" onclick="saveCurrentCalculation()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-      Hesabı Kaydet
+      <span data-i18n="report.saveCalculation">Hesabı Kaydet</span>
     </button>
-    <button class="btn btn-outline" onclick="openComparison()">
+    <button class="btn btn-outline" data-testid="open-comparison" onclick="openComparison()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Teklif Karşılaştır
+      <span data-i18n="report.compareQuotes">Teklif Karşılaştır</span>
     </button>
-    <button class="btn btn-outline" onclick="goToStep(1)">
+    <button class="btn btn-outline" data-testid="recalculate" onclick="goToStep(1)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
-      Yeniden Hesapla
+      <span data-i18n="report.recalculate">Yeniden Hesapla</span>
     </button>
   </div>
 
@@ -2659,13 +2736,13 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
 <!-- TEKLİF KARŞILAŞTIRMA MODAL -->
 <div id="comparison-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);max-width:900px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-md)">
+  <div role="dialog" aria-modal="true" aria-labelledby="comparison-modal-title" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);max-width:900px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-md)">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border)">
-      <h2 style="font-family:var(--font-display);font-size:1.1rem;font-weight:700;color:var(--primary)">
+      <h2 id="comparison-modal-title" style="font-family:var(--font-display);font-size:1.1rem;font-weight:700;color:var(--primary)">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:8px"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        Teklif Karşılaştırma
+        <span data-i18n="comparison.title">Teklif Karşılaştırma</span>
       </h2>
-      <button onclick="closeComparison()" aria-label="Kapat" title="Kapat" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.4rem;padding:4px 8px">✕</button>
+      <button onclick="closeComparison()" aria-label="Kapat" title="Kapat" data-i18n-title="common.close" data-i18n-aria-label="common.close" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.4rem;padding:4px 8px">✕</button>
     </div>
     <div style="padding:24px">
       <div id="comparison-scenarios" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:20px"></div>
@@ -2676,16 +2753,16 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
 <!-- KAYITLI HESAPLAR DASHBOARD MODAL -->
 <div id="dashboard-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);max-width:1000px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-md)">
+  <div role="dialog" aria-modal="true" aria-labelledby="dashboard-modal-title" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);max-width:1000px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-md)">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border)">
-      <h2 style="font-family:var(--font-display);font-size:1.1rem;font-weight:700;color:var(--primary)">
+      <h2 id="dashboard-modal-title" style="font-family:var(--font-display);font-size:1.1rem;font-weight:700;color:var(--primary)">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:8px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-        Kayıtlı Hesaplar
+        <span data-i18n="dashboard.saved">Kayıtlı Hesaplar</span>
       </h2>
       <div style="display:flex;gap:10px;align-items:center">
-        <button onclick="compareDashboardSelected()" class="btn btn-outline" style="font-size:0.78rem;padding:6px 12px">Seçilenleri Karşılaştır</button>
-        <button onclick="clearAllSaved()" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#EF4444;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:0.78rem">Tümünü Sil</button>
-        <button onclick="closeDashboard()" aria-label="Kapat" title="Kapat" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.4rem;padding:4px 8px">✕</button>
+        <button onclick="compareDashboardSelected()" class="btn btn-outline" style="font-size:0.78rem;padding:6px 12px" data-i18n="dashboard.compareSelected">Seçilenleri Karşılaştır</button>
+        <button onclick="clearAllSaved()" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#EF4444;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:0.78rem" data-i18n="dashboard.clearAll">Tümünü Sil</button>
+        <button onclick="closeDashboard()" aria-label="Kapat" title="Kapat" data-i18n-title="common.close" data-i18n-aria-label="common.close" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.4rem;padding:4px 8px">✕</button>
       </div>
     </div>
     <div id="dashboard-body" style="padding:24px"></div>

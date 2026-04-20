@@ -82,8 +82,27 @@ export function renderResults() {
   const scenarioFrame = document.getElementById('result-scenario-frame');
   const engineSource = document.getElementById('result-engine-source');
   if (scenarioLabel) scenarioLabel.textContent = state.scenarioContext?.label || 'On-Grid';
-  if (scenarioFrame) scenarioFrame.textContent = state.scenarioContext?.resultFrame || 'Grid-connected savings and proposal readiness';
+  if (scenarioFrame) {
+    scenarioFrame.innerHTML = `
+      <span class="result-context-main">${escapeHtml(state.scenarioContext?.resultFrame || 'Grid-connected savings and proposal readiness')}</span>
+      <span class="result-context-caution">${escapeHtml(state.scenarioContext?.resultCaution || i18n.t('report.preFeasibilityDisclaimer'))}</span>
+    `;
+  }
   if (engineSource) engineSource.textContent = engineSummaryText(r, state);
+  let trustNote = document.getElementById('result-trust-note');
+  if (!trustNote && scenarioFrame) {
+    trustNote = document.createElement('div');
+    trustNote.id = 'result-trust-note';
+    trustNote.className = 'result-trust-note';
+    scenarioFrame.closest('.result-context-strip')?.insertAdjacentElement('afterend', trustNote);
+  }
+  if (trustNote) {
+    const status = statusLabel(r.quoteReadiness?.status || r.confidenceLevel || '—');
+    trustNote.innerHTML = `
+      <strong>${escapeHtml(i18n.t('report.trustNoteTitle'))}: ${escapeHtml(status)}</strong>
+      <span>${escapeHtml(state.scenarioContext?.nextAction || i18n.t('onGridResult.commercialNextAction'))}</span>
+    `;
+  }
 
   const savingsUnit = document.querySelector('#step-7 .kpi-card:nth-child(2) .kpi-unit');
   if (savingsUnit) {
@@ -105,13 +124,13 @@ export function renderResults() {
       finCostEl.textContent = money(grossCost);
     }
   }
-  document.getElementById('fin-payback').textContent = r.simplePaybackYear ? r.simplePaybackYear + ` ${i18n.t('units.year')}` : `>25 ${i18n.t('units.year')}`;
+  document.getElementById('fin-payback').textContent = r.grossSimplePaybackYear ? Number(r.grossSimplePaybackYear).toFixed(1) + ` ${i18n.t('units.year')}` : `>25 ${i18n.t('units.year')}`;
   const discountedPaybackEl = document.getElementById('fin-discounted-payback');
   if (discountedPaybackEl) discountedPaybackEl.textContent = r.discountedPaybackYear ? r.discountedPaybackYear + ` ${i18n.t('units.year')}` : `>25 ${i18n.t('units.year')}`;
   document.getElementById('fin-total').textContent = money(r.npvTotal);
   document.getElementById('fin-roi').textContent = r.roi + '%';
   document.getElementById('fin-irr').textContent = r.irr === 'N/A' ? 'N/A' : r.irr + '%';
-  document.getElementById('fin-lcoe').textContent = moneyRate(r.lcoe, 'kWh');
+  document.getElementById('fin-lcoe').textContent = moneyRate(r.compensatedLcoe || r.lcoe, 'kWh');
 
   const omRow = document.getElementById('fin-om-row');
   const invRow = document.getElementById('fin-inverter-row');
@@ -122,7 +141,7 @@ export function renderResults() {
     if (omRow) omRow.style.display = 'none';
     if (invRow) invRow.style.display = 'none';
   }
-  const paybackPct = Math.min(((r.simplePaybackYear || 25) / 15) * 100, 100);
+  const paybackPct = Math.min(((r.grossSimplePaybackYear || 25) / 15) * 100, 100);
   document.getElementById('payback-bar').style.width = paybackPct + '%';
 
   document.getElementById('eng-report-body').innerHTML = '';
@@ -696,7 +715,16 @@ function renderOnGridResultLayers(state, r) {
   const tariffInputMode = r.tariffInputMode || state.tariffInputMode || 'net-plus-fee';
   const tariffModeText = tariffInputMode === 'gross' ? i18n.t('onGridResult.tariffModeGross') : i18n.t('onGridResult.tariffModeNet');
   const settlementBasisText = r.settlementProvisional
-    ? i18n.t('onGridResult.settlementProvisional')
+    ? (() => {
+        const importOffsetKwh = r.compensationSummary?.importOffsetKwh ?? 0;
+        const effectiveImport = (r.tariffModel?.importRate ?? 0) + (r.tariffModel?.distributionFee ?? 0);
+        const exportRt = r.tariffModel?.exportRate ?? 0;
+        const annualDelta = Math.round(importOffsetKwh * (effectiveImport - exportRt));
+        const deltaStr = annualDelta > 0
+          ? ` (aylık mod saatlikten yıllık ~${annualDelta.toLocaleString('tr-TR')} TL avantajlı)`
+          : '';
+        return i18n.t('onGridResult.settlementProvisional') + deltaStr;
+      })()
     : `${comp.settlementInterval || r.tariffModel?.exportCompensationPolicy?.interval || '—'}${comp.annualExportCapKwh ? ` / ${Math.round(comp.annualExportCapKwh).toLocaleString(localeTag())} kWh cap` : ''}`;
 
   // Tariff source display
@@ -769,10 +797,10 @@ function renderOnGridResultLayers(state, r) {
         <div class="on-grid-result-metric"><strong>${money(r.financialCostBasis || r.totalCost)}</strong><span>${escapeHtml(i18n.t('onGridResult.financialBasis'))}</span></div>
         <div class="on-grid-result-metric"><strong>${money(r.annualSavings)}</strong><span>${escapeHtml(i18n.t('onGridResult.annualSavings'))}</span></div>
         <div class="on-grid-result-metric"><strong>${money(r.firstYearNetCashFlow ?? 0)}</strong><span>${escapeHtml(i18n.t('onGridResult.firstYearNetCashFlow'))}</span></div>
-        <div class="on-grid-result-metric"><strong>${r.simplePaybackYear || '>25'} ${escapeHtml(i18n.t('units.year'))}</strong><span>${escapeHtml(i18n.t('finance.simplePayback'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${r.grossSimplePaybackYear ? Number(r.grossSimplePaybackYear).toFixed(1) : '>25'} ${escapeHtml(i18n.t('units.year'))}</strong><span>${escapeHtml(i18n.t('finance.grossSimplePayback'))}</span></div>
         <div class="on-grid-result-metric"><strong>${money(r.npvTotal)}</strong><span>NPV</span></div>
         <div class="on-grid-result-metric"><strong>${r.irr === 'N/A' ? 'N/A' : r.irr + '%'}</strong><span>IRR</span></div>
-        <div class="on-grid-result-metric"><strong>${moneyRate(r.lcoe, 'kWh')}</strong><span>${escapeHtml(i18n.t('onGridResult.lcoeLabel'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${moneyRate(r.compensatedLcoe || r.lcoe, 'kWh')}</strong><span>${escapeHtml(i18n.t(r.compensatedLcoe ? 'onGridResult.compensatedLcoeLabel' : 'onGridResult.lcoeLabel'))}</span></div>
         <div class="on-grid-result-metric"><strong>${r.roi}%</strong><span>${escapeHtml(i18n.t('onGridResult.roiLabel'))}</span></div>
         <div class="on-grid-result-metric"><strong>${escapeHtml(settlementBasisText)}</strong><span>${escapeHtml(i18n.t('onGridResult.settlementBasisLabel'))}</span></div>
         <div class="on-grid-result-metric"><strong>${escapeHtml(tariffModeText)}</strong><span>${escapeHtml(i18n.t('onGridResult.tariffModeNet').replace('Enerji bedeli + ', '').replace('Energy rate + ', '').replace('Energiepreis + ', '') || 'Tarife modu')}</span></div>
@@ -906,10 +934,17 @@ function renderWarningsAndAudit(state, r) {
       ? `${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.unservedLoad')}: ${Math.round(r.bessMetrics?.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.curtailedPv')}: ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag())} kWh`
       : `${Math.round(r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.exportRevenueDisabled')}`;
 
+  const scrollHint = `<div class="ui-scroll-hint">${escapeHtml(i18n.t('common.scrollHint'))}</div>`;
+
   audit.innerHTML = `
     <div class="card-title">${escapeHtml(i18n.t('governance.auditPanel'))}</div>
+    <div class="audit-purpose-note">
+      <strong>${escapeHtml(i18n.t('audit.purposeTitle'))}</strong>
+      <span>${escapeHtml(i18n.t('audit.purposeBody'))}</span>
+    </div>
     ${offGridAuditNote}
     ${warningHtml}
+    ${scrollHint}
     <table class="tech-table">
       <tbody>
         <tr><td>${escapeHtml(i18n.t('audit.location'))}</td><td>${escapeHtml(state.cityName || '—')} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
@@ -935,8 +970,10 @@ function renderWarningsAndAudit(state, r) {
       </tbody>
     </table>
     <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.assumptionLedger'))}</div>
+    ${scrollHint}
     <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.assumption'))}</th><th>${escapeHtml(i18n.t('audit.value'))}</th><th>${escapeHtml(i18n.t('audit.confidence'))}</th><th>${escapeHtml(i18n.t('audit.source'))}</th></tr></thead><tbody>${ledgerRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table>
     <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.evidenceRecords'))}</div>
+    ${scrollHint}
     <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.evidence'))}</th><th>${escapeHtml(i18n.t('audit.status'))}</th><th>Ref</th><th>${escapeHtml(i18n.t('audit.checkedDate'))}</th><th>${escapeHtml(i18n.t('audit.validity'))}</th><th>File / SHA-256</th></tr></thead><tbody>${evidenceRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table>
     <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.revisionDiff'))}</div>
     <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.field'))}</th><th>${escapeHtml(i18n.t('audit.before'))}</th><th>${escapeHtml(i18n.t('audit.after'))}</th></tr></thead><tbody>${revisionRows || `<tr><td colspan="3">${escapeHtml(i18n.t('audit.noRevisionDiff'))}</td></tr>`}</tbody></table>
@@ -1241,11 +1278,11 @@ export function downloadPDF() {
     [pdfSafeText(i18n.t('onGridResult.firstYearNetCashFlow')), money(r.firstYearNetCashFlow ?? 0)],
     [pdfSafeText(i18n.t('report.systemPower')), r.systemPower.toFixed(2) + ' kWp'],
     [pdfSafeText(i18n.t('report.totalCost')), money(r.totalCost)],
-    [pdfSafeText(i18n.t('report.simplePayback')), (r.simplePaybackYear || '>25') + ` ${yearUnit}`],
+    [pdfSafeText(i18n.t('finance.grossSimplePayback')), (r.grossSimplePaybackYear ? Number(r.grossSimplePaybackYear).toFixed(1) : '>25') + ` ${yearUnit}`],
     [pdfSafeText(i18n.t('report.discountedPayback')), (r.discountedPaybackYear || '>25') + ` ${yearUnit}`],
     [pdfSafeText(`NPV (25 ${yearUnit})`), money(r.npvTotal)],
     ['IRR', r.irr + '%'],
-    ['LCOE', moneyRate(r.lcoe, 'kWh')],
+    [pdfSafeText(i18n.t(r.compensatedLcoe ? 'onGridResult.compensatedLcoeLabel' : 'onGridResult.lcoeLabel')), moneyRate(r.compensatedLcoe || r.lcoe, 'kWh')],
     ['ROI', r.roi + '%'],
     [pdfSafeText(i18n.t('report.co2Savings')), r.co2Savings + ` ${i18n.t('units.tonsCo2PerYear')}`],
   ];

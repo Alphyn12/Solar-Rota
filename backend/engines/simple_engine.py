@@ -178,14 +178,14 @@ def calculate_production(request: EngineRequest) -> Dict[str, object]:
     if snapshot_power:
         system_power_kwp, panel_count = snapshot_power
     else:
-        usable_area = max(0, request.roof.areaM2) * 0.75
+        usable_area = max(0, request.roof.areaM2) * max(0.1, min(1.0, request.roof.usableRoofRatio))
         panel_count = int(usable_area // panel_area)
         system_power_kwp = panel_count * panel_watt / 1000
 
     psh = _annual_ghi_to_psh(request.site.ghi, request.site.cityName)
     soiling_factor = 1 - _clamp(request.roof.soilingPct, 0, 50) / 100
     inverter_factor = inverter_efficiency(request)
-    bifacial_factor = 1 + bifacial_gain(request)
+    _bifacial_base_gain = bifacial_gain(request)
     wiring_factor = cable_loss_factor(request)
     sections = layout_sections_from_snapshot(request)
     use_section_geometry = bool(sections)
@@ -200,8 +200,9 @@ def calculate_production(request: EngineRequest) -> Dict[str, object]:
             section_base = section_power * psh * 365
             section_orientation = _tilt_factor(section["tiltDeg"]) * _azimuth_factor(section["azimuthDeg"])
             section_shading_factor = 1 - _clamp(section["shadingPct"], 0, 80) / 100
+            section_bifacial = 1 + _bifacial_base_gain * (1 - _clamp(section["shadingPct"], 0, 80) / 200)
             base_energy += section_base
-            annual_energy += section_base * section_shading_factor * soiling_factor * inverter_factor * section_orientation * bifacial_factor * wiring_factor
+            annual_energy += section_base * section_shading_factor * soiling_factor * inverter_factor * section_orientation * section_bifacial * wiring_factor
             orientation_weighted += section_orientation * section_power
             shading_weighted += section["shadingPct"] * section_power
         orientation_factor = orientation_weighted / max(system_power_kwp, 1e-9)
@@ -211,6 +212,7 @@ def calculate_production(request: EngineRequest) -> Dict[str, object]:
         shading_pct = request.roof.shadingPct
         shading_factor = 1 - _clamp(shading_pct, 0, 80) / 100
         orientation_factor = _tilt_factor(request.roof.tiltDeg) * _azimuth_factor(request.roof.azimuthDeg)
+        bifacial_factor = 1 + _bifacial_base_gain * (1 - _clamp(shading_pct, 0, 80) / 200)
         annual_energy = base_energy * shading_factor * soiling_factor * inverter_factor * orientation_factor * bifacial_factor * wiring_factor
     monthly = [round(annual_energy * weight) for weight in MONTH_WEIGHTS]
 

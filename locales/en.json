@@ -11,7 +11,26 @@
     "step4": "Equipment",
     "step5": "Finance",
     "step6": "Calculate",
-    "step7": "Results"
+    "step7": "Results",
+    "stepPrefix": "step",
+    "progressAria": "Form steps"
+  },
+  "language": {
+    "switcherAria": "Language selection",
+    "switchTo": "Switch to:",
+    "tr": "Turkish",
+    "en": "English",
+    "de": "German"
+  },
+  "settings": {
+    "title": "Settings",
+    "theme": "Theme",
+    "dark": "🌙 Dark",
+    "light": "☀️ Light",
+    "language": "Language",
+    "currency": "Currency",
+    "usdTryRate": "USD / TRY Rate",
+    "refreshRate": "Refresh rate"
   },
   "hero": {
     "eyebrow": "Turkey's complete solar energy calculator",
@@ -31,28 +50,39 @@
     "headline": "Choose your solar system type",
     "subline": "Select the system type that matches your needs to start the right calculation flow",
     "fallbackLabel": "Scenario",
-    "selectedToast": "workflow selected."
+    "selectedToast": "workflow selected.",
+    "defaultContinue": "Next Step",
+    "selectedSummaryTitle": "Selected workflow",
+    "summaryBestFor": "Best for",
+    "summaryOutput": "Output you will get",
+    "summaryNext": "Before you continue"
   },
   "scenarios": {
     "onGrid": {
       "label": "On-Grid",
       "shortLabel": "On-grid",
       "description": "Grid-connected solar. Bill savings, self-consumption, export revenue, and ROI analysis.",
+      "decisionHint": "Use when the site has grid access and the main goal is bill reduction and proposal readiness.",
       "forWhom": "Suitable for homes, offices, and commercial facilities",
       "workflowLabel": "Grid-connected proposal workflow",
       "resultFrame": "Grid-connected savings and proposal readiness",
       "nextAction": "Validate the site, bill evidence, tariff source, and supplier quote before quote-ready approval.",
-      "confidenceHint": "Best for commercial proposals when PVGIS, bill evidence, and source checks are verified."
+      "confidenceHint": "Best for commercial proposals when PVGIS, bill evidence, and source checks are verified.",
+      "resultCaution": "Proposal language should remain conditional until site, tariff, bill, and supplier evidence are verified.",
+      "primaryCta": "Continue with On-Grid"
     },
     "offGrid": {
       "label": "Off-Grid",
       "shortLabel": "Off-grid",
       "description": "Grid-independent solar. Battery capacity, critical load autonomy, and dispatch analysis.",
+      "decisionHint": "Use when the load must run without grid access or grid reliability is not acceptable.",
       "forWhom": "Suitable for rural properties, caravans, boats, and remote sites",
       "workflowLabel": "Off-grid pre-feasibility and battery dispatch workflow",
       "resultFrame": "Off-grid pre-feasibility sizing",
       "nextAction": "Define critical loads and validate autonomy with field evidence before proposal approval.",
-      "confidenceHint": "Surplus PV is not monetized; confidence depends on battery dispatch and critical-load evidence."
+      "confidenceHint": "Surplus PV is not monetized; confidence depends on battery dispatch and critical-load evidence.",
+      "resultCaution": "This is a pre-feasibility autonomy estimate, not a field guarantee or final off-grid design.",
+      "primaryCta": "Continue with Off-Grid"
     },
     "agriculturalIrrigation": {
       "label": "Agricultural Irrigation",
@@ -156,6 +186,7 @@
     "exchangeLoading": "Loading USD/TRY rate...",
     "settlementBadge": "Hourly settlement",
     "simplePayback": "Cumulative Net Payback Period",
+    "grossSimplePayback": "Simple Payback Period",
     "discountedPayback": "Discounted Cumulative Payback Period",
     "npv": "Project NPV (discounted net present value)",
     "roi": "Return on Investment (ROI)",
@@ -292,6 +323,7 @@
     "settlementBasisLabel": "Settlement basis",
     "settlementProvisional": "Date missing; monthly preliminary assumption",
     "lcoeLabel": "LCOE (not a standalone decision metric)",
+    "compensatedLcoeLabel": "Economic LCOE (after compensation)",
     "roughEstimate": "Rough estimate",
     "engineeringEstimate": "Engineering estimate",
     "quoteReadyCandidate": "Quote-ready candidate",
@@ -333,6 +365,20 @@
     "proposalTitle": "Turkey Solar Energy and Investment Report",
     "technicalTitle": "Solar Rota Technical Calculation Report",
     "preFeasibilityDisclaimer": "Pre-feasibility report only; it does not replace a final offer, structural project, or official permit document.",
+    "trustNoteTitle": "Output confidence status",
+    "engineeringReportTitle": "Engineering Calculation Report",
+    "engineeringReportSubtitle": "Review method, assumptions, and intermediate checks.",
+    "engineeringReportBadge": "Assumptions visible",
+    "downloadProposalPdf": "Download Pre-Feasibility PDF",
+    "downloadTechnicalPdf": "Download Technical Appendix PDF",
+    "shareResults": "Share Result Summary",
+    "actionsNoteTitle": "What are these outputs for?",
+    "actionsNote": "The PDF is for customer pre-feasibility, the Technical Appendix is for engineering review, and JSON files are for integration and CRM handoff.",
+    "exportProposalJson": "Proposal JSON",
+    "exportCrmJson": "CRM JSON",
+    "saveCalculation": "Save Calculation",
+    "compareQuotes": "Compare Quotes",
+    "recalculate": "Recalculate",
     "methodology": "Methodology",
     "calculationMode": "Calculation mode",
     "sourceDate": "Source date",
@@ -491,6 +537,8 @@
     "simplePaybackPreTax": "First year when cumulative net cash flow exceeds the investment basis"
   },
   "audit": {
+    "purposeTitle": "What is this panel for?",
+    "purposeBody": "Use it to see which data and evidence still need verification, not as a final approval signal.",
     "warningsTitle": "Calculation warnings",
     "noCriticalAnomalies": "No critical anomaly was found by the warning checks.",
     "location": "Location",
@@ -610,6 +658,7 @@
     "tonsCo2PerYear": "tons CO₂ / year",
     "panelUnit": "panels",
     "treeEquivalent": "tree equivalent",
+    "perDay": "/day",
     "additionalAssumption": "additional assumption",
     "offOrNone": "Off / none"
   },
@@ -658,6 +707,7 @@
     "export": "Export",
     "import": "Import",
     "clearAll": "Clear All",
+    "compareSelected": "Compare Selected",
     "paybackLabel": "Payback:",
     "compareTitle": "Comparison Results",
     "selectAtLeast2": "Select at least 2 calculations.",
@@ -677,6 +727,7 @@
     "metricAzimuth": "Azimuth"
   },
   "comparison": {
+    "title": "Quote Comparison",
     "scenarioLabel": "Scenario {letter}",
     "panelTypeLabel": "Panel Type",
     "inverterTypeLabel": "Inverter Type",
@@ -757,11 +808,14 @@
   "common": {
     "yes": "Yes",
     "no": "No",
+    "skipToMain": "Skip to main content",
+    "scrollHint": "Scroll horizontally to see all table columns.",
     "back": "← Back",
     "continue": "Continue",
     "save": "Save",
     "cancel": "Cancel",
     "close": "Close",
+    "remove": "Remove",
     "loading": "Loading...",
     "error": "Error",
     "success": "Success",

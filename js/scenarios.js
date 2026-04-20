@@ -268,7 +268,7 @@ function computeScenario(r, inflationRate, state) {
   const cashFlows = [-totalCost, ...financial.rows.map(row => row.netCashFlow)];
 
   return {
-    paybackYear: financial.simplePaybackYear,
+    paybackYear: financial.grossSimplePaybackYear ? Number(financial.grossSimplePaybackYear).toFixed(1) : financial.simplePaybackYear,
     npv: Math.round(financial.projectNPV),
     irr: calcIRR(cashFlows),
     roi: financial.roi.toFixed(1),

@@ -144,7 +144,7 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
             if is_off_grid
             else "Self-consumption calculated via scenario-heuristic target ratios "
             f"({self_consumption_target:.0%}), not 8760-hour hourly dispatch. "
-            "NPV may differ from browser calculation by 10-15%. "
+            "NPV may differ from browser calculation by up to 40%. "
             "Use browser output for commercial proposals."
         ),
     }

@@ -72,7 +72,7 @@ def engine_source(mode: str = "auto", fallback_reason: str | None = None) -> Eng
             engine="python-backend",
             provider="python-pvlib",
             source="pvlib-backed",
-            confidence="high",
+            confidence="medium",
             engineQuality="engineering-mvp",
             pvlibReady=True,
             pvlibBacked=True,
@@ -80,7 +80,7 @@ def engine_source(mode: str = "auto", fallback_reason: str | None = None) -> Eng
             notes=[
                 "pvlib solar position, clear-sky irradiance, POA transposition, cell temperature, and PVWatts DC model are active.",
                 "Panel wattage, panel area, inverter efficiency, bifacial gain, and cable loss are read from the shared frontend/backend request contract when present.",
-                "Weather is still normalized from the request GHI when no measured or PVGIS time series is provided.",
+                "Weather uses synthetic seasonal temperature (17 ± 11 °C sinusoid) and constant 1.5 m/s wind — measured data not yet integrated.",
                 "Inverter clipping, AOI losses, and dispatch remain simplified in this MVP pass.",
             ],
         )

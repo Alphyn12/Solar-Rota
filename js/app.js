@@ -82,9 +82,11 @@ function switchCurrency(currency) {
   const selectEl = document.getElementById('display-currency');
   if (selectEl) selectEl.value = currency;
   try { localStorage.setItem(CURRENCY_STORAGE_KEY, currency); } catch { /* ignore */ }
-  document.querySelectorAll('[data-currency]').forEach(btn =>
-    btn.classList.toggle('active', btn.dataset.currency === currency)
-  );
+  document.querySelectorAll('[data-currency]').forEach(btn => {
+    const isActive = btn.dataset.currency === currency;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
   buildPanelCards();
   buildInverterCards();
   updatePanelPreview();
@@ -95,14 +97,18 @@ function switchCurrency(currency) {
 window.switchCurrency = switchCurrency;
 
 // ── Ayarlar Paneli & Tema ────────────────────────────────────
+let settingsReturnFocus = null;
+
 function openSettings() {
   const panel = document.getElementById('settings-panel');
   const overlay = document.getElementById('settings-overlay');
   if (!panel) return;
+  settingsReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   panel.style.display = 'block';
   overlay.style.display = 'block';
   requestAnimationFrame(() => { panel.style.transform = 'translateX(0)'; });
   syncSettingsPanel();
+  setTimeout(() => document.getElementById('settings-close-btn')?.focus(), 120);
 }
 
 function closeSettings() {
@@ -112,6 +118,8 @@ function closeSettings() {
   panel.style.transform = 'translateX(100%)';
   overlay.style.display = 'none';
   setTimeout(() => { panel.style.display = 'none'; }, 300);
+  if (settingsReturnFocus?.isConnected) settingsReturnFocus.focus();
+  settingsReturnFocus = null;
 }
 
 function setTheme(theme) {
@@ -131,16 +139,28 @@ function initTheme() {
 
 function syncSettingsPanel() {
   const theme = document.documentElement.getAttribute('data-theme') || 'dark';
-  document.getElementById('theme-dark-btn')?.classList.toggle('active', theme === 'dark');
-  document.getElementById('theme-light-btn')?.classList.toggle('active', theme === 'light');
+  const darkBtn = document.getElementById('theme-dark-btn');
+  const lightBtn = document.getElementById('theme-light-btn');
+  if (darkBtn) {
+    darkBtn.classList.toggle('active', theme === 'dark');
+    darkBtn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+  }
+  if (lightBtn) {
+    lightBtn.classList.toggle('active', theme === 'light');
+    lightBtn.setAttribute('aria-pressed', theme === 'light' ? 'true' : 'false');
+  }
   const lang = window._currentLang || 'tr';
-  document.querySelectorAll('#settings-panel .lang-btn').forEach(btn =>
-    btn.classList.toggle('active', btn.dataset.lang === lang)
-  );
+  document.querySelectorAll('#settings-panel .lang-btn').forEach(btn => {
+    const isActive = btn.dataset.lang === lang;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
   const cur = window.state?.displayCurrency || 'TRY';
-  document.querySelectorAll('#settings-panel .currency-btn').forEach(btn =>
-    btn.classList.toggle('active', btn.dataset.currency === cur)
-  );
+  document.querySelectorAll('#settings-panel .currency-btn').forEach(btn => {
+    const isActive = btn.dataset.currency === cur;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
 }
 
 window.openSettings = openSettings;
@@ -622,6 +642,12 @@ document.addEventListener('DOMContentLoaded', () => {
       input.setAttribute('aria-expanded', 'false');
     }
   });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('settings-panel')?.style.display === 'block') closeSettings();
+    if (document.getElementById('comparison-modal')?.style.display !== 'none') closeComparison();
+    if (document.getElementById('dashboard-modal')?.style.display !== 'none') closeDashboard();
+  });
 
   document.querySelectorAll('#step-3 input[type=number]').forEach(el => {
     el.addEventListener('keydown', e => {
@@ -733,6 +759,8 @@ function renderScenarioCards() {
       return `
     <button type="button" class="scenario-choice-card${window.state.scenarioKey === scenario.key ? ' selected' : ''}"
             data-scenario-key="${scenario.key}"
+            data-testid="scenario-card-${scenario.key}"
+            aria-pressed="${window.state.scenarioKey === scenario.key ? 'true' : 'false'}"
             style="--card-color:${color}">
       <div class="scenario-card-icon">${icon}</div>
       <strong class="scenario-card-title">${scenario.label}</strong>
@@ -755,20 +783,31 @@ function updateScenarioUI() {
     resultFrame: scenario.resultFrame,
     nextAction: scenario.nextAction,
     confidenceHint: scenario.confidenceHint,
+    decisionHint: scenario.decisionHint,
+    resultCaution: scenario.resultCaution,
+    primaryCta: scenario.primaryCta,
     proposalTone: scenario.proposalTone,
     visibleBlocks: scenario.visibleBlocks
   };
   document.querySelectorAll('.scenario-choice-card').forEach(card => {
-    card.classList.toggle('selected', card.dataset.scenarioKey === scenario.key);
+    const isSelected = card.dataset.scenarioKey === scenario.key;
+    card.classList.toggle('selected', isSelected);
+    card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
   });
   const selected = document.getElementById('scenario-selected-summary');
   if (selected) {
     selected.innerHTML = `
+      <div class="scenario-summary-kicker">${i18n.t('scenario.selectedSummaryTitle')}</div>
       <strong>${scenario.label}</strong>
-      <span>${scenario.resultFrame}</span>
-      <em>${scenario.nextAction}</em>
+      <div class="scenario-summary-grid">
+        <span>${i18n.t('scenario.summaryBestFor')}</span><em>${scenario.decisionHint || scenario.description}</em>
+        <span>${i18n.t('scenario.summaryOutput')}</span><em>${scenario.resultFrame}</em>
+        <span>${i18n.t('scenario.summaryNext')}</span><em>${scenario.nextAction}</em>
+      </div>
     `;
   }
+  const step1ContinueText = document.querySelector('#step1-continue-btn [data-i18n-text]');
+  if (step1ContinueText) step1ContinueText.textContent = scenario.primaryCta || i18n.t('scenario.defaultContinue');
   const stepLabel = document.getElementById('scenario-step-label');
   if (stepLabel) stepLabel.textContent = scenario.workflowLabel;
   const resultFrame = document.getElementById('result-scenario-frame');
@@ -780,6 +819,7 @@ function updateScenarioUI() {
   if (hint) {
     hint.innerHTML = `
       <strong>${scenario.shortLabel} workflow</strong>
+      <span>${scenario.decisionHint || scenario.description}</span>
       <span>${scenario.confidenceHint}</span>
       <span>${scenario.nextAction}</span>
     `;
@@ -898,7 +938,6 @@ function selectScenario(key) {
   syncScenarioControls();
   persistState();
   showToast(`${window.state.scenarioContext?.label || i18n.t('scenario.fallbackLabel')} ${i18n.t('scenario.selectedToast')}`, 'success');
-  setTimeout(() => validateStep1(), 450);
 }
 
 function useGeolocation() {
@@ -2043,9 +2082,12 @@ function updateProgressBar() {
   const state = window.state;
   document.querySelectorAll('.step-dot').forEach(el => {
     const s = parseInt(el.dataset.step);
+    const isActive = s === state.step;
     el.classList.remove('active','done');
-    if (s === state.step) el.classList.add('active');
+    if (isActive) el.classList.add('active');
     else if (s < state.step) el.classList.add('done');
+    if (isActive) el.setAttribute('aria-current', 'step');
+    else el.removeAttribute('aria-current');
   });
   for (let i = 1; i <= 6; i++) {
     const conn = document.getElementById(`conn-${i}-${i+1}`);
@@ -2460,7 +2502,15 @@ window.onOMToggle = onOMToggle;
 window.selectScenario = selectScenario;
 window.renderScenarioCards = renderScenarioCards;
 window.updateScenarioUI = updateScenarioUI;
-window.updateScenarioUI = updateScenarioUI;
+window.switchLanguage = async function switchSolarRotaLanguage(lang) {
+  await switchLanguage(lang);
+  renderScenarioCards();
+  updateScenarioUI();
+  syncScenarioControls();
+  if (window.state?.results && document.getElementById('step-7')?.classList.contains('active')) {
+    renderResults();
+  }
+};
 window.selectCity = selectCity;
 window.useGeolocation = useGeolocation;
 window.isInTurkey = isInTurkey;
@@ -2655,6 +2705,14 @@ function renderOffgridDeviceTable() {
   if (emptyMsg) emptyMsg.style.display = 'none';
 
   const catLabels = _getCatLabels();
+  const nameLabel = i18n.t('offgridL2.deviceName');
+  const powerLabel = i18n.t('offgridL2.devicePowerW');
+  const hoursLabel = i18n.t('offgridL2.deviceHours');
+  const nightLabel = i18n.t('offgridL2.deviceNightHours');
+  const criticalLabel = i18n.t('offgridL2.deviceCritical');
+  const categoryLabel = i18n.t('offgridL2.deviceCategory');
+  const removeLabel = i18n.t('common.remove');
+  const perDayLabel = i18n.t('units.perDay');
   let totalDailyWh = 0;
   let critDailyWh  = 0;
   let critCount    = 0;
@@ -2671,34 +2729,35 @@ function renderOffgridDeviceTable() {
     if (d.isCritical) { critDailyWh += dailyWh; critCount++; }
 
     return `<tr style="border-bottom:1px solid rgba(148,163,184,0.1)">
-      <td style="padding:3px 6px"><input type="text" value="${_escHtml(d.name || '')}" placeholder="Cihaz adı"
+      <td style="padding:3px 6px"><input type="text" value="${_escHtml(d.name || '')}" placeholder="${_escHtml(nameLabel)}" aria-label="${_escHtml(nameLabel)}"
         style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);width:100px;font-size:0.75rem"
         oninput="updateOffgridDevice(${i},'name',this.value)"/></td>
-      <td style="padding:3px 6px;text-align:right"><input type="number" value="${powerW||100}" min="1" max="100000"
+      <td style="padding:3px 6px;text-align:right"><input type="number" value="${powerW||100}" min="1" max="100000" aria-label="${_escHtml(powerLabel)}"
         style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);width:68px;font-size:0.75rem;text-align:right"
         oninput="updateOffgridDevice(${i},'powerW',this.value)"/></td>
-      <td style="padding:3px 6px;text-align:right"><input type="number" value="${hours||4}" min="0.1" max="24" step="0.25"
+      <td style="padding:3px 6px;text-align:right"><input type="number" value="${hours||4}" min="0.1" max="24" step="0.25" aria-label="${_escHtml(hoursLabel)}"
         style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);width:55px;font-size:0.75rem;text-align:right"
         oninput="updateOffgridDevice(${i},'hoursPerDay',this.value)"/></td>
-      <td style="padding:3px 6px;text-align:right"><input type="number" value="${nightH||0}" min="0" max="24" step="0.25"
+      <td style="padding:3px 6px;text-align:right"><input type="number" value="${nightH||0}" min="0" max="24" step="0.25" aria-label="${_escHtml(nightLabel)}"
         style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);width:50px;font-size:0.75rem;text-align:right"
         oninput="updateOffgridDevice(${i},'nightHoursPerDay',this.value)"/></td>
-      <td style="padding:3px 6px;text-align:right;font-weight:600;color:var(--text);font-size:0.75rem">${_whLabel(dailyWh)}/gün</td>
+      <td style="padding:3px 6px;text-align:right;font-weight:600;color:var(--text);font-size:0.75rem">${_whLabel(dailyWh)}${_escHtml(perDayLabel)}</td>
       <td style="padding:3px 6px;text-align:center"><input type="checkbox" ${d.isCritical ? 'checked' : ''}
+        aria-label="${_escHtml(criticalLabel)}"
         onchange="updateOffgridDevice(${i},'isCritical',this.checked)"
         style="accent-color:#EF4444;cursor:pointer"/></td>
-      <td style="padding:3px 6px"><select
+      <td style="padding:3px 6px"><select aria-label="${_escHtml(categoryLabel)}"
         style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 4px;color:var(--text);font-size:0.72rem"
         onchange="updateOffgridDevice(${i},'category',this.value)">
         ${DEVICE_CATEGORIES.map(c => `<option value="${c}" ${(d.category||'generic')===c?'selected':''}>${_escHtml(catLabels[c]||c)}</option>`).join('')}
       </select></td>
-      <td style="padding:3px 6px"><button onclick="removeOffgridDevice(${i})"
+      <td style="padding:3px 6px"><button onclick="removeOffgridDevice(${i})" aria-label="${_escHtml(removeLabel)}"
         style="background:rgba(239,68,68,0.1);color:#EF4444;border:none;border-radius:4px;padding:2px 8px;font-size:0.72rem;cursor:pointer">✕</button></td>
     </tr>`;
   }).join('');
 
-  if (totalEl) totalEl.textContent = _whLabel(totalDailyWh) + '/gün';
-  if (critEl)  critEl.textContent  = critDailyWh > 0 ? _whLabel(critDailyWh) + '/gün (kritik)' : '—';
+  if (totalEl) totalEl.textContent = _whLabel(totalDailyWh) + perDayLabel;
+  if (critEl)  critEl.textContent  = critDailyWh > 0 ? _whLabel(critDailyWh) + perDayLabel + ` (${i18n.t('offgridL2.deviceCritical')})` : '—';
 
   _renderOffgridLiveSummary(devices.length, totalDailyWh, critDailyWh, critCount, estimatedNightWh);
 }
@@ -2720,9 +2779,9 @@ function _renderOffgridLiveSummary(deviceCount, totalDailyWh, critDailyWh, critC
 
   body.innerHTML = [
     stat(i18n.t('offgridL2.liveSummaryDevices'), String(deviceCount), '#8B5CF6'),
-    stat(i18n.t('offgridL2.liveSummaryDaily'), _whLabel(totalDailyWh) + '/gün', 'var(--text)'),
-    critDailyWh > 0 ? stat(i18n.t('offgridL2.liveSummaryCritical'), _whLabel(critDailyWh) + '/gün', '#EF4444') : '',
+    stat(i18n.t('offgridL2.liveSummaryDaily'), _whLabel(totalDailyWh) + i18n.t('units.perDay'), 'var(--text)'),
+    critDailyWh > 0 ? stat(i18n.t('offgridL2.liveSummaryCritical'), _whLabel(critDailyWh) + i18n.t('units.perDay'), '#EF4444') : '',
     critCount > 0   ? stat(i18n.t('offgridL2.liveSummaryCriticalDevices'), String(critCount), '#EF4444') : '',
-    nightWh > 0     ? stat(i18n.t('offgridL2.liveSummaryNightLoad'), _whLabel(nightWh) + '/gün', '#8B5CF6') : '',
+    nightWh > 0     ? stat(i18n.t('offgridL2.liveSummaryNightLoad'), _whLabel(nightWh) + i18n.t('units.perDay'), '#8B5CF6') : '',
   ].filter(Boolean).join('');
 }

@@ -213,8 +213,8 @@ ${escapeHtml(i18n.t('onGridResult.financialBasis'))}: ${money(r.financialCostBas
 ${escapeHtml(report('totalLifetimeExpenses'))}: ${money(r.totalExpenses25y)}
 ${escapeHtml(report('discountRate'))}: %${(r.discountRate*100).toFixed(0)}
 
-LCOE = ${moneyRate(r.lcoe, 'kWh')}</div>
-    <div class="formula-note">${escapeHtml(report('userTariff'))}: ${moneyRate(r.tariff, 'kWh')} (${escapeHtml(state.tariffType)}). ${escapeHtml(report('lcoeNote'))} ${escapeHtml(i18n.t('onGridResult.lcoeLabel'))}.${r.compensatedLcoe ? ` Compensated LCOE: ${moneyRate(r.compensatedLcoe, 'kWh')}` : ''}</div>
+LCOE = ${r.compensatedLcoe ? moneyRate(r.compensatedLcoe, 'kWh') + ' (ekonomik)' : moneyRate(r.lcoe, 'kWh')}</div>
+    <div class="formula-note">${escapeHtml(report('userTariff'))}: ${moneyRate(r.tariff, 'kWh')} (${escapeHtml(state.tariffType)}). ${escapeHtml(report('lcoeNote'))} ${escapeHtml(i18n.t('onGridResult.lcoeLabel'))}.${r.compensatedLcoe ? ` Tüm üretim bazlı LCOE: ${moneyRate(r.lcoe, 'kWh')}` : ''}</div>
   </div>
   <div class="formula-card">
     <div class="formula-title">IRR — ${escapeHtml(report('irrTitle'))} (${escapeHtml(report('rootSearch'))})</div>
@@ -444,7 +444,7 @@ export function renderEngCalcPanel() {
     ? report('lcoeShortNoteOffGrid')
     : report('lcoeShortNote');
   const co2Value = Number.parseFloat(r.co2Savings);
-  const paybackValue = Number(r.simplePaybackYear || r.paybackYear || 0);
+  const paybackValue = Number(r.grossSimplePaybackYear || r.simplePaybackYear || r.paybackYear || 0);
 
   panel.style.display = 'block';
   panel.innerHTML = `

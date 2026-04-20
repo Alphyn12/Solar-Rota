@@ -34,17 +34,21 @@ def main():
             page.wait_for_load_state("networkidle")
             page.click('[data-lang="en"]')
             page.wait_for_function("document.querySelector('.hero-title')?.textContent.includes('Design your solar energy system')")
-            page.wait_for_function("document.querySelector('.scenario-grid-label')?.textContent === 'Choose your system scenario'")
+            page.wait_for_function("document.querySelector('.scenario-select-headline')?.textContent === 'Choose your solar system type'")
             assert page.evaluate("localStorage.getItem('guneshesap_lang')") == "en"
             assert page.locator('.step-dot[data-step="1"] .step-dot-label').inner_text() == "Scenario"
+            assert page.locator('.step-dot[data-step="1"]').get_attribute("aria-label") == "1. step: Scenario"
             assert page.locator('.step-dot[data-step="7"] .step-dot-label').inner_text() == "Results"
+            assert page.locator('.step-dots').get_attribute("aria-label") == "Form steps"
+            assert page.locator('.header-lang-btn[data-lang="en"]').get_attribute("aria-pressed") == "true"
             assert page.locator('.scenario-choice-card[data-scenario-key="on-grid"] strong').inner_text() == "On-Grid"
             assert "Bill savings" in page.locator('.scenario-choice-card[data-scenario-key="on-grid"] .scenario-card-desc').inner_text()
             assert page.locator("#geolocation-btn svg").count() == 1
             assert page.locator("#geolocation-btn .step2-geo-label").inner_text() == "Use My Location"
             page.click('.scenario-choice-card[data-scenario-key="off-grid"]')
-            assert "Autonomy-first" in page.locator("#scenario-selected-summary").inner_text()
-            assert page.locator(".chart-title").first.inner_text() == "Monthly Energy Production (kWh)"
+            assert "Output you will get" in page.locator("#scenario-selected-summary").inner_text()
+            assert "Continue with Off-Grid" in page.locator("#step1-continue-btn").inner_text()
+            assert page.locator('.scenario-choice-card[data-scenario-key="off-grid"]').get_attribute("aria-pressed") == "true"
             page.reload()
             page.wait_for_load_state("networkidle")
             page.wait_for_function("document.querySelector('.hero-title')?.textContent.includes('Design your solar energy system')")
@@ -52,10 +56,12 @@ def main():
             page.wait_for_function("document.querySelector('.hero-title')?.textContent.includes('Planen Sie Ihr Solarsystem')")
             assert page.evaluate("localStorage.getItem('guneshesap_lang')") == "de"
             assert page.locator('.step-dot[data-step="1"] .step-dot-label').inner_text() == "Szenario"
+            assert page.locator('.step-dot[data-step="1"]').get_attribute("aria-label") == "1. Schritt: Szenario"
             assert page.locator('.step-dot[data-step="7"] .step-dot-label').inner_text() == "Ergebnisse"
+            assert page.locator('.step-dots').get_attribute("aria-label") == "Formularschritte"
             assert page.locator("#geolocation-btn svg").count() == 1
             assert page.locator("#geolocation-btn .step2-geo-label").inner_text() == "Meinen Standort verwenden"
-            assert page.locator('.scenario-choice-card[data-scenario-key="ev-charging"] strong').inner_text() == "EV-Ladestation"
+            assert page.locator('.scenario-choice-card[data-scenario-key="off-grid"] strong').inner_text() == "Off-Grid"
             print("i18n browser smoke passed")
             browser.close()
     finally:
