@@ -397,8 +397,10 @@ textarea {
 
   .scenario-card-icon {
     grid-row: span 2;
-    width: 44px;
-    height: 44px;
+    width: 60px;
+    height: 60px;
+    justify-self: center;
+    align-self: center;
     margin-bottom: 0;
   }
 
@@ -778,8 +780,10 @@ textarea {
   }
 
   .scenario-card-icon {
-    width: 40px;
-    height: 40px;
+    width: 56px;
+    height: 56px;
+    justify-self: center;
+    align-self: center;
   }
 
   .step2-geo-label {

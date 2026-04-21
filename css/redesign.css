@@ -231,17 +231,18 @@ h2, .h2, .step-heading-title {
   animation: cardGlowPulse 3s ease-in-out infinite;
 }
 #step-1 .scenario-choice-card .scenario-card-icon {
-  width: 120px; height: 120px;
+  width: 142px; height: 142px;
   border-radius: 22px;
   background: rgba(255,255,255,.05);
   border: 1px solid rgba(255,255,255,.12);
   display: flex; align-items: center; justify-content: center;
+  align-self: center;
   flex-shrink: 0;
   margin-bottom: 8px;
 }
 #step-1 .scenario-choice-card .scenario-card-icon .scenario-svg-icon,
 #step-1 .scenario-choice-card .scenario-card-icon svg {
-  width: 96px; height: 96px;
+  width: 114px; height: 114px;
 }
 #step-1 .scenario-card-desc {
   font-size: .80rem; color: var(--text-muted); line-height: 1.55; flex: 1;
@@ -281,8 +282,8 @@ h2, .h2, .step-heading-title {
 }
 @media(max-width:560px){
   #step-1 .scenario-choice-card { min-height: 200px; padding: 22px 18px; }
-  #step-1 .scenario-choice-card .scenario-card-icon { width: 90px; height: 90px; }
-  #step-1 .scenario-choice-card .scenario-card-icon svg { width: 72px; height: 72px; }
+  #step-1 .scenario-choice-card .scenario-card-icon { width: 104px; height: 104px; align-self: center; }
+  #step-1 .scenario-choice-card .scenario-card-icon svg { width: 82px; height: 82px; }
   #step-1 .scenario-card-title { font-size: 1.05rem; }
   .hero-logo-main { height: 120px; }
 }
