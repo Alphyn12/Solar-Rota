@@ -344,9 +344,14 @@ h2, .h2, .step-heading-title {
   padding: 10px 16px;
   box-shadow: 0 2px 16px rgba(0,0,0,.4);
 }
+.step2-search-wrap {
+  flex: 1 1 640px;
+  min-width: 320px;
+  max-width: 760px;
+}
 .step2-topbar .input-wrap {
   flex: 1;
-  max-width: 500px;
+  max-width: none;
   position: relative;
 }
 .step2-topbar input[type=text] {
@@ -389,7 +394,7 @@ h2, .h2, .step-heading-title {
 }
 .step2-map-helper {
   top: 14px;
-  left: 14px;
+  left: 56px;
   max-width: min(360px, calc(100% - 28px));
   display: grid;
   gap: 5px;
