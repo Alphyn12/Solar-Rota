@@ -458,23 +458,30 @@ textarea {
     flex: 1 1 160px;
   }
 
-  .step2-topbar .ghi-legend {
-    order: 5;
-    width: 100%;
-    margin-left: 0 !important;
-    overflow-x: auto;
-    flex-wrap: nowrap !important;
-    padding-bottom: 2px;
-    -webkit-overflow-scrolling: touch;
-  }
-
   #location-warning {
     flex: 1 1 100%;
   }
 
   #step2-map-slot {
-    height: calc(100dvh - var(--header-h) - 118px);
-    min-height: 350px;
+    height: auto;
+    min-height: 0;
+  }
+
+  .step2-map-helper,
+  .step2-legend-card {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    max-width: none;
+  }
+
+  .step2-map-helper {
+    top: 10px;
+  }
+
+  .step2-legend-card {
+    top: auto;
+    bottom: 116px;
   }
 
   .leaflet-touch .leaflet-bar a {
@@ -493,15 +500,11 @@ textarea {
   .location-bottom-card {
     left: 10px;
     right: 10px;
-    bottom: -260px;
+    bottom: 10px;
     padding: 12px;
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
-  }
-
-  .location-bottom-card.visible {
-    bottom: 10px;
   }
 
   .loc-bottom-left,
@@ -531,6 +534,14 @@ textarea {
   .step3-map-col {
     height: min(46dvh, 390px);
     min-height: 280px;
+  }
+
+  .roof-tool-legend {
+    top: 84px;
+    left: 10px;
+    right: 10px;
+    max-width: none;
+    padding: 10px 12px;
   }
 
   .step3-config-col {
@@ -791,13 +802,38 @@ textarea {
   }
 
   #step2-map-slot {
-    height: calc(100dvh - var(--header-h) - 128px);
-    min-height: 330px;
+    height: auto;
+    min-height: 0;
   }
 
   .location-bottom-card {
     left: 8px;
     right: 8px;
+  }
+
+  .step2-map-helper {
+    padding: 10px 12px;
+  }
+
+  .step2-map-helper strong {
+    font-size: .82rem;
+  }
+
+  .step2-map-helper span,
+  .step2-overlay-legend .ghi-leg-item {
+    font-size: .7rem;
+  }
+
+  .step2-legend-card {
+    bottom: 108px;
+    padding: 9px 10px;
+  }
+
+  .roof-tool-legend {
+    top: 78px;
+    left: 8px;
+    right: 8px;
+    padding: 9px 10px;
   }
 
   .loc-bottom-right {

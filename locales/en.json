@@ -125,7 +125,7 @@
     }
   },
   "step2": {
-    "search": "Search for a city...",
+    "search": "Search an address, street, neighborhood, district, or city...",
     "geoBtn": "Use My Location",
     "geoLoading": "Getting location...",
     "geoUnsupported": "Your browser does not support location detection.",
@@ -133,7 +133,27 @@
     "geoDenied": "Location access was denied.",
     "locationSelected": "Location selected",
     "satellite": "Satellite",
+    "satelliteMapLabel": "Satellite view",
+    "darkMapLabel": "Dark map",
+    "helperKicker": "Location selection",
+    "helperTitle": "Search an address or click the map",
+    "helperBody": "Street, neighborhood, district, and city matches are listed together. Choose the most accurate result.",
+    "legendTitle": "Solar resource range",
+    "quickPickLabel": "Quick city pick",
+    "addressResultLabel": "Address",
     "outOfTurkey": "⚠ Choose a location inside Turkey."
+  },
+  "step3": {
+    "drawGuideTitle": "Tool guide for measuring the roof area",
+    "drawGuidePolygon": "Freeform: follow the roof boundary corner by corner",
+    "drawGuideRect": "Rectangle: use fast measurement for regular roofs",
+    "drawGuideEdit": "Edit: move points and update the area",
+    "drawGuideDelete": "Delete: clear the measurement and start over",
+    "drawToolPolygon": "Freeform drawing tool",
+    "drawToolRect": "Rectangle drawing tool",
+    "drawToolEdit": "Edit drawing",
+    "drawToolDelete": "Delete drawing",
+    "drawToastStart": "Click roof corners and double-click to finish. The rectangle tool is faster for regular roofs."
   },
   "step4": {
     "eyebrow": "Step 4 / 7",

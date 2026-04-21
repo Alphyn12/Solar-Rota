@@ -125,7 +125,7 @@
     }
   },
   "step2": {
-    "search": "Şehir adı yazın...",
+    "search": "Adres, sokak, mahalle, ilçe veya şehir yazın...",
     "geoBtn": "Konumumu Kullan",
     "geoLoading": "Konum alınıyor...",
     "geoUnsupported": "Tarayıcınız konum belirlemeyi desteklemiyor.",
@@ -133,7 +133,27 @@
     "geoDenied": "Konum erişimi reddedildi.",
     "locationSelected": "Konum seçildi",
     "satellite": "Uydu",
+    "satelliteMapLabel": "Uydu görünüm",
+    "darkMapLabel": "Koyu görünüm",
+    "helperKicker": "Konum seçimi",
+    "helperTitle": "Adres arayın veya haritaya tıklayın",
+    "helperBody": "Sokak, mahalle, ilçe ve şehir sonuçları birlikte listelenir. En doğru eşleşmeyi seçin.",
+    "legendTitle": "Güneşlenme aralığı",
+    "quickPickLabel": "Hızlı şehir seçimi",
+    "addressResultLabel": "Adres",
     "outOfTurkey": "⚠ Türkiye sınırları içinde bir konum seçin."
+  },
+  "step3": {
+    "drawGuideTitle": "Çatı alanını ölçmek için araç rehberi",
+    "drawGuidePolygon": "Serbest çizim: çatı sınırını köşe köşe takip edin",
+    "drawGuideRect": "Dikdörtgen: düzenli çatılarda hızlı ölçüm alın",
+    "drawGuideEdit": "Düzenle: noktaları taşıyıp alanı güncelleyin",
+    "drawGuideDelete": "Sil: ölçümü temizleyip yeniden başlayın",
+    "drawToolPolygon": "Serbest çizim aracı",
+    "drawToolRect": "Dikdörtgen çizim aracı",
+    "drawToolEdit": "Çizimi düzenle",
+    "drawToolDelete": "Çizimi sil",
+    "drawToastStart": "Çatı köşelerine tıklayın, çift tıklayarak tamamlayın. Dikdörtgen araç düzenli çatılarda daha hızlıdır."
   },
   "step4": {
     "eyebrow": "Adım 4 / 7",

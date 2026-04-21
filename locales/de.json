@@ -125,7 +125,7 @@
     }
   },
   "step2": {
-    "search": "Stadt suchen...",
+    "search": "Adresse, Straße, Viertel, Bezirk oder Stadt suchen...",
     "geoBtn": "Meinen Standort verwenden",
     "geoLoading": "Standort wird ermittelt...",
     "geoUnsupported": "Ihr Browser unterstützt keine Standortermittlung.",
@@ -133,7 +133,27 @@
     "geoDenied": "Standortzugriff wurde verweigert.",
     "locationSelected": "Standort ausgewählt",
     "satellite": "Satellit",
+    "satelliteMapLabel": "Satellitenansicht",
+    "darkMapLabel": "Dunkle Karte",
+    "helperKicker": "Standortwahl",
+    "helperTitle": "Adresse suchen oder auf die Karte klicken",
+    "helperBody": "Straßen-, Viertel-, Bezirks- und Stadttreffer werden gemeinsam gelistet. Wählen Sie den genauesten Treffer.",
+    "legendTitle": "Solarressourcenbereich",
+    "quickPickLabel": "Schnelle Stadtauswahl",
+    "addressResultLabel": "Adresse",
     "outOfTurkey": "⚠ Wählen Sie einen Standort innerhalb der Türkei."
+  },
+  "step3": {
+    "drawGuideTitle": "Werkzeughilfe zur Dachflächenmessung",
+    "drawGuidePolygon": "Freiform: folgen Sie der Dachkante Ecke für Ecke",
+    "drawGuideRect": "Rechteck: schnelle Messung für regelmäßige Dächer",
+    "drawGuideEdit": "Bearbeiten: Punkte verschieben und Fläche aktualisieren",
+    "drawGuideDelete": "Löschen: Messung zurücksetzen und neu beginnen",
+    "drawToolPolygon": "Freiform-Zeichenwerkzeug",
+    "drawToolRect": "Rechteck-Zeichenwerkzeug",
+    "drawToolEdit": "Zeichnung bearbeiten",
+    "drawToolDelete": "Zeichnung löschen",
+    "drawToastStart": "Klicken Sie die Dachecken an und doppelklicken Sie zum Abschluss. Für regelmäßige Dächer ist das Rechteck-Werkzeug schneller."
   },
   "step4": {
     "eyebrow": "Schritt 4 / 7",

@@ -40,6 +40,7 @@ import { applyScenarioDefaults, getScenarioDefinition, listScenarioDefinitions, 
 import { createSolarProposalMark } from './solar-art.js';
 import { loadProposalState, saveProposalState } from './storage.js';
 import { DEVICE_CATALOG, DEVICE_CATEGORIES, DEVICE_CATEGORY_LABELS, catalogItemToDevice, getDevicesByCategory } from './device-catalog.js';
+import { escapeHtml } from './security.js';
 
 // ── Global data referansı ────────────────────────────────────────────────────
 window._appData = { PANEL_TYPES, BATTERY_MODELS, COMPASS_DIRS, INVERTER_TYPES, MONTHS, HEAT_PUMP_DATA, EV_MODELS };
@@ -371,6 +372,13 @@ window._drawingMode = false;
 window._glarePickMode = false;
 window._activeTileLayer = 'dark';
 
+function syncHeaderHeightVar() {
+  const header = document.getElementById('app-header');
+  if (!header) return;
+  document.documentElement.style.setProperty('--header-h', `${header.offsetHeight}px`);
+}
+window.syncHeaderHeightVar = syncHeaderHeightVar;
+
 function initMap() {
   map = L.map('map', { zoomControl: true }).setView([39.0, 35.0], 6);
   window.map = map;
@@ -418,17 +426,12 @@ function initMap() {
     const name = e.name;
     if (name.includes('Uydu')) {
       window._activeTileLayer = 'satellite';
-      const btn = document.getElementById('map-layer-label');
-      if (btn) btn.textContent = 'Koyu';
     } else if (name.includes('OSM') || name.includes('Open')) {
       window._activeTileLayer = 'osm';
-      const btn = document.getElementById('map-layer-label');
-      if (btn) btn.textContent = 'Uydu';
     } else {
       window._activeTileLayer = 'dark';
-      const btn = document.getElementById('map-layer-label');
-      if (btn) btn.textContent = 'Uydu';
     }
+    syncMapLayerButton();
   });
 
   // ── Şehir işaretçileri ──────────────────────────────────
@@ -461,6 +464,7 @@ function initMap() {
   });
 
   initRoofDrawing(map);
+  syncMapLayerButton();
 
   // invalidateSize — birden fazla noktada
   setTimeout(() => map.invalidateSize(), 100);
@@ -477,20 +481,26 @@ function toggleMapLayer() {
     window._osmLayer.remove();
     window._darkLayer.addTo(window.map);
     window._activeTileLayer = 'dark';
-    const lbl = document.getElementById('map-layer-label');
-    if (lbl) lbl.textContent = 'Uydu';
     document.getElementById('map-satellite-btn')?.classList.remove('active');
   } else {
     window._darkLayer.remove();
     window._osmLayer.remove();
     window._satelliteLayer.addTo(window.map);
     window._activeTileLayer = 'satellite';
-    const lbl = document.getElementById('map-layer-label');
-    if (lbl) lbl.textContent = 'Koyu';
     document.getElementById('map-satellite-btn')?.classList.add('active');
   }
+  syncMapLayerButton();
 }
 window.toggleMapLayer = toggleMapLayer;
+
+function syncMapLayerButton() {
+  const lbl = document.getElementById('map-layer-label');
+  if (!lbl) return;
+  lbl.textContent = window._activeTileLayer === 'satellite'
+    ? i18n.t('step2.darkMapLabel')
+    : i18n.t('step2.satelliteMapLabel');
+}
+window.syncMapLayerButton = syncMapLayerButton;
 
 function getGHIColor(ghi) {
   if (ghi < 1300) return '#6B7280';
@@ -569,12 +579,67 @@ function isInTurkey(lat, lon) {
   return isLocationInTurkey(lat, lon);
 }
 
+function setAutocompleteOpen(open) {
+  const list = document.getElementById('autocomplete-list');
+  const input = document.getElementById('city-search');
+  if (list) list.classList.toggle('open', !!open);
+  if (input) input.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function createAutocompleteItem({ title, subtitle = '', meta = '', onSelect }) {
+  const item = document.createElement('div');
+  item.className = 'autocomplete-item';
+  item.setAttribute('role', 'option');
+  item.setAttribute('aria-selected', 'false');
+  item.innerHTML = `
+    <span class="autocomplete-copy">
+      <strong>${escapeHtml(title)}</strong>
+      ${subtitle ? `<span>${escapeHtml(subtitle)}</span>` : ''}
+    </span>
+    ${meta ? `<span class="autocomplete-ghi">${escapeHtml(meta)}</span>` : ''}
+  `;
+  item.addEventListener('mousedown', event => {
+    event.preventDefault();
+    onSelect?.();
+  });
+  return item;
+}
+
+function formatNominatimResult(result) {
+  const address = result?.address || {};
+  const titleBase = address.road
+    || address.pedestrian
+    || address.footway
+    || address.path
+    || address.residential
+    || address.neighbourhood
+    || address.suburb
+    || address.quarter
+    || address.village
+    || address.town
+    || address.city
+    || result?.namedetails?.name
+    || String(result?.display_name || '').split(',')[0]?.trim()
+    || 'Adres';
+  const title = [titleBase, address.house_number].filter(Boolean).join(' ');
+  const subtitleParts = [
+    address.neighbourhood || address.suburb || address.quarter,
+    address.city_district || address.town || address.county || address.state_district,
+    address.city || address.state
+  ].filter(Boolean);
+  const subtitle = [...new Set(subtitleParts)].join(' · ')
+    || String(result?.display_name || '').split(',').slice(1, 4).map(v => v.trim()).filter(Boolean).join(' · ');
+  return { title, subtitle };
+}
+
 // ═══════════════════════════════════════════════════════════
 // AUTOCOMPLETE
 // ═══════════════════════════════════════════════════════════
 let acIndex = -1;
 let lastTariffAuditSnapshot = null;
 document.addEventListener('DOMContentLoaded', () => {
+  syncHeaderHeightVar();
+  window.addEventListener('resize', syncHeaderHeightVar);
   try { initMap(); } catch(e) {
     console.error('initMap hatası:', e);
     document.getElementById('map').innerHTML =
@@ -610,22 +675,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const qLow = q.toLowerCase();
     list.innerHTML = '';
     acIndex = -1;
-    if (q.length < 1) { list.classList.remove('open'); input.setAttribute('aria-expanded','false'); return; }
+    if (q.length < 1) { setAutocompleteOpen(false); return; }
     const matches = TURKISH_CITIES.filter(c => c.name.toLowerCase().includes(qLow)).slice(0, 5);
     matches.forEach(c => {
-      const item = document.createElement('div');
-      item.className = 'autocomplete-item';
-      item.setAttribute('role', 'option');
-      item.setAttribute('aria-selected', 'false');
-      item.innerHTML = `<span>${c.name}</span><span class="autocomplete-ghi">${c.ghi} kWh/m²</span>`;
-      item.addEventListener('mousedown', () => selectCity(c));
+      const item = createAutocompleteItem({
+        title: c.name,
+        subtitle: i18n.t('step2.quickPickLabel'),
+        meta: `${c.ghi} kWh/m²`,
+        onSelect: () => selectCity(c)
+      });
       list.appendChild(item);
     });
-    if (list.children.length) { list.classList.add('open'); input.setAttribute('aria-expanded', 'true'); }
+    if (list.children.length) setAutocompleteOpen(true);
     // Nominatim geocoding for street/neighborhood search
     if (_nominatimTimer) clearTimeout(_nominatimTimer);
     if (q.length >= 3) {
-      _nominatimTimer = setTimeout(() => _fetchNominatim(q, qLow, list), 450);
+      _nominatimTimer = setTimeout(() => _fetchNominatim(q, qLow, list), 320);
     }
   });
 
@@ -633,13 +698,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const items = list.querySelectorAll('.autocomplete-item');
     if (e.key === 'ArrowDown') { acIndex = Math.min(acIndex+1, items.length-1); highlightAC(items); e.preventDefault(); }
     else if (e.key === 'ArrowUp') { acIndex = Math.max(acIndex-1, -1); highlightAC(items); e.preventDefault(); }
-    else if (e.key === 'Enter' && acIndex >= 0) { items[acIndex].dispatchEvent(new Event('mousedown')); e.preventDefault(); }
-    else if (e.key === 'Escape') { list.classList.remove('open'); }
+    else if (e.key === 'Enter' && items.length) {
+      const targetIndex = acIndex >= 0 ? acIndex : 0;
+      items[targetIndex].dispatchEvent(new Event('mousedown'));
+      e.preventDefault();
+    }
+    else if (e.key === 'Escape') { setAutocompleteOpen(false); }
   });
   document.addEventListener('click', e => {
     if (!e.target.closest('.input-wrap')) {
-      list.classList.remove('open');
-      input.setAttribute('aria-expanded', 'false');
+      setAutocompleteOpen(false);
     }
   });
   document.addEventListener('keydown', e => {
@@ -667,14 +735,18 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function highlightAC(items) {
-  items.forEach((el, i) => el.classList.toggle('selected', i === acIndex));
+  items.forEach((el, i) => {
+    const isSelected = i === acIndex;
+    el.classList.toggle('selected', isSelected);
+    el.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+  });
 }
 
 function selectCity(city) {
   window.state.lat = city.lat; window.state.lon = city.lon;
   window.state.cityName = city.name; window.state.ghi = city.ghi;
   document.getElementById('city-search').value = city.name;
-  document.getElementById('autocomplete-list').classList.remove('open');
+  setAutocompleteOpen(false);
   document.getElementById('location-warning').style.display = 'none';
   document.getElementById('selected-loc-text').textContent =
     `${city.name} — ${city.lat.toFixed(4)}°K, ${city.lon.toFixed(4)}°D (GHI: ${city.ghi})`;
@@ -685,7 +757,8 @@ function selectCity(city) {
 
 async function _fetchNominatim(q, qLow, list) {
   try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ', Türkiye')}&countrycodes=tr&format=json&limit=6&addressdetails=1&accept-language=tr`;
+    const locale = (window._currentLang || 'tr');
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ', Türkiye')}&countrycodes=tr&format=json&limit=8&addressdetails=1&namedetails=1&accept-language=${encodeURIComponent(locale)}`;
     const resp = await fetch(url);
     if (!resp.ok) return;
     const results = await resp.json();
@@ -693,34 +766,32 @@ async function _fetchNominatim(q, qLow, list) {
     const currentQ = document.getElementById('city-search')?.value?.trim()?.toLowerCase();
     if (currentQ !== qLow) return;
     const added = [];
+    const seen = new Set();
     for (const r of results) {
-      if (added.length >= 4) break;
-      const lat = parseFloat(r.lat), lon = parseFloat(r.lon);
-      if (!isLocationInTurkey(lat, lon)) continue;
-      const parts = r.display_name.split(',');
-      const shortName = parts.slice(0, Math.min(3, parts.length)).join(',').trim();
-      // Skip duplicates with local cities
-      if (TURKISH_CITIES.some(c => c.name.toLowerCase() === parts[0].trim().toLowerCase())) continue;
-      const item = document.createElement('div');
-      item.className = 'autocomplete-item';
-      item.setAttribute('role', 'option');
-      item.setAttribute('aria-selected', 'false');
-      item.innerHTML = `<span style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${shortName}</span><span class="autocomplete-ghi" style="color:#06B6D4;font-size:0.68rem">📍 Adres</span>`;
-      item.addEventListener('mousedown', () => _selectNominatimResult(r));
+      if (added.length >= 6) break;
+      const formatted = formatNominatimResult(r);
+      const dedupeKey = String(r.display_name || `${formatted.title}|${formatted.subtitle}`).toLowerCase();
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      const item = createAutocompleteItem({
+        title: formatted.title,
+        subtitle: formatted.subtitle,
+        meta: i18n.t('step2.addressResultLabel'),
+        onSelect: () => _selectNominatimResult(r)
+      });
       list.appendChild(item);
       added.push(r);
     }
     if (list.children.length > 0) {
-      list.classList.add('open');
-      document.getElementById('city-search')?.setAttribute('aria-expanded', 'true');
+      setAutocompleteOpen(true);
     }
   } catch { /* network errors silently ignored */ }
 }
 
 function _selectNominatimResult(result) {
   const lat = parseFloat(result.lat), lon = parseFloat(result.lon);
-  const parts = result.display_name.split(',');
-  const name = parts.slice(0, Math.min(3, parts.length)).join(',').trim();
+  const formatted = formatNominatimResult(result);
+  const name = [formatted.title, formatted.subtitle].filter(Boolean).join(' · ');
   // Find nearest city for GHI lookup
   const nearest = TURKISH_CITIES.reduce((best, c) =>
     Math.hypot(c.lat - lat, c.lon - lon) < Math.hypot(best.lat - lat, best.lon - lon) ? c : best
@@ -728,7 +799,7 @@ function _selectNominatimResult(result) {
   window.state.lat = lat; window.state.lon = lon;
   window.state.cityName = name; window.state.ghi = nearest.ghi;
   document.getElementById('city-search').value = name;
-  document.getElementById('autocomplete-list').classList.remove('open');
+  setAutocompleteOpen(false);
   document.getElementById('location-warning').style.display = 'none';
   map.setView([lat, lon], 15, { animate: true });
   marker.setLatLng([lat, lon]);
@@ -2054,6 +2125,7 @@ function goToStep(n) {
   const fromEl = document.getElementById(`step-${state.step}`);
   const toEl = document.getElementById(`step-${n}`);
   if (!fromEl || !toEl) return;
+  const main = document.getElementById('main-content');
   fromEl.classList.remove('active');
   state.step = n;
   if (n === 1) {
@@ -2069,8 +2141,12 @@ function goToStep(n) {
     }, 600);
   }
   toEl.classList.add('active');
+  if (main) main.classList.toggle('immersive-flow', n === 2 || n === 3);
+  document.body.classList.toggle('immersive-screen', n === 2 || n === 3);
+  document.documentElement.classList.toggle('immersive-screen', n === 2 || n === 3);
+  syncHeaderHeightVar();
   updateProgressBar();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: (n === 2 || n === 3) ? 'auto' : 'smooth' });
   // Show/hide roof start hint
   const roofStartHint = document.getElementById('roof-draw-start-hint');
   if (roofStartHint) {

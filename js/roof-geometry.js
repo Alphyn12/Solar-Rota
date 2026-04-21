@@ -143,6 +143,22 @@ function layerToPoints(layer) {
   return latlngs.map(p => ({ lat: p.lat, lng: p.lng }));
 }
 
+function syncDrawToolbarLabels() {
+  const t = key => window.i18n?.t?.(key) || key;
+  const labels = [
+    ['.leaflet-draw-draw-polygon', t('step3.drawToolPolygon')],
+    ['.leaflet-draw-draw-rectangle', t('step3.drawToolRect')],
+    ['.leaflet-draw-edit-edit', t('step3.drawToolEdit')],
+    ['.leaflet-draw-edit-remove', t('step3.drawToolDelete')]
+  ];
+  labels.forEach(([selector, label]) => {
+    document.querySelectorAll(selector).forEach(el => {
+      el.setAttribute('title', label);
+      el.setAttribute('aria-label', label);
+    });
+  });
+}
+
 function persist(summary) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(summary)); } catch { /* ignore */ }
 }
@@ -257,6 +273,8 @@ export function initRoofDrawing(map) {
     }
   });
   map.addControl(drawControl);
+  syncDrawToolbarLabels();
+  window.syncRoofDrawToolbarLabels = syncDrawToolbarLabels;
 
   // ── Çizim başladı ─────────────────────────────────────
   map.on(L.Draw.Event.DRAWSTART, () => {
@@ -268,13 +286,13 @@ export function initRoofDrawing(map) {
       window._satelliteLayer?.addTo(map);
       window._activeTileLayer = 'satellite';
       const lbl = document.getElementById('map-layer-label');
-      if (lbl) lbl.textContent = 'Koyu';
+      if (lbl) lbl.textContent = window.i18n?.t?.('step2.darkMapLabel') || 'Koyu görünüm';
       document.getElementById('map-satellite-btn')?.classList.add('active');
     }
     if (map.getZoom() > 18) map.setZoom(18);
     const hint = document.getElementById('map-draw-hint');
     if (hint) hint.style.display = 'block';
-    window.showToast?.('Çatı köşelerine tıklayın · çift tıklayarak tamamlayın · ESC ile iptal edin.', 'info');
+    window.showToast?.(window.i18n?.t?.('step3.drawToastStart') || 'Çatı köşelerine tıklayın, çift tıklayarak tamamlayın. Dikdörtgen araç düzenli çatılar için daha hızlıdır.', 'info');
   });
 
   map.on(L.Draw.Event.DRAWSTOP, () => {

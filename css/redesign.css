@@ -324,12 +324,16 @@ h2, .h2, .step-heading-title {
   margin-left: calc(50% - 50vw);
   padding: 0;
   overflow: hidden;
+  height: calc(100dvh - var(--header-h));
+  min-height: calc(100dvh - var(--header-h));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .step2-topbar {
   position: relative;
-  z-index: 20;
-  height: 64px;
+  z-index: 600;
+  min-height: 60px;
   background: rgba(15,23,42,.97);
   backdrop-filter: blur(20px) saturate(1.5);
   -webkit-backdrop-filter: blur(20px) saturate(1.5);
@@ -337,7 +341,7 @@ h2, .h2, .step-heading-title {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 16px;
+  padding: 10px 16px;
   box-shadow: 0 2px 16px rgba(0,0,0,.4);
 }
 .step2-topbar .input-wrap {
@@ -362,22 +366,89 @@ h2, .h2, .step-heading-title {
 
 #step2-map-slot {
   width: 100%;
-  height: calc(100vh - var(--header-h) - 64px);
-  min-height: 380px;
+  height: auto;
+  min-height: 0;
   position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
 }
 #step2-map-slot #map-card {
   width: 100%!important; height: 100%!important;
   border-radius: 0!important; border: none!important;
   padding: 0!important; box-shadow: none!important;
   transform: none!important;
+  background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
 }
-#step2-map-slot #map { height: 100%!important; border-radius: 0!important; }
+#step2-map-slot #map,
+#step2-map-slot .leaflet-container { height: 100%!important; border-radius: 0!important; background: linear-gradient(180deg, #0b1220 0%, #111827 100%); }
+.step2-map-overlay {
+  position: absolute;
+  z-index: 450;
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+.step2-map-helper {
+  top: 14px;
+  left: 14px;
+  max-width: min(360px, calc(100% - 28px));
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 12px;
+  background: rgba(9,14,25,.76);
+  box-shadow: 0 10px 28px rgba(0,0,0,.35);
+}
+.step2-helper-kicker {
+  font-size: .66rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--primary);
+}
+.step2-map-helper strong {
+  font-size: .9rem;
+  line-height: 1.25;
+  color: var(--text);
+}
+.step2-map-helper span {
+  font-size: .76rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.step2-legend-card {
+  right: 14px;
+  top: 14px;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(9,14,25,.76);
+  box-shadow: 0 10px 28px rgba(0,0,0,.35);
+}
+.step2-legend-title {
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.step2-overlay-legend {
+  gap: 7px;
+  max-width: 280px;
+}
+.step2-overlay-legend .ghi-leg-item {
+  font-size: .68rem;
+}
+.leaflet-control-layers {
+  display: none !important;
+}
 
 /* Location bottom card — slides up after pin drop */
 .location-bottom-card {
-  position: fixed;
-  bottom: -120px; left: 0; right: 0;
+  position: absolute;
+  bottom: 18px; left: 18px; right: 18px;
   z-index: 200;
   background: rgba(15,23,42,.98);
   backdrop-filter: blur(24px) saturate(1.8);
@@ -388,10 +459,17 @@ h2, .h2, .step-heading-title {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  transition: bottom .45s cubic-bezier(.34,1.56,.64,1);
+  opacity: 0;
+  transform: translateY(24px);
+  pointer-events: none;
+  transition: transform .35s ease, opacity .35s ease;
   box-shadow: 0 -8px 32px rgba(0,0,0,.5);
 }
-.location-bottom-card.visible { bottom: 0; }
+.location-bottom-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
 
 .loc-bottom-left {
   display: flex;
@@ -433,6 +511,35 @@ h2, .h2, .step-heading-title {
 }
 .loc-bottom-right {
   display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.roof-tool-legend {
+  position: absolute;
+  top: 84px;
+  right: 16px;
+  z-index: 998;
+  max-width: 320px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(9,14,25,.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 26px rgba(0,0,0,.35);
+}
+.roof-tool-legend-title {
+  font-size: .74rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.roof-tool-legend-list {
+  display: grid;
+  gap: 6px;
+}
+.roof-tool-legend-list span {
+  font-size: .73rem;
+  line-height: 1.45;
+  color: var(--text-muted);
 }
 
 /* Step 2 GHI legend */
