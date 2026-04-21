@@ -1467,6 +1467,12 @@ export function loadFromHash() {
     if (params.v >= 2 && params.state) {
       const safeState = sanitizeSharedState(params.state);
       Object.assign(state, safeState, { results: null, step: 1 });
+      const multiRoofToggle = document.getElementById('multi-roof-toggle');
+      if (multiRoofToggle) multiRoofToggle.checked = !!safeState.multiRoof;
+      const roofSectionsExtra = document.getElementById('roof-sections-extra');
+      if (roofSectionsExtra) roofSectionsExtra.style.display = safeState.multiRoof ? 'block' : 'none';
+      window.renderRoofSections?.();
+      window.syncMultiRoofUi?.();
       if (safeState.cityName) document.getElementById('city-search').value = safeState.cityName;
       if (safeState.roofArea) document.getElementById('roof-area').value = safeState.roofArea;
       if (safeState.tilt !== undefined) { document.getElementById('tilt-slider').value = safeState.tilt; window.updateTilt(safeState.tilt); }

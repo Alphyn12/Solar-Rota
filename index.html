@@ -1007,25 +1007,41 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
       <!-- Multi-roof -->
       <div class="card" style="margin-bottom:16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-          <div>
+        <div class="multi-roof-header">
+          <div class="multi-roof-header-copy">
             <div class="card-title" style="margin-bottom:4px;font-size:0.9rem">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg>
               Birden Fazla Çatı Yüzeyi
             </div>
-            <div style="font-size:0.78rem;color:var(--text-muted)">Farklı yönlerde 2 veya 3 çatı bölümü ekleyin</div>
+            <div class="multi-roof-subtitle">Farklı yön, eğim veya gölge koşullarına sahip ek çatı yüzeylerini ayrı tanımlayın.</div>
+            <div class="multi-roof-note">Ayrı yüzey eklemek özellikle doğu-batı veya güneydoğu-güneybatı çatılarda üretim hesabını daha doğru yapar.</div>
           </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="multi-roof-toggle" onchange="toggleMultiRoof(this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
+          <div class="multi-roof-header-actions">
+            <span class="multi-roof-count-badge" id="multi-roof-count-badge">Kapalı</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="multi-roof-toggle" onchange="toggleMultiRoof(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
         </div>
         <div id="roof-sections-extra" style="display:none;margin-top:16px">
+          <div class="multi-roof-intro-card">
+            <div class="multi-roof-intro-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M9 20v-5h6v5"/></svg>
+            </div>
+            <div class="multi-roof-intro-copy">
+              <strong>Ek yüzeyleri bağımsız tanımlayın</strong>
+              <span>Her yüzey için alan, yön, eğim ve gölge değeri ayrı kaydedilir. Sistem toplam üretimi bu yüzeylerin birleşimiyle hesaplar.</span>
+            </div>
+          </div>
           <div id="roof-sections-list"></div>
-          <button class="btn btn-outline" onclick="addRoofSection()" id="add-roof-btn" style="width:100%;margin-top:4px">
+          <div class="multi-roof-actions">
+            <div class="multi-roof-actions-copy" id="multi-roof-actions-copy">En fazla 2 ek yüzey ekleyebilirsiniz.</div>
+            <button class="btn btn-outline" onclick="addRoofSection()" id="add-roof-btn" style="width:100%;margin-top:4px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Yüzey Ekle (maks. 3)
-          </button>
+              Yeni Yüzey Ekle
+            </button>
+          </div>
         </div>
       </div>
 

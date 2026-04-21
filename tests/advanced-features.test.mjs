@@ -27,6 +27,25 @@ const shadow = computeShadowRisk(
 );
 assert.ok(shadow.score > 0);
 
+const shadowNorth = computeShadowRisk(
+  { lat: 39.0, lng: 32.0 },
+  [{ centroid: { lat: 39.0004, lng: 32.0 }, heightM: 18, tags: {}, points: [] }],
+  { panelAzimuth: 180 }
+);
+assert.equal(shadowNorth.score, 0);
+
+const shadowNear = computeShadowRisk(
+  { lat: 39.0, lng: 32.0 },
+  [{ centroid: { lat: 38.9997, lng: 32.0 }, heightM: 18, tags: {}, points: [] }],
+  { panelAzimuth: 180 }
+);
+const shadowFar = computeShadowRisk(
+  { lat: 39.0, lng: 32.0 },
+  [{ centroid: { lat: 38.9986, lng: 32.0 }, heightM: 18, tags: {}, points: [] }],
+  { panelAzimuth: 180 }
+);
+assert.ok(shadowNear.score > shadowFar.score, `expected near building risk to exceed far risk: ${shadowNear.score} vs ${shadowFar.score}`);
+
 const items = normalizeBomItems([
   { category: 'panel', supplier: 'A', name: 'Panel', unit: 'wp', unitCost: 20 },
   { category: 'inverter', supplier: 'A', name: 'Inv', unit: 'kwp', unitCost: 6000 }

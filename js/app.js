@@ -649,6 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
   buildCompass();
   buildInverterCards();
   loadFromHash();
+  syncMultiRoofUi();
   syncEnterpriseInputsFromState();
   initScenarioExperience();
   updateDashboard();
@@ -2317,6 +2318,7 @@ function toggleMultiRoof(checked) {
     window.state.roofSections = [];
     renderRoofSections();
   }
+  syncMultiRoofUi();
   updatePanelPreview();
 }
 
@@ -2328,22 +2330,39 @@ function addRoofSection() {
   window.state.roofSections.push({ id, area: 30, tilt: 20, azimuth: 90, azimuthCoeff: 0.85, azimuthName: 'Doğu', shadingFactor: 10 });
   renderRoofSections();
   updatePanelPreview();
-  const btn = document.getElementById('add-roof-btn');
-  if (btn) btn.style.display = window.state.roofSections.length >= 2 ? 'none' : '';
 }
 
 function removeRoofSection(id) {
   window.state.roofSections = window.state.roofSections.filter(s => s.id !== id);
   renderRoofSections();
   updatePanelPreview();
-  const btn = document.getElementById('add-roof-btn');
-  if (btn) btn.style.display = window.state.roofSections.length >= 2 ? 'none' : '';
+}
+
+function syncMultiRoofUi() {
+  const isEnabled = !!window.state.multiRoof;
+  const count = Array.isArray(window.state.roofSections) ? window.state.roofSections.length : 0;
+  const badge = document.getElementById('multi-roof-count-badge');
+  const addBtn = document.getElementById('add-roof-btn');
+  const copy = document.getElementById('multi-roof-actions-copy');
+  if (badge) {
+    badge.textContent = !isEnabled ? 'Kapalı' : count === 0 ? '1 ana yüzey' : `${count + 1} yüzey aktif`;
+  }
+  if (addBtn) {
+    const atMax = count >= 2;
+    addBtn.style.display = isEnabled && !atMax ? '' : isEnabled && atMax ? 'none' : '';
+  }
+  if (copy) {
+    if (!isEnabled) copy.textContent = 'Ek yüzeyler kapalı.';
+    else if (count >= 2) copy.textContent = 'Maksimum ek yüzey sayısına ulaşıldı.';
+    else copy.textContent = `Şu an ${count + 1} yüzey tanımlı. İsterseniz ${2 - count} ek yüzey daha ekleyebilirsiniz.`;
+  }
 }
 
 function renderRoofSections() {
   const list = document.getElementById('roof-sections-list');
   if (!list) return;
   list.innerHTML = '';
+  list.className = 'roof-sections-stack';
   window.state.roofSections.forEach((sec, idx) => {
     const secNum = idx + 2;
     const dirOpts = COMPASS_DIRS.map(d =>
@@ -2354,43 +2373,73 @@ function renderRoofSections() {
     div.id = `sec-form-${sec.id}`;
     div.innerHTML = `
       <div class="roof-section-header">
-        <span>${secNum}. Çatı Yüzeyi</span>
-        <button class="remove-section-btn" onclick="removeRoofSection(${sec.id})">✕ Kaldır</button>
+        <div class="roof-section-title-wrap">
+          <div class="roof-section-title"><span class="roof-section-index">${secNum}</span> Ek Çatı Yüzeyi</div>
+          <div class="roof-section-subtitle">Bu yüzey ana çatıdan bağımsız yön, eğim ve gölge değerleriyle hesaplanır.</div>
+        </div>
+        <button class="remove-section-btn" onclick="removeRoofSection(${sec.id})">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          Kaldır
+        </button>
+      </div>
+      <div class="roof-section-summary" id="sec-summary-${sec.id}">
+        <span class="roof-section-chip">Alan<strong>${Number(sec.area || 0).toFixed(0)} m²</strong></span>
+        <span class="roof-section-chip">Yön<strong>${sec.azimuthName}</strong></span>
+        <span class="roof-section-chip">Eğim<strong>${Number(sec.tilt || 0)}°</strong></span>
+        <span class="roof-section-chip">Gölge<strong>%${Number(sec.shadingFactor || 0)}</strong></span>
       </div>
       <div class="roof-section-grid">
-        <div class="form-group" style="margin:0">
-          <label style="font-size:0.8rem">Alan (m²)</label>
+        <div class="roof-section-field">
+          <label>Alan (m²)</label>
           <input type="number" id="sec-area-${sec.id}" value="${sec.area}" min="5" max="500"
-            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
+            class="roof-section-input"
             oninput="updateSecArea(${sec.id},this.value)"/>
         </div>
-        <div class="form-group" style="margin:0">
-          <label style="font-size:0.8rem">Yön</label>
+        <div class="roof-section-field">
+          <label>Yön</label>
           <select id="sec-dir-${sec.id}" onchange="updateSecDir(${sec.id},this)"
-            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem">
+            class="roof-section-select">
             ${dirOpts}
           </select>
         </div>
-        <div class="form-group" style="margin:0">
-          <label style="font-size:0.8rem">Eğim (°)</label>
+        <div class="roof-section-field">
+          <label>Eğim (°)</label>
           <input type="number" id="sec-tilt-${sec.id}" value="${sec.tilt}" min="0" max="90"
-            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
+            class="roof-section-input"
             oninput="updateSecTilt(${sec.id},this.value)"/>
         </div>
-        <div class="form-group" style="margin:0">
-          <label style="font-size:0.8rem">Gölgelenme (%)</label>
+        <div class="roof-section-field">
+          <label>Gölgelenme (%)</label>
           <input type="number" id="sec-shade-${sec.id}" value="${sec.shadingFactor}" min="0" max="80"
-            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
+            class="roof-section-input"
             oninput="updateSecShade(${sec.id},this.value)"/>
         </div>
-      </div>`;
+      </div>
+      <div class="roof-section-footer">Öneri: Ayrı yüzey eklemeyi sadece gerçekten farklı yön veya gölge koşulu varsa kullanın.</div>`;
     list.appendChild(div);
   });
+  syncMultiRoofUi();
+}
+
+function updateRoofSectionSummary(id) {
+  const sec = window.state.roofSections.find(s => s.id === id);
+  const summary = document.getElementById(`sec-summary-${id}`);
+  if (!sec || !summary) return;
+  summary.innerHTML = `
+    <span class="roof-section-chip">Alan<strong>${Number(sec.area || 0).toFixed(0)} m²</strong></span>
+    <span class="roof-section-chip">Yön<strong>${sec.azimuthName}</strong></span>
+    <span class="roof-section-chip">Eğim<strong>${Number(sec.tilt || 0)}°</strong></span>
+    <span class="roof-section-chip">Gölge<strong>%${Number(sec.shadingFactor || 0)}</strong></span>
+  `;
 }
 
 function updateSecArea(id, val) {
   const sec = window.state.roofSections.find(s => s.id === id);
-  if (sec) { sec.area = parseFloat(val) || sec.area; updatePanelPreview(); }
+  if (sec) {
+    sec.area = parseFloat(val) || sec.area;
+    updateRoofSectionSummary(id);
+    updatePanelPreview();
+  }
 }
 function updateSecDir(id, sel) {
   const sec = window.state.roofSections.find(s => s.id === id);
@@ -2399,15 +2448,22 @@ function updateSecDir(id, sel) {
     sec.azimuth = parseInt(sel.value);
     sec.azimuthCoeff = parseFloat(opt.dataset.coeff);
     sec.azimuthName = opt.dataset.name;
+    updateRoofSectionSummary(id);
   }
 }
 function updateSecTilt(id, val) {
   const sec = window.state.roofSections.find(s => s.id === id);
-  if (sec) sec.tilt = parseInt(val) || 0;
+  if (sec) {
+    sec.tilt = parseInt(val) || 0;
+    updateRoofSectionSummary(id);
+  }
 }
 function updateSecShade(id, val) {
   const sec = window.state.roofSections.find(s => s.id === id);
-  if (sec) sec.shadingFactor = Math.max(0, Math.min(80, parseInt(val) || 0));
+  if (sec) {
+    sec.shadingFactor = Math.max(0, Math.min(80, parseInt(val) || 0));
+    updateRoofSectionSummary(id);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2617,6 +2673,7 @@ window.toggleMultiRoof = toggleMultiRoof;
 window.addRoofSection = addRoofSection;
 window.removeRoofSection = removeRoofSection;
 window.renderRoofSections = renderRoofSections;
+window.syncMultiRoofUi = syncMultiRoofUi;
 window.updateSecArea = updateSecArea;
 window.updateSecDir = updateSecDir;
 window.updateSecTilt = updateSecTilt;
