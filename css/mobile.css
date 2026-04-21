@@ -456,6 +456,7 @@ textarea {
 
   .step2-geo-btn {
     flex: 1 1 160px;
+    margin-left: 0;
   }
 
   #location-warning {

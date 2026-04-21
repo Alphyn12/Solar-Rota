@@ -348,6 +348,7 @@ h2, .h2, .step-heading-title {
   flex: 1 1 640px;
   min-width: 320px;
   max-width: 760px;
+  margin-right: auto;
 }
 .step2-topbar .input-wrap {
   flex: 1;
@@ -367,6 +368,10 @@ h2, .h2, .step-heading-title {
   border-color: rgba(245,158,11,.5);
   box-shadow: 0 0 0 3px rgba(245,158,11,.12);
   outline: none;
+}
+.step2-geo-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 #step2-map-slot {
@@ -446,6 +451,11 @@ h2, .h2, .step-heading-title {
 .step2-overlay-legend .ghi-leg-item {
   font-size: .68rem;
 }
+.map-layer-btn {
+  top: 94px !important;
+  right: 14px !important;
+  z-index: 460 !important;
+}
 .leaflet-control-layers {
   display: none !important;
 }
@@ -454,7 +464,7 @@ h2, .h2, .step-heading-title {
 .location-bottom-card {
   position: absolute;
   bottom: 18px; left: 18px; right: 18px;
-  z-index: 200;
+  z-index: 720;
   background: rgba(15,23,42,.98);
   backdrop-filter: blur(24px) saturate(1.8);
   -webkit-backdrop-filter: blur(24px) saturate(1.8);
@@ -516,6 +526,9 @@ h2, .h2, .step-heading-title {
 }
 .loc-bottom-right {
   display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.loc-bottom-right .btn {
+  min-height: 42px;
 }
 .roof-tool-legend {
   position: absolute;
