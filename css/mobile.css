@@ -466,6 +466,7 @@ textarea {
   #step2-map-slot {
     height: auto;
     min-height: 0;
+    --step2-map-footer-h: 112px;
   }
 
   .step2-map-helper,
@@ -482,7 +483,7 @@ textarea {
 
   .step2-legend-card {
     top: auto;
-    bottom: 116px;
+    bottom: 96px;
   }
 
   .leaflet-touch .leaflet-bar a {
@@ -502,7 +503,7 @@ textarea {
     left: 10px;
     right: 10px;
     bottom: 10px;
-    padding: 12px;
+    padding: 10px 12px;
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
@@ -538,15 +539,36 @@ textarea {
   }
 
   .roof-tool-legend {
-    top: 84px;
-    left: 10px;
+    top: 10px;
+    left: auto;
     right: 10px;
-    max-width: none;
+    width: min(320px, calc(100% - 20px));
     padding: 10px 12px;
   }
 
+  .roof-tool-legend-toggle {
+    top: 10px;
+    right: 10px;
+  }
+
+  .roof-map-compass {
+    bottom: 10px;
+    left: 10px;
+    grid-template-columns: 40px auto;
+    padding: 8px 10px;
+  }
+
+  .roof-map-compass-glyph {
+    width: 40px;
+    height: 40px;
+  }
+
+  .roof-map-compass-arrow {
+    height: 20px;
+  }
+
   .step3-config-col {
-    padding: 16px 12px 96px;
+    padding: 16px 12px 24px;
   }
 
   .equipment-summary-card {
@@ -805,6 +827,7 @@ textarea {
   #step2-map-slot {
     height: auto;
     min-height: 0;
+    --step2-map-footer-h: 120px;
   }
 
   .location-bottom-card {
@@ -826,15 +849,27 @@ textarea {
   }
 
   .step2-legend-card {
-    bottom: 108px;
+    bottom: 88px;
     padding: 9px 10px;
   }
 
   .roof-tool-legend {
-    top: 78px;
-    left: 8px;
+    top: 8px;
+    left: auto;
     right: 8px;
+    width: min(300px, calc(100% - 16px));
     padding: 9px 10px;
+  }
+
+  .roof-tool-legend-toggle {
+    top: 8px;
+    right: 8px;
+  }
+
+  .roof-map-compass {
+    bottom: 8px;
+    left: 8px;
+    max-width: calc(100% - 16px);
   }
 
   .loc-bottom-right {

@@ -6,8 +6,8 @@
 <title>Solar Rota | Profesyonel GES Mühendislik Aracı</title>
 <meta name="description" content="Solar Rota ile Türkiye için senaryo bazlı güneş paneli enerji ve yatırım hesaplaması yapın."/>
 <link rel="manifest" href="/manifest.json"/>
-<link rel="icon" type="image/png" href="new_logo.png" sizes="any"/>
-<link rel="apple-touch-icon" href="new_logo.png"/>
+<link rel="icon" type="image/png" href="new_version_logo.png" sizes="any"/>
+<link rel="apple-touch-icon" href="new_version_logo.png"/>
 <meta name="theme-color" content="#F59E0B"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" integrity="sha384-NZLkVuBRMEeB4VeZz27WwTRvlhec30biQ8Xx7zG7JJnkvEKRg5qi6BNbEXo9ydwv" crossorigin="anonymous"/>
@@ -100,8 +100,8 @@ body>main{z-index:auto}
 .header-steps-row{padding:10px 24px}
 .brand-lockup{display:flex;align-items:center;min-width:0}
 .logo{display:flex;align-items:center;gap:13px;min-width:0;text-decoration:none;color:inherit}
-.logo-icon{height:66px;width:auto;max-width:220px;object-fit:contain;border-radius:12px;filter:drop-shadow(0 0 12px rgba(245,158,11,0.38));animation:logoGlow 3s ease-in-out infinite alternate;}
-@keyframes logoGlow{0%{filter:drop-shadow(0 0 8px rgba(245,158,11,0.35))}100%{filter:drop-shadow(0 0 22px rgba(245,158,11,0.75))}}
+.logo-icon{height:66px;width:auto;max-width:220px;object-fit:contain;border-radius:0;filter:drop-shadow(0 0 10px rgba(59,130,246,0.28));animation:logoGlow 3s ease-in-out infinite alternate;}
+@keyframes logoGlow{0%{filter:drop-shadow(0 0 6px rgba(59,130,246,0.22))}100%{filter:drop-shadow(0 0 18px rgba(59,130,246,0.48))}}
 .brand-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
 .header-actions{display:flex;align-items:center;gap:10px;margin-left:auto}
 .header-icon-btn{display:flex;align-items:center;gap:8px;height:42px;padding:0 15px;border-radius:8px;border:1px solid rgba(245,158,11,0.32);background:rgba(255,255,255,0.055);color:var(--text);cursor:pointer;font-size:0.82rem;font-weight:700;font-family:var(--font-body);transition:all 0.2s;white-space:nowrap;box-shadow:0 1px 0 rgba(255,255,255,0.06) inset}
@@ -261,14 +261,14 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .range-value{position:absolute;top:-28px;left:50%;transform:translateX(-50%);background:var(--primary);color:#000;font-size:0.75rem;font-weight:700;padding:2px 7px;border-radius:4px;pointer-events:none;white-space:nowrap;}
 
 /* ── AUTOCOMPLETE ── */
-.autocomplete-list{position:absolute;top:calc(100% + 8px);left:0;right:0;background:rgba(9,14,25,.96);border:1px solid rgba(255,255,255,.08);border-radius:14px;max-height:320px;overflow-y:auto;z-index:520;display:none;box-shadow:0 16px 40px rgba(0,0,0,.42);padding:6px}
+.autocomplete-list{position:absolute;top:calc(100% + 8px);left:0;right:0;background:color-mix(in srgb,var(--secondary) 82%,var(--surface) 18%);border:1px solid var(--border-subtle);border-radius:14px;max-height:320px;overflow-y:auto;z-index:520;display:none;box-shadow:0 16px 40px rgba(0,0,0,.32);padding:6px;backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2)}
 .autocomplete-list.open{display:block}
-.autocomplete-item{padding:10px 12px;cursor:pointer;font-size:0.85rem;transition:background var(--transition),border-color var(--transition);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border:1px solid transparent;border-radius:10px}
-.autocomplete-item:hover,.autocomplete-item.selected{background:rgba(255,255,255,.05);border-color:rgba(245,158,11,.18)}
+.autocomplete-item{padding:10px 12px;cursor:pointer;font-size:0.85rem;transition:background var(--transition),border-color var(--transition),transform var(--transition);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border:1px solid transparent;border-radius:10px}
+.autocomplete-item:hover,.autocomplete-item.selected{background:rgba(255,255,255,.04);border-color:rgba(245,158,11,.22);transform:translateY(-1px)}
 .autocomplete-copy{display:grid;gap:3px;min-width:0}
 .autocomplete-copy strong{font-size:.83rem;line-height:1.3;color:var(--text);font-weight:700}
 .autocomplete-copy span{font-size:.73rem;line-height:1.45;color:var(--text-muted);overflow-wrap:anywhere}
-.autocomplete-ghi{font-size:0.7rem;color:var(--text-muted);white-space:nowrap;flex-shrink:0;padding-top:2px}
+.autocomplete-ghi{font-size:0.68rem;color:var(--primary);white-space:nowrap;flex-shrink:0;padding:4px 8px;border-radius:999px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.16)}
 
 /* ── LOCATION (hidden helper) ── */
 #selected-location{background:var(--surface-light);border-radius:8px;padding:10px 12px;font-size:0.85rem;display:none;align-items:center;gap:8px;margin-top:8px;}
@@ -312,19 +312,38 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 @media(max-width:768px){.sticky-nav{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;background:rgba(15,23,42,0.95);backdrop-filter:blur(16px);border-top:1px solid var(--border-subtle);box-shadow:0 -4px 24px rgba(0,0,0,0.4);z-index:90;}.sticky-nav .btn{min-height:48px;font-size:1rem}.btn{min-height:44px}}
 
 /* ── TILT SVG ── */
-#tilt-diagram-wrap{background:var(--surface-light);border-radius:8px;padding:12px;margin-top:8px}
-#tilt-info{font-size:0.8rem;margin-top:6px;text-align:center;font-weight:600;padding:4px 10px;border-radius:6px;display:inline-block;}
-.tilt-good{background:rgba(16,185,129,0.15);color:var(--success)}
-.tilt-warn{background:rgba(234,179,8,0.15);color:#EAB308}
-.tilt-bad{background:rgba(239,68,68,0.15);color:var(--danger)}
+.roof-geometry-grid{display:grid;grid-template-columns:1fr;gap:18px}
+.roof-geometry-panel{display:grid;gap:12px;min-width:0}
+.roof-control-head{display:grid;gap:6px}
+.roof-control-label{display:flex;align-items:center;gap:6px;font-size:0.92rem;font-weight:700;color:var(--text)}
+.roof-control-help{font-size:0.78rem;line-height:1.5;color:var(--text-muted)}
+.roof-control-shell{display:grid;gap:14px;padding:0;border:none;background:none;box-shadow:none}
+.roof-control-shell .range-wrap{margin-top:2px}
+#tilt-diagram-wrap{margin-top:0}
+#tilt-diagram-wrap svg,#compass-wrap svg{display:block;max-width:100%;margin:0 auto}
+#tilt-info{margin:0}
+.roof-control-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) auto;gap:10px;align-items:center}
+.roof-control-kpi{display:grid;gap:4px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.035);border:1px solid var(--border-subtle)}
+.roof-control-kpi span{font-size:0.72rem;color:var(--text-muted)}
+.roof-control-kpi strong{font-size:0.92rem;font-weight:700;color:var(--text);font-family:var(--font-display)}
+.tilt-status-pill{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 14px;border-radius:999px;font-size:0.74rem;font-weight:700;text-align:center;border:1px solid transparent;white-space:nowrap}
+.tilt-status-pill.is-good{background:rgba(16,185,129,0.12);border-color:rgba(16,185,129,0.28);color:var(--success)}
+.tilt-status-pill.is-warn{background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.28);color:var(--primary)}
+.tilt-status-pill.is-bad{background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.28);color:var(--danger)}
 
 /* ── COMPASS ── */
-#compass-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+#compass-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
 .compass-svg-container{cursor:pointer;user-select:none}
 .compass-dir-btn{cursor:pointer;transition:opacity 0.2s}
 .compass-dir-btn:hover{opacity:0.8}
-#azimuth-info{font-size:0.8rem;color:var(--text-muted);text-align:center}
+#azimuth-info{font-size:inherit;color:inherit;text-align:left}
 .optimal-badge{background:rgba(245,158,11,0.15);color:var(--primary);font-size:0.7rem;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid rgba(245,158,11,0.3);}
+.step2-search-icon{position:absolute;top:50%;right:0;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:24px;height:24px;color:var(--text-muted);pointer-events:none}
+
+@media(max-width:720px){
+  .roof-control-summary{grid-template-columns:1fr}
+  .tilt-status-pill,.optimal-badge{justify-self:start}
+}
 
 /* ── PANEL CARDS ── */
 .panel-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
@@ -446,7 +465,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div class="header-inner">
       <div class="brand-lockup">
       <a class="logo" href="#main-content" aria-label="Solar Rota ana içerik" data-i18n-aria-label="app.homeAria">
-        <img src="new_logo.png" class="logo-icon" alt="Solar Rota"/>
+        <img src="new_version_logo.png" class="logo-icon" alt="Solar Rota"/>
         <span class="brand-copy">
           <span class="logo-text">Solar Rota</span>
           <span class="logo-tagline" data-i18n="app.headerTagline">GES tasarım ve fizibilite stüdyosu</span>
@@ -649,11 +668,13 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       Geri
     </button>
     <div class="step2-search-wrap">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--text-muted)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <div class="input-wrap" style="flex:1">
         <input type="text" id="city-search" placeholder="Adres, sokak, mahalle, ilçe veya şehir yazın..." autocomplete="off"
           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-owns="autocomplete-list"
-          style="background:transparent;border:none;padding:0;font-size:0.95rem"/>
+          style="background:transparent;border:none;padding:0 28px 0 0;font-size:0.95rem"/>
+        <span class="step2-search-icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
         <div class="autocomplete-list" id="autocomplete-list" role="listbox"></div>
       </div>
     </div>
@@ -738,12 +759,58 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
         <span style="color:#10B981;font-weight:600">Çatı köşelerine tıkla, çift tıkla bitir</span>
       </div>
       <div class="roof-tool-legend" id="roof-tool-legend">
+        <button class="roof-tool-legend-close" type="button" onclick="closeRoofToolLegend()" aria-label="Araç rehberini kapat" title="Kapat">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
         <div class="roof-tool-legend-title" data-i18n="step3.drawGuideTitle">Çatı alanını ölçmek için araç rehberi</div>
+        <div class="roof-tool-legend-intro" data-i18n="step3.drawToastStart">Çatı köşelerine tıklayın, çift tıklayarak tamamlayın. Dikdörtgen araç düzenli çatılarda daha hızlıdır.</div>
         <div class="roof-tool-legend-list">
-          <span data-i18n="step3.drawGuidePolygon">Serbest çizim: çatı sınırını köşe köşe takip edin</span>
-          <span data-i18n="step3.drawGuideRect">Dikdörtgen: düzenli çatılarda hızlı ölçüm alın</span>
-          <span data-i18n="step3.drawGuideEdit">Düzenle: noktaları taşıyıp alanı güncelleyin</span>
-          <span data-i18n="step3.drawGuideDelete">Sil: ölçümü temizleyip yeniden başlayın</span>
+          <div class="roof-tool-legend-item">
+            <div class="roof-tool-legend-button" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><polygon points="4 6 11 3 18 6 20 14 13 21 6 18 4 6"/></svg>
+            </div>
+            <div class="roof-tool-legend-copy">
+              <span data-i18n="step3.drawGuidePolygon">Serbest çizim: çatı sınırını köşe köşe takip edin</span>
+            </div>
+          </div>
+          <div class="roof-tool-legend-item">
+            <div class="roof-tool-legend-button" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="4" y="5" width="16" height="14" rx="2"/></svg>
+            </div>
+            <div class="roof-tool-legend-copy">
+              <span data-i18n="step3.drawGuideRect">Dikdörtgen: düzenli çatılarda hızlı ölçüm alın</span>
+            </div>
+          </div>
+          <div class="roof-tool-legend-item">
+            <div class="roof-tool-legend-button" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M4 20l4.5-1 9.8-9.8a2.1 2.1 0 00-3-3L5.5 16 4 20z"/><path d="M13.5 6.5l4 4"/></svg>
+            </div>
+            <div class="roof-tool-legend-copy">
+              <span data-i18n="step3.drawGuideEdit">Düzenle: noktaları taşıyıp alanı güncelleyin</span>
+            </div>
+          </div>
+          <div class="roof-tool-legend-item">
+            <div class="roof-tool-legend-button" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M7 6l1 13h8l1-13"/><path d="M10 10v6M14 10v6"/></svg>
+            </div>
+            <div class="roof-tool-legend-copy">
+              <span data-i18n="step3.drawGuideDelete">Sil: ölçümü temizleyip yeniden başlayın</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="roof-tool-legend-toggle" id="roof-tool-legend-toggle" type="button" onclick="openRoofToolLegend()" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg>
+        Araç rehberi
+      </button>
+      <div class="roof-map-compass" id="roof-map-compass" aria-label="Harita pusulası">
+        <div class="roof-map-compass-glyph">
+          <div class="roof-map-compass-arrow" id="roof-map-compass-arrow"></div>
+        </div>
+        <div class="roof-map-compass-meta">
+          <strong>Harita: kuzey yukarı</strong>
+          <span id="roof-map-compass-label">Çatı yönü: Güney</span>
+          <small id="roof-map-compass-degree">180°</small>
         </div>
       </div>
       <!-- Sağ alt araç çubuğu (sadece temizle — uydu butonu harita kartında) -->
@@ -786,74 +853,92 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <!-- Tilt -->
       <div class="card" style="margin-bottom:16px">
         <div class="card-title" style="font-size:0.9rem;margin-bottom:14px">Eğim & Yön</div>
-        <div class="form-group">
-          <label>Çatı Eğimi (°)
-            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Panelin yatay düzlemle yaptığı açı. Türkiye için optimum 30-35°.</span></span>
-          </label>
-          <div class="range-wrap">
-            <span class="range-value" id="tilt-val">33°</span>
-            <input type="range" id="tilt-slider" min="0" max="90" value="33" oninput="updateTilt(this.value)"/>
-            <div class="range-labels"><span>0°</span><span>45°</span><span>90°</span></div>
-          </div>
-          <div id="tilt-diagram-wrap">
-            <svg id="tilt-svg" width="100%" height="180" viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#0F172A"/>
-                  <stop offset="100%" stop-color="#1E293B"/>
-                </linearGradient>
-              </defs>
-              <rect width="400" height="180" fill="url(#skyGrad)" rx="8"/>
-              <rect x="0" y="145" width="400" height="35" fill="#1E3A5F" rx="0"/>
-              <line x1="0" y1="145" x2="400" y2="145" stroke="#334155" stroke-width="1.5"/>
-              <rect x="30" y="105" width="55" height="40" fill="#0F172A" stroke="#334155" stroke-width="1"/>
-              <polygon points="25,105 57,75 90,105" fill="#0F172A" stroke="#334155" stroke-width="1"/>
-              <g id="sun-rays-group" opacity="0.6">
-                <circle id="sun-circle" cx="340" cy="40" r="16" fill="#FCD34D" opacity="0.9"/>
-                <line x1="340" y1="15" x2="340" y2="7" stroke="#FCD34D" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="358" y1="22" x2="364" y2="16" stroke="#FCD34D" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="365" y1="40" x2="373" y2="40" stroke="#FCD34D" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="322" y1="22" x2="316" y2="16" stroke="#FCD34D" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="315" y1="40" x2="307" y2="40" stroke="#FCD34D" stroke-width="1.5" stroke-linecap="round"/>
-              </g>
-              <g id="panel-group" transform="rotate(-33, 155, 145)">
-                <rect x="105" y="130" width="100" height="15" fill="rgba(6,182,212,0.25)" stroke="#06B6D4" stroke-width="2" rx="2"/>
-                <line x1="138" y1="130" x2="138" y2="145" stroke="rgba(6,182,212,0.4)" stroke-width="0.5"/>
-                <line x1="171" y1="130" x2="171" y2="145" stroke="rgba(6,182,212,0.4)" stroke-width="0.5"/>
-                <line x1="105" y1="137" x2="205" y2="137" stroke="rgba(6,182,212,0.4)" stroke-width="0.5"/>
-              </g>
-              <path id="tilt-arc" d="M175,145 A25,25 0 0,0 195,128" fill="none" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="3,2"/>
-              <text id="tilt-angle-text" x="200" y="122" fill="#F59E0B" font-size="13" font-family="Space Grotesk,Inter" font-weight="700">33°</text>
-              <rect id="opt-badge" x="10" y="10" width="130" height="18" rx="4" fill="rgba(16,185,129,0.15)" stroke="rgba(16,185,129,0.4)" stroke-width="1"/>
-              <text id="opt-badge-text" x="75" y="22" text-anchor="middle" fill="#10B981" font-size="10" font-family="Space Grotesk,Inter" font-weight="600">Optimal aralık (25°–40°) ✓</text>
-              <text id="tilt-coeff-text" x="390" y="20" text-anchor="end" fill="rgba(148,163,184,0.8)" font-size="9" font-family="Inter">Verim: ×1.00</text>
-            </svg>
-            <div style="text-align:center;margin-top:4px">
-              <span id="tilt-info" style="font-size:0.8rem;font-weight:600;padding:3px 10px;border-radius:6px;display:inline-block"></span>
+        <div class="roof-geometry-grid">
+          <div class="roof-geometry-panel">
+            <div class="roof-control-head">
+              <div class="roof-control-label">Çatı Eğimi (°)
+                <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Panelin yatay düzlemle yaptığı açı. Türkiye için optimum 30-35°.</span></span>
+              </div>
+              <div class="roof-control-help">Eğim ayarı yıllık üretimi, kış performansını ve taşıyıcı konstrüksiyon dengesini etkiler.</div>
+            </div>
+            <div class="roof-control-shell">
+              <div class="range-wrap">
+                <span class="range-value" id="tilt-val">33°</span>
+                <input type="range" id="tilt-slider" min="0" max="90" value="33" oninput="updateTilt(this.value)"/>
+                <div class="range-labels"><span>0°</span><span>45°</span><span>90°</span></div>
+              </div>
+              <div id="tilt-diagram-wrap">
+                <svg id="tilt-svg" width="100%" height="180" viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="1.5" y="1.5" width="397" height="177" rx="16" fill="#242426" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+                  <line x1="54" y1="145" x2="344" y2="145" stroke="#3A3A3C" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="155" y1="145" x2="155" y2="86" stroke="rgba(152,152,158,0.24)" stroke-width="1.2" stroke-dasharray="4 5"/>
+                  <line x1="155" y1="145" x2="247" y2="145" stroke="rgba(152,152,158,0.28)" stroke-width="1.2" stroke-dasharray="5 5"/>
+                  <text x="56" y="162" fill="rgba(152,152,158,0.82)" font-size="11" font-family="Inter">Yatay referans</text>
+                  <text x="154" y="78" text-anchor="middle" fill="rgba(152,152,158,0.82)" font-size="11" font-family="Inter">90°</text>
+                  <text x="252" y="149" fill="rgba(152,152,158,0.82)" font-size="11" font-family="Inter">0°</text>
+                  <circle cx="155" cy="145" r="4.5" fill="#98989E"/>
+                  <path d="M140 145L155 117L170 145Z" fill="rgba(58,58,60,0.82)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                  <g id="panel-group" transform="rotate(-33, 155, 145)">
+                    <rect x="155" y="118" width="118" height="18" rx="3" fill="rgba(245,158,11,0.12)" stroke="#F59E0B" stroke-width="1.7"/>
+                    <line x1="184" y1="118" x2="184" y2="136" stroke="rgba(255,255,255,0.16)" stroke-width="0.8"/>
+                    <line x1="214" y1="118" x2="214" y2="136" stroke="rgba(255,255,255,0.16)" stroke-width="0.8"/>
+                    <line x1="243" y1="118" x2="243" y2="136" stroke="rgba(255,255,255,0.16)" stroke-width="0.8"/>
+                    <line x1="155" y1="127" x2="273" y2="127" stroke="rgba(255,255,255,0.14)" stroke-width="0.8"/>
+                  </g>
+                  <path id="tilt-arc" d="M183,145 A28,28 0 0,0 178.5,129.8" fill="none" stroke="#F59E0B" stroke-width="1.8" stroke-dasharray="4,3"/>
+                  <text id="tilt-angle-text" x="174" y="116" fill="#F59E0B" font-size="13" font-family="Space Grotesk,Inter" font-weight="700">33°</text>
+                  <rect id="opt-badge" x="16" y="16" width="148" height="22" rx="11" fill="rgba(16,185,129,0.12)" stroke="rgba(16,185,129,0.35)" stroke-width="1"/>
+                  <text id="opt-badge-text" x="90" y="30.5" text-anchor="middle" fill="#10B981" font-size="10.5" font-family="Space Grotesk,Inter" font-weight="600">Optimal aralık (25°–40°) ✓</text>
+                  <text id="tilt-coeff-text" x="382" y="28" text-anchor="end" fill="rgba(152,152,158,0.92)" font-size="10.5" font-family="Inter">Verim: ×1.00</text>
+                </svg>
+              </div>
+              <div class="roof-control-summary">
+                <div class="roof-control-kpi">
+                  <span>Seçili eğim</span>
+                  <strong id="tilt-summary-angle">33°</strong>
+                </div>
+                <div class="roof-control-kpi">
+                  <span>Verim katsayısı</span>
+                  <strong id="tilt-summary-coeff">×1.00</strong>
+                </div>
+                <span id="tilt-info" class="tilt-status-pill is-good">Optimal açı aralığı ✓</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Compass -->
-        <div class="form-group" style="margin-top:16px">
-          <label>Çatı Yönü
-            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Panelin baktığı yön (azimut). 180° = tam güney — en yüksek yıllık üretim.</span></span>
-          </label>
-          <div id="compass-wrap">
-            <svg id="compass-svg" width="200" height="200" viewBox="0 0 200 200" class="compass-svg-container">
-              <circle cx="100" cy="100" r="95" fill="rgba(30,41,59,0.8)" stroke="#475569" stroke-width="1.5"/>
-              <circle cx="100" cy="100" r="6" fill="#475569"/>
-              <g id="compass-dirs"></g>
-              <text x="100" y="18" text-anchor="middle" font-size="13" font-family="Inter" font-weight="700" fill="#94A3B8">K</text>
-              <text x="100" y="192" text-anchor="middle" font-size="13" font-family="Inter" font-weight="700" fill="#F59E0B">G</text>
-              <text x="188" y="105" text-anchor="middle" font-size="13" font-family="Inter" font-weight="700" fill="#94A3B8">D</text>
-              <text x="12" y="105" text-anchor="middle" font-size="13" font-family="Inter" font-weight="700" fill="#94A3B8">B</text>
-              <text x="158" y="42" text-anchor="middle" font-size="10" font-family="Inter" fill="#94A3B8">KD</text>
-              <text x="42" y="42" text-anchor="middle" font-size="10" font-family="Inter" fill="#94A3B8">KB</text>
-              <text x="158" y="168" text-anchor="middle" font-size="10" font-family="Inter" fill="#94A3B8">GD</text>
-              <text x="42" y="168" text-anchor="middle" font-size="10" font-family="Inter" fill="#94A3B8">GB</text>
-            </svg>
-            <div id="azimuth-info">Seçili: <strong id="dir-name">Güney</strong> — Katsayı: <strong id="dir-coeff">1.00</strong> <span class="optimal-badge">OPTİMAL ✓</span></div>
+          <div class="roof-geometry-panel">
+            <div class="roof-control-head">
+              <div class="roof-control-label">Çatı Yönü
+                <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Panelin baktığı yön (azimut). 180° = tam güney — en yüksek yıllık üretim.</span></span>
+              </div>
+              <div class="roof-control-help">Güney yönü yıllık üretimde referans kabul edilir; doğu ve batı yüzeyler birçok projede halen verimlidir.</div>
+            </div>
+            <div id="compass-wrap" class="roof-control-shell">
+              <svg id="compass-svg" width="200" height="200" viewBox="0 0 200 200" class="compass-svg-container">
+                <circle cx="100" cy="100" r="95" fill="rgba(36,36,38,0.96)" stroke="#3A3A3C" stroke-width="1.5"/>
+                <circle cx="100" cy="100" r="6" fill="#3A3A3C"/>
+                <g id="compass-dirs"></g>
+                <text x="100" y="18" text-anchor="middle" font-size="13" font-family="Inter" font-weight="700" fill="#98989E">K</text>
+                <text x="100" y="192" text-anchor="middle" font-size="13" font-family="Inter" font-weight="700" fill="#F59E0B">G</text>
+                <text x="188" y="105" text-anchor="middle" font-size="13" font-family="Inter" font-weight="700" fill="#98989E">D</text>
+                <text x="12" y="105" text-anchor="middle" font-size="13" font-family="Inter" font-weight="700" fill="#98989E">B</text>
+                <text x="158" y="42" text-anchor="middle" font-size="10" font-family="Inter" fill="#98989E">KD</text>
+                <text x="42" y="42" text-anchor="middle" font-size="10" font-family="Inter" fill="#98989E">KB</text>
+                <text x="158" y="168" text-anchor="middle" font-size="10" font-family="Inter" fill="#98989E">GD</text>
+                <text x="42" y="168" text-anchor="middle" font-size="10" font-family="Inter" fill="#98989E">GB</text>
+              </svg>
+              <div id="azimuth-info" class="roof-control-summary">
+                <div class="roof-control-kpi">
+                  <span>Seçili yön</span>
+                  <strong id="dir-name">Güney</strong>
+                </div>
+                <div class="roof-control-kpi">
+                  <span>Katsayı</span>
+                  <strong id="dir-coeff">1.00</strong>
+                </div>
+                <span class="optimal-badge">OPTİMAL ✓</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

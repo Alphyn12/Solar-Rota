@@ -1050,6 +1050,8 @@ function updateTilt(val) {
   val = Math.max(0, Math.min(90, parseInt(val, 10) || 0));
   window.state.tilt = val;
   document.getElementById('tilt-val').textContent = val + '°';
+  const summaryAngleEl = document.getElementById('tilt-summary-angle');
+  if (summaryAngleEl) summaryAngleEl.textContent = val + '°';
   positionRangeThumb('tilt-slider', 'tilt-val', 0, 90);
 
   // Pivot point: (155, 145) — çatı köşesi
@@ -1082,6 +1084,8 @@ function updateTilt(val) {
   const coeff = getTiltCoeff(val);
   const coeffEl = document.getElementById('tilt-coeff-text');
   if (coeffEl) coeffEl.textContent = `Verim: ×${coeff.toFixed(2)}`;
+  const summaryCoeffEl = document.getElementById('tilt-summary-coeff');
+  if (summaryCoeffEl) summaryCoeffEl.textContent = `×${coeff.toFixed(2)}`;
 
   // Optimal badge
   const badge = document.getElementById('opt-badge');
@@ -1090,15 +1094,15 @@ function updateTilt(val) {
   if (val >= 25 && val <= 40) {
     if (badge) { badge.setAttribute('fill', 'rgba(16,185,129,0.15)'); badge.setAttribute('stroke', 'rgba(16,185,129,0.4)'); }
     if (badgeText) { badgeText.setAttribute('fill', '#10B981'); badgeText.textContent = 'Optimal aralık (25°–40°) ✓'; }
-    if (info) { info.style.cssText = 'color:#10B981;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3)'; info.textContent = 'Optimal açı aralığı ✓'; }
+    if (info) { info.className = 'tilt-status-pill is-good'; info.textContent = 'Optimal açı aralığı ✓'; }
   } else if ((val >= 15 && val < 25) || (val > 40 && val <= 55)) {
     if (badge) { badge.setAttribute('fill', 'rgba(245,158,11,0.12)'); badge.setAttribute('stroke', 'rgba(245,158,11,0.35)'); }
     if (badgeText) { badgeText.setAttribute('fill', '#F59E0B'); badgeText.textContent = `Kabul edilebilir (${val < 25 ? '15°–25°' : '40°–55°'})`; }
-    if (info) { info.style.cssText = 'color:#F59E0B;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3)'; info.textContent = 'Kabul edilebilir açı aralığı'; }
+    if (info) { info.className = 'tilt-status-pill is-warn'; info.textContent = 'Kabul edilebilir açı aralığı'; }
   } else {
     if (badge) { badge.setAttribute('fill', 'rgba(239,68,68,0.1)'); badge.setAttribute('stroke', 'rgba(239,68,68,0.35)'); }
     if (badgeText) { badgeText.setAttribute('fill', '#EF4444'); badgeText.textContent = 'Verimsiz açı — düzeltme önerilir'; }
-    if (info) { info.style.cssText = 'color:#EF4444;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3)'; info.textContent = 'Verimsiz açı — düzeltme önerilir'; }
+    if (info) { info.className = 'tilt-status-pill is-bad'; info.textContent = 'Verimsiz açı — düzeltme önerilir'; }
   }
 }
 
@@ -1957,10 +1961,11 @@ function positionRangeThumb(sliderId, valId, min, max) {
 // ═══════════════════════════════════════════════════════════
 function buildCompass() {
   const g = document.getElementById('compass-dirs');
+  if (!g) return;
   g.innerHTML = '';
   const cx = 100, cy = 100, r = 85, innerR = 28;
 
-  COMPASS_DIRS.forEach((dir, i) => {
+  COMPASS_DIRS.forEach((dir) => {
     const startAngle = (dir.angle - 22.5) * Math.PI / 180;
     const endAngle = (dir.angle + 22.5) * Math.PI / 180;
     const x1 = cx + innerR * Math.cos(startAngle), y1 = cy + innerR * Math.sin(startAngle);
@@ -1970,33 +1975,83 @@ function buildCompass() {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     const d = `M${x1},${y1} L${x2},${y2} A${r},${r} 0 0,1 ${x3},${y3} L${x4},${y4} A${innerR},${innerR} 0 0,0 ${x1},${y1}Z`;
     path.setAttribute('d', d);
-    path.setAttribute('fill', dir.azimuth === 180 ? 'rgba(245,158,11,0.35)' : 'rgba(51,65,85,0.5)');
-    path.setAttribute('stroke', '#475569');
+    path.setAttribute('fill', dir.azimuth === 180 ? 'rgba(245,158,11,0.34)' : 'rgba(58,58,60,0.82)');
+    path.setAttribute('stroke', dir.azimuth === 180 ? '#F59E0B' : '#52525B');
     path.setAttribute('stroke-width', '1');
     path.setAttribute('data-az', dir.azimuth);
     path.style.cursor = 'pointer';
     path.style.transition = 'fill 0.2s';
     path.addEventListener('click', () => selectDirection(dir));
     path.addEventListener('mouseenter', () => { if (window.state.azimuth !== dir.azimuth) path.setAttribute('fill', 'rgba(245,158,11,0.15)'); });
-    path.addEventListener('mouseleave', () => { if (window.state.azimuth !== dir.azimuth) path.setAttribute('fill', 'rgba(51,65,85,0.5)'); });
+    path.addEventListener('mouseleave', () => syncRoofOrientationUI());
     path.id = `compass-seg-${dir.azimuth}`;
     g.appendChild(path);
   });
+  syncRoofOrientationUI({
+    azimuth: window.state.azimuth ?? 180,
+    coeff: window.state.azimuthCoeff ?? 1,
+    name: window.state.azimuthName || 'Güney'
+  });
+}
+
+function nearestCompassDirection(azimuth) {
+  const safeAz = ((Number(azimuth) % 360) + 360) % 360;
+  return COMPASS_DIRS.reduce((best, dir) => {
+    const bestDiff = Math.min(Math.abs(best.azimuth - safeAz), 360 - Math.abs(best.azimuth - safeAz));
+    const dirDiff = Math.min(Math.abs(dir.azimuth - safeAz), 360 - Math.abs(dir.azimuth - safeAz));
+    return dirDiff < bestDiff ? dir : best;
+  }, COMPASS_DIRS[0]);
+}
+
+function syncRoofOrientationUI({ azimuth, coeff, name } = {}) {
+  const safeAzimuth = ((Number(azimuth ?? window.state.azimuth ?? 180) % 360) + 360) % 360;
+  const safeCoeff = Number(coeff ?? window.state.azimuthCoeff ?? 1);
+  const safeName = String(name ?? window.state.azimuthName ?? 'Güney');
+  const activeDir = nearestCompassDirection(safeAzimuth);
+
+  COMPASS_DIRS.forEach(d => {
+    const el = document.getElementById(`compass-seg-${d.azimuth}`);
+    if (!el) return;
+    const isActive = d.azimuth === activeDir.azimuth;
+    el.setAttribute('fill', isActive ? 'rgba(245,158,11,0.34)' : 'rgba(58,58,60,0.82)');
+    el.setAttribute('stroke', isActive ? '#F59E0B' : '#52525B');
+    el.setAttribute('stroke-width', isActive ? '1.4' : '1');
+  });
+
+  const dirNameEl = document.getElementById('dir-name');
+  const dirCoeffEl = document.getElementById('dir-coeff');
+  if (dirNameEl) dirNameEl.textContent = safeName;
+  if (dirCoeffEl) dirCoeffEl.textContent = safeCoeff.toFixed(2);
+
+  const badge = document.querySelector('.optimal-badge');
+  if (badge) badge.style.display = activeDir.azimuth === 180 ? 'inline-flex' : 'none';
+
+  const mapArrow = document.getElementById('roof-map-compass-arrow');
+  const mapLabel = document.getElementById('roof-map-compass-label');
+  const mapDegree = document.getElementById('roof-map-compass-degree');
+  if (mapArrow) mapArrow.style.transform = `rotate(${safeAzimuth}deg)`;
+  if (mapLabel) mapLabel.textContent = `Çatı yönü: ${safeName}`;
+  if (mapDegree) mapDegree.textContent = `${Math.round(safeAzimuth)}°`;
 }
 
 function selectDirection(dir) {
   window.state.azimuth = dir.azimuth;
   window.state.azimuthCoeff = dir.coeff;
   window.state.azimuthName = dir.name;
-  COMPASS_DIRS.forEach(d => {
-    const el = document.getElementById(`compass-seg-${d.azimuth}`);
-    if (el) el.setAttribute('fill', d.azimuth === dir.azimuth ? 'rgba(245,158,11,0.35)' : 'rgba(51,65,85,0.5)');
-  });
-  document.getElementById('dir-name').textContent = dir.name;
-  document.getElementById('dir-coeff').textContent = dir.coeff.toFixed(2);
-  const badge = document.querySelector('.optimal-badge');
-  badge.style.display = dir.azimuth === 180 ? 'inline' : 'none';
+  syncRoofOrientationUI({ azimuth: dir.azimuth, coeff: dir.coeff, name: dir.name });
   updatePanelPreview();
+}
+
+function closeRoofToolLegend() {
+  document.getElementById('roof-tool-legend')?.classList.add('is-hidden');
+  const toggle = document.getElementById('roof-tool-legend-toggle');
+  if (toggle) toggle.style.display = 'inline-flex';
+}
+
+function openRoofToolLegend() {
+  document.getElementById('roof-tool-legend')?.classList.remove('is-hidden');
+  const toggle = document.getElementById('roof-tool-legend-toggle');
+  if (toggle) toggle.style.display = 'none';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2553,6 +2608,9 @@ window.updateConsumption = updateConsumption;
 window.positionRangeThumb = positionRangeThumb;
 window.buildCompass = buildCompass;
 window.selectDirection = selectDirection;
+window.syncRoofOrientationUI = syncRoofOrientationUI;
+window.closeRoofToolLegend = closeRoofToolLegend;
+window.openRoofToolLegend = openRoofToolLegend;
 window.buildPanelCards = buildPanelCards;
 window.updatePanelPreview = updatePanelPreview;
 window.toggleMultiRoof = toggleMultiRoof;

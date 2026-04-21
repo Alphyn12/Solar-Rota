@@ -179,6 +179,11 @@ function updateUiAndState(summary) {
   const dirCoeff = document.getElementById('dir-coeff');
   if (dirName) dirName.textContent = state.azimuthName;
   if (dirCoeff) dirCoeff.textContent = state.azimuthCoeff.toFixed(2);
+  window.syncRoofOrientationUI?.({
+    azimuth: state.azimuth,
+    coeff: state.azimuthCoeff,
+    name: state.azimuthName
+  });
   const selected = document.getElementById('selected-loc-text');
   if (selected && summary.centroid) {
     selected.textContent = `${state.cityName || 'Çatı merkezi'} — ${summary.centroid.lat.toFixed(4)}°K, ${summary.centroid.lng.toFixed(4)}°D`;
