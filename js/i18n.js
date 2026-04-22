@@ -22,7 +22,7 @@ const STATIC_BINDINGS = [
   ['#city-search', 'step2.search', 'placeholder'],
   ['#geolocation-btn .step2-geo-label', 'step2.geoBtn'],
   ['#step2-back-btn', 'common.back'],
-  ['#step2-continue-btn .step2-continue-label', 'common.continue'],
+  ['#step2-continue-btn .step2-continue-label', 'scenario.defaultContinue'],
   ['#location-warning', 'step2.outOfTurkey'],
   ['#map-layer-label', 'step2.satellite'],
   ['#step-4 .step-heading-eyebrow', 'step4.eyebrow'],

@@ -6,9 +6,9 @@ import { INVERTER_TYPES } from './data.js';
 import { convertTry } from './exchange-rate.js';
 
 const inverterDescriptions = {
-  string:    'Tüm panellerin enerjisini merkezi bir cihaz dönüştürür. Gölge ve yön sorunu yoksa en ekonomik çözüm.',
-  micro:     'Her panele ayrı inverter. Gölgeli veya farklı yönlü çatılarda üstün performans ve panel düzeyinde izleme.',
-  optimizer: 'Her panelde DC optimizör + merkezi string inverter. Yüksek gölge toleransı, mikro inverterden daha düşük maliyet.'
+  string:    'Merkezi mimari. Tek yönlü ve düzenli çatılarda yatırım/performans dengesi güçlüdür.',
+  micro:     'Panel bazlı mimari. Karma yönlü veya kısmi gölgeli yüzeylerde performans avantajı sağlar.',
+  optimizer: 'Panel bazında optimizasyon ile merkezi inverteri birleştirir. Karma çatı projelerinde kontrollü orta yol sunar.'
 };
 
 export function buildInverterCards() {
@@ -24,14 +24,23 @@ export function buildInverterCards() {
     const price10 = convertTry(inv.pricePerKWp.lt10, cur, rate);
     const priceStr = cur === 'USD'
       ? `$${price10.toLocaleString('en-US', { maximumFractionDigits: 0 })}/kWp`
-      : `${inv.pricePerKWp.lt10.toLocaleString('tr-TR')} ₺/kWp`;
+      : `${Math.round(price10).toLocaleString('tr-TR')} ₺/kWp`;
     return `
     <div class="inverter-card${selected === key ? ' selected' : ''}" id="inv-card-${key}" onclick="selectInverter('${key}')">
       <div class="inverter-check">✓</div>
+      <div class="equipment-card-topline">
+        <span class="equipment-card-badge">${inv.badge || 'İnverter tipi'}</span>
+        <span class="equipment-card-example">${inv.exampleModel || ''}</span>
+      </div>
       <div class="inverter-card-title">${inv.name}</div>
-      <div style="font-size:0.71rem;color:var(--text-muted);line-height:1.5;margin:6px 4px 10px;text-align:center">${inverterDescriptions[key]}</div>
+      <div class="equipment-card-copy">${inv.summary || inverterDescriptions[key]}</div>
       <div class="inverter-card-eff">${(inv.efficiency * 100).toFixed(1)}%</div>
-      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">Verimlilik</div>
+      <div class="equipment-card-metric-label">Örnek cihaz verimi</div>
+      <div class="equipment-chip-row equipment-chip-row-tight">
+        <span class="equipment-chip">${inv.structure || 'Mimari bilgisi'}</span>
+        <span class="equipment-chip">${inv.monitoring || 'İzleme bilgisi'}</span>
+        <span class="equipment-chip">${inv.batteryPath || 'Batarya entegrasyonu'}</span>
+      </div>
       <div class="inverter-card-stats">
         <div class="inverter-stat">
           <span class="inverter-stat-label">Gölge Toleransı</span>
@@ -42,10 +51,16 @@ export function buildInverterCards() {
           <span>${inv.lifetime} yıl</span>
         </div>
         <div class="inverter-stat">
-          <span class="inverter-stat-label">Fiyat (≤10 kWp)</span>
+          <span class="inverter-stat-label">Garanti</span>
+          <span>${inv.warranty || inv.lifetime} yıl</span>
+        </div>
+        <div class="inverter-stat">
+          <span class="inverter-stat-label">Tipik maliyet (≤10 kWp)</span>
           <span>${priceStr}</span>
         </div>
       </div>
+      <div class="equipment-card-note"><strong>En uygun:</strong> ${inv.bestFor || inverterDescriptions[key]}</div>
+      <div class="equipment-card-note equipment-card-note-muted"><strong>Teknik vurgu:</strong> ${(inv.technicalHighlights || []).join(' • ')}</div>
       <div class="inverter-card-pros">
         ${inv.advantages.map(a => `<div class="inv-pro">✓ ${a}</div>`).join('')}
       </div>
@@ -55,6 +70,7 @@ export function buildInverterCards() {
     </div>
   `;
   }).join('');
+  window.updateEquipmentSelectionSummary?.();
 }
 
 export function selectInverter(key) {
@@ -70,12 +86,24 @@ export function selectInverter(key) {
   if (infoEl) {
     infoEl.innerHTML = `
       <div class="inverter-selected-info">
-        <span style="color:var(--primary);font-weight:600">${inv.name}</span> seçildi —
-        Verimlilik: <strong>${(inv.efficiency * 100).toFixed(1)}%</strong> |
-        Ömür: <strong>${inv.lifetime} yıl</strong> |
-        Gölge Toleransı: <strong>${(inv.shadeTolerance * 100).toFixed(0)}%</strong>
+        <div class="battery-summary-head">
+          <div>
+            <strong>${inv.name}</strong>
+            <span>${inv.summary || inverterDescriptions[key]}</span>
+          </div>
+          <span class="equipment-card-badge">${inv.badge || 'İnverter'}</span>
+        </div>
+        <div class="battery-summary-grid">
+          <div class="battery-summary-stat"><span>Verim</span><strong>${(inv.efficiency * 100).toFixed(1)}%</strong></div>
+          <div class="battery-summary-stat"><span>Gölge toleransı</span><strong>${(inv.shadeTolerance * 100).toFixed(0)}%</strong></div>
+          <div class="battery-summary-stat"><span>Garanti</span><strong>${inv.warranty || inv.lifetime} yıl</strong></div>
+          <div class="battery-summary-stat"><span>Mimari</span><strong>${inv.structure || '—'}</strong></div>
+        </div>
+        <div class="equipment-card-note"><strong>Batarya yolu:</strong> ${inv.batteryPath || 'Teklif aşamasında üretici uyumluluğu doğrulanmalıdır.'}</div>
       </div>`;
   }
+  window.updatePanelPreview?.();
+  window.updateEquipmentSelectionSummary?.();
 }
 
 // window'a expose et

@@ -1070,6 +1070,17 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
           <span data-i18n="step4.panelType">Panel Tipi Seçin</span>
         </div>
+        <div class="equipment-section-intro">
+          <div class="equipment-section-copy">
+            <strong>Panel seçimi çatıda kaç kWp sığacağını, sıcak havadaki kaybı ve uzun dönem üretim düşüşünü belirler.</strong>
+            <span>Her kartta resmi ürün ailesinden alınmış örnek ölçü ve teknoloji özeti gösterilir. Fiyatlar ise saha teklifine göre değiştiği için tipik piyasa modelidir.</span>
+          </div>
+          <div class="equipment-chip-row equipment-chip-row-tight">
+            <span class="equipment-chip">Örnek modül ölçüsü</span>
+            <span class="equipment-chip">Sıcaklık katsayısı</span>
+            <span class="equipment-chip">Ürün / performans garantisi</span>
+          </div>
+        </div>
         <div class="panel-cards" id="panel-cards-wrap"></div>
         <div class="panel-preview" id="panel-preview-wrap">
           <div class="panel-preview-stat">
@@ -1086,7 +1097,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           </div>
           <div class="panel-preview-stat">
             <div class="panel-preview-val" id="prev-cost">-</div>
-            <div class="panel-preview-label" id="prev-cost-label">Tahmini Maliyet (₺)</div>
+            <div class="panel-preview-label" id="prev-cost-label">Panel Maliyeti (₺)</div>
           </div>
         </div>
       </div>
@@ -1097,73 +1108,145 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg>
           <span data-i18n="step4.inverterType">İnverter Tipi</span>
         </div>
+        <div class="equipment-section-intro">
+          <div class="equipment-section-copy">
+            <strong>İnverter, panelden gelen DC elektriği evin kullandığı AC elektriğe çeviren sistemin beyni gibidir.</strong>
+            <span>Çatıda gölge, farklı yön ve batarya planı varsa inverter mimarisi toplam üretimi ve ilerideki genişleme kolaylığını doğrudan etkiler.</span>
+          </div>
+          <div class="equipment-chip-row equipment-chip-row-tight">
+            <span class="equipment-chip">MPPT / mimari yapı</span>
+            <span class="equipment-chip">Gölge davranışı</span>
+            <span class="equipment-chip">Batarya entegrasyonu</span>
+          </div>
+        </div>
         <div id="inverter-cards-wrap" class="inverter-cards"></div>
         <div id="inverter-info" style="margin-top:12px;font-size:0.82rem;color:var(--text-muted)"></div>
       </div>
 
-      <!-- Battery block — moved here from financial step -->
-      <div class="advanced-feature-block" id="battery-block">
-        <div class="feature-toggle-header" onclick="toggleBatteryBlock()">
-          <div class="feature-toggle-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2M12 12v4"/><line x1="8" y1="14" x2="8" y2="14"/></svg>
-            <span data-i18n="step4.batteryStorage">Batarya Depolama (BESS)</span>
-            <span class="feature-badge">YENİ</span>
+      <!-- Battery block — redesigned to match other equipment cards -->
+      <div class="card equipment-battery-card" id="battery-block">
+        <div class="equipment-battery-head">
+          <div class="equipment-battery-head-copy">
+            <div class="card-title" style="margin-bottom:8px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2M12 12v4"/><line x1="8" y1="14" x2="8" y2="14"/></svg>
+              <span data-i18n="step4.batteryStorage">Batarya Depolama (BESS)</span>
+            </div>
+            <p class="equipment-battery-subcopy">Batarya; gündüz üretilen fazla elektriği akşam kullanmak, kısa kesintilerde kritik yükleri beslemek ve öz tüketim oranını artırmak için kullanılır. Sadece “fazla üretimi satmak” isteyen projede şart değildir.</p>
           </div>
           <label class="toggle-switch" onclick="event.stopPropagation()">
             <input type="checkbox" id="battery-toggle" onchange="onBatteryToggle(this.checked)">
             <span class="toggle-slider"></span>
           </label>
         </div>
+        <div class="battery-explainer-grid">
+          <article class="battery-explainer-card">
+            <strong>Akşam Kullanımı</strong>
+            <span>Gündüz şebekeye gitmesi muhtemel üretimi akşam tüketimine kaydırır.</span>
+          </article>
+          <article class="battery-explainer-card">
+            <strong>Kesinti Yedeği</strong>
+            <span>İnternet, aydınlatma, kombi ve kritik prizler için yedek güç sağlar.</span>
+          </article>
+          <article class="battery-explainer-card">
+            <strong>Yük Yönetimi</strong>
+            <span>Talep piklerini yumuşatır; hibrit sistemlerde enerji yönetimini daha esnek hale getirir.</span>
+          </article>
+        </div>
         <div class="feature-toggle-body" id="battery-inputs" style="display:none">
-          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">Popüler ev tipi batarya modellerinden seçin veya özel kapasite girin</div>
-          <div class="bat-models" id="bat-models-wrap"></div>
-          <div id="bat-custom-inputs" style="display:none;margin-bottom:16px">
-            <div class="roof-section-grid">
-              <div class="form-group" style="margin:0">
-                <label style="font-size:0.8rem">Kapasite (kWh)</label>
-                <input type="number" id="bat-capacity" min="1" max="50" value="5" step="0.1"
-                  style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
-                  oninput="updateBatteryCustom()"/>
-              </div>
-              <div class="form-group" style="margin:0">
-                <label style="font-size:0.8rem">Deşarj Derinliği DoD (%)</label>
-                <input type="number" id="bat-dod" min="50" max="100" value="80" step="5"
-                  style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
-                  oninput="updateBatteryCustom()"/>
-              </div>
+          <div class="equipment-section-intro battery-section-intro">
+            <div class="equipment-section-copy">
+              <strong>Resmi ürün serilerinden doğrulanmış örnek ev tipi bataryalar</strong>
+              <span>Gösterilen kullanılabilir enerji, mimari ve genişleme bilgileri üretici teknik sayfalarına dayalıdır. Fiyat ve round-trip verim alanı ise teklif ve model varsayımına göre değişebilir.</span>
             </div>
           </div>
-          <div class="form-group" style="margin-bottom:0">
-            <label style="font-size:0.8rem">Round-trip Verimlilik (%)
-              <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Şarj edilen enerjinin ne kadarı deşarjda geri alınır. LFP: %92–95, NMC: %90–93.</span></span>
-            </label>
-            <div class="range-wrap">
-              <span class="range-value" id="bat-eff-val">92%</span>
-              <input type="range" id="bat-eff" min="75" max="97" value="92" oninput="updateBatEff(this.value)"/>
-              <div class="range-labels"><span>75%</span><span>86%</span><span>97%</span></div>
+          <div class="bat-models" id="bat-models-wrap"></div>
+          <div class="battery-summary-card" id="battery-summary"></div>
+          <div id="bat-custom-inputs" class="battery-custom-card" style="display:none">
+            <div class="battery-custom-head">
+              <strong>Özel batarya tanımı</strong>
+              <span>Teknik veri sayfası elinizdeyse aşağıdaki alanlarla projeyi manuel modelleyin.</span>
+            </div>
+            <div class="battery-custom-grid">
+              <div class="form-group" style="margin:0">
+                <label>Kapasite (kWh)</label>
+                <input type="number" id="bat-capacity" min="1" max="50" value="5" step="0.1" oninput="updateBatteryCustom()"/>
+              </div>
+              <div class="form-group" style="margin:0">
+                <label>Deşarj Derinliği DoD (%)</label>
+                <input type="number" id="bat-dod" min="50" max="100" value="80" step="5" oninput="updateBatteryCustom()"/>
+              </div>
+              <div class="form-group" style="margin:0">
+                <label>Round-trip Verimlilik (%)
+                  <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Şarj edilen enerjinin ne kadarı deşarjda geri alınır. Ev tipi LFP sistemlerde modelleme için çoğunlukla %90–95 bandı kullanılır.</span></span>
+                </label>
+                <input type="number" id="bat-eff-input" min="75" max="97" value="90" step="1" oninput="syncBatteryEfficiencyInputs(this.value, 'number')"/>
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label>Modelleme için kullanılan round-trip verimi</label>
+              <div class="range-wrap">
+                <span class="range-value" id="bat-eff-val">90%</span>
+                <input type="range" id="bat-eff" min="75" max="97" value="90" oninput="syncBatteryEfficiencyInputs(this.value, 'range')"/>
+                <div class="range-labels"><span>75%</span><span>86%</span><span>97%</span></div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
     <!-- Sticky summary card -->
     <div class="equipment-summary-card">
-      <div class="card-title" style="font-size:0.9rem" data-i18n="step4.systemSummary">Sistem Özeti</div>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <div style="display:flex;justify-content:space-between;font-size:0.85rem">
-          <span style="color:var(--text-muted)">Sistem Gücü</span>
-          <span id="equip-summary-power" style="font-weight:700;color:var(--primary)">—</span>
+      <div class="equipment-summary-headline">
+        <div>
+          <div class="card-title" style="font-size:0.9rem;margin-bottom:8px" data-i18n="step4.systemSummary">Sistem Özeti</div>
+          <p class="equipment-summary-subcopy">Bu özet, Step 4 içinde seçtiğiniz ekipmanlara göre anlık olarak güncellenir. Toplam ekipman maliyeti panel, inverter ve aktifse batarya depolamayı birlikte gösterir.</p>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:0.85rem">
-          <span style="color:var(--text-muted)">Panel Sayısı</span>
-          <span id="equip-summary-panels" style="font-weight:700">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:0.85rem">
-          <span style="color:var(--text-muted)">Tahmini Maliyet</span>
-          <span id="equip-summary-cost" style="font-weight:700;color:var(--success)">—</span>
+        <div class="equipment-summary-total">
+          <span>Toplam ekipman</span>
+          <strong id="equip-summary-cost">—</strong>
         </div>
       </div>
+      <div class="equipment-summary-grid">
+        <div class="equipment-summary-item">
+          <span>Panel Teknolojisi</span>
+          <strong id="equip-summary-panel-type">—</strong>
+        </div>
+        <div class="equipment-summary-item">
+          <span>İnverter Mimarisi</span>
+          <strong id="equip-summary-inverter">—</strong>
+        </div>
+        <div class="equipment-summary-item">
+          <span>Depolama</span>
+          <strong id="equip-summary-battery">Kapalı</strong>
+        </div>
+        <div class="equipment-summary-item">
+          <span>Sistem Gücü</span>
+          <strong id="equip-summary-power">—</strong>
+        </div>
+        <div class="equipment-summary-item">
+          <span>Panel Sayısı</span>
+          <strong id="equip-summary-panels">—</strong>
+        </div>
+        <div class="equipment-summary-item">
+          <span>Alan Kullanımı</span>
+          <strong id="equip-summary-area">—</strong>
+        </div>
+      </div>
+      <div class="equipment-cost-breakdown">
+        <div class="equipment-cost-row">
+          <span>Panel maliyeti</span>
+          <strong id="equip-summary-panel-cost">—</strong>
+        </div>
+        <div class="equipment-cost-row">
+          <span>İnverter maliyeti</span>
+          <strong id="equip-summary-inverter-cost">—</strong>
+        </div>
+        <div class="equipment-cost-row">
+          <span>Batarya maliyeti</span>
+          <strong id="equip-summary-battery-cost">Kapalı</strong>
+        </div>
+      </div>
+      <div class="equipment-summary-note" id="equip-summary-cost-note">Toplam ekipman tahmini: panel + inverter</div>
       <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
         <button class="btn btn-secondary btn-full" onclick="goToStep(3)" style="font-size:0.82rem">← Geri</button>
         <button class="btn btn-primary btn-full" onclick="validateStep4()" data-i18n="step4.next">Sonraki Adım →</button>

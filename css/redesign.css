@@ -800,19 +800,113 @@ h2, .h2, .step-heading-title {
 
 .equipment-layout {
   display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
   align-items: start;
 }
-.equipment-main { min-width: 0; }
+.equipment-main {
+  min-width: 0;
+  display: grid;
+  gap: 22px;
+}
 .equipment-summary-card {
-  position: sticky;
-  top: calc(var(--header-h) + 16px);
+  position: relative;
+  top: 0;
   background: rgba(255,255,255,.03);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  padding: 24px 26px;
   backdrop-filter: blur(8px);
+}
+.equipment-main > .card {
+  margin-bottom: 0 !important;
+  padding: 28px;
+}
+.equipment-summary-headline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+.equipment-summary-subcopy {
+  font-size: .79rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.equipment-summary-total {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(245,158,11,.18);
+  background: rgba(245,158,11,.08);
+}
+.equipment-summary-total span {
+  font-size: .74rem;
+  color: var(--text-muted);
+}
+.equipment-summary-total strong {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--primary);
+  letter-spacing: -.03em;
+}
+.equipment-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.equipment-summary-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255,255,255,.03);
+}
+.equipment-summary-item span {
+  font-size: .72rem;
+  color: var(--text-muted);
+}
+.equipment-summary-item strong {
+  font-size: .92rem;
+  line-height: 1.35;
+  color: var(--text);
+}
+.equipment-cost-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.equipment-cost-row {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.025);
+}
+.equipment-cost-row span {
+  font-size: .72rem;
+  color: var(--text-muted);
+}
+.equipment-cost-row strong {
+  font-size: .95rem;
+  color: var(--text);
+}
+.equipment-summary-note {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(245,158,11,.14);
+  background: rgba(245,158,11,.05);
+  font-size: .74rem;
+  line-height: 1.55;
+  color: var(--text-muted);
 }
 .equipment-summary-title {
   font-family: var(--font-display);
@@ -832,9 +926,330 @@ h2, .h2, .step-heading-title {
 .equip-stat-val { font-weight: 700; color: var(--text); font-family: var(--font-display); }
 .equip-stat-val.highlight { color: var(--primary); }
 
+.equipment-section-intro {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(245,158,11,.14);
+  background: rgba(255,255,255,.03);
+}
+.equipment-section-copy {
+  display: grid;
+  gap: 6px;
+}
+.equipment-section-copy strong {
+  font-size: .84rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+.equipment-section-copy span {
+  font-size: .76rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.equipment-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.equipment-chip-row-tight {
+  gap: 6px;
+}
+.equipment-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255,255,255,.04);
+  font-size: .7rem;
+  color: var(--text-muted);
+}
+.equipment-card-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin: 0 28px 10px 0;
+}
+.equipment-card-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(245,158,11,.12);
+  border: 1px solid rgba(245,158,11,.24);
+  color: var(--primary);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.equipment-card-example {
+  font-size: .68rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+.equipment-card-copy {
+  font-size: .75rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.equipment-card-metric-label {
+  font-size: .72rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+  margin-bottom: 10px;
+}
+.equipment-card-note {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(245,158,11,.14);
+  background: rgba(245,158,11,.05);
+  font-size: .73rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+.equipment-card-note strong {
+  color: var(--primary);
+}
+.equipment-card-note-muted {
+  border-color: var(--border-subtle);
+  background: rgba(255,255,255,.03);
+  color: var(--text-muted);
+}
+.panel-card,
+.inverter-card,
+.bat-model-btn {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.panel-card-stats,
+.inverter-card-stats,
+.battery-model-grid {
+  margin-top: 12px;
+}
+.panel-card .equipment-card-note:last-child,
+.inverter-card .inverter-card-cons,
+.bat-model-btn .battery-model-note {
+  margin-top: auto;
+}
+.equipment-battery-card {
+  display: grid;
+  gap: 16px;
+}
+.equipment-battery-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.equipment-battery-head-copy {
+  min-width: 0;
+}
+.equipment-battery-subcopy {
+  font-size: .8rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.battery-explainer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.battery-explainer-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255,255,255,.03);
+}
+.battery-explainer-card strong {
+  font-size: .8rem;
+  color: var(--text);
+}
+.battery-explainer-card span {
+  font-size: .74rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.battery-section-intro {
+  margin-bottom: 14px;
+}
+.bat-models {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.bat-model-btn {
+  text-align: left;
+  background: var(--surface-glass);
+  border: 2px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 18px;
+  cursor: pointer;
+  color: var(--text);
+  transition: all var(--transition-bounce);
+}
+.bat-model-btn:hover {
+  transform: translateY(-3px);
+  border-color: rgba(245,158,11,.35);
+  box-shadow: var(--shadow-glow-primary);
+}
+.bat-model-btn.selected {
+  border-color: var(--primary);
+  background: rgba(245,158,11,.05);
+  box-shadow: var(--shadow-glow-primary);
+}
+.battery-model-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.battery-model-voltage {
+  font-size: .68rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  text-align: right;
+}
+.battery-model-title {
+  font-family: var(--font-display);
+  font-size: .92rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.battery-model-spec {
+  margin-top: 4px;
+  font-size: .75rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.battery-model-grid,
+.battery-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.battery-model-stat,
+.battery-summary-stat {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255,255,255,.03);
+}
+.battery-model-stat span,
+.battery-summary-stat span {
+  font-size: .68rem;
+  color: var(--text-muted);
+}
+.battery-model-stat strong,
+.battery-summary-stat strong {
+  font-size: .82rem;
+  line-height: 1.35;
+  color: var(--text);
+}
+.battery-model-note {
+  margin-top: 12px;
+  font-size: .74rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.battery-summary-card,
+.inverter-selected-info {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(245,158,11,.14);
+  background: rgba(255,255,255,.03);
+}
+.battery-summary-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+.battery-summary-head > div {
+  display: grid;
+  gap: 4px;
+}
+.battery-summary-head strong {
+  font-size: .92rem;
+  color: var(--text);
+}
+.battery-summary-head span {
+  font-size: .75rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.battery-custom-card {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255,255,255,.03);
+}
+.battery-custom-head {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.battery-custom-head strong {
+  font-size: .86rem;
+  color: var(--text);
+}
+.battery-custom-head span {
+  font-size: .75rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.battery-custom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
 @media(max-width:1024px) {
   .equipment-layout { grid-template-columns: 1fr; }
-  .equipment-summary-card { position: relative; top: 0; }
+  .equipment-summary-headline,
+  .equipment-summary-grid,
+  .equipment-cost-breakdown {
+    grid-template-columns: 1fr;
+  }
+  .battery-explainer-grid,
+  .bat-models,
+  .battery-custom-grid { grid-template-columns: 1fr; }
+}
+
+@media(max-width:640px) {
+  .equipment-summary-headline,
+  .equipment-battery-head,
+  .battery-summary-head,
+  .equipment-card-topline {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+  .equipment-card-example,
+  .battery-model-voltage {
+    text-align: left;
+  }
+  .battery-model-grid,
+  .battery-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1000,6 +1415,12 @@ h2, .h2, .step-heading-title {
 
 /* Override main-content padding for full-bleed steps */
 #step-2.active ~ * { display: none; }
+
+#main-content.wide-flow {
+  max-width: 1380px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
 
 /* Smooth nav btn row */
 .step-nav-row {

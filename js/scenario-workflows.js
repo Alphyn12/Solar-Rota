@@ -47,7 +47,7 @@ export const SCENARIO_DEFINITIONS = {
       dailyConsumption: 12,
       tariffType: 'residential',
       tariff: 7.16,
-      battery: { model: 'pylontech_us5000c', capacity: 9.6, dod: 0.90, efficiency: 0.94, chemistry: 'LFP', warranty: 10, cycles: 6000 },
+      battery: { model: 'huawei_luna15', capacity: 15.0, dod: 1.00, efficiency: 0.95, chemistry: 'LFP', warranty: 10, cycles: 5000 },
       exportSettlementMode: 'monthly'
     },
     visibleBlocks: { netMetering: false, battery: true, heatPump: true, ev: false, tax: false, governance: true },

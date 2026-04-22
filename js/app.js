@@ -197,7 +197,7 @@ window.state = {
   // Tüketim & BESS
   dailyConsumption: 10,
   batteryEnabled: false,
-  battery: { model: 'pylontech_us5000c', capacity: 9.6, dod: 0.90, efficiency: 0.94, chemistry: 'LFP', warranty: 10, cycles: 6000 },
+  battery: { model: 'huawei_luna15', capacity: 15.0, dod: 1.00, efficiency: 0.95, chemistry: 'LFP', warranty: 10, cycles: 5000 },
   // Saatlik mahsuplaşma / şebeke ihracatı
   netMeteringEnabled: false,
   usdToTry: 38.5,
@@ -2061,11 +2061,6 @@ function openRoofToolLegend() {
 function buildPanelCards() {
   const wrap = document.getElementById('panel-cards-wrap');
   wrap.innerHTML = '';
-  const panelDescriptions = {
-    mono: 'En yaygın tercih. Yüksek verimlilik ve kompakt kurulum; çoğu konut ve ticari proje için ideal denge.',
-    poly: 'Ekonomik seçenek. Daha geniş alana ihtiyaç duyar; maliyet öncelikli ve büyük çatılar için uygundur.',
-    bifacial: 'Hem ön hem arka yüzeyden enerji üretir. Açık çatı veya zeminde %10 ek kazanç; 30 yıl garantiyle en uzun ömürlü.'
-  };
   const cur = window.state.displayCurrency || 'TRY';
   const rate = window.state.usdToTry || 40;
   Object.entries(PANEL_TYPES).forEach(([key, p]) => {
@@ -2078,31 +2073,63 @@ function buildPanelCards() {
     card.id = `panel-card-${key}`;
     card.innerHTML = `
       <div class="panel-check">✓</div>
+      <div class="equipment-card-topline">
+        <span class="equipment-card-badge">${p.badge || 'Panel tipi'}</span>
+        <span class="equipment-card-example">${p.exampleModel}</span>
+      </div>
       <div class="panel-card-title">${p.name}</div>
-      <div style="font-size:0.71rem;color:var(--text-muted);line-height:1.5;margin:6px 4px 10px;text-align:center">${panelDescriptions[key]}</div>
+      <div class="equipment-card-copy">${p.summary || ''}</div>
       <div class="panel-card-eff">${(p.efficiency * 100).toFixed(1)}%</div>
-      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">Verimlilik</div>
+      <div class="equipment-card-metric-label">Örnek modül verimi</div>
+      <div class="equipment-chip-row">
+        <span class="equipment-chip">${p.powerRange || `${p.wattPeak} Wp`}</span>
+        <span class="equipment-chip">${p.exampleSize || `${Math.round(p.height * 1000)} × ${Math.round(p.width * 1000)} mm`}</span>
+        <span class="equipment-chip">${p.cellLayout || 'Yarım hücre'}</span>
+      </div>
       <div class="panel-card-stats">
-        <div class="panel-stat"><span class="panel-stat-label">Güç</span><span>${p.wattPeak} Wp</span></div>
-        <div class="panel-stat"><span class="panel-stat-label">Sıcaklık Katsayısı</span><span>${(p.tempCoeff*100).toFixed(2)}%/°C</span></div>
-        <div class="panel-stat"><span class="panel-stat-label">Yıllık Bozulma</span><span>${(p.degradation*100).toFixed(1)}%</span></div>
-        <div class="panel-stat"><span class="panel-stat-label">Fiyat</span><span>${priceLabel}</span></div>
-        <div class="panel-stat"><span class="panel-stat-label">Garanti</span><span>${p.warranty} yıl</span></div>
-      </div>`;
+        <div class="panel-stat"><span class="panel-stat-label">Nominal güç</span><span>${p.wattPeak} Wp</span></div>
+        <div class="panel-stat"><span class="panel-stat-label">Sıcaklık katsayısı</span><span>${(p.tempCoeff * 100).toFixed(2)}%/°C</span></div>
+        <div class="panel-stat"><span class="panel-stat-label">1. yıl düşüşü</span><span>${(p.firstYearDeg * 100).toFixed(1)}%</span></div>
+        <div class="panel-stat"><span class="panel-stat-label">Sonraki yıllar</span><span>${(p.degradation * 100).toFixed(2)}%</span></div>
+        <div class="panel-stat"><span class="panel-stat-label">Ürün / güç garantisi</span><span>${p.warranty} / ${p.powerWarranty || p.warranty} yıl</span></div>
+        <div class="panel-stat"><span class="panel-stat-label">Tipik fiyat</span><span>${priceLabel}</span></div>
+      </div>
+      <div class="equipment-card-note"><strong>En uygun:</strong> ${p.bestFor || 'Genel çatı projeleri'}</div>
+      <div class="equipment-card-note equipment-card-note-muted"><strong>Dikkat:</strong> ${p.watchFor || 'Teklifte ürün veri sayfası ile doğrulanmalıdır.'}</div>`;
     card.addEventListener('click', () => {
       window.state.panelType = key;
       document.querySelectorAll('.panel-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
       updatePanelPreview();
+      updateEquipmentSelectionSummary();
       // Show albedo selector only for bifacial panels
       const albedoWrap = document.getElementById('albedo-wrap');
       if (albedoWrap) albedoWrap.style.display = key === 'bifacial' ? '' : 'none';
     });
     wrap.appendChild(card);
   });
+  updateEquipmentSelectionSummary();
 }
 
-function updatePanelPreview() {
+function estimateBatteryPreviewCostTry(battery) {
+  const model = BATTERY_MODELS[battery?.model];
+  const modelPrice = Number(model?.price_try);
+  if (Number.isFinite(modelPrice) && modelPrice > 0) return Math.round(modelPrice);
+  const capacity = Math.max(0, Number(battery?.capacity ?? model?.capacity) || 0);
+  return Math.round(capacity * 8000);
+}
+
+function formatPreviewCurrency(tryAmount, withCurrency = true) {
+  const cur = window.state.displayCurrency || 'TRY';
+  const rate = window.state.usdToTry || 40;
+  const formatted = cur === 'USD'
+    ? convertTry(tryAmount, 'USD', rate).toLocaleString('en-US', { maximumFractionDigits: 0 })
+    : Math.round(tryAmount).toLocaleString('tr-TR');
+  if (!withCurrency) return formatted;
+  return cur === 'USD' ? `$${formatted}` : `${formatted} ₺`;
+}
+
+function computeEquipmentPreviewMetrics() {
   const panel = PANEL_TYPES[window.state.panelType];
   const panelArea = panel.width * panel.height;
   const usableRatio = Math.max(0.1, Math.min(0.95, Number(window.state.usableRoofRatio) || 0.75));
@@ -2125,28 +2152,77 @@ function updatePanelPreview() {
     totalPanelCount = Math.min(totalPanelCount, targetPanelCount);
   }
 
-  const systemPower = (totalPanelCount * panel.wattPeak / 1000).toFixed(2);
-  window.state.previewSystemPower = Number(systemPower);
-  const costTry = totalPanelCount * panel.wattPeak * panel.pricePerWatt;
-  const cur = window.state.displayCurrency || 'TRY';
-  const rate = window.state.usdToTry || 40;
-  const costDisplay = cur === 'USD'
-    ? convertTry(costTry, 'USD', rate).toLocaleString('en-US', { maximumFractionDigits: 0 })
-    : Math.round(costTry).toLocaleString('tr-TR');
+  normalizeBatterySelection();
+  const systemPower = totalPanelCount * panel.wattPeak / 1000;
+  const inverter = INVERTER_TYPES[window.state.inverterType] || INVERTER_TYPES.string;
+  const inverterUnitTry = systemPower < 10 ? inverter.pricePerKWp.lt10 : systemPower < 50 ? inverter.pricePerKWp.lt50 : inverter.pricePerKWp.gt50;
+  const panelCostTry = totalPanelCount * panel.wattPeak * panel.pricePerWatt;
+  const inverterCostTry = systemPower > 0 ? Math.round(systemPower * inverterUnitTry) : 0;
+  const batteryCostTry = window.state.batteryEnabled ? estimateBatteryPreviewCostTry(window.state.battery) : 0;
+  return {
+    panel,
+    panelArea,
+    usableRatio,
+    totalPanelCount,
+    roofCapacityPanelCount,
+    systemPower,
+    panelCostTry,
+    inverterCostTry,
+    batteryCostTry,
+    totalEquipmentCostTry: panelCostTry + inverterCostTry + batteryCostTry
+  };
+}
+
+function updatePanelPreview() {
+  const {
+    panel,
+    panelArea,
+    usableRatio,
+    totalPanelCount,
+    roofCapacityPanelCount,
+    systemPower,
+    panelCostTry,
+    inverterCostTry,
+    batteryCostTry,
+    totalEquipmentCostTry
+  } = computeEquipmentPreviewMetrics();
+  window.state.previewSystemPower = Number(systemPower.toFixed(2));
+  const panelCostDisplay = formatPreviewCurrency(panelCostTry, false);
 
   document.getElementById('prev-count').textContent = totalPanelCount;
-  document.getElementById('prev-power').textContent = systemPower;
+  document.getElementById('prev-power').textContent = systemPower.toFixed(2);
   document.getElementById('prev-area').textContent = (totalPanelCount * panelArea).toFixed(1);
-  document.getElementById('prev-cost').textContent = costDisplay;
+  document.getElementById('prev-cost').textContent = panelCostDisplay;
   const costLabel = document.getElementById('prev-cost-label');
-  if (costLabel) costLabel.textContent = cur === 'USD' ? 'Tahmini Maliyet ($)' : 'Tahmini Maliyet (₺)';
+  if (costLabel) costLabel.textContent = (window.state.displayCurrency || 'TRY') === 'USD' ? 'Panel Maliyeti ($)' : 'Panel Maliyeti (₺)';
+  const summaryPower = document.getElementById('equip-summary-power');
+  const summaryPanels = document.getElementById('equip-summary-panels');
+  const summaryArea = document.getElementById('equip-summary-area');
+  if (summaryPower) summaryPower.textContent = `${systemPower.toFixed(2)} kWp`;
+  if (summaryPanels) summaryPanels.textContent = `${totalPanelCount} adet`;
+  if (summaryArea) summaryArea.textContent = `${(totalPanelCount * panelArea).toFixed(1)} m²`;
+
+  const summaryCost = document.getElementById('equip-summary-cost');
+  const summaryPanelCost = document.getElementById('equip-summary-panel-cost');
+  const summaryInverterCost = document.getElementById('equip-summary-inverter-cost');
+  const summaryBatteryCost = document.getElementById('equip-summary-battery-cost');
+  const summaryCostNote = document.getElementById('equip-summary-cost-note');
+  if (summaryCost) summaryCost.textContent = formatPreviewCurrency(totalEquipmentCostTry);
+  if (summaryPanelCost) summaryPanelCost.textContent = formatPreviewCurrency(panelCostTry);
+  if (summaryInverterCost) summaryInverterCost.textContent = formatPreviewCurrency(inverterCostTry);
+  if (summaryBatteryCost) summaryBatteryCost.textContent = window.state.batteryEnabled ? formatPreviewCurrency(batteryCostTry) : 'Kapalı';
+  if (summaryCostNote) {
+    summaryCostNote.textContent = window.state.batteryEnabled
+      ? 'Toplam ekipman tahmini: panel + inverter + batarya depolama'
+      : 'Toplam ekipman tahmini: panel + inverter';
+  }
 
   const preview = document.getElementById('panel-count-preview');
   const isBillTarget = window.state.scenarioKey === 'on-grid' && window.state.designTarget === 'bill-offset';
   if (preview) {
     const previewVerb = isBillTarget ? 'seçilir' : 'sığar';
     preview.textContent = totalPanelCount > 0
-      ? `≈ ${totalPanelCount} panel ${previewVerb} (${systemPower} kWp, çatı sınırı ${roofCapacityPanelCount}, net alan ${Math.round(usableRatio * 100)}%)`
+      ? `≈ ${totalPanelCount} panel ${previewVerb} (${systemPower.toFixed(2)} kWp, çatı sınırı ${roofCapacityPanelCount}, net alan ${Math.round(usableRatio * 100)}%)`
       : '';
   }
   const roofMode = document.getElementById('on-grid-roof-mode-preview');
@@ -2154,6 +2230,36 @@ function updatePanelPreview() {
     const target = isBillTarget ? 'Fatura hedefi kadar boyutlandır' : 'Çatıyı teknik sınıra kadar kullan';
     roofMode.textContent = `${target} · ${Math.round(usableRatio * 100)}% kullanılabilir alan · ${totalPanelCount}/${roofCapacityPanelCount} panel`;
   }
+  updateEquipmentSelectionSummary();
+}
+
+function normalizeBatterySelection() {
+  const currentKey = window.state.battery?.model;
+  if (currentKey === 'custom') {
+    window.state.battery = { ...BATTERY_MODELS.custom, ...(window.state.battery || {}), model: 'custom' };
+    return;
+  }
+  if (!BATTERY_MODELS[currentKey]) {
+    window.state.battery = { ...BATTERY_MODELS.huawei_luna15, model: 'huawei_luna15' };
+  }
+}
+
+function updateEquipmentSelectionSummary() {
+  const panelEl = document.getElementById('equip-summary-panel-type');
+  const inverterEl = document.getElementById('equip-summary-inverter');
+  const batteryEl = document.getElementById('equip-summary-battery');
+  const panel = PANEL_TYPES[window.state.panelType];
+  const inverter = INVERTER_TYPES[window.state.inverterType];
+  normalizeBatterySelection();
+  const battery = window.state.battery || BATTERY_MODELS.custom;
+  const batteryLabel = !window.state.batteryEnabled
+    ? 'Kapalı'
+    : battery.model === 'custom'
+      ? `Özel ${Number(battery.capacity || 0).toFixed(1)} kWh`
+      : battery.name;
+  if (panelEl) panelEl.textContent = panel?.name || '—';
+  if (inverterEl) inverterEl.textContent = inverter?.name || '—';
+  if (batteryEl) batteryEl.textContent = batteryLabel;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2198,6 +2304,7 @@ function goToStep(n) {
   }
   toEl.classList.add('active');
   if (main) main.classList.toggle('immersive-flow', n === 2 || n === 3);
+  if (main) main.classList.toggle('wide-flow', n === 4);
   document.body.classList.toggle('immersive-screen', n === 2 || n === 3);
   document.documentElement.classList.toggle('immersive-screen', n === 2 || n === 3);
   syncHeaderHeightVar();
@@ -2492,32 +2599,58 @@ function onBatteryToggle(checked) {
   window.state.batteryEnabled = checked;
   const inputs = document.getElementById('battery-inputs');
   if (inputs) inputs.style.display = checked ? 'block' : 'none';
+  normalizeBatterySelection();
   if (checked && !document.getElementById('bat-models-wrap').innerHTML) {
     renderBatteryModels();
   }
-  if (checked) syncBatteryCustomInputs();
+  if (checked) {
+    syncBatteryCustomInputs();
+    updateBatterySummary();
+  } else {
+    const summary = document.getElementById('battery-summary');
+    if (summary) {
+      summary.style.display = 'none';
+      summary.innerHTML = '';
+    }
+  }
+  updatePanelPreview();
+  updateEquipmentSelectionSummary();
 }
 
 function renderBatteryModels() {
   const wrap = document.getElementById('bat-models-wrap');
   if (!wrap) return;
+  normalizeBatterySelection();
   wrap.innerHTML = Object.entries(BATTERY_MODELS).map(([key, m]) => `
     <button type="button" class="bat-model-btn${window.state.battery.model === key ? ' selected' : ''}" data-battery-model="${key}">
-      <div style="font-weight:700;font-size:0.82rem;color:var(--text)">${m.name}</div>
-      <div style="font-size:0.71rem;color:var(--text-muted);margin-top:2px">${m.spec}</div>
-      ${m.chemistry ? `<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">
-        <span style="font-size:0.68rem;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:4px;padding:1px 5px;color:#6EE7B7">${m.chemistry}</span>
-        ${m.cycles ? `<span style="font-size:0.68rem;background:rgba(255,255,255,0.06);border:1px solid var(--border-subtle);border-radius:4px;padding:1px 5px;color:var(--text-muted)">${m.cycles.toLocaleString('tr-TR')} döngü</span>` : ''}
-        ${m.warranty ? `<span style="font-size:0.68rem;background:rgba(255,255,255,0.06);border:1px solid var(--border-subtle);border-radius:4px;padding:1px 5px;color:var(--text-muted)">${m.warranty} yıl garanti</span>` : ''}
-      </div>` : ''}
+      <div class="battery-model-topline">
+        <span class="equipment-card-badge">${m.brand}</span>
+        <span class="battery-model-voltage">${key === 'custom' ? 'Manuel modelleme' : (m.voltageClass || '')}</span>
+      </div>
+      <div class="battery-model-title">${m.name}</div>
+      <div class="battery-model-spec">${m.spec}</div>
+      <div class="equipment-chip-row equipment-chip-row-tight">
+        ${m.chemistry ? `<span class="equipment-chip">${m.chemistry}</span>` : ''}
+        ${m.dimensions ? `<span class="equipment-chip">${m.dimensions}</span>` : ''}
+        ${m.expandability ? `<span class="equipment-chip">${m.expandability}</span>` : ''}
+      </div>
+      <div class="battery-model-grid">
+        <div class="battery-model-stat"><span>Kullanılabilir enerji</span><strong>${Number(m.usableCapacity ?? (m.capacity * (m.dod ?? 1))).toFixed(1)} kWh</strong></div>
+        <div class="battery-model-stat"><span>Sürekli güç</span><strong>${m.maxOutputKw ? `${Number(m.maxOutputKw).toFixed(1)} kW` : 'Üreticiye bağlı'}</strong></div>
+        <div class="battery-model-stat"><span>Garanti</span><strong>${m.warranty ? `${m.warranty} yıl` : 'Teklifte doğrula'}</strong></div>
+        <div class="battery-model-stat"><span>Model verimi</span><strong>${Math.round((m.efficiency || 0.9) * 100)}%</strong></div>
+      </div>
+      <div class="battery-model-note">${m.useCase || 'Teknik veri sayfası ile proje özelinde doğrulanmalıdır.'}</div>
     </button>`).join('');
   wrap.querySelectorAll('[data-battery-model]').forEach(btn => {
     btn.addEventListener('click', () => selectBatteryModel(btn.dataset.batteryModel));
   });
   syncBatteryCustomInputs();
+  updateBatterySummary();
 }
 
 function syncBatteryCustomInputs() {
+  normalizeBatterySelection();
   const battery = window.state.battery || BATTERY_MODELS.custom;
   const isCustom = battery.model === 'custom';
   const customWrap = document.getElementById('bat-custom-inputs');
@@ -2525,12 +2658,16 @@ function syncBatteryCustomInputs() {
   const capEl = document.getElementById('bat-capacity');
   const dodEl = document.getElementById('bat-dod');
   const effEl = document.getElementById('bat-eff');
+  const effInputEl = document.getElementById('bat-eff-input');
   if (capEl) capEl.value = Number(battery.capacity ?? BATTERY_MODELS.custom.capacity).toFixed(1);
   if (dodEl) dodEl.value = Math.round(Number(battery.dod ?? BATTERY_MODELS.custom.dod) * 100);
-  if (effEl) effEl.value = Math.round(Number(battery.efficiency ?? BATTERY_MODELS.custom.efficiency) * 100);
+  const effPct = Math.round(Number(battery.efficiency ?? BATTERY_MODELS.custom.efficiency) * 100);
+  if (effEl) effEl.value = effPct;
+  if (effInputEl) effInputEl.value = effPct;
   updateBatCapacity(capEl?.value ?? battery.capacity);
   updateBatDod(dodEl?.value ?? Math.round((battery.dod || 0.8) * 100));
-  updateBatEff(effEl?.value ?? Math.round((battery.efficiency || 0.9) * 100));
+  updateBatEff(effPct);
+  updateBatterySummary();
 }
 
 function selectBatteryModel(key) {
@@ -2541,6 +2678,9 @@ function selectBatteryModel(key) {
   const btn = document.querySelector(`[data-battery-model="${key}"]`);
   if (btn) btn.classList.add('selected');
   syncBatteryCustomInputs();
+  updateBatterySummary();
+  updatePanelPreview();
+  updateEquipmentSelectionSummary();
 }
 
 function updateBatCapacity(val) {
@@ -2548,23 +2688,41 @@ function updateBatCapacity(val) {
   window.state.battery.capacity = Math.max(1, Math.min(50, parseFloat(val) || BATTERY_MODELS.custom.capacity));
   const el = document.getElementById('bat-cap-val');
   if (el) el.textContent = window.state.battery.capacity + ' kWh';
+  updateBatterySummary();
+  updatePanelPreview();
+  updateEquipmentSelectionSummary();
 }
 function updateBatDod(val) {
   window.state.battery = { ...(window.state.battery || BATTERY_MODELS.custom) };
   window.state.battery.dod = Math.max(0.5, Math.min(1, (parseInt(val, 10) || 80) / 100));
   const el = document.getElementById('bat-dod-val');
   if (el) el.textContent = Math.round(window.state.battery.dod * 100) + '%';
+  updateBatterySummary();
+  updatePanelPreview();
 }
 function updateBatEff(val) {
   window.state.battery = { ...(window.state.battery || BATTERY_MODELS.custom) };
   window.state.battery.efficiency = Math.max(0.75, Math.min(0.97, (parseInt(val, 10) || 90) / 100));
   const el = document.getElementById('bat-eff-val');
   if (el) el.textContent = Math.round(window.state.battery.efficiency * 100) + '%';
+  const effInput = document.getElementById('bat-eff-input');
+  if (effInput) effInput.value = Math.round(window.state.battery.efficiency * 100);
+  updateBatterySummary();
+  updatePanelPreview();
+}
+
+function syncBatteryEfficiencyInputs(val, source = 'range') {
+  const normalized = Math.max(75, Math.min(97, parseInt(val, 10) || 90));
+  const rangeEl = document.getElementById('bat-eff');
+  const inputEl = document.getElementById('bat-eff-input');
+  if (source !== 'range' && rangeEl) rangeEl.value = normalized;
+  if (source !== 'number' && inputEl) inputEl.value = normalized;
+  updateBatteryCustom();
 }
 function updateBatteryCustom() {
   const capValue = document.getElementById('bat-capacity')?.value;
   const dodValue = document.getElementById('bat-dod')?.value;
-  const effValue = document.getElementById('bat-eff')?.value;
+  const effValue = document.getElementById('bat-eff-input')?.value || document.getElementById('bat-eff')?.value;
   const base = { ...BATTERY_MODELS.custom, ...(window.state.battery || {}) };
   window.state.battery = { ...base, model: 'custom', name: BATTERY_MODELS.custom.name, spec: BATTERY_MODELS.custom.spec, price_try: 0 };
   document.querySelectorAll('.bat-model-btn').forEach(b => b.classList.toggle('selected', b.dataset.batteryModel === 'custom'));
@@ -2573,6 +2731,45 @@ function updateBatteryCustom() {
   updateBatCapacity(capValue ?? window.state.battery.capacity);
   updateBatDod(dodValue ?? Math.round(window.state.battery.dod * 100));
   updateBatEff(effValue ?? Math.round(window.state.battery.efficiency * 100));
+  window.state.battery.usableCapacity = Number(window.state.battery.capacity) * Number(window.state.battery.dod);
+  updateBatterySummary();
+  updatePanelPreview();
+  updateEquipmentSelectionSummary();
+}
+
+function updateBatterySummary() {
+  const summary = document.getElementById('battery-summary');
+  if (!summary) return;
+  if (!window.state.batteryEnabled) {
+    summary.style.display = 'none';
+    summary.innerHTML = '';
+    return;
+  }
+  normalizeBatterySelection();
+  const selected = window.state.battery || BATTERY_MODELS.custom;
+  const base = BATTERY_MODELS[selected.model] || BATTERY_MODELS.custom;
+  const merged = { ...base, ...selected };
+  const usableCapacity = Math.max(0, Number(merged.usableCapacity ?? ((merged.capacity || 0) * (merged.dod ?? 1))));
+  const modelEfficiency = Math.round(Number(merged.efficiency || 0.9) * 100);
+  summary.style.display = 'grid';
+  summary.innerHTML = `
+    <div class="battery-summary-head">
+      <div>
+        <strong>${merged.name}</strong>
+        <span>${merged.spec}</span>
+      </div>
+      <span class="equipment-card-badge">${merged.brand}</span>
+    </div>
+    <div class="battery-summary-grid">
+      <div class="battery-summary-stat"><span>Kullanılabilir enerji</span><strong>${usableCapacity.toFixed(1)} kWh</strong></div>
+      <div class="battery-summary-stat"><span>Sürekli güç</span><strong>${merged.maxOutputKw ? `${Number(merged.maxOutputKw).toFixed(1)} kW` : 'Üreticiye göre'}</strong></div>
+      <div class="battery-summary-stat"><span>Kimya</span><strong>${merged.chemistry || 'Belirtilmedi'}</strong></div>
+      <div class="battery-summary-stat"><span>Model çevrim verimi</span><strong>${modelEfficiency}%</strong></div>
+      <div class="battery-summary-stat"><span>Garanti</span><strong>${merged.warranty ? `${merged.warranty} yıl` : 'Teklifte doğrula'}</strong></div>
+      <div class="battery-summary-stat"><span>Genişleme</span><strong>${merged.expandability || 'Üreticiye göre'}</strong></div>
+    </div>
+    <div class="equipment-card-note"><strong>Ne için uygun:</strong> ${merged.useCase || 'Akşam tüketimi ve yedekleme ihtiyaçları için değerlendirilir.'}</div>
+    <div class="equipment-card-note equipment-card-note-muted"><strong>Teknik not:</strong> ${merged.details || 'Kesin değerler teklif ve veri sayfası ile doğrulanmalıdır.'}</div>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2669,6 +2866,7 @@ window.closeRoofToolLegend = closeRoofToolLegend;
 window.openRoofToolLegend = openRoofToolLegend;
 window.buildPanelCards = buildPanelCards;
 window.updatePanelPreview = updatePanelPreview;
+window.updateEquipmentSelectionSummary = updateEquipmentSelectionSummary;
 window.toggleMultiRoof = toggleMultiRoof;
 window.addRoofSection = addRoofSection;
 window.removeRoofSection = removeRoofSection;
@@ -2685,6 +2883,7 @@ window.selectBatteryModel = selectBatteryModel;
 window.updateBatCapacity = updateBatCapacity;
 window.updateBatDod = updateBatDod;
 window.updateBatEff = updateBatEff;
+window.syncBatteryEfficiencyInputs = syncBatteryEfficiencyInputs;
 window.updateBatteryCustom = updateBatteryCustom;
 window.toggleNMBlock = toggleNMBlock;
 window.onNMToggle = onNMToggle;
