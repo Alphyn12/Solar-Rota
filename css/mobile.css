@@ -477,6 +477,19 @@ textarea {
     max-width: none;
   }
 
+  .roof-draw-hint {
+    left: 10px;
+    right: 10px;
+    top: 62px;
+    transform: none;
+    min-width: 0;
+    max-width: none;
+    padding: 10px 12px;
+    gap: 8px;
+    justify-content: flex-start;
+    white-space: normal;
+  }
+
   .step2-map-helper {
     top: 10px;
   }

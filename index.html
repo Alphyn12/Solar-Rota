@@ -121,9 +121,9 @@ body>main{z-index:auto}
 .leaflet-draw-tooltip:before{display:none}
 .leaflet-draw-guide-dash{background:#F59E0B!important}
 .leaflet-editing-icon{border-color:#F59E0B!important;background:#0F172A!important;width:10px!important;height:10px!important;border-radius:50%!important;}
-.roof-draw-hint{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:999;background:rgba(15,23,42,0.92);border:1px solid rgba(245,158,11,0.35);border-radius:10px;padding:8px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;font-size:0.78rem;color:#F1F5F9;white-space:nowrap;backdrop-filter:blur(8px);pointer-events:none}
-.rdh-step{display:flex;align-items:center;gap:5px}.rdh-num{width:18px;height:18px;border-radius:50%;background:#F59E0B;color:#000;font-size:0.68rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.rdh-sep{color:#475569;margin:0 2px}
+.roof-draw-hint{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:999;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;min-width:min(760px,calc(100% - 28px));max-width:calc(100% - 28px);padding:10px 18px;border-radius:14px;border:1px solid rgba(245,158,11,0.24);background:color-mix(in srgb,var(--secondary) 86%,var(--surface) 14%);box-shadow:0 14px 34px rgba(0,0,0,0.34);font-size:0.78rem;color:var(--text);backdrop-filter:blur(16px) saturate(1.2);-webkit-backdrop-filter:blur(16px) saturate(1.2);pointer-events:none}
+.rdh-step{display:flex;align-items:center;gap:6px}.rdh-num{width:20px;height:20px;border-radius:999px;background:var(--primary);color:#000;font-size:0.7rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 0 4px rgba(245,158,11,0.12)}
+.rdh-sep{color:rgba(152,152,158,0.6);margin:0 2px}
 .roof-draw-toolbar{position:absolute;bottom:16px;right:16px;z-index:999;display:flex;flex-direction:column;gap:7px}
 .roof-tool-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;font-size:0.8rem;font-weight:600;border-radius:9px;border:1px solid rgba(71,85,105,0.5);background:rgba(15,23,42,0.9);color:#F1F5F9;cursor:pointer;backdrop-filter:blur(8px);transition:all 0.2s;white-space:nowrap}
 .roof-tool-btn:hover{border-color:#F59E0B;background:rgba(245,158,11,0.12);color:#F59E0B}
@@ -694,6 +694,19 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
   <!-- Full-screen map slot -->
   <div id="step2-map-slot">
+    <div class="roof-draw-hint" id="roof-draw-start-hint">
+      <span class="rdh-step"><span class="rdh-num">1</span></span>
+      <span style="color:var(--primary);font-weight:700">Uydu</span>
+      <span style="color:var(--text-muted)">görünümüne geç</span>
+      <span class="rdh-sep">→</span>
+      <span class="rdh-step"><span class="rdh-num">2</span></span>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" style="flex-shrink:0;color:var(--primary)"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+      <span style="color:var(--primary);font-weight:700">Poligon aracı</span>
+      <span style="color:var(--text-muted)">sol üstte</span>
+      <span class="rdh-sep">→</span>
+      <span class="rdh-step"><span class="rdh-num">3</span></span>
+      <span style="color:var(--success);font-weight:700">Çatı köşelerine tıkla, çift tıkla bitir</span>
+    </div>
     <div class="step2-map-overlay step2-map-helper">
       <div class="step2-helper-kicker" data-i18n="step2.helperKicker">Konum seçimi</div>
       <strong data-i18n="step2.helperTitle">Adres arayın veya haritaya tıklayın</strong>
@@ -744,20 +757,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <!-- LEFT: sticky map col -->
     <div class="step3-map-col">
       <div id="step3-map-slot" style="width:100%;height:100%"></div>
-      <!-- Başlangıç ipucu (çizim yokken gösterilir) -->
-      <div class="roof-draw-hint" id="roof-draw-start-hint">
-        <span class="rdh-step"><span class="rdh-num">1</span></span>
-        <span style="color:#F59E0B;font-weight:700">Uydu</span>
-        <span style="color:#94A3B8">görünümüne geç</span>
-        <span class="rdh-sep">→</span>
-        <span class="rdh-step"><span class="rdh-num">2</span></span>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5" style="flex-shrink:0"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-        <span style="color:#F59E0B;font-weight:700">Poligon aracı</span>
-        <span style="color:#94A3B8">sol üstte</span>
-        <span class="rdh-sep">→</span>
-        <span class="rdh-step"><span class="rdh-num">3</span></span>
-        <span style="color:#10B981;font-weight:600">Çatı köşelerine tıkla, çift tıkla bitir</span>
-      </div>
       <div class="roof-tool-legend" id="roof-tool-legend">
         <button class="roof-tool-legend-close" type="button" onclick="closeRoofToolLegend()" aria-label="Araç rehberini kapat" title="Kapat">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -1193,6 +1192,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           </div>
         </div>
       </div>
+    </div>
 
     <!-- Sticky summary card -->
     <div class="equipment-summary-card">

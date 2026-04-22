@@ -2313,7 +2313,7 @@ function goToStep(n) {
   // Show/hide roof start hint
   const roofStartHint = document.getElementById('roof-draw-start-hint');
   if (roofStartHint) {
-    roofStartHint.style.display = (n === 3 && !window.roofDrawnItems?.getLayers().length) ? 'flex' : 'none';
+    roofStartHint.style.display = (n === 2 && !window.roofDrawnItems?.getLayers().length) ? 'flex' : 'none';
   }
 }
 

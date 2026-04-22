@@ -11,15 +11,31 @@ def main():
         page.goto(BASE_URL, wait_until="networkidle")
         page.evaluate(
             """() => {
+                window.state.lat = 41.0;
+                window.state.lon = 28.9;
+                window.state.cityName = 'Istanbul';
+                window.state.ghi = 1550;
+                window.goToStep(2);
+            }"""
+        )
+        page.wait_for_function("window.state.step === 2")
+        assert page.locator("#roof-draw-start-hint").is_visible()
+
+        page.evaluate("validateStep2()")
+        page.wait_for_function("window.state.step === 3")
+        page.fill("#roof-area", "120")
+        page.click(".step3-nav-sticky .btn-primary")
+        page.wait_for_function("window.state.step === 4")
+
+        page.evaluate(
+            """() => {
                 const data = window._appData;
-                window.state.roofArea = 120;
                 window.state.annualConsumptionKwh = 9600;
                 window.state.usableRoofRatio = 0.72;
                 window.state.panelType = 'poly';
                 window.state.inverterType = 'optimizer';
                 window.state.batteryEnabled = true;
                 window.state.battery = { ...data.BATTERY_MODELS.tesla_pw3, model: 'tesla_pw3' };
-                window.goToStep(4);
                 window.buildPanelCards();
                 window.buildInverterCards();
                 window.updatePanelPreview();
@@ -62,6 +78,11 @@ def main():
         assert page.locator("#equip-summary-power").inner_text().endswith("kWp")
         assert page.locator("#equip-summary-area").inner_text().endswith("m²")
         assert "Kullanılabilir enerji" in page.locator("#battery-summary").inner_text()
+
+        page.click('#step-4 .btn-primary.btn-full')
+        page.wait_for_function("window.state.step === 5")
+        assert page.locator("#step-5").get_attribute("class") and "active" in page.locator("#step-5").get_attribute("class")
+        assert page.locator("#on-grid-flow-panel").is_visible()
 
         page.screenshot(path="tests/artifacts-step4-equipment.png", full_page=True)
         browser.close()
