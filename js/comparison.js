@@ -2,7 +2,7 @@
 // COMPARISON — Rekabetçi Teklif Karşılaştırma (Faz D4)
 // Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
-import { PANEL_TYPES, INVERTER_TYPES } from './data.js';
+import { PANEL_TYPES, INVERTER_TYPES, PANEL_TYPE_OPTIONS, normalizePanelTypeKey } from './data.js';
 import {
   buildTariffModel,
   calculateSystemLayout,
@@ -13,9 +13,9 @@ import {
 
 const SCENARIO_LETTERS = ['A', 'B', 'C'];
 const DEFAULT_SCENARIOS = [
-  { panelType: 'mono',    inverterType: 'string',    customPrice: null },
-  { panelType: 'bifacial', inverterType: 'optimizer', customPrice: null },
-  { panelType: 'poly',    inverterType: 'string',    customPrice: null }
+  { panelType: 'mono_perc',        inverterType: 'string',    customPrice: null },
+  { panelType: 'bifacial_topcon',  inverterType: 'optimizer', customPrice: null },
+  { panelType: 'n_type_topcon',    inverterType: 'string',    customPrice: null }
 ];
 const ct = key => window.i18n?.t?.(key) || key;
 
@@ -61,9 +61,10 @@ function buildComparisonUI() {
         <label>${ct('comparison.panelTypeLabel')}</label>
         <select id="comp-panel-${idx}" onchange="runComparison()"
           style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%">
-          ${Object.entries(PANEL_TYPES).map(([k, p]) => `
-            <option value="${k}" ${k === sc.panelType ? 'selected' : ''}>${p.name}</option>
-          `).join('')}
+          ${PANEL_TYPE_OPTIONS.map(k => {
+            const p = PANEL_TYPES[k];
+            return `<option value="${k}" ${k === sc.panelType ? 'selected' : ''}>${p.name}</option>`;
+          }).join('')}
         </select>
       </div>
       <div class="form-group">
@@ -93,7 +94,7 @@ export function runComparison() {
 
   const r = state.results;
   const results = DEFAULT_SCENARIOS.map((_, idx) => {
-    const panelKey = document.getElementById(`comp-panel-${idx}`)?.value || 'mono';
+    const panelKey = normalizePanelTypeKey(document.getElementById(`comp-panel-${idx}`)?.value || 'mono_perc');
     const invKey = document.getElementById(`comp-inv-${idx}`)?.value || 'string';
     const customPrice = parseFloat(document.getElementById(`comp-price-${idx}`)?.value) || null;
 
@@ -105,7 +106,7 @@ export function runComparison() {
     const systemPower = layout.systemPower;
 
     const basePower = Math.max(r.systemPower, 0.001);
-    const baseBifacialGain = PANEL_TYPES[state.panelType || 'mono']?.bifacialGain ?? 0;
+    const baseBifacialGain = PANEL_TYPES[normalizePanelTypeKey(state.panelType || 'mono_perc')]?.bifacialGain ?? 0;
     const scenarioBifacialGain = panel.bifacialGain ?? 0;
     const bifacialFactor = (1 + scenarioBifacialGain) / (1 + baseBifacialGain);
     const annualEnergy = Math.round(r.annualEnergy * (systemPower / basePower) * inv.efficiency / (INVERTER_TYPES[state.inverterType || 'string']?.efficiency || 0.97) * bifacialFactor);

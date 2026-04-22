@@ -5,8 +5,17 @@
 import {
   TURKISH_CITIES, PANEL_TYPES, BATTERY_MODELS, COMPASS_DIRS,
   PSH_FALLBACK, CITY_SUMMER_TEMPS, MONTHS, MONTH_WEIGHTS,
-  DEFAULT_TARIFFS, INVERTER_TYPES, HEAT_PUMP_DATA, EV_MODELS, TARIFF_META
+  DEFAULT_TARIFFS, INVERTER_TYPES, HEAT_PUMP_DATA, EV_MODELS, TARIFF_META,
+  normalizePanelTypeKey
 } from './data.js';
+import {
+  PANEL_CATALOG,
+  PANEL_CATALOG_SEGMENT_FILTERS,
+  PANEL_CATALOG_TECH_FILTERS,
+  filterPanelCatalog,
+  getPanelCatalogById,
+  getPanelCatalogForType
+} from './panel-catalog.js';
 import { showToast, animateCounter, launchConfetti, resetConfetti, renderPRGauge } from './ui-charts.js';
 import { renderResults, renderMonthlyChart, downloadPDF, shareResults, loadFromHash } from './ui-render.js';
 import { toggleEngReport, renderEngReport, renderEngCalcPanel } from './eng-report.js';
@@ -43,7 +52,7 @@ import { DEVICE_CATALOG, DEVICE_CATEGORIES, DEVICE_CATEGORY_LABELS, catalogItemT
 import { escapeHtml } from './security.js';
 
 // ── Global data referansı ────────────────────────────────────────────────────
-window._appData = { PANEL_TYPES, BATTERY_MODELS, COMPASS_DIRS, INVERTER_TYPES, MONTHS, HEAT_PUMP_DATA, EV_MODELS };
+window._appData = { PANEL_TYPES, PANEL_CATALOG, BATTERY_MODELS, COMPASS_DIRS, INVERTER_TYPES, MONTHS, HEAT_PUMP_DATA, EV_MODELS };
 
 // FIX-4: calculateStructural was imported but never exposed on window, making
 // the structural-check branch in calc-engine.js dead code. Wire it up here.
@@ -178,7 +187,10 @@ window.state = {
   lat: null, lon: null, cityName: null, ghi: null,
   roofArea: null, tilt: 33, azimuth: 180, azimuthCoeff: 1.00,
   azimuthName: "Güney", shadingFactor: 10,
-  panelType: 'mono',
+  panelType: 'mono_perc',
+  panelCatalogId: 'trina_vertex_s_plus_neg9r28',
+  panelCatalogTechFilter: 'all',
+  panelCatalogSegmentFilter: 'all',
   inverterType: 'string',
   results: null,
   enginePreference: 'pvgis-hybrid-js',
@@ -211,6 +223,7 @@ window.state = {
   connectionType: 'trifaze',
   usageProfile: 'balanced',
   annualConsumptionKwh: null,
+  onGridMonthlyBillEstimate: null,
   onGridInputMode: 'basic',
   designTarget: 'bill-offset',
   roofType: 'flat-concrete',
@@ -922,6 +935,7 @@ function syncScenarioControls() {
   setVal('on-grid-connection-type', s.connectionType || 'trifaze');
   setVal('on-grid-usage-profile', s.usageProfile || 'balanced');
   setVal('on-grid-annual-consumption', Math.round(Number(s.annualConsumptionKwh) || Number(s.dailyConsumption || 0) * 365 || 3650));
+  setVal('on-grid-monthly-bill-estimate', s.onGridMonthlyBillEstimate ? Math.round(Number(s.onGridMonthlyBillEstimate)) : '');
   setVal('on-grid-design-target', s.designTarget || 'bill-offset');
   setVal('on-grid-roof-type', s.roofType || 'flat-concrete');
   setVal('on-grid-usable-roof-ratio', Math.round((Number(s.usableRoofRatio) || 0.75) * 100));
@@ -939,6 +953,8 @@ function syncScenarioControls() {
   // Warn when off-grid cost is missing (calc will silently use tariff × 2.5)
   const offGridWarn = document.getElementById('off-grid-cost-warn');
   if (offGridWarn) offGridWarn.style.display = (s.scenarioKey === 'off-grid' && !s.offGridCostPerKwh) ? '' : 'none';
+  const dailyConsumptionBlock = document.getElementById('step5-daily-consumption-block');
+  if (dailyConsumptionBlock) dailyConsumptionBlock.style.display = s.scenarioKey === 'on-grid' ? 'none' : '';
   // Off-Grid Level 2 panel göster/gizle
   const offgridL2Wrap = document.getElementById('offgrid-l2-wrap');
   if (offgridL2Wrap) offgridL2Wrap.style.display = s.scenarioKey === 'off-grid' ? '' : 'none';
@@ -1496,6 +1512,48 @@ function updateOnGridMonthlyConsumption() {
   persistState();
 }
 
+function getOnGridEffectiveImportRate() {
+  const s = window.state;
+  const baseRate = Math.max(0, Number(document.getElementById('tariff-input')?.value) || Number(s.importTariffBase) || Number(s.tariff) || 7.16);
+  const tariffInputMode = document.getElementById('tariff-input-mode')?.value || s.tariffInputMode || 'net-plus-fee';
+  const distributionFee = tariffInputMode === 'gross'
+    ? 0
+    : Math.max(0, Number(document.getElementById('distribution-fee-input')?.value) || Number(s.distributionFee) || 0);
+  return baseRate + distributionFee;
+}
+
+function syncOnGridDesignTargetCards() {
+  const target = window.state.designTarget || document.getElementById('on-grid-design-target')?.value || 'bill-offset';
+  document.querySelectorAll('[data-design-target-card]').forEach(card => {
+    const active = card.dataset.designTargetCard === target;
+    card.classList.toggle('active', active);
+    card.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+function setOnGridDesignTarget(target = 'bill-offset') {
+  const nextTarget = target === 'fill-roof' ? 'fill-roof' : 'bill-offset';
+  const input = document.getElementById('on-grid-design-target');
+  if (input) input.value = nextTarget;
+  window.state.designTarget = nextTarget;
+  syncOnGridDesignTargetCards();
+  updateOnGridAssumptions();
+}
+
+function syncOnGridMonthlyBillEstimate() {
+  const billInput = document.getElementById('on-grid-monthly-bill-estimate');
+  if (!billInput || document.activeElement === billInput) return;
+  const annual = Math.max(0, Number(window.state.annualConsumptionKwh) || Number(window.state.dailyConsumption || 0) * 365 || 0);
+  if (!annual) {
+    billInput.value = '';
+    window.state.onGridMonthlyBillEstimate = null;
+    return;
+  }
+  const estimate = Math.round((annual / 12) * getOnGridEffectiveImportRate());
+  billInput.value = estimate;
+  window.state.onGridMonthlyBillEstimate = estimate;
+}
+
 function setOnGridInputMode(mode = 'basic') {
   window.state.onGridInputMode = mode === 'advanced' ? 'advanced' : 'basic';
   document.querySelectorAll('[data-on-grid-mode-btn]').forEach(btn => {
@@ -1503,6 +1561,9 @@ function setOnGridInputMode(mode = 'basic') {
   });
   const advanced = document.getElementById('on-grid-advanced-fields');
   if (advanced) advanced.style.display = window.state.onGridInputMode === 'advanced' ? '' : 'none';
+  const advancedCard = document.getElementById('step5-advanced-card');
+  if (advancedCard) advancedCard.open = window.state.onGridInputMode === 'advanced';
+  syncOnGridDesignTargetCards();
   updateOnGridFlowSummary();
   persistState();
 }
@@ -1518,15 +1579,43 @@ function updateOnGridFlowSummary() {
     'evening-heavy': i18n.t('onGridFlow.profileEvening'),
     'business-hours': i18n.t('onGridFlow.profileBusiness')
   };
+  const targetLabel = s.designTarget === 'fill-roof'
+    ? 'Maksimum teknik performans'
+    : 'Elektrik faturasını dengele';
+  const targetCopy = s.designTarget === 'fill-roof'
+    ? 'Çatı alanı izin verdiği sürece panel sayısı artırılır.'
+    : 'Sistem yıllık tüketimi karşılayacak seviyede sınırlandırılır.';
   const settlement = s.exportSettlementMode === 'auto'
     ? (s.settlementDate ? `${i18n.t('onGridFlow.settlementAuto')} (${s.settlementDate})` : i18n.t('onGridFlow.settlementAutoMissing'))
     : s.exportSettlementMode === 'hourly' ? i18n.t('onGridFlow.settlementHourly') : i18n.t('onGridFlow.settlementMonthly');
+  const monthlyBill = Math.round(Number(s.onGridMonthlyBillEstimate) || ((annual / 12) * getOnGridEffectiveImportRate()) || 0);
+  const profileSource = s.hourlyProfileSource === 'hourly-uploaded'
+    ? 'Gerçek 8760 veri'
+    : s.hourlyProfileSource === 'monthly-derived'
+      ? 'Aylık veriden türetildi'
+      : 'Varsayılan sentetik profil';
+  const defaultsSummary = `${profileLabels[s.usageProfile] || profileLabels.balanced} · ${Math.round((Number(s.usableRoofRatio) || 0.75) * 100)}% net alan`;
   summary.innerHTML = `
-    <div><strong>${annual.toLocaleString('tr-TR')}</strong><span>${i18n.t('onGridFlow.summaryAnnualConsumption')}</span></div>
-    <div><strong>${profileLabels[s.usageProfile] || profileLabels.balanced}</strong><span>${i18n.t('onGridFlow.summaryUsageProfile')}</span></div>
+    <div><strong>${targetLabel}</strong><span>${targetCopy}</span></div>
+    <div><strong>${annual.toLocaleString('tr-TR')} kWh/yıl</strong><span>Hesapta kullanılan tüketim hedefi</span></div>
+    <div><strong>${monthlyBill > 0 ? `${monthlyBill.toLocaleString('tr-TR')} ₺/ay` : 'Otomatik'}</strong><span>Mevcut tarife varsayımına göre yaklaşık fatura karşılığı</span></div>
+    <div><strong>${defaultsSummary}</strong><span>Basit modun otomatik profili ve çatı kabulü</span></div>
     <div><strong>${settlement}</strong><span>${i18n.t('onGridFlow.summarySettlement')}</span></div>
-    <div><strong>${Math.round((Number(s.usableRoofRatio) || 0.75) * 100)}%</strong><span>${i18n.t('onGridFlow.summaryUsableRoof')}</span></div>
+    <div><strong>${profileSource}</strong><span>Tüketim eğrisinin hesapta üretildiği kaynak</span></div>
   `;
+  const basicNarrative = document.getElementById('on-grid-basic-target-copy');
+  if (basicNarrative) {
+    basicNarrative.textContent = s.designTarget === 'fill-roof'
+      ? 'Bu seçimde sistem, çatının net kullanılabilir alanı ve panel ölçülerine göre teknik olarak sığabilecek en yüksek kurulu güce çıkarılır. Tüketiminiz daha düşük olsa bile sonuç sayfasında olası fazla üretim ayrıca gösterilir.'
+      : `Bu seçimde sistem, yıllık yaklaşık ${annual.toLocaleString('tr-TR')} kWh tüketimi karşılamaya odaklanır. Kullanıcı ek veri vermezse dengeli tüketim profili, ${Math.round((Number(s.usableRoofRatio) || 0.75) * 100)}% net çatı kullanımı ve otomatik mahsuplaşma varsayımı uygulanır.`;
+  }
+  const quickBillNote = document.getElementById('on-grid-bill-estimate-note');
+  if (quickBillNote) {
+    quickBillNote.textContent = monthlyBill > 0
+      ? `Yaklaşık aylık fatura ${monthlyBill.toLocaleString('tr-TR')} ₺ olarak hesaplandı. Bu değer seçili ithal enerji birim fiyatına göre otomatik türetildi; tam fatura analizi gerekiyorsa ileri moda geçin.`
+      : 'İsterseniz yaklaşık aylık fatura tutarı girin; sistem seçili tarife varsayımına göre bunu yıllık kWh tüketimine çevirir.';
+  }
+  syncOnGridDesignTargetCards();
 }
 
 function updateOnGridAssumptions(options = {}) {
@@ -1554,7 +1643,19 @@ function updateOnGridAssumptions(options = {}) {
     updateTariffType(mappedTariff);
   }
   const annualInput = Number(document.getElementById('on-grid-annual-consumption')?.value);
-  if (Number.isFinite(annualInput) && annualInput > 0) {
+  const monthlyBillEstimateInput = Number(document.getElementById('on-grid-monthly-bill-estimate')?.value);
+  s.onGridMonthlyBillEstimate = Number.isFinite(monthlyBillEstimateInput) && monthlyBillEstimateInput > 0
+    ? Math.round(monthlyBillEstimateInput)
+    : null;
+  if (options.source === 'monthly-bill' && s.onGridMonthlyBillEstimate) {
+    const derivedAnnual = Math.max(0, Math.round((s.onGridMonthlyBillEstimate * 12) / Math.max(0.01, getOnGridEffectiveImportRate())));
+    s.annualConsumptionKwh = derivedAnnual;
+    s.dailyConsumption = derivedAnnual / 365;
+    const annualField = document.getElementById('on-grid-annual-consumption');
+    if (annualField) annualField.value = derivedAnnual;
+    if (options.fillMonthly !== false) fillOnGridMonthlyFromAnnual(derivedAnnual);
+  }
+  if (options.source !== 'monthly-bill' && Number.isFinite(annualInput) && annualInput > 0) {
     s.annualConsumptionKwh = Math.round(annualInput);
     s.dailyConsumption = s.annualConsumptionKwh / 365;
     if (options.fillMonthly || !Array.isArray(s.monthlyConsumption)) fillOnGridMonthlyFromAnnual(s.annualConsumptionKwh);
@@ -1564,6 +1665,7 @@ function updateOnGridAssumptions(options = {}) {
   const usableHint = document.getElementById('on-grid-usable-roof-hint');
   if (usableHint) usableHint.textContent = `${Math.round(s.usableRoofRatio * 100)}% net alan: servis boşluğu, parapet, yangın yolu ve bakım koridoru sonrası ön fizibilite varsayımı.`;
   updatePanelPreview();
+  syncOnGridMonthlyBillEstimate();
   updateOnGridFlowSummary();
   persistState();
 }
@@ -1593,6 +1695,10 @@ function updateTariffAssumptions() {
   if (distFeeInput) {
     distFeeInput.disabled = (s.tariffInputMode === 'gross');
     if (distFeeLabel) distFeeLabel.style.opacity = (s.tariffInputMode === 'gross') ? '0.4' : '';
+  }
+  if (s.scenarioKey === 'on-grid') {
+    syncOnGridMonthlyBillEstimate();
+    updateOnGridFlowSummary();
   }
   s.tariffRegime = document.getElementById('tariff-regime')?.value || s.tariffRegime || 'auto';
   s.tariffMode = s.tariffRegime;
@@ -2058,56 +2164,126 @@ function openRoofToolLegend() {
 // ═══════════════════════════════════════════════════════════
 // PANEL CARDS
 // ═══════════════════════════════════════════════════════════
+function syncPanelCatalogSelection() {
+  const desiredType = normalizePanelTypeKey(window.state.panelType);
+  window.state.panelType = desiredType;
+  const currentCatalog = getPanelCatalogById(window.state.panelCatalogId);
+  if (currentCatalog && normalizePanelTypeKey(currentCatalog.technologyProfileId) === desiredType) {
+    window.state.panelCatalogId = currentCatalog.id;
+    window.state.panelType = normalizePanelTypeKey(currentCatalog.technologyProfileId);
+    return currentCatalog;
+  }
+  const fallback = getPanelCatalogForType(desiredType)[0] || PANEL_CATALOG[0] || null;
+  if (fallback) {
+    window.state.panelCatalogId = fallback.id;
+    window.state.panelType = normalizePanelTypeKey(fallback.technologyProfileId);
+  }
+  return fallback;
+}
+
+function buildPanelCatalogFilters() {
+  const techSelect = document.getElementById('panel-tech-filter');
+  const segmentSelect = document.getElementById('panel-segment-filter');
+  if (techSelect && !techSelect.dataset.ready) {
+    techSelect.innerHTML = PANEL_CATALOG_TECH_FILTERS.map(item => `<option value="${item.id}">${item.label}</option>`).join('');
+    techSelect.dataset.ready = 'true';
+    techSelect.addEventListener('change', () => {
+      window.state.panelCatalogTechFilter = techSelect.value || 'all';
+      buildPanelCards();
+    });
+  }
+  if (segmentSelect && !segmentSelect.dataset.ready) {
+    segmentSelect.innerHTML = PANEL_CATALOG_SEGMENT_FILTERS.map(item => `<option value="${item.id}">${item.label}</option>`).join('');
+    segmentSelect.dataset.ready = 'true';
+    segmentSelect.addEventListener('change', () => {
+      window.state.panelCatalogSegmentFilter = segmentSelect.value || 'all';
+      buildPanelCards();
+    });
+  }
+  if (techSelect) techSelect.value = window.state.panelCatalogTechFilter || 'all';
+  if (segmentSelect) segmentSelect.value = window.state.panelCatalogSegmentFilter || 'all';
+}
+
+function syncPanelSelectionUI() {
+  const selectedType = normalizePanelTypeKey(window.state.panelType);
+  const albedoWrap = document.getElementById('albedo-wrap');
+  if (albedoWrap) albedoWrap.style.display = selectedType === 'bifacial_topcon' ? '' : 'none';
+}
+
 function buildPanelCards() {
   const wrap = document.getElementById('panel-cards-wrap');
+  if (!wrap) return;
+  buildPanelCatalogFilters();
+  const selectedCatalog = syncPanelCatalogSelection();
+  syncPanelSelectionUI();
   wrap.innerHTML = '';
-  const cur = window.state.displayCurrency || 'TRY';
-  const rate = window.state.usdToTry || 40;
-  Object.entries(PANEL_TYPES).forEach(([key, p]) => {
-    const priceVal = convertTry(p.pricePerWatt, cur, rate);
-    const priceLabel = cur === 'USD'
-      ? `$${priceVal.toFixed(3)}/W`
-      : `${priceVal.toFixed(1)} ₺/W`;
+  const filteredCatalog = filterPanelCatalog({
+    technology: window.state.panelCatalogTechFilter || 'all',
+    segment: window.state.panelCatalogSegmentFilter || 'all'
+  });
+  const visibleCatalog = filteredCatalog.length ? filteredCatalog : PANEL_CATALOG;
+  const activeCatalog = visibleCatalog.find(item => item.id === selectedCatalog?.id) || selectedCatalog || visibleCatalog[0] || null;
+  if (activeCatalog) {
+    window.state.panelCatalogId = activeCatalog.id;
+    window.state.panelType = normalizePanelTypeKey(activeCatalog.technologyProfileId);
+  }
+  visibleCatalog.forEach(entry => {
+    const techKey = normalizePanelTypeKey(entry.technologyProfileId);
+    const p = PANEL_TYPES[techKey];
     const card = document.createElement('div');
-    card.className = 'panel-card' + (key === window.state.panelType ? ' selected' : '');
-    card.id = `panel-card-${key}`;
+    card.className = 'panel-card panel-catalog-card' + (entry.id === window.state.panelCatalogId ? ' selected' : '');
+    card.id = `panel-card-${entry.id}`;
+    card.dataset.panelTech = techKey;
     card.innerHTML = `
       <div class="panel-check">✓</div>
-      <div class="equipment-card-topline">
+      <div class="panel-catalog-topline">
         <span class="equipment-card-badge">${p.badge || 'Panel tipi'}</span>
-        <span class="equipment-card-example">${p.exampleModel}</span>
+        <span class="panel-catalog-verified">Doğrulama: ${entry.verifiedAt}</span>
       </div>
-      <div class="panel-card-title">${p.name}</div>
-      <div class="equipment-card-copy">${p.summary || ''}</div>
-      <div class="panel-card-eff">${(p.efficiency * 100).toFixed(1)}%</div>
-      <div class="equipment-card-metric-label">Örnek modül verimi</div>
+      <div class="panel-catalog-brandline">
+        <div>
+          <div class="panel-catalog-brand">${entry.brand}</div>
+          <div class="panel-card-title">${entry.series}</div>
+        </div>
+        <div class="panel-catalog-tier">${entry.marketTier === 'premium' ? 'Premium' : 'Ana akım'}</div>
+      </div>
+      <div class="equipment-card-copy">${entry.displayName}</div>
+      <div class="panel-card-eff">${entry.efficiencyText}</div>
+      <div class="equipment-card-metric-label">Üretici verisine göre örnek modül verimi</div>
       <div class="equipment-chip-row">
-        <span class="equipment-chip">${p.powerRange || `${p.wattPeak} Wp`}</span>
-        <span class="equipment-chip">${p.exampleSize || `${Math.round(p.height * 1000)} × ${Math.round(p.width * 1000)} mm`}</span>
-        <span class="equipment-chip">${p.cellLayout || 'Yarım hücre'}</span>
+        <span class="equipment-chip">${entry.powerRange}</span>
+        <span class="equipment-chip">${entry.dimensions}</span>
+        <span class="equipment-chip">${entry.cellTechnology}</span>
       </div>
       <div class="panel-card-stats">
-        <div class="panel-stat"><span class="panel-stat-label">Nominal güç</span><span>${p.wattPeak} Wp</span></div>
-        <div class="panel-stat"><span class="panel-stat-label">Sıcaklık katsayısı</span><span>${(p.tempCoeff * 100).toFixed(2)}%/°C</span></div>
-        <div class="panel-stat"><span class="panel-stat-label">1. yıl düşüşü</span><span>${(p.firstYearDeg * 100).toFixed(1)}%</span></div>
-        <div class="panel-stat"><span class="panel-stat-label">Sonraki yıllar</span><span>${(p.degradation * 100).toFixed(2)}%</span></div>
-        <div class="panel-stat"><span class="panel-stat-label">Ürün / güç garantisi</span><span>${p.warranty} / ${p.powerWarranty || p.warranty} yıl</span></div>
-        <div class="panel-stat"><span class="panel-stat-label">Tipik fiyat</span><span>${priceLabel}</span></div>
+        <div class="panel-stat"><span class="panel-stat-label">Teknoloji profili</span><span>${p.name}</span></div>
+        <div class="panel-stat"><span class="panel-stat-label">Sıcaklık katsayısı</span><span>${entry.temperatureCoeffText}</span></div>
+        <div class="panel-stat"><span class="panel-stat-label">Ağırlık / yapı</span><span>${entry.weight} · ${entry.construction}</span></div>
+        <div class="panel-stat"><span class="panel-stat-label">Ürün / performans</span><span>${entry.warrantyText}</span></div>
+        <div class="panel-stat"><span class="panel-stat-label">Kaynak tipi</span><span>${entry.sourceType}</span></div>
+        <div class="panel-stat"><span class="panel-stat-label">Fiyat bandı</span><span>${entry.priceBand}</span></div>
       </div>
-      <div class="equipment-card-note"><strong>En uygun:</strong> ${p.bestFor || 'Genel çatı projeleri'}</div>
-      <div class="equipment-card-note equipment-card-note-muted"><strong>Dikkat:</strong> ${p.watchFor || 'Teklifte ürün veri sayfası ile doğrulanmalıdır.'}</div>`;
+      <div class="equipment-card-note"><strong>En uygun:</strong> ${entry.idealFor}</div>
+      <div class="equipment-card-note equipment-card-note-muted"><strong>Dikkat:</strong> ${entry.watchFor}</div>
+      <div class="panel-catalog-footer">
+        <div class="panel-catalog-source">${entry.sourceLabel}</div>
+        <a class="panel-catalog-link" href="${entry.datasheetUrl}" target="_blank" rel="noopener noreferrer">Datasheet</a>
+      </div>`;
     card.addEventListener('click', () => {
-      window.state.panelType = key;
+      window.state.panelCatalogId = entry.id;
+      window.state.panelType = techKey;
       document.querySelectorAll('.panel-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
+      syncPanelSelectionUI();
       updatePanelPreview();
       updateEquipmentSelectionSummary();
-      // Show albedo selector only for bifacial panels
-      const albedoWrap = document.getElementById('albedo-wrap');
-      if (albedoWrap) albedoWrap.style.display = key === 'bifacial' ? '' : 'none';
     });
     wrap.appendChild(card);
   });
+  const meta = document.getElementById('panel-catalog-meta');
+  if (meta) {
+    meta.textContent = `${visibleCatalog.length} doğrulanmış seri gösteriliyor. Kartlarda üretici datasheet kaynağı, doğrulama tarihi ve fiyat bandı birlikte sunulur.`;
+  }
   updateEquipmentSelectionSummary();
 }
 
@@ -2130,7 +2306,8 @@ function formatPreviewCurrency(tryAmount, withCurrency = true) {
 }
 
 function computeEquipmentPreviewMetrics() {
-  const panel = PANEL_TYPES[window.state.panelType];
+  window.state.panelType = normalizePanelTypeKey(window.state.panelType);
+  const panel = PANEL_TYPES[window.state.panelType] || PANEL_TYPES.mono_perc;
   const panelArea = panel.width * panel.height;
   const usableRatio = Math.max(0.1, Math.min(0.95, Number(window.state.usableRoofRatio) || 0.75));
 
@@ -2248,7 +2425,9 @@ function updateEquipmentSelectionSummary() {
   const panelEl = document.getElementById('equip-summary-panel-type');
   const inverterEl = document.getElementById('equip-summary-inverter');
   const batteryEl = document.getElementById('equip-summary-battery');
-  const panel = PANEL_TYPES[window.state.panelType];
+  window.state.panelType = normalizePanelTypeKey(window.state.panelType);
+  const panel = PANEL_TYPES[window.state.panelType] || PANEL_TYPES.mono_perc;
+  const panelCatalog = syncPanelCatalogSelection();
   const inverter = INVERTER_TYPES[window.state.inverterType];
   normalizeBatterySelection();
   const battery = window.state.battery || BATTERY_MODELS.custom;
@@ -2257,7 +2436,7 @@ function updateEquipmentSelectionSummary() {
     : battery.model === 'custom'
       ? `Özel ${Number(battery.capacity || 0).toFixed(1)} kWh`
       : battery.name;
-  if (panelEl) panelEl.textContent = panel?.name || '—';
+  if (panelEl) panelEl.textContent = panelCatalog?.displayName || panel?.name || '—';
   if (inverterEl) inverterEl.textContent = inverter?.name || '—';
   if (batteryEl) batteryEl.textContent = batteryLabel;
 }
@@ -2843,6 +3022,7 @@ window.updateTariffAssumptions = updateTariffAssumptions;
 window.updateOnGridAssumptions = updateOnGridAssumptions;
 window.updateOnGridMonthlyConsumption = updateOnGridMonthlyConsumption;
 window.setOnGridInputMode = setOnGridInputMode;
+window.setOnGridDesignTarget = setOnGridDesignTarget;
 window.fillOnGridMonthlyFromAnnual = fillOnGridMonthlyFromAnnual;
 window.handleHourlyCsvUpload = handleHourlyCsvUpload;
 window.clearHourlyCsvUpload = clearHourlyCsvUpload;

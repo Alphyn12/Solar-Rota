@@ -443,11 +443,11 @@ def test_pvgis_proxy_network_error():
 # ── Bug-fix tests ─────────────────────────────────────────────────────────────
 
 def test_pvlib_gamma_pdc_varies_by_panel_type():
-    """Bug 3 fix: gamma_pdc must differ per panel type (mono/-0.0034, poly/-0.0040, bifacial/-0.0028)."""
+    """Bug 3 fix: gamma_pdc must differ per panel type (mono_perc/-0.0034, n_type_topcon/-0.0029, bifacial_topcon/-0.0028)."""
     from backend.engines.pvlib_engine import PANEL_GAMMA_PDC
-    assert PANEL_GAMMA_PDC["mono"] == -0.0034
-    assert PANEL_GAMMA_PDC["poly"] == -0.0040
-    assert PANEL_GAMMA_PDC["bifacial"] == -0.0028
+    assert PANEL_GAMMA_PDC["mono_perc"] == -0.0034
+    assert PANEL_GAMMA_PDC["n_type_topcon"] == -0.0029
+    assert PANEL_GAMMA_PDC["bifacial_topcon"] == -0.0028
     # All values are physically valid (between -1% and 0%)
     for panel_type, coeff in PANEL_GAMMA_PDC.items():
         assert -0.01 <= coeff <= 0, f"{panel_type}: gamma_pdc {coeff} out of physical range"

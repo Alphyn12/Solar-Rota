@@ -125,7 +125,7 @@ export const SCENARIO_DEFINITIONS = {
       roofArea: 12,
       tariffType: 'residential',
       tariff: 7.16,
-      panelType: 'mono',
+      panelType: 'mono_perc',
       battery: { model: 'custom', name: 'Özel Batarya', capacity: 3.0, dod: 0.80, efficiency: 0.90, chemistry: 'LFP', warranty: 5, cycles: 3000, price_try: 0, brand: 'Özel' }
     },
     visibleBlocks: { netMetering: false, battery: true, heatPump: false, ev: false, tax: false, governance: false },

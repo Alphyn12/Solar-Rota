@@ -366,7 +366,7 @@ export async function runCalculation() {
   // Albedo scaling is pre-computed once here.
   const groundAlbedo = Math.max(0.05, Math.min(0.50, Number(state.groundAlbedo) || 0.20));
   const albedoScale  = groundAlbedo / 0.20;  // normalised to IEC reference albedo
-  const bifacialBaseGain = (state.panelType === 'bifacial' && panel.bifacialGain > 0)
+  const bifacialBaseGain = ((state.panelType === 'bifacial' || state.panelType === 'bifacial_topcon') && panel.bifacialGain > 0)
     ? panel.bifacialGain * albedoScale
     : 0;
   const fallbackTempAdjustment = resolveProductionTemperatureAdjustment({
@@ -580,7 +580,7 @@ export async function runCalculation() {
     soilingLoss = Math.round(pvgisRawEnergy * ((Number(bl.soilingPct ?? state.soilingFactor) || 0) / 100));
     tempLossEnergy = Math.max(0, Math.round((Number(bl.dcAnnualKwh || adjustedEnergy) || adjustedEnergy) - adjustedEnergy));
     azimuthLossEnergy = 0;
-    bifacialGainEnergy = state.panelType === 'bifacial' ? Math.max(0, Math.round(adjustedEnergy * 0.05)) : 0;
+    bifacialGainEnergy = (state.panelType === 'bifacial' || state.panelType === 'bifacial_topcon') ? Math.max(0, Math.round(adjustedEnergy * 0.05)) : 0;
     const backendCableLossPct = Math.max(0, Number(bl.wiringLossPct ?? bl.wiringMismatchPct ?? cableLossPct) || 0);
     totalCableLoss = Math.max(0, Math.round(pvgisRawEnergy * backendCableLossPct / 100));
     effectiveShadingFactor = Number(bl.shadingPct ?? state.shadingFactor ?? effectiveShadingFactor);
@@ -1455,7 +1455,7 @@ function calculateEVMetrics(annualEnergy, dailyConsumption, ev, tariff) {
   const electricityCost = annual_kWh * tariff;
   const netSaving = fuelCostSaved - electricityCost;
 
-  const _evPanel = PANEL_TYPES[window.state?.panelType || 'mono'];
+  const _evPanel = PANEL_TYPES[window.state?.panelType || 'mono_perc'];
   const panelArea = (_evPanel?.width || 1.134) * (_evPanel?.height || 1.762);
   const productionPerPanel = annualEnergy / Math.max(1, Math.floor(window.state.roofArea * 0.75 / panelArea));
   const additionalPanels = productionPerPanel > 0 ? Math.ceil(annual_kWh / productionPerPanel) : 0;

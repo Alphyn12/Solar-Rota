@@ -172,7 +172,7 @@ export function combineHourlyLoads(...loads) {
 }
 
 export function calculateSystemLayout(state, panelType = state.panelType) {
-  const panel = PANEL_TYPES[panelType || 'mono'];
+  const panel = PANEL_TYPES[panelType || 'mono_perc'];
   const panelArea = panel.width * panel.height;
   const primarySection = {
     area: Number(state.roofArea) || 0,

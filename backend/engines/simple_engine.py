@@ -8,12 +8,20 @@ from backend.models.engine_contracts import EngineRequest
 MONTH_WEIGHTS = [0.055, 0.062, 0.085, 0.095, 0.105, 0.115, 0.112, 0.108, 0.090, 0.075, 0.055, 0.043]
 
 PANEL_WATT = {
-    "mono": 430,
-    "poly": 370,
-    "bifacial": 470,
+    "mono_perc": 435,
+    "n_type_topcon": 455,
+    "bifacial_topcon": 455,
+    "hjt": 460,
+    "mono": 435,
+    "poly": 455,
+    "bifacial": 455,
 }
 
 PANEL_AREA_M2 = {
+    "mono_perc": 1.134 * 1.762,
+    "n_type_topcon": 1.134 * 1.762,
+    "bifacial_topcon": 1.134 * 1.762,
+    "hjt": 1.205 * 1.728,
     "mono": 1.134 * 1.762,
     "poly": 1.134 * 1.762,
     "bifacial": 1.134 * 1.762,
@@ -92,14 +100,14 @@ def panel_watt_peak(request: EngineRequest) -> float:
     explicit = getattr(request.system, "panelWattPeak", None)
     if explicit and float(explicit) > 0:
         return float(explicit)
-    return float(PANEL_WATT.get(request.system.panelType, PANEL_WATT["mono"]))
+    return float(PANEL_WATT.get(request.system.panelType, PANEL_WATT["mono_perc"]))
 
 
 def panel_area_m2(request: EngineRequest) -> float:
     explicit = getattr(request.system, "panelAreaM2", None)
     if explicit and float(explicit) > 0:
         return float(explicit)
-    return float(PANEL_AREA_M2.get(request.system.panelType, PANEL_AREA_M2["mono"]))
+    return float(PANEL_AREA_M2.get(request.system.panelType, PANEL_AREA_M2["mono_perc"]))
 
 
 def inverter_efficiency(request: EngineRequest) -> float:
@@ -113,7 +121,7 @@ def bifacial_gain(request: EngineRequest) -> float:
     explicit = getattr(request.system, "bifacialGain", None)
     if explicit is not None:
         return max(0.0, float(explicit))
-    return 0.10 if request.system.panelType == "bifacial" else 0.0
+    return 0.10 if request.system.panelType in {"bifacial", "bifacial_topcon"} else 0.0
 
 
 def cable_loss_factor(request: EngineRequest) -> float:

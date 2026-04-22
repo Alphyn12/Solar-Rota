@@ -124,14 +124,18 @@ def run_click_flow_to_results(
     page.wait_for_function("window.state.step === 5")
     assert page.locator("#on-grid-flow-panel").is_visible()
     assert page.locator("#on-grid-subscriber-type").is_visible()
-    assert page.locator("#on-grid-usage-profile").is_visible()
-    assert page.locator("#on-grid-design-target").is_visible()
+    assert page.locator("#on-grid-monthly-bill-estimate").is_visible()
+    assert page.locator('[data-design-target-card="bill-offset"]').is_visible()
     page.select_option("#on-grid-subscriber-type", "commercial")
-    page.select_option("#on-grid-usage-profile", "business-hours")
     page.fill("#on-grid-annual-consumption", "18000")
-    page.select_option("#on-grid-design-target", design_target)
+    if design_target == "fill-roof":
+        page.click('[data-design-target-card="fill-roof"]')
+    else:
+        page.click('[data-design-target-card="bill-offset"]')
     page.click('[data-on-grid-mode-btn="advanced"]')
     assert page.locator("#on-grid-advanced-fields").is_visible()
+    assert page.locator("#on-grid-usage-profile").is_visible()
+    page.select_option("#on-grid-usage-profile", "business-hours")
     # Verify new Turn-1 form fields exist
     assert page.locator("#tariff-input-mode").count() == 1
     assert page.locator("#hourly-csv-upload").count() == 1
@@ -156,7 +160,9 @@ def run_click_flow_to_results(
         arg=[design_target, int(float(usable_roof_ratio))]
     )
     page.fill("#tariff-input", "8.44")
-    page.wait_for_function("Math.abs(window.state.tariff - 8.94) < 0.001")
+    page.wait_for_function(
+        "() => Math.abs(window.state.importTariffBase - 8.44) < 0.001 && Math.abs(window.state.distributionFee - 0.50) < 0.001"
+    )
     page.click('[data-testid="calculate-results"]')
     try:
         page.wait_for_function(

@@ -60,7 +60,7 @@ class RoofInput(FlexibleModel):
 
 
 class SystemInput(FlexibleModel):
-    panelType: str = "mono"
+    panelType: str = "mono_perc"
     panelWattPeak: Optional[float] = None
     panelAreaM2: Optional[float] = None
     panelTempCoeffPerC: Optional[float] = None

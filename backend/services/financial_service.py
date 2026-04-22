@@ -159,9 +159,13 @@ def _frontend_default_capex(request: EngineRequest, system_power_kwp: float) -> 
     estimate, not a replacement for browser governance/BOM totals.
     """
     panel_price_per_watt = {
-        "mono": 20.0,
-        "poly": 15.5,
-        "bifacial": 25.0,
+        "mono_perc": 18.5,
+        "n_type_topcon": 21.5,
+        "bifacial_topcon": 23.5,
+        "hjt": 28.5,
+        "mono": 18.5,
+        "poly": 21.5,
+        "bifacial": 23.5,
     }.get(request.system.panelType, 20.0)
     inverter_price = {
         "string": (7500, 6500, 5500),

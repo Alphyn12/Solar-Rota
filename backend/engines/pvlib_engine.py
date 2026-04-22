@@ -22,9 +22,13 @@ PVLIB_AVAILABLE = find_spec("pvlib") is not None
 
 # Temperature coefficients (P_max / °C) per panel technology — used for pvwatts_dc gamma_pdc
 PANEL_GAMMA_PDC: dict[str, float] = {
+    "mono_perc": -0.0034,
+    "n_type_topcon": -0.0029,
+    "bifacial_topcon": -0.0028,
+    "hjt": -0.0024,
     "mono": -0.0034,
     "bifacial": -0.0028,
-    "poly": -0.0040,
+    "poly": -0.0029,
 }
 
 

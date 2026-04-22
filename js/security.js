@@ -1,3 +1,5 @@
+import { normalizePanelTypeKey } from './data.js';
+
 // Shared defensive helpers for rendering and imported state.
 
 const NUMBER_LIMITS = {
@@ -35,6 +37,9 @@ const STRING_LIMITS = {
   cityName: 80,
   azimuthName: 40,
   panelType: 40,
+  panelCatalogId: 80,
+  panelCatalogTechFilter: 40,
+  panelCatalogSegmentFilter: 40,
   tariffType: 40,
   tariffMode: 40,
   tariffRegime: 40,
@@ -77,7 +82,7 @@ const ARRAY_KEYS = new Set([
 ]);
 
 const ENUM_VALUES = {
-  panelType: new Set(['mono', 'poly', 'bifacial']),
+  panelType: new Set(['mono', 'poly', 'bifacial', 'mono_perc', 'n_type_topcon', 'bifacial_topcon', 'hjt']),
   tariffType: new Set(['residential', 'commercial', 'industrial', 'agriculture', 'custom']),
   tariffMode: new Set(['auto', 'custom', 'pst', 'sktt', 'contract']),
   tariffRegime: new Set(['auto', 'pst', 'sktt', 'contract']),
@@ -181,7 +186,7 @@ function sanitizeState(input, { trustedLocal = false } = {}) {
     } else if (STRING_LIMITS[key]) {
       const clean = cleanString(value, STRING_LIMITS[key]);
       if (ENUM_VALUES[key] && !ENUM_VALUES[key].has(clean)) continue;
-      out[key] = clean;
+      out[key] = key === 'panelType' ? normalizePanelTypeKey(clean) : clean;
     } else if (BOOLEAN_KEYS.has(key)) {
       out[key] = !!value;
     } else if (OBJECT_KEYS.has(key)) {

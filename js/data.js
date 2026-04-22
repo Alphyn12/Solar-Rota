@@ -85,8 +85,8 @@ export const TURKISH_CITIES = [
   { name: "Erzincan", lat: 39.7500, lon: 39.5000, ghi: 1640 }
 ];
 
-export const PANEL_TYPES = {
-  mono: {
+const PANEL_TYPE_PROFILES = {
+  mono_perc: {
     name: "Monokristal PERC",
     badge: "Dengeli seçim",
     summary: "Klasik tek yüzeyli panel mimarisi. Maliyet ile performans arasında dengeli çözüm arayan çatılar için güvenli tercih.",
@@ -108,17 +108,17 @@ export const PANEL_TYPES = {
     standard: "IEC 61215 / IEC 61730",
     bifacialGain: 0
   },
-  poly: {
+  n_type_topcon: {
     name: "N-Type TOPCon",
     badge: "Güncel standart",
-    summary: "Yeni nesil konut projelerinde en sık tercih edilen yüksek verimli panel sınıfı. Aynı çatı alanında daha yüksek güç kurmaya yardımcı olur.",
-    exampleModel: "Trina Vertex S+ NEG9R.28",
+    summary: "Yeni nesil yüksek verimli panel sınıfı. Aynı çatı alanında daha yüksek güç kurmaya yardımcı olur ve sıcak iklimde PERC'e göre daha dengeli davranır.",
+    exampleModel: "Trina Vertex S+ TSM-NEG9R.28",
     exampleSize: "1762 × 1134 × 30 mm",
     powerRange: "430–455 W",
-    cellLayout: "144 hücre, dual-glass",
+    cellLayout: "144 yarım hücre, dual-glass",
     bestFor: "Alanı kısıtlı ama üretim hedefi yüksek çatılar",
     watchFor: "İlk yatırım maliyeti PERC'e göre genelde daha yüksektir.",
-    efficiency: 0.225,
+    efficiency: 0.228,
     wattPeak: 455,
     width: 1.134, height: 1.762,
     tempCoeff: -0.0029,
@@ -130,18 +130,18 @@ export const PANEL_TYPES = {
     standard: "IEC 61215 / IEC 61730 / IEC 62716",
     bifacialGain: 0
   },
-  bifacial: {
+  bifacial_topcon: {
     name: "Bifacial N-Type TOPCon",
     badge: "Arka yüz kazancı",
     summary: "Ön ve arka yüzden üretim alabilen çift cam panel. Açık renkli membran, sehpa sistem veya carport gibi yansıtıcı yüzeylerde fark yaratır.",
-    exampleModel: "Jinko Tiger Neo 54HL4R-B",
+    exampleModel: "Astronergy ASTRO N7s",
     exampleSize: "1762 × 1134 × 30 mm",
-    powerRange: "430–455 W",
+    powerRange: "445–465 W",
     cellLayout: "108 yarım hücre, çift cam",
     bestFor: "Yükseltilmiş taşıyıcı ve açık renk zeminli kurulumlar",
     watchFor: "Koyu zeminli ve çatıya sıfır kurulumda arka yüz kazancı sınırlı kalır.",
-    efficiency: 0.225,
-    wattPeak: 445,
+    efficiency: 0.233,
+    wattPeak: 455,
     width: 1.134, height: 1.762,
     tempCoeff: -0.0029,
     degradation: 0.0040,
@@ -151,7 +151,51 @@ export const PANEL_TYPES = {
     powerWarranty: 30,
     standard: "IEC 61215 / IEC TS 60904-1-2",
     bifacialGain: 0.15
+  },
+  hjt: {
+    name: "HJT Premium",
+    badge: "Premium sıcak iklim",
+    summary: "Heterojunction hücre mimarisi sıcaklık davranışı ve premium performans sınıfıyla öne çıkar. Yüksek kalite odaklı konut projelerinde tercih edilir.",
+    exampleModel: "REC Alpha Pure-RX",
+    exampleSize: "1728 × 1205 × 30 mm",
+    powerRange: "450–470 W",
+    cellLayout: "HJT rooftop module",
+    bestFor: "Premium konut ve sıcak havada sıcaklık kaybını düşürmek isteyen projeler",
+    watchFor: "Fiyat seviyesi ana akım TOPCon ürünlerinden yüksektir.",
+    efficiency: 0.226,
+    wattPeak: 460,
+    width: 1.205, height: 1.728,
+    tempCoeff: -0.0024,
+    degradation: 0.0025,
+    firstYearDeg: 0.01,
+    pricePerWatt: 28.5,
+    warranty: 25,
+    powerWarranty: 25,
+    standard: "IEC 61215 / IEC 61730",
+    bifacialGain: 0
   }
+};
+
+export const PANEL_TYPE_KEY_ALIASES = {
+  mono: "mono_perc",
+  poly: "n_type_topcon",
+  bifacial: "bifacial_topcon"
+};
+
+export const PANEL_TYPE_OPTIONS = ["mono_perc", "n_type_topcon", "bifacial_topcon", "hjt"];
+
+export function normalizePanelTypeKey(rawKey) {
+  const key = String(rawKey || "").trim();
+  if (PANEL_TYPE_PROFILES[key]) return key;
+  if (PANEL_TYPE_KEY_ALIASES[key]) return PANEL_TYPE_KEY_ALIASES[key];
+  return "mono_perc";
+}
+
+export const PANEL_TYPES = {
+  ...PANEL_TYPE_PROFILES,
+  mono: PANEL_TYPE_PROFILES.mono_perc,
+  poly: PANEL_TYPE_PROFILES.n_type_topcon,
+  bifacial: PANEL_TYPE_PROFILES.bifacial_topcon
 };
 
 export const BATTERY_MODELS = {

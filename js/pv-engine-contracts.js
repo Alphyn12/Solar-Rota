@@ -21,7 +21,7 @@ function currentTargetPowerKwp(state = {}) {
 function buildLayoutSnapshot(state = {}) {
   if (!state || !Number.isFinite(Number(state.roofArea)) || Number(state.roofArea) <= 0) return null;
   try {
-    const layout = calculateSystemLayout(state, state.panelType || 'mono');
+    const layout = calculateSystemLayout(state, state.panelType || 'mono_perc');
     const sections = (layout.sections || []).map(sec => ({
       areaM2: finite(sec.area, 0),
       tiltDeg: finite(sec.tilt, 0),
@@ -77,7 +77,7 @@ function normalizeHourlyProfile(values) {
 }
 
 export function buildPvEngineRequest(state = {}) {
-  const panel = PANEL_TYPES[state.panelType || 'mono'] || PANEL_TYPES.mono;
+  const panel = PANEL_TYPES[state.panelType || 'mono_perc'] || PANEL_TYPES.mono_perc;
   const inverter = INVERTER_TYPES[state.inverterType || 'string'] || INVERTER_TYPES.string;
   const cableLossPct = state.cableLossEnabled
     ? Math.max(0, finite(state.cableLoss?.totalLossPct ?? state.cableLossPct ?? state.cableLoss, 0))
@@ -118,7 +118,7 @@ export function buildPvEngineRequest(state = {}) {
       sections: Array.isArray(state.roofSections) ? state.roofSections : []
     },
     system: {
-      panelType: state.panelType || 'mono',
+      panelType: state.panelType || 'mono_perc',
       panelWattPeak: finite(panel.wattPeak, 0),
       panelAreaM2: finite((panel.width || 0) * (panel.height || 0), 0),
       panelTempCoeffPerC: finite(panel.tempCoeff, -0.0037),
