@@ -110,6 +110,25 @@ const billTargetLayout = calculateSystemLayout({
 assert.ok(billTargetLayout.panelCount < fillRoofLayout.panelCount);
 assert.equal(billTargetLayout.designTargetApplied, 'bill-offset');
 
+const qcellsLayout = calculateSystemLayout({
+  scenarioKey: 'on-grid',
+  designTarget: 'fill-roof',
+  panelType: 'n_type_topcon',
+  panelCatalogId: 'qcells_qtron_blk_mg2',
+  roofArea: 60,
+  usableRoofRatio: 0.75
+}, 'n_type_topcon');
+nearly(qcellsLayout.panelArea, 1.722 * 1.134, 1e-9);
+assert.equal(qcellsLayout.panelCount, 23);
+nearly(qcellsLayout.systemPower, 23 * 440 / 1000, 1e-9);
+assert.ok(qcellsLayout.panelCount > calculateSystemLayout({
+  scenarioKey: 'on-grid',
+  designTarget: 'fill-roof',
+  panelType: 'n_type_topcon',
+  roofArea: 60,
+  usableRoofRatio: 0.75
+}, 'n_type_topcon').panelCount);
+
 const battery = simulateBatteryOnHourlySummary(hourly, { capacity: 10, dod: 0.9, efficiency: 0.9 });
 assert.ok(battery.totalSelfConsumption >= hourly.selfConsumption);
 assert.ok(battery.remainingExport <= hourly.gridExport);

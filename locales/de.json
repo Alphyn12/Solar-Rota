@@ -167,8 +167,8 @@
   },
   "step5": {
     "eyebrow": "Schritt 5 / 7",
-    "title": "Finanzparameter",
-    "subtitle": "Tarif, Verbrauch und erweiterte Finanzoptionen festlegen.",
+    "title": "System- und Szenarioeinstellungen",
+    "subtitle": "Dimensionierungslogik, Verbrauchsziel, Tarif und erweiterte Angebotsannahmen festlegen.",
     "advancedOptions": "Erweiterte Optionen"
   },
   "step6": {
@@ -257,6 +257,7 @@
     "subscriberType": "Abnehmertyp",
     "connectionType": "Anschlussart",
     "annualConsumption": "Jahresverbrauch (kWh)",
+    "monthlyConsumptionInput": "Verbrauch auf der Rechnung dieses Monats (kWh, optional)",
     "usageProfile": "Nutzungsprofil",
     "distributionFee": "Verteilgebühr zusätzlich zum Import (TRY/kWh)",
     "designTarget": "Systemziel",
@@ -458,7 +459,7 @@
     "totalRoofArea": "gesamte Dachfläche",
     "panelCountFormula": "Panelanzahl = floor(nutzbare Fläche ÷ Panelfläche)",
     "panelCountUnit": "Stk.",
-    "layoutNote": "Der nutzbare Flächenfaktor von 75% ist eine Vor-Machbarkeitsannahme. Für ein IEC-62548-konformes Endlayout sind Vor-Ort-Prüfung, Brandschutzwege, Wartungskorridore und Montagevorgaben des Herstellers separat zu prüfen.",
+    "layoutNote": "Der nutzbare Flächenfaktor ist eine Vor-Machbarkeitsannahme. Für ein IEC-62548-konformes Endlayout sind Vor-Ort-Prüfung, Brandschutzwege, Wartungskorridore und Montagevorgaben des Herstellers separat zu prüfen.",
     "installedPowerResult": "Systemleistung",
     "stcNote": "STC: 1000 W/m² Einstrahlung, 25°C Zelltemperatur, AM-1.5G-Spektrum. Panelstandard",
     "inverterTitle": "Wechselrichter",

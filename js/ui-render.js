@@ -9,6 +9,7 @@ import { localeTag, localizeKnownMessage, localizeMessageList, statusLabel, tx }
 import { createShareStateSnapshot, escapeHtml, sanitizeSharedState } from './security.js';
 import { buildStructuredProposalExport } from './evidence-governance.js';
 import { buildCrmLeadExport } from './crm-export.js';
+import { resolvePanelSpec } from './calc-core.js';
 
 let monthlyChart = null;
 
@@ -347,6 +348,8 @@ function renderOffgridL2Results(offgridL2Results, state) {
         `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genRunHours'))}: <strong style="color:var(--text)">${hoursStr} h/yıl</strong></span>`,
         `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genFuelCost'))}: <strong style="color:var(--text)">${money(L.generatorFuelCostAnnual)} / yıl</strong></span>`,
         `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genKwh'))}: <strong style="color:var(--text)">${kwhStr} kWh/yıl</strong></span>`,
+        L.generatorMaintenanceCostAnnual ? `<span style="color:var(--text-muted)">Servis gideri: <strong style="color:var(--text)">${money(L.generatorMaintenanceCostAnnual)} / yıl</strong></span>` : '',
+        L.generatorStrategy ? `<span style="color:var(--text-muted)">Strateji: <strong style="color:var(--text)">${escapeHtml(String(L.generatorStrategy))}</strong></span>` : '',
         `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.generatorCapex'))}: <strong style="color:var(--text)">${money(L.generatorCapex || 0)}</strong></span>`,
         L.generatorCapexMissing ? `<span style="color:#F59E0B">${escapeHtml(i18n.t('offgridL2.generatorCapexMissing'))}</span>` : '',
         `<div style="margin-top:6px;font-size:0.72rem;color:var(--text-muted);font-style:italic;width:100%">${escapeHtml(narrative)}</div>`,
@@ -659,7 +662,8 @@ function renderOnGridResultLayers(state, r) {
     quoteCandidate: i18n.t('onGridResult.quoteReadyCandidate')
   };
   const roofAreaTotal = (Number(state.roofArea) || 0) + (state.multiRoof ? (state.roofSections || []).reduce((s, sec) => s + (Number(sec.area) || 0), 0) : 0);
-  const panelArea = (PANEL_TYPES[state.panelType]?.width || 0) * (PANEL_TYPES[state.panelType]?.height || 0) * (Number(r.panelCount) || 0);
+  const panelSpec = resolvePanelSpec(state, state.panelType);
+  const panelArea = (panelSpec.areaM2 || 0) * (Number(r.panelCount) || 0);
   const roofUsePct = roofAreaTotal > 0 ? Math.min(100, panelArea / roofAreaTotal * 100) : 0;
   const comp = r.compensationSummary || {};
   const exportText = `${Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString(localeTag())} / ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag())} kWh`;

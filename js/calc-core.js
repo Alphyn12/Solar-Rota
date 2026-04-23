@@ -4,12 +4,13 @@
 // ═══════════════════════════════════════════════════════════
 import {
   PANEL_TYPES, HOURLY_SOLAR_PROFILE, RESIDENTIAL_LOAD, COMMERCIAL_LOAD,
-  INDUSTRIAL_LOAD, MONTH_WEIGHTS, TARIFF_META
+  INDUSTRIAL_LOAD, MONTH_WEIGHTS, TARIFF_META, normalizePanelTypeKey
 } from './data.js';
 import {
   applyExportCompensation, buildExportCompensationPolicy, determineSkttRegime, TARIFF_DATA_LIFECYCLE
 } from './turkey-regulation.js';
 import { hasMeaningfulMonthlyConsumption } from './consumption-evidence.js';
+import { getPanelCatalogById } from './panel-catalog.js';
 
 export const METHODOLOGY_VERSION = 'GH-CALC-2026.04-v2.1';
 export const PVGIS_LOSS_PARAM = 0;
@@ -162,6 +163,50 @@ export function buildBaseHourlyLoad8760(monthlyLoad, tariffType = 'residential',
   return out;
 }
 
+function parsePanelDimensionsMeters(rawDimensions) {
+  if (typeof rawDimensions !== 'string') return null;
+  const match = rawDimensions.match(/(\d{3,4}(?:[.,]\d+)?)\s*[×x]\s*(\d{3,4}(?:[.,]\d+)?)/i);
+  if (!match) return null;
+  const widthMm = Number(String(match[1]).replace(',', '.'));
+  const heightMm = Number(String(match[2]).replace(',', '.'));
+  if (!Number.isFinite(widthMm) || !Number.isFinite(heightMm) || widthMm <= 0 || heightMm <= 0) return null;
+  return {
+    width: widthMm / 1000,
+    height: heightMm / 1000
+  };
+}
+
+export function resolvePanelSpec(state = {}, panelType = state.panelType) {
+  const normalizedType = normalizePanelTypeKey(panelType);
+  const basePanel = PANEL_TYPES[normalizedType] || PANEL_TYPES.mono_perc;
+  const selectedCatalog = getPanelCatalogById(state.panelCatalogId);
+  const panel = { ...basePanel, key: normalizedType };
+
+  if (selectedCatalog && normalizePanelTypeKey(selectedCatalog.technologyProfileId) === normalizedType) {
+    const parsedDimensions = parsePanelDimensionsMeters(selectedCatalog.dimensions);
+    const modeledWattPeak = Number(selectedCatalog.modeledWattPeak);
+    const modeledTempCoeffPerC = Number(selectedCatalog.modeledTempCoeffPerC);
+    if (parsedDimensions) {
+      panel.width = parsedDimensions.width;
+      panel.height = parsedDimensions.height;
+      panel.dimensionsSource = 'catalog';
+    }
+    if (Number.isFinite(modeledWattPeak) && modeledWattPeak > 0) {
+      panel.wattPeak = modeledWattPeak;
+      panel.wattSource = 'catalog';
+    }
+    if (Number.isFinite(modeledTempCoeffPerC) && modeledTempCoeffPerC < 0) {
+      panel.tempCoeff = modeledTempCoeffPerC;
+      panel.tempCoeffSource = 'catalog';
+    }
+    panel.catalogId = selectedCatalog.id;
+    panel.catalogDisplayName = selectedCatalog.displayName;
+  }
+
+  panel.areaM2 = (Number(panel.width) || 0) * (Number(panel.height) || 0);
+  return panel;
+}
+
 export function combineHourlyLoads(...loads) {
   const out = new Array(8760).fill(0);
   loads.forEach(load => {
@@ -172,8 +217,8 @@ export function combineHourlyLoads(...loads) {
 }
 
 export function calculateSystemLayout(state, panelType = state.panelType) {
-  const panel = PANEL_TYPES[panelType || 'mono_perc'];
-  const panelArea = panel.width * panel.height;
+  const panel = resolvePanelSpec(state, panelType);
+  const panelArea = panel.areaM2;
   const primarySection = {
     area: Number(state.roofArea) || 0,
     tilt: Number(state.tilt) || 0,
@@ -207,7 +252,8 @@ export function calculateSystemLayout(state, panelType = state.panelType) {
   const annualTargetKwh = Math.max(0, Number(state.annualConsumptionKwh) || (Number(state.dailyConsumption) || 0) * 365);
   const targetSpecificYield = Math.max(900, Math.min(1800, (Number(state.ghi) || 1600) * 0.85));
   const targetPanelCount = Math.max(1, Math.ceil((annualTargetKwh / targetSpecificYield) * 1000 / panel.wattPeak));
-  const shouldCapToBillTarget = state.scenarioKey === 'on-grid'
+  const canCapToLoadTarget = state.scenarioKey === 'on-grid' || state.scenarioKey === 'off-grid';
+  const shouldCapToBillTarget = canCapToLoadTarget
     && state.designTarget === 'bill-offset'
     && annualTargetKwh > 0
     && maxPanelCount > 0

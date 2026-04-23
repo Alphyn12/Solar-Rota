@@ -167,8 +167,8 @@
   },
   "step5": {
     "eyebrow": "Step 5 / 7",
-    "title": "Financial Parameters",
-    "subtitle": "Set tariff, consumption, and advanced financial options.",
+    "title": "System and Scenario Settings",
+    "subtitle": "Set sizing logic, consumption target, tariff, and advanced proposal assumptions.",
     "advancedOptions": "Advanced Options"
   },
   "step6": {
@@ -257,6 +257,7 @@
     "subscriberType": "Subscriber type",
     "connectionType": "Connection type",
     "annualConsumption": "Annual consumption (kWh)",
+    "monthlyConsumptionInput": "Consumption on this month's bill (kWh, optional)",
     "usageProfile": "Usage profile",
     "distributionFee": "Distribution fee added to import (TRY/kWh)",
     "designTarget": "System target",
@@ -458,7 +459,7 @@
     "totalRoofArea": "total roof area",
     "panelCountFormula": "Panel count = floor(usable area ÷ panel area)",
     "panelCountUnit": "pcs",
-    "layoutNote": "The 75% usable-area factor is a pre-feasibility assumption. Final IEC 62548-compliant layout requires field survey, fire access paths, maintenance corridors, and manufacturer mounting instructions.",
+    "layoutNote": "The usable-area factor is a pre-feasibility assumption. Final IEC 62548-compliant layout requires field survey, fire access paths, maintenance corridors, and manufacturer mounting instructions.",
     "installedPowerResult": "System power",
     "stcNote": "STC: 1000 W/m² irradiance, 25°C cell temperature, AM 1.5G spectrum. Panel standard",
     "inverterTitle": "Inverter",

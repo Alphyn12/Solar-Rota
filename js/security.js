@@ -17,6 +17,8 @@ const NUMBER_LIMITS = {
   skttTariff: [0, 1000],
   contractedTariff: [0, 1000],
   contractedPowerKw: [0, 100000],
+  onGridMonthlyConsumptionKwh: [0, 100000000],
+  onGridMonthlyBillEstimate: [0, 100000000],
   previousYearConsumptionKwh: [0, 100000000],
   currentYearConsumptionKwh: [0, 100000000],
   sellableExportCapKwh: [0, 100000000],
@@ -24,6 +26,18 @@ const NUMBER_LIMITS = {
   discountRate: [0, 2],
   expenseEscalationRate: [-0.5, 2],
   dailyConsumption: [0, 100000],
+  offgridCriticalFraction: [0.1, 1],
+  offgridGeneratorKw: [0, 500],
+  offgridGeneratorFuelCostPerKwh: [0, 1000],
+  offgridGeneratorCapexTry: [0, 100000000],
+  offgridGeneratorReservePct: [0, 200],
+  offgridGeneratorStartSocPct: [0, 90],
+  offgridGeneratorMaxHoursPerDay: [0, 24],
+  offgridGeneratorMaintenanceCostTry: [0, 100000000],
+  offgridBatteryMaxChargeKw: [0, 100000],
+  offgridBatteryMaxDischargeKw: [0, 100000],
+  offgridInverterAcKw: [0, 100000],
+  offgridInverterSurgeMultiplier: [1, 3],
   usdToTry: [0.0001, 10000],
   omRate: [0, 20],
   insuranceRate: [0, 20],
@@ -44,6 +58,7 @@ const STRING_LIMITS = {
   tariffMode: 40,
   tariffRegime: 40,
   exportSettlementMode: 20,
+  designTarget: 20,
   settlementDate: 20,
   displayCurrency: 3,
   inverterType: 40,
@@ -53,6 +68,12 @@ const STRING_LIMITS = {
   scenarioSelectedAt: 40,
   enginePreference: 40,
   offgridCalculationMode: 20,
+  offgridLoadProfileKey: 40,
+  offgridAutonomyGoal: 40,
+  offgridBadWeatherLevel: 20,
+  offgridGeneratorStrategy: 40,
+  offgridGeneratorFuelType: 20,
+  offgridGeneratorSizePreset: 20,
   offgridPvHourlySource: 120,
   hourlyProductionSource: 120
 };
@@ -63,7 +84,7 @@ const BOOLEAN_KEYS = new Set([
   'osmShadowEnabled', 'hasBilateralContract',
   'hasSignedCustomerBillData', 'quoteInputsVerified', 'quoteReadyApproved',
   'multiRoof', 'tariffIncludesTax', 'satelliteEnhancementEnabled',
-  'offgridFieldGuaranteeMode'
+  'offgridFieldGuaranteeMode', 'offgridGeneratorEnabled'
 ]);
 
 const OBJECT_KEYS = new Set([
@@ -76,7 +97,7 @@ const OBJECT_KEYS = new Set([
 
 const ARRAY_KEYS = new Set([
   'roofSections', 'monthlyConsumption', 'hourlyConsumption8760', 'hourlyProduction8760',
-  'offgridPvHourly8760', 'offgridCriticalLoad8760', 'criticalLoad8760',
+  'offgridDevices', 'offgridPvHourly8760', 'offgridCriticalLoad8760', 'criticalLoad8760',
   'glareTargets', 'proposalRevisions',
   'auditLog'
 ]);
@@ -87,9 +108,16 @@ const ENUM_VALUES = {
   tariffMode: new Set(['auto', 'custom', 'pst', 'sktt', 'contract']),
   tariffRegime: new Set(['auto', 'pst', 'sktt', 'contract']),
   exportSettlementMode: new Set(['auto', 'hourly', 'monthly']),
+  designTarget: new Set(['bill-offset', 'fill-roof']),
   scenarioKey: new Set(['on-grid', 'off-grid', 'agricultural-irrigation', 'heat-pump', 'flexible-mobile', 'ev-charging']),
   enginePreference: new Set(['auto', 'js-local', 'pvgis-hybrid-js', 'python-backend', 'pvlib-service']),
   offgridCalculationMode: new Set(['basic', 'advanced']),
+  offgridLoadProfileKey: new Set(['studio', 'small-home', 'family-home', 'comfort-home', 'rural-pump']),
+  offgridAutonomyGoal: new Set(['cost-focus', 'reliability', 'critical-safety']),
+  offgridBadWeatherLevel: new Set(['', 'light', 'moderate', 'severe']),
+  offgridGeneratorStrategy: new Set(['critical-backup', 'bad-weather', 'full-backup', 'manual']),
+  offgridGeneratorFuelType: new Set(['diesel', 'gasoline', 'lpg', 'hybrid']),
+  offgridGeneratorSizePreset: new Set(['auto', 'small', 'large', 'custom']),
   displayCurrency: new Set(['TRY', 'USD']),
   inverterType: new Set(['string', 'micro', 'optimizer'])
 };

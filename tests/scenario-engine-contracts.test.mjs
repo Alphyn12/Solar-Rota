@@ -48,9 +48,9 @@ assert.equal(request.tariff.discountRate, 0.18);
 assert.equal(request.system.targetPowerKwp, null);
 assert.equal(request.system.layoutSnapshot.authoritativeSizing, true);
 assert.ok(request.system.layoutSnapshot.panelCount > 0);
-assert.equal(request.system.panelWattPeak, 430);
+assert.equal(request.system.panelWattPeak, 435);
 assert.ok(Math.abs(request.system.panelAreaM2 - (1.134 * 1.762)) < 1e-9);
-assert.equal(request.system.inverterEfficiency, 0.97);
+assert.equal(request.system.inverterEfficiency, 0.984);
 assert.equal(request.system.cableLossPct, 0);
 assert.equal(request.parity.authoritativeSourceRule, 'one-production-source-per-run');
 
@@ -93,6 +93,19 @@ const roofLimitedRequest = buildPvEngineRequest({
 assert.equal(roofLimitedRequest.system.layoutSnapshot.designTargetApplied, 'fill-roof');
 assert.equal(roofLimitedRequest.system.layoutSnapshot.limitedBy, 'roof-area');
 assert.equal(roofLimitedRequest.system.authoritativePanelCount, roofLimitedRequest.system.layoutSnapshot.panelCount);
+
+const qcellsCatalogRequest = buildPvEngineRequest({
+  scenarioKey: 'on-grid',
+  lat: 39.9,
+  lon: 32.8,
+  roofArea: 60,
+  panelType: 'n_type_topcon',
+  panelCatalogId: 'qcells_qtron_blk_mg2',
+  usableRoofRatio: 0.75
+});
+assert.equal(qcellsCatalogRequest.system.panelWattPeak, 440);
+assert.ok(Math.abs(qcellsCatalogRequest.system.panelAreaM2 - (1.722 * 1.134)) < 1e-9);
+assert.equal(qcellsCatalogRequest.system.layoutSnapshot.panelCount, 23);
 
 const explicitTargetRequest = buildPvEngineRequest({
   lat: 39.9,

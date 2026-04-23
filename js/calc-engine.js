@@ -847,18 +847,19 @@ export async function runCalculation() {
       fuelCostPerKwh: Math.max(0, Number(state.offgridGeneratorFuelCostPerKwh) || 0)
     };
 
-    // Yük profili oluştur. Gerçek 8760 saha yükü varsa cihaz listesinin önüne geçer.
-    const hasRealHourlyLoad = hasCompleteHourlyProfile8760(state.hourlyConsumption8760);
+    // Yük profili oluştur. Basit mod profil/günlük kWh kullanır; ileri modda gerçek 8760 yük cihaz listesinin önüne geçer.
+    const useAdvancedOffgridInputs = state.offgridCalculationMode === 'advanced';
+    const hasRealHourlyLoad = useAdvancedOffgridInputs && hasCompleteHourlyProfile8760(state.hourlyConsumption8760);
     const realCriticalHourly = completeHourlyArray(state.offgridCriticalLoad8760)
       || completeHourlyArray(state.criticalLoad8760);
     const offgridLoadProfile = buildOffgridLoadProfile(
-      Array.isArray(state.offgridDevices) ? state.offgridDevices : [],
+      useAdvancedOffgridInputs && Array.isArray(state.offgridDevices) ? state.offgridDevices : [],
       {
         hourlyLoad8760: hasRealHourlyLoad ? hourlyLoad8760 : null,
         hourlyLoadSource: hasRealHourlyLoad ? (state.hourlyProfileSource || 'hourly-uploaded') : null,
-        criticalHourly8760: realCriticalHourly,
+        criticalHourly8760: useAdvancedOffgridInputs ? realCriticalHourly : null,
         fallbackDailyKwh: hourlySummaryRaw.annualLoad / 365,
-        criticalFraction: Math.max(0.1, Math.min(1, Number(state.offgridCriticalFraction) || 0.3)),
+        criticalFraction: Math.max(0.1, Math.min(1, Number(state.offgridCriticalFraction) || 0.45)),
         tariffType: state.tariffType
       }
     );
@@ -933,6 +934,13 @@ export async function runCalculation() {
         alternativeEnergyCostPerKwh: effectiveSavingsTariff,
         systemCapexTry: solarCost + battCapexForLifecycle,
         generatorCapexTry: Math.max(0, Number(state.offgridGeneratorCapexTry) || 0),
+        generatorMaintenanceCostTry: Math.max(0, Number(state.offgridGeneratorMaintenanceCostTry) || 0),
+        generatorStrategy: state.offgridGeneratorStrategy || 'critical-backup',
+        generatorFuelType: state.offgridGeneratorFuelType || 'diesel',
+        generatorSizePreset: state.offgridGeneratorSizePreset || 'auto',
+        generatorReservePct: Math.max(0, Number(state.offgridGeneratorReservePct) || 0),
+        generatorStartSocPct: Math.max(0, Number(state.offgridGeneratorStartSocPct) || 0),
+        generatorMaxHoursPerDay: Math.max(0, Number(state.offgridGeneratorMaxHoursPerDay) || 0),
         batteryCapexTry: battCapexForLifecycle,
         batteryLifetimeYears: battLifetimeYears,
         weatherScenario: weatherLevel,

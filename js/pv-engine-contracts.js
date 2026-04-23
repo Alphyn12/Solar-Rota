@@ -1,5 +1,5 @@
-import { INVERTER_TYPES, PANEL_TYPES } from './data.js';
-import { calculateSystemLayout } from './calc-core.js';
+import { INVERTER_TYPES } from './data.js';
+import { calculateSystemLayout, resolvePanelSpec } from './calc-core.js';
 
 export const PV_ENGINE_CONTRACT_VERSION = 'GH-PV-ENGINE-CONTRACT-2026.04-v1';
 
@@ -77,7 +77,7 @@ function normalizeHourlyProfile(values) {
 }
 
 export function buildPvEngineRequest(state = {}) {
-  const panel = PANEL_TYPES[state.panelType || 'mono_perc'] || PANEL_TYPES.mono_perc;
+  const panel = resolvePanelSpec(state, state.panelType || 'mono_perc');
   const inverter = INVERTER_TYPES[state.inverterType || 'string'] || INVERTER_TYPES.string;
   const cableLossPct = state.cableLossEnabled
     ? Math.max(0, finite(state.cableLoss?.totalLossPct ?? state.cableLossPct ?? state.cableLoss, 0))
@@ -120,7 +120,7 @@ export function buildPvEngineRequest(state = {}) {
     system: {
       panelType: state.panelType || 'mono_perc',
       panelWattPeak: finite(panel.wattPeak, 0),
-      panelAreaM2: finite((panel.width || 0) * (panel.height || 0), 0),
+      panelAreaM2: finite(panel.areaM2, 0),
       panelTempCoeffPerC: finite(panel.tempCoeff, -0.0037),
       panelDegradationRate: finite(panel.degradation, 0.0045),
       panelFirstYearDegradationRate: finite(panel.firstYearDeg, 0.02),
@@ -174,6 +174,13 @@ export function buildPvEngineRequest(state = {}) {
       generatorKw: finite(state.offgridGeneratorKw, 0),
       generatorFuelCostPerKwh: finite(state.offgridGeneratorFuelCostPerKwh, 0),
       generatorCapexTry: finite(state.offgridGeneratorCapexTry, 0),
+      generatorStrategy: state.offgridGeneratorStrategy || 'critical-backup',
+      generatorFuelType: state.offgridGeneratorFuelType || 'diesel',
+      generatorSizePreset: state.offgridGeneratorSizePreset || 'auto',
+      generatorReservePct: finite(state.offgridGeneratorReservePct, 20),
+      generatorStartSocPct: finite(state.offgridGeneratorStartSocPct, 25),
+      generatorMaxHoursPerDay: finite(state.offgridGeneratorMaxHoursPerDay, 8),
+      generatorMaintenanceCostTry: finite(state.offgridGeneratorMaintenanceCostTry, 0),
       badWeatherLevel: state.offgridBadWeatherLevel || '',
       fieldGuaranteeMode: !!state.offgridFieldGuaranteeMode,
       productionSourcePriority: ['offgridPvHourly8760', 'hourlyProduction8760', 'monthlyProductionDerivedSynthetic8760'],

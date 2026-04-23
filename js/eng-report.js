@@ -2,10 +2,10 @@
 // ENG REPORT — Engineering calculation report
 // Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
-import { PANEL_TYPES } from './data.js';
 import { i18n } from './i18n.js';
 import { localeTag, localizeKnownMessage, statusLabel, tx } from './output-i18n.js';
 import { escapeHtml } from './security.js';
+import { calculateSystemLayout, resolvePanelSpec } from './calc-core.js';
 
 export function toggleEngReport() {
   const body    = document.getElementById('eng-report-body');
@@ -22,7 +22,8 @@ export function renderEngReport() {
   const state = window.state;
   const r = state.results;
   if (!r) return;
-  const p   = PANEL_TYPES[state.panelType];
+  const p = resolvePanelSpec(state, state.panelType);
+  const layout = calculateSystemLayout(state, state.panelType);
   const body = document.getElementById('eng-report-body');
   const lcoeValue = r.lcoe != null ? Number.parseFloat(r.lcoe) : null;
   const activeLocale = localeTag();
@@ -40,8 +41,10 @@ export function renderEngReport() {
     return converted.toLocaleString(currency === 'USD' ? 'en-US' : activeLocale, { maximumFractionDigits: currency === 'USD' ? 3 : 2 }) + ` ${currency}/${unit}`;
   };
 
-  const panelArea   = p.width * p.height;
-  const usableArea  = state.roofArea * 0.75;
+  const panelArea   = p.areaM2;
+  const roofAreaTotal = (Number(state.roofArea) || 0) + (state.multiRoof ? (state.roofSections || []).reduce((sum, sec) => sum + (Number(sec.area) || 0), 0) : 0);
+  const usableRatio = Math.max(0.1, Math.min(0.95, Number(state.usableRoofRatio) || 0.75));
+  const usableArea  = layout.usableArea;
   const pvgisAzimut = state.azimuth - 180;
   const netEnergy   = r.annualEnergy;
   const authoritativeSource = r.authoritativeEngineSource || r.engineSource || {};
@@ -87,8 +90,8 @@ ${fallbackReason ? `${escapeHtml(i18n.t('engine.fallbackReason'))}: ${escapeHtml
     <div class="formula-body">${escapeHtml(report('areaFormula'))}
 = ${p.width} m × ${p.height} m = ${panelArea.toFixed(4)} m²
 
-${escapeHtml(report('usableRoofArea'))} = ${escapeHtml(report('totalRoofArea'))} × 0.75
-= ${state.roofArea} m² × 0.75 = ${usableArea.toFixed(1)} m²
+${escapeHtml(report('usableRoofArea'))} = ${escapeHtml(report('totalRoofArea'))} × ${usableRatio.toFixed(2)}
+= ${roofAreaTotal.toFixed(1)} m² × ${usableRatio.toFixed(2)} = ${usableArea.toFixed(1)} m²
 
 ${escapeHtml(report('panelCountFormula'))}
 = floor(${usableArea.toFixed(1)} ÷ ${panelArea.toFixed(4)}) = ${r.panelCount} ${escapeHtml(panelUnit)}</div>
@@ -427,7 +430,7 @@ export function renderEngCalcPanel() {
   const panel = document.getElementById('eng-calc-panel');
   if (!panel || !r) return;
 
-  const p = PANEL_TYPES[state.panelType];
+  const p = resolvePanelSpec(state, state.panelType);
   if (!p) return;
 
   const currency = state.displayCurrency || 'TRY';

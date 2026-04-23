@@ -370,6 +370,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .panel-card-stats{margin-top:12px;display:flex;flex-direction:column;gap:5px}
 .panel-stat{display:flex;justify-content:space-between;font-size:0.78rem}
 .panel-stat-label{color:var(--text-muted)}
+.panel-card-scenario{margin-top:12px;padding:12px 14px;border:1px solid rgba(245,158,11,.16);border-radius:12px;background:rgba(245,158,11,.06);font-size:.78rem;line-height:1.55;color:var(--text)}
 .panel-check{position:absolute;top:8px;right:8px;background:var(--primary);border-radius:50%;width:22px;height:22px;display:none;align-items:center;justify-content:center;font-size:12px;color:#000;box-shadow:0 0 10px rgba(245,158,11,0.5);}
 .panel-card.selected .panel-check{display:flex}
 .panel-catalog-footer{margin-top:12px;padding-top:12px;border-top:1px solid var(--border-subtle)}
@@ -526,7 +527,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <span class="step-dot-label">Ekipman</span>
           </button>
           <div class="step-connector" id="conn-4-5"></div>
-          <button type="button" class="step-dot" data-step="5" data-testid="step-dot-5" aria-controls="step-5" aria-label="5. adım: Finansal" onclick="goToStep(5)">
+          <button type="button" class="step-dot" data-step="5" data-testid="step-dot-5" aria-controls="step-5" aria-label="5. adım: Ayarlar" onclick="goToStep(5)">
             <span class="step-dot-num">5</span>
             <span class="step-dot-label">Finansal</span>
           </button>
@@ -1119,7 +1120,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           </div>
           <div class="panel-preview-stat">
             <div class="panel-preview-val" id="prev-area">-</div>
-            <div class="panel-preview-label">Panel Alanı (m²)</div>
+            <div class="panel-preview-label">Yerleşen / Net Alan (m²)</div>
           </div>
           <div class="panel-preview-stat">
             <div class="panel-preview-val" id="prev-cost">-</div>
@@ -1255,7 +1256,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           <strong id="equip-summary-panels">—</strong>
         </div>
         <div class="equipment-summary-item">
-          <span>Alan Kullanımı</span>
+          <span>Yerleşen / Net Alan</span>
           <strong id="equip-summary-area">—</strong>
         </div>
       </div>
@@ -1282,12 +1283,12 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   </div>
 </div>
 
-<!-- ═══════════════ STEP 5: FİNANSAL ═══════════════ -->
+<!-- ═══════════════ STEP 5: SENARYO AYARLARI ═══════════════ -->
 <div class="step-pane" id="step-5">
   <div class="step-heading">
     <div class="step-heading-eyebrow">Adım 5 / 7</div>
-    <h1 class="step-heading-title">Finansal Parametreler</h1>
-    <p class="step-heading-sub">Tarife, tüketim ve gelişmiş finansal seçenekleri belirleyin.</p>
+    <h1 class="step-heading-title">Sistem ve Senaryo Ayarları</h1>
+    <p class="step-heading-sub">Boyutlandırma mantığı, tüketim hedefi, tarife ve gelişmiş teklif varsayımlarını belirleyin.</p>
   </div>
 
   <div class="on-grid-flow-panel" id="on-grid-flow-panel">
@@ -1309,14 +1310,14 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
         <h3>Önce hangi mantıkla boyutlandırmak istediğinizi seçin</h3>
         <p class="on-grid-basic-intro">Basit modda sistem sizin yerinize tüketim profili, mahsuplaşma tipi, net çatı kullanımı ve temel tarife kabullerini otomatik uygular. Böylece ilk kez bakan kullanıcı bile birkaç bilgiyle sonucu görebilir.</p>
 
-        <input type="hidden" id="on-grid-design-target" value="bill-offset">
+        <input type="hidden" id="on-grid-design-target" value="fill-roof">
         <div class="on-grid-choice-grid" role="group" aria-label="On-grid sistem hedefi">
-          <button type="button" class="on-grid-choice-card active" data-design-target-card="bill-offset" onclick="setOnGridDesignTarget('bill-offset')">
+          <button type="button" class="on-grid-choice-card" data-design-target-card="bill-offset" onclick="setOnGridDesignTarget('bill-offset')">
             <strong>Elektrik faturasına göre sistem</strong>
             <span>Yıllık tüketiminizi karşılayacak ölçekte, daha dengeli bir kurulu güç seçilir.</span>
             <small>Ev, villa, küçük işletme ve ilk teklif görüşmeleri için önerilir.</small>
           </button>
-          <button type="button" class="on-grid-choice-card" data-design-target-card="fill-roof" onclick="setOnGridDesignTarget('fill-roof')">
+          <button type="button" class="on-grid-choice-card active" data-design-target-card="fill-roof" onclick="setOnGridDesignTarget('fill-roof')">
             <strong>Maksimum teknik performans</strong>
             <span>Çatı alanı izin verdiği sürece daha yüksek kurulu güç hedeflenir.</span>
             <small>Çatının potansiyelini görmek, ileride yük artışı planlamak veya fazla üretimi incelemek için uygundur.</small>
@@ -1324,7 +1325,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
         </div>
 
         <div class="on-grid-field-grid on-grid-basic-form">
-          <label><span data-i18n="onGridFlow.subscriberType">Abone tipi</span>
+          <label class="on-grid-field-card"><span class="on-grid-field-label" data-i18n="onGridFlow.subscriberType">Abone tipi</span>
             <select id="on-grid-subscriber-type" onchange="updateOnGridAssumptions(); updateTariffAssumptions()">
               <option value="residential" data-i18n="onGridFlow.subscriberResidential">Mesken</option>
               <option value="commercial" data-i18n="onGridFlow.subscriberCommercial">Ticari</option>
@@ -1334,16 +1335,19 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
               <option value="other" data-i18n="onGridFlow.subscriberOther">Diğer / manuel</option>
             </select>
           </label>
-          <label><span data-i18n="onGridFlow.annualConsumption">Yıllık tüketim (kWh)</span>
+          <label class="on-grid-field-card"><span class="on-grid-field-label" data-i18n="onGridFlow.annualConsumption">Yıllık tüketim (kWh)</span>
             <input type="number" id="on-grid-annual-consumption" min="0" step="1" value="3650" oninput="updateOnGridAssumptions({ fillMonthly: true })">
           </label>
-          <label><span>Yaklaşık aylık elektrik faturası (₺, isteğe bağlı)</span>
+          <label class="on-grid-field-card"><span class="on-grid-field-label" data-i18n="onGridFlow.monthlyConsumptionInput">Faturadaki aylık tüketim (kWh, isteğe bağlı)</span>
+            <input type="number" id="on-grid-monthly-consumption-input" min="0" step="1" value="" oninput="updateOnGridAssumptions({ source: 'monthly-kwh', fillMonthly: true })">
+          </label>
+          <label class="on-grid-field-card"><span class="on-grid-field-label">Yaklaşık aylık elektrik faturası (₺, isteğe bağlı)</span>
             <input type="number" id="on-grid-monthly-bill-estimate" min="0" step="1" value="" oninput="updateOnGridAssumptions({ source: 'monthly-bill', fillMonthly: true })">
           </label>
         </div>
 
         <div class="on-grid-explain" id="on-grid-basic-target-copy">Bu seçimde sistem, yıllık tüketiminizi karşılamaya odaklanır ve basit mod varsayımları otomatik uygulanır.</div>
-        <div class="on-grid-explain" id="on-grid-bill-estimate-note">İsterseniz yaklaşık aylık fatura tutarı girin; sistem seçili tarife varsayımına göre bunu yıllık kWh tüketimine çevirir.</div>
+        <div class="on-grid-explain" id="on-grid-bill-estimate-note">Mümkünse faturadaki gerçek kWh tüketimini girin. TL tutarı sadece yaklaşık tahmin içindir ve seçili tarife varsayımına göre yıllık kWh tüketimine çevrilir.</div>
       </section>
 
       <section class="on-grid-panel-section on-grid-basic-help">
@@ -1470,6 +1474,8 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div class="on-grid-flow-summary" id="on-grid-flow-summary"></div>
   </div>
 
+  <div id="offgrid-l2-anchor"></div>
+
   <details class="card step5-advanced-card" id="step5-advanced-card">
     <summary class="step5-advanced-summary">
       <span class="step5-advanced-summary-title">
@@ -1492,6 +1498,41 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           <strong>3. Opsiyonel modülleri sadece gerekiyorsa açın</strong>
           <span>Fatura analizi, EV, ısı pompası, vergi ve bakım gibi modüller temel senaryoyu genişletir. İlk incelemede hepsini doldurmak zorunda değilsiniz.</span>
         </article>
+      </div>
+
+      <div id="offgrid-advanced-options" style="display:none">
+        <details class="step5-subdetails" open>
+          <summary class="step5-subsummary">
+            <div>
+              <strong>Off-grid ileri varsayımlar</strong>
+              <span>Şebekesiz sistem için saha güveni, alternatif enerji maliyeti ve işletme kanıtlarını yönetin.</span>
+            </div>
+          </summary>
+          <div class="step5-subbody">
+            <div class="step5-inline-note"><strong>Bu bölüm off-grid’e özeldir:</strong> On-grid mahsuplaşma ve şebeke ihracatı burada kullanılmaz. Önemli olan yük kanıtı, kötü hava dayanımı, batarya sağlığı, jeneratör yakıt/servis takibi ve alternatif enerji maliyetidir.</div>
+            <div class="step5-tariff-quick-grid">
+              <div id="offgrid-cost-anchor"></div>
+              <div>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Off-grid teklif olgunluğu</div>
+                <select id="offgrid-field-maturity-note" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;width:100%">
+                  <option>Ön keşif: profil ve varsayımlarla hesap</option>
+                  <option>Saha hazırlığı: cihaz listesi ve gölge kontrolü var</option>
+                  <option>Teklif hazır: yük ölçümü, datasheet ve kabul kanıtları var</option>
+                </select>
+              </div>
+            </div>
+            <div class="step5-tariff-tips">
+              <div class="step5-tariff-tip">
+                <strong>İleri hesap için gerekenler</strong>
+                <span>Cihaz listesi, gece çalışma süresi, kritik yük ayrımı ve varsa 8760 yük/üretim dosyaları off-grid sonucunu belirgin şekilde iyileştirir.</span>
+              </div>
+              <div class="step5-tariff-tip">
+                <strong>Garantiye yaklaşmak için</strong>
+                <span>Batarya sağlık raporu, jeneratör servis/yakıt kaydı, devreye alma raporu ve 30 günlük telemetri saha kanıtı olarak saklanmalıdır.</span>
+              </div>
+            </div>
+          </div>
+        </details>
       </div>
 
       <details class="step5-subdetails" open>
@@ -1771,28 +1812,54 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       </details>
 
         <!-- ═══ OFF-GRID LEVEL 2 GİRİŞ AYARLARI — yalnızca off-grid senaryosunda görünür ═══ -->
-        <div id="offgrid-l2-wrap" style="display:none;margin-top:16px;padding:14px 16px;background:rgba(139,92,246,0.07);border-radius:10px;border:1px solid rgba(139,92,246,0.25)">
-          <div style="font-size:0.8rem;font-weight:700;color:#8B5CF6;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <div id="offgrid-l2-wrap" class="offgrid-l2-card" style="display:none">
+          <div class="offgrid-l2-head">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
             <span data-i18n="offgridL2.sectionTitle">Off-Grid Level 2 Ayarları</span>
           </div>
 
+          <!-- Boyutlandırma Hedefi -->
+          <div class="offgrid-block">
+            <div class="offgrid-block-kicker">Önce sistemi nasıl boyutlandıracağınızı seçin</div>
+            <div class="offgrid-sizing-choice-grid" role="group" aria-label="Off-grid sistem hedefi">
+              <button type="button" data-offgrid-design-target-card="bill-offset" onclick="setOffgridDesignTarget('bill-offset')">
+                <strong>Elektrik ihtiyacına göre sistem</strong>
+                <span>Seçilen konut profili veya cihaz listesindeki yıllık yük kadar kurulu güç hedeflenir.</span>
+                <small>Batarya ve jeneratörle birlikte daha dengeli, maliyet odaklı ön fizibilite için.</small>
+              </button>
+              <button type="button" data-offgrid-design-target-card="fill-roof" onclick="setOffgridDesignTarget('fill-roof')" class="active">
+                <strong>Maksimum çatı kapasitesi</strong>
+                <span>Çatı alanı izin verdiği kadar panel yerleştirilir; fazla üretim ve kötü hava dayanımı ayrıca incelenir.</span>
+                <small>Şebekesiz bölgede ileride yük artışı, pompa/klima veya yüksek otonomi düşünülüyorsa.</small>
+              </button>
+            </div>
+            <div id="offgrid-design-target-note" class="offgrid-mode-hint">Maksimum çatı kapasitesi seçili: panel sayısı çatının net kullanılabilir alanına göre sınırlandırılır.</div>
+          </div>
+
           <!-- Hesap Seviyesi -->
-          <div style="margin-bottom:14px">
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px" data-i18n="offgridL2.calculationModeLabel">Hesap Seviyesi</div>
-            <select id="offgrid-calculation-mode"
-              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.85rem;width:100%"
-              onchange="updateOffgridL2Settings()">
-              <option value="basic" data-i18n="offgridL2.calculationModeBasic">Basit: günlük tüketim / cihaz listesi</option>
-              <option value="advanced" data-i18n="offgridL2.calculationModeAdvanced">İleri: 8760 CSV ve saha kanıtları</option>
+          <div class="offgrid-block">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px" data-i18n="offgridL2.calculationModeLabel">Hesap Seviyesi</div>
+            <div class="offgrid-mode-toggle">
+              <button type="button" data-offgrid-mode-btn="basic" onclick="setOffgridCalculationMode('basic')" class="active">
+                <strong>Basit hesap</strong>
+                <span>Konut tipini seç; günlük tüketim ve kritik yük varsayımları otomatik gelsin.</span>
+              </button>
+              <button type="button" data-offgrid-mode-btn="advanced" onclick="setOffgridCalculationMode('advanced')">
+                <strong>İleri hesap</strong>
+                <span>Cihazları tek tek ekle, gece yükünü ve saha/8760 kanıtlarını ayrı modelle.</span>
+              </button>
+            </div>
+            <select id="offgrid-calculation-mode" style="display:none" onchange="updateOffgridL2Settings()">
+              <option value="basic" data-i18n="offgridL2.calculationModeBasic">Basit: konut profili</option>
+              <option value="advanced" data-i18n="offgridL2.calculationModeAdvanced">İleri: cihaz listesi ve 8760 saha verisi</option>
             </select>
-            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.calculationModeHint">
-              Basit mod hızlı ön fizibilite verir. İleri modda 8760 PV, toplam yük ve kritik yük dosyaları puanı yükseltir.
+            <div class="offgrid-mode-hint">
+              Basit hesap ilk keşif ve hızlı teklif öncesi içindir. İleri hesapta cihaz listesi, gece tüketimi, kritik yük ayrımı ve CSV/saha kanıtı sonuç güvenini yükseltir.
             </div>
           </div>
 
           <!-- Otonom Hedef Seçici -->
-          <div style="margin-bottom:14px">
+          <div class="offgrid-block">
             <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px" data-i18n="offgridL2.autonomyGoalLabel">Otonom Hedef</div>
             <select id="offgrid-autonomy-goal"
               style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.85rem;width:100%"
@@ -1803,8 +1870,19 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             </select>
           </div>
 
-          <!-- Basit Mod: Kritik Yük Oranı -->
+          <!-- Basit Mod: Konut Profili + Kritik Yük Oranı -->
           <div id="offgrid-simple-mode-wrap" style="margin-bottom:14px">
+            <div class="offgrid-simple-intro">
+              <strong>Basit off-grid hesabı nasıl çalışır?</strong>
+              <span>Seçilen konut profili günlük kWh ihtiyacını, kritik yük payını ve varsayılan otonomi hedefini doldurur. Hesap motoru bu değeri 8760 saatlik sentetik yük eğrisine dağıtır; bu yüzden cihaz listesi eklemeden de batarya ve kapsama sonucu alınır.</span>
+            </div>
+            <div class="offgrid-explain-grid">
+              <div><strong>Konut profili</strong><span>Stüdyo, küçük ev, aile evi veya pompalı kırsal ev gibi hazır tüketim seviyeleri günlük kWh hedefini belirler.</span></div>
+              <div><strong>Kritik yük</strong><span>Kesinti anında çalışması gereken buzdolabı, modem, güvenlik, temel aydınlatma ve pompa gibi yüklerin payıdır.</span></div>
+              <div><strong>Sonuç etkisi</strong><span>Günlük kWh toplam sistem boyutunu, kritik yük oranı ise batarya ve kapsama güvenilirliğini doğrudan etkiler.</span></div>
+            </div>
+            <div id="offgrid-residential-profile-grid" class="offgrid-profile-grid"></div>
+            <div id="offgrid-simple-profile-summary" class="offgrid-profile-summary"></div>
             <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px">
               <span data-i18n="offgridL2.criticalFractionLabel">Kritik Yük Oranı</span>
               <span id="offgrid-critical-fraction-val" style="font-weight:700;color:#8B5CF6;margin-left:6px">60%</span>
@@ -1813,7 +1891,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
               style="width:100%;accent-color:#8B5CF6"
               oninput="document.getElementById('offgrid-critical-fraction-val').textContent=this.value+'%'; updateOffgridL2Settings()"/>
             <div style="font-size:0.7rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.criticalFractionHint">
-              Toplam günlük tüketimin yüzde kaçı kritik yük (kesintisiz gerekli)?
+              Toplam günlük tüketimin yüzde kaçı kesintisiz çalışmalı? Buzdolabı, modem, güvenlik, temel aydınlatma ve zorunlu pompa yükleri genelde kritik sayılır.
             </div>
           </div>
 
@@ -1927,9 +2005,20 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <div style="font-size:0.68rem;color:var(--text-muted);margin-top:6px" data-i18n="offgridL2.fieldDataHint">Faz 1 için üç gerçek 8760 seri gerekir. Faz 2 için SHA-256 saha kanıtları gerekir. Faz 4 için kabul dosyaları, Faz 5 için aktif izleme ve bakım kayıtları, Faz 6 için periyodik revalidasyon kanıtları gerekir.</div>
           </div>
 
-          <!-- Cihaz Listesi (Gelişmiş Mod) -->
+          <!-- Cihaz Listesi (İleri Mod) -->
           <div id="offgrid-device-section" style="margin-bottom:14px">
-            <div style="font-size:0.75rem;font-weight:600;color:var(--text);margin-bottom:8px" data-i18n="offgridL2.deviceListTitle">Cihaz Listesi (İsteğe Bağlı)</div>
+            <div style="font-size:0.75rem;font-weight:600;color:var(--text);margin-bottom:8px" data-i18n="offgridL2.deviceListTitle">İleri Cihaz Bazlı Yük Modeli</div>
+            <div class="offgrid-advanced-note">
+              Her cihaz için güç, günlük çalışma süresi, gece çalışma süresi ve kritik olup olmadığı ayrı girilir. Bu modda hesap motoru günlük kWh alanı yerine cihaz listesini kullanır; cihaz yoksa yedek olarak günlük kWh profiline döner.
+            </div>
+            <div class="offgrid-explain-grid">
+              <div><strong>Güç (W)</strong><span>Cihazın anlık çekişidir. İnverter gücü ve pik/surge limitleri için en kritik girdidir.</span></div>
+              <div><strong>Saat/gün</strong><span>Enerji hesabını üretir: W × saat = Wh/gün. Yanlış saat girişi batarya ve panel sonucunu doğrudan bozar.</span></div>
+              <div><strong>Gece (sa)</strong><span>Güneş yokken bataryadan karşılanacak bölümü gösterir; batarya kapasitesi ve deşarj gücünü etkiler.</span></div>
+              <div><strong>Kritik?</strong><span>İşaretlenen cihazlar kesintisiz öncelikli yük sayılır. Kritik kapsama metriği bu cihazlar üzerinden hesaplanır.</span></div>
+              <div><strong>8760 CSV</strong><span>Gerçek toplam yük ve kritik yük dosyası varsa cihaz listesinden daha güvenilir kabul edilir.</span></div>
+              <div><strong>Saha kanıtı</strong><span>Gölge, datasheet, devreye alma ve izleme dosyaları garantiye hazırlık puanını yükseltir; ön fizibiliteyi saha verisine yaklaştırır.</span></div>
+            </div>
 
             <!-- Katalog Seçici -->
             <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;margin-bottom:8px;padding:8px 10px;background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.18);border-radius:8px">
@@ -2008,7 +2097,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           </div>
 
           <!-- Jeneratör / Yedek Güç -->
-          <div style="margin-bottom:14px;padding:10px 12px;background:rgba(245,158,11,0.06);border-radius:8px;border:1px solid rgba(245,158,11,0.2)">
+          <div class="offgrid-generator-card">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
               <span style="font-size:0.78rem;font-weight:600;color:#F59E0B" data-i18n="offgridL2.generatorTitle">Jeneratör / Yedek Güç</span>
@@ -2017,27 +2106,75 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
                 <span style="font-size:0.72rem;color:var(--text-muted)" data-i18n="offgridL2.generatorEnable">Etkin</span>
               </label>
             </div>
-            <div id="offgrid-generator-details" style="display:none;flex-wrap:wrap;gap:10px">
-              <div>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px" data-i18n="offgridL2.generatorKw">Kapasite (kW)</div>
-                <input type="number" id="offgrid-generator-kw" value="5" min="0.5" max="500" step="0.5"
-                  style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);width:100px;font-size:0.85rem"
-                  oninput="updateOffgridL2Settings()"/>
-              </div>
-              <div>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px" data-i18n="offgridL2.generatorFuelCost">Yakıt Maliyeti (₺/kWh)</div>
+            <div class="offgrid-generator-copy">
+              Jeneratör opsiyoneldir. Kullanıcı sadece ne kadar güvence istediğini seçer; teknik kapasite ve çalışma varsayımları sistem tarafından otomatik önerilir.
+            </div>
+            <div id="offgrid-generator-details" class="offgrid-generator-details" style="display:none">
+              <label>
+                <span>Yedek güç seviyesi</span>
+                <select id="offgrid-generator-strategy" onchange="updateOffgridL2Settings()">
+                  <option value="critical-backup">Temel: buzdolabı, modem, ışık gibi kritikler</option>
+                  <option value="bad-weather">Güçlü: kötü havada daha uzun dayanım</option>
+                  <option value="full-backup">Tam yedek: evin büyük bölümünü destekle</option>
+                  <option value="manual">Uzman: değerleri elle belirle</option>
+                </select>
+              </label>
+              <label>
+                <span>Yakıt türü</span>
+                <select id="offgrid-generator-fuel-type" onchange="updateOffgridL2Settings()">
+                  <option value="diesel">Dizel</option>
+                  <option value="gasoline">Benzin</option>
+                  <option value="lpg">LPG / Doğalgaz</option>
+                  <option value="hybrid">Hibrit / Diğer</option>
+                </select>
+              </label>
+              <label>
+                <span>Jeneratör büyüklüğü</span>
+                <select id="offgrid-generator-size-preset" onchange="updateOffgridL2Settings()">
+                  <option value="auto">Otomatik öner</option>
+                  <option value="small">Küçük / ekonomik</option>
+                  <option value="large">Büyük / konforlu</option>
+                  <option value="custom">Uzman: kW elle gir</option>
+                </select>
+              </label>
+              <label>
+                <span data-i18n="offgridL2.generatorFuelCost">Yakıt Maliyeti (₺/kWh)</span>
                 <input type="number" id="offgrid-generator-fuel-cost" value="8" min="0" max="100" step="0.5"
-                  style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);width:120px;font-size:0.85rem"
                   oninput="updateOffgridL2Settings()"/>
-              </div>
-              <div>
-                <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:3px" data-i18n="offgridL2.generatorCapexLabel">Jeneratör Yatırım Maliyeti (₺)</div>
+              </label>
+              <label>
+                <span data-i18n="offgridL2.generatorCapexLabel">Tahmini jeneratör maliyeti (₺)</span>
                 <input type="number" id="offgrid-generator-capex" value="" min="0" max="10000000" step="1000"
-                  style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);width:140px;font-size:0.85rem"
                   placeholder="örn. 50000"
                   oninput="updateOffgridL2Settings()"/>
-              </div>
+              </label>
+              <details class="offgrid-generator-expert">
+                <summary>Uzman ayarları</summary>
+                <div class="offgrid-generator-expert-grid">
+                  <label>
+                    <span data-i18n="offgridL2.generatorKw">Kapasite (kW)</span>
+                    <input type="number" id="offgrid-generator-kw" value="5" min="0.5" max="500" step="0.5" oninput="updateOffgridL2Settings()"/>
+                  </label>
+                  <label>
+                    <span>Kapasite payı (%)</span>
+                    <input type="number" id="offgrid-generator-reserve-pct" value="20" min="0" max="200" step="5" oninput="updateOffgridL2Settings()"/>
+                  </label>
+                  <label>
+                    <span>Başlatma eşiği (%)</span>
+                    <input type="number" id="offgrid-generator-start-soc-pct" value="25" min="0" max="90" step="5" oninput="updateOffgridL2Settings()"/>
+                  </label>
+                  <label>
+                    <span>Maks. çalışma (saat/gün)</span>
+                    <input type="number" id="offgrid-generator-max-hours-day" value="8" min="0" max="24" step="0.5" oninput="updateOffgridL2Settings()"/>
+                  </label>
+                  <label>
+                    <span>Yıllık servis gideri (₺)</span>
+                    <input type="number" id="offgrid-generator-maintenance-cost" value="0" min="0" max="10000000" step="500" oninput="updateOffgridL2Settings()"/>
+                  </label>
+                </div>
+              </details>
             </div>
+            <div id="offgrid-generator-preview" class="offgrid-generator-preview"></div>
           </div>
 
           <!-- Kötü Hava Dayanıklılık Testi -->

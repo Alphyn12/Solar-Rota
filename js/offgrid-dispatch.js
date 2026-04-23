@@ -1147,15 +1147,16 @@ export function buildOffgridFieldModelMaturityGate(stressAnalysis = {}, {
 export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProfile, generatorConfig, financialInputs = {}, withoutGeneratorDispatch = null, productionProfile = {}) {
   const capex = Math.max(0, Number(financialInputs.systemCapexTry) || 0);
   const genCapex = Math.max(0, Number(financialInputs.generatorCapexTry) || 0);
+  const generatorMaintenanceAnnual = Math.max(0, Number(financialInputs.generatorMaintenanceCostTry) || 0);
   const totalCapex = capex + genCapex;
 
-  // Yaşam döngüsü maliyeti: düz amortisman + jeneratör yakıt + pil değişimi
+  // Yaşam döngüsü maliyeti: düz amortisman + jeneratör yakıt/bakım + pil değişimi
   const battCapex = Math.max(0, Number(financialInputs.batteryCapexTry) || 0);
   const battLifetime = Math.max(0, Number(financialInputs.batteryLifetimeYears) || 0);
   const battReplaceFraction = 0.85;
   const battReplacementsIn25y = battLifetime > 0 ? Math.floor(24 / battLifetime) : 0;
   const battReplacementAnnual = battLifetime > 0 ? (battCapex * battReplaceFraction * battReplacementsIn25y) / 25 : 0;
-  const lifecycleCostAnnual = (totalCapex / 25) + (normalDispatch.generatorFuelCostAnnual || 0) + battReplacementAnnual;
+  const lifecycleCostAnnual = (totalCapex / 25) + (normalDispatch.generatorFuelCostAnnual || 0) + generatorMaintenanceAnnual + battReplacementAnnual;
 
   const generatorEnabled = !!(generatorConfig && generatorConfig.enabled && Number(generatorConfig.capacityKw) > 0);
   const accuracyAssessment = buildOffgridAccuracyAssessment({
@@ -1224,6 +1225,13 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     generatorRunHoursPerYear: normalDispatch.generatorRunHours,
     generatorFuelCostAnnual: normalDispatch.generatorFuelCostAnnual,
     generatorFuelCostPerKwh: Math.max(0, Number(generatorConfig?.fuelCostPerKwh) || 0),
+    generatorMaintenanceCostAnnual: generatorMaintenanceAnnual,
+    generatorStrategy: financialInputs.generatorStrategy || 'critical-backup',
+    generatorFuelType: financialInputs.generatorFuelType || 'diesel',
+    generatorSizePreset: financialInputs.generatorSizePreset || 'auto',
+    generatorReservePct: Math.max(0, Number(financialInputs.generatorReservePct) || 0),
+    generatorStartSocPct: Math.max(0, Number(financialInputs.generatorStartSocPct) || 0),
+    generatorMaxHoursPerDay: Math.max(0, Number(financialInputs.generatorMaxHoursPerDay) || 0),
     generatorCapex: genCapex,
     generatorCapexTry: genCapex,
     generatorCapexMissing: generatorEnabled && genCapex <= 0,

@@ -167,8 +167,8 @@
   },
   "step5": {
     "eyebrow": "Adım 5 / 7",
-    "title": "Finansal Parametreler",
-    "subtitle": "Tarife, tüketim ve gelişmiş finansal seçenekleri belirleyin.",
+    "title": "Sistem ve Senaryo Ayarları",
+    "subtitle": "Boyutlandırma mantığı, tüketim hedefi, tarife ve gelişmiş teklif varsayımlarını belirleyin.",
     "advancedOptions": "Gelişmiş Seçenekler"
   },
   "step6": {
@@ -257,6 +257,7 @@
     "subscriberType": "Abone tipi",
     "connectionType": "Bağlantı tipi",
     "annualConsumption": "Yıllık tüketim (kWh)",
+    "monthlyConsumptionInput": "Bu ay faturadaki tüketim (kWh, isteğe bağlı)",
     "usageProfile": "Kullanım profili",
     "distributionFee": "Dağıtım bedeli (importa ek, TL/kWh)",
     "designTarget": "Sistem hedefi",
@@ -458,7 +459,7 @@
     "totalRoofArea": "toplam çatı alanı",
     "panelCountFormula": "Panel sayısı = floor(kullanılabilir alan ÷ panel alanı)",
     "panelCountUnit": "adet",
-    "layoutNote": "%75 kullanılabilir alan katsayısı ön fizibilite varsayımıdır. IEC 62548 uyumlu kesin yerleşim için saha keşfi, yangın kaçış yolları, bakım koridorları ve üretici montaj talimatları ayrıca doğrulanmalıdır.",
+    "layoutNote": "Kullanılabilir alan katsayısı ön fizibilite varsayımıdır. IEC 62548 uyumlu kesin yerleşim için saha keşfi, yangın kaçış yolları, bakım koridorları ve üretici montaj talimatları ayrıca doğrulanmalıdır.",
     "installedPowerResult": "Sistem gücü",
     "stcNote": "STC: 1000 W/m² ışınım, 25°C hücre sıcaklığı, AM 1.5G spektrumu. Panel standardı",
     "inverterTitle": "İnverter",
