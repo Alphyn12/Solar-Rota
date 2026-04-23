@@ -38,12 +38,11 @@ function moneyRate(value, unit = 'kWh') {
 
 function engineSummaryText(results = {}, state = window.state || {}) {
   const source = results.authoritativeEngineSource || results.engineSource || results.backendEngineSource;
-  const label = source?.source || results.calculationMode || 'PVGIS/JS';
-  const quality = source?.engineQuality || source?.confidence || results.confidence?.level || 'medium';
   const fallback = results.authoritativeEngineFallbackReason || (state.backendEngineAvailable === false ? state.backendEngineLastError : '');
-  return fallback
-    ? `${i18n.t('engine.authoritative')}: ${label} · ${i18n.t('engine.fallback')}: ${fallback}`
-    : `${i18n.t('engine.authoritative')}: ${label} · ${quality}`;
+  if (fallback) return 'Canlı veri geçici olarak alınamadı; yerel tahmin modeli kullanıldı.';
+  return source?.pvlibBacked || source?.source
+    ? 'Canlı güneş verisiyle desteklenen hesaplama kullanıldı.'
+    : 'Yerel tahmin modeliyle hesaplama yapıldı.';
 }
 
 function backendEngineText(results = {}, state = window.state || {}) {
@@ -152,40 +151,23 @@ export function renderResults() {
 
   const tbody = document.getElementById('tech-table-body');
   tbody.innerHTML = '';
-  const isPvlibAuthoritative = !!r.authoritativeEngineSource?.pvlibBacked;
-  // FIX-9: Replace ~30 hardcoded Turkish strings with i18n.t() calls so the
-  // tech table renders correctly when the user switches to EN or DE.
   const tt = k => i18n.t(`techTable.${k}`);
+  const annualLoad = Math.round(r.hourlySummary?.annualLoad || state.dailyConsumption * 365 || 0);
+  const roofAreaTotal = (Number(state.roofArea) || 0) + (state.multiRoof ? (state.roofSections || []).reduce((s, sec) => s + (Number(sec.area) || 0), 0) : 0);
+  const roofUseArea = (p.areaM2 || 0) * (Number(r.panelCount) || 0);
+  const coveragePct = annualLoad > 0 ? Math.min(999, (Number(r.annualEnergy || 0) / annualLoad) * 100) : 0;
   const rows = [
-    [tt('panelCount'), r.panelCount + ' ' + i18n.t('report.panelCountUnit')],
-    [tt('panelType'), p.name],
-    [tt('panelEfficiency'), (p.efficiency*100).toFixed(1) + '%'],
-    [tt('systemPower'), r.systemPower.toFixed(2) + ' kWp'],
-    [tt('roofTilt'), state.tilt + '°'],
-    [tt('roofAzimuth'), state.azimuthName],
-    [tt('shading'), state.shadingFactor + '%'],
-    [tt('soiling'), state.soilingFactor + '%'],
-    [tt('osmShadow'), r.osmShadowFactor ? `${Number(r.osmShadowFactor).toFixed(1)}% ${i18n.t('units.additionalAssumption')}` : i18n.t('units.offOrNone')],
-    [tt('mapRoofArea'), state.roofGeometry ? `${state.roofGeometry.areaM2.toFixed(1)} m² | ${state.roofGeometry.azimuthName} ${Math.round(state.roofGeometry.azimuth)}°` : '—'],
-    [tt('inverterType'), r.inverterType ? r.inverterType.charAt(0).toUpperCase() + r.inverterType.slice(1) : 'String'],
-    [tt('inverterEfficiency'), (r.inverterEfficiency || '97') + '%'],
-    [tt('specificYield') + ' <span style="cursor:help;opacity:0.6" title="Kurulu her kWp gücün yılda ürettiği enerji. Türkiyeʼde iyi bir sistem 1.400–1.700 kWh/kWp üretir. Konum, eğim ve gölge kalitesini ölçen en özlü göstergedir.">?</span>', r.ysp + ' kWh/kWp'],
-    [tt('capacityFactor') + ' <span style="cursor:help;opacity:0.6" title="Sistemin teorik maksimum kapasitesine oranla ne kadar çalıştığı (%). Güneş enerjisinde %15–22 beklenir; yükseldikçe konum ve konfigürasyon kalitesi artar.">?</span>', r.cf + '%'],
-    [tt('performanceRatio') + ' <span style="cursor:help;opacity:0.6" title="Gerçek üretimin teorik ideale oranı (%). %75–85 iyi, %85+ mükemmel. Gölge, sıcaklık, kirlenme ve kablo kayıpları bu oranı düşürür.">?</span>', r.pr + '%'],
-    [tt('co2Savings'), r.co2Savings + ' ton/yıl'],
-    [tt('calcMethod'), `${r.calculationMode || '—'} / ${r.methodologyVersion || '—'}`],
-    [tt('scenario'), `${state.scenarioContext?.label || state.scenarioKey || 'On-Grid'} / ${state.scenarioContext?.resultFrame || '—'}`],
-    [tt('authoritativeEngine'), backendEngineText(r, state)],
-    [tt('fallbackReason'), r.authoritativeEngineFallbackReason || '—'],
-    [isPvlibAuthoritative ? tt('pvlibIrradianceSource') : tt('pvgisLossParam'), isPvlibAuthoritative ? 'Clear-sky + request GHI scaling' : `${r.pvgisLossParam ?? 0}%`],
-    [isPvlibAuthoritative ? tt('pvlibPoaRef') : tt('pvgisPoa'), `${r.pvgisPoa || '—'} kWh/m²/yıl`],
-    [tt('tariff'), moneyRate(r.tariff, 'kWh')],
-    [tt('tariffRegime'), `${r.tariffModel?.effectiveRegime || '—'} / ${r.tariffModel?.contractedPowerKw || 0} kW`],
-    [tt('skttLimit'), r.tariffModel?.regulation?.limitKwh ? `${Number(r.tariffModel.regulation.limitKwh).toLocaleString('tr-TR')} kWh/${i18n.t('units.year')}` : '—'],
-    [state.scenarioKey === 'off-grid' ? tt('surplusPvTreatment') : tt('exportSettlement'), state.netMeteringEnabled ? `${r.tariffModel?.exportCompensationPolicy?.interval || '—'} / ${r.tariffModel?.exportCompensationPolicy?.annualSellableExportCapKwh ? Math.round(r.tariffModel.exportCompensationPolicy.annualSellableExportCapKwh).toLocaleString('tr-TR') + ' kWh' : '—'}` : tt('netMeteringOff')],
-    [tt('currency'), `${state.displayCurrency || 'TRY'} (USD/TRY: ${Number(state.usdToTry || 38.5).toFixed(2)} | ${state.exchangeRate?.source || 'manual/fallback'})`],
-    [tt('tariffSourceDate'), r.tariffModel?.sourceDate || '—'],
-    [tt('annualPriceIncrease'), ((r.annualPriceIncrease || 0) * 100).toFixed(1) + '%'],
+    [tt('summarySystemSize'), `${r.systemPower.toFixed(2)} kWp · ${r.panelCount} ${i18n.t('report.panelCountUnit')}`],
+    [tt('summaryRoofUse'), roofAreaTotal > 0 ? `${roofUseArea.toFixed(1)} m² panel yerleşimi / ${roofAreaTotal.toFixed(1)} m² çatı` : '—'],
+    [tt('summaryAnnualProduction'), `${Number(r.annualEnergy || 0).toLocaleString('tr-TR')} kWh/${i18n.t('units.year')}`],
+    [tt('summaryMonthlyAverage'), `${Math.round((Number(r.annualEnergy || 0) / 12)).toLocaleString('tr-TR')} kWh/ay`],
+    [tt('summaryConsumption'), `${annualLoad.toLocaleString('tr-TR')} kWh/${i18n.t('units.year')}`],
+    [tt('summaryCoverage'), `%${coveragePct.toFixed(0)} civarı`],
+    [tt('summaryOrientation'), `${state.azimuthName || '—'} · ${state.tilt}° eğim`],
+    [tt('summarySavingsEffect'), money(r.annualSavings)],
+    [tt('summaryPayback'), r.grossSimplePaybackYear ? `${Number(r.grossSimplePaybackYear).toFixed(1)} ${i18n.t('units.year')}` : `>25 ${i18n.t('units.year')}`],
+    [tt('summarySource'), engineSummaryText(r, state)],
+    [tt('summaryNextStep'), state.scenarioContext?.nextAction || i18n.t('onGridResult.commercialNextAction')],
   ];
   rows.forEach(([k, v]) => {
     const tr = document.createElement('tr');
@@ -694,10 +676,10 @@ function renderOnGridResultLayers(state, r) {
   const profileSourceClass = profileSourceKey === 'hourly-uploaded' ? 'data-source-good' : profileSourceKey === 'monthly-derived' ? 'data-source-ok' : 'data-source-warn';
   const productionProfileSourceKey = r.productionProfileSource || 'monthly-derived-synthetic-pv';
   const productionProfileLabels = {
-    'backend-pvlib-hourly': 'Backend pvlib hourly 8760',
-    'pvgis-seriescalc-hourly': 'PVGIS seriescalc hourly 8760',
-    'user-hourly-pv-normalized-to-authoritative-annual': 'User hourly PV 8760',
-    'monthly-derived-synthetic-pv': 'Monthly-derived synthetic PV'
+    'backend-pvlib-hourly': 'Canlı veriyle detaylı üretim modeli',
+    'pvgis-seriescalc-hourly': 'Canlı güneş verisiyle saatlik hesap',
+    'user-hourly-pv-normalized-to-authoritative-annual': 'Saatlik üretim profiline göre hesap',
+    'monthly-derived-synthetic-pv': 'Aylık veriye göre hızlı üretim tahmini'
   };
   const productionProfileText = productionProfileLabels[productionProfileSourceKey] || productionProfileSourceKey;
   const productionProfileClass = productionProfileSourceKey === 'backend-pvlib-hourly' || productionProfileSourceKey === 'pvgis-seriescalc-hourly' || productionProfileSourceKey === 'user-hourly-pv-normalized-to-authoritative-annual'
@@ -718,6 +700,13 @@ function renderOnGridResultLayers(state, r) {
   // Tariff mode display
   const tariffInputMode = r.tariffInputMode || state.tariffInputMode || 'net-plus-fee';
   const tariffModeText = tariffInputMode === 'gross' ? i18n.t('onGridResult.tariffModeGross') : i18n.t('onGridResult.tariffModeNet');
+  const settlementIntervalRaw = comp.settlementInterval || r.tariffModel?.exportCompensationPolicy?.interval || '—';
+  const settlementIntervalLabels = {
+    monthly: 'Aylık dengeleme',
+    hourly: 'Saatlik dengeleme',
+    annual: 'Yıllık dengeleme',
+    yearly: 'Yıllık dengeleme'
+  };
   const settlementBasisText = r.settlementProvisional
     ? (() => {
         const importOffsetKwh = r.compensationSummary?.importOffsetKwh ?? 0;
@@ -725,11 +714,11 @@ function renderOnGridResultLayers(state, r) {
         const exportRt = r.tariffModel?.exportRate ?? 0;
         const annualDelta = Math.round(importOffsetKwh * (effectiveImport - exportRt));
         const deltaStr = annualDelta > 0
-          ? ` (aylık mod saatlikten yıllık ~${annualDelta.toLocaleString('tr-TR')} TL avantajlı)`
+          ? ` (aylık mod saatliğe göre yılda yaklaşık ${annualDelta.toLocaleString('tr-TR')} TL daha avantajlı)`
           : '';
         return i18n.t('onGridResult.settlementProvisional') + deltaStr;
       })()
-    : `${comp.settlementInterval || r.tariffModel?.exportCompensationPolicy?.interval || '—'}${comp.annualExportCapKwh ? ` / ${Math.round(comp.annualExportCapKwh).toLocaleString(localeTag())} kWh cap` : ''}`;
+    : `${settlementIntervalLabels[settlementIntervalRaw] || settlementIntervalRaw}${comp.annualExportCapKwh ? ` / yıllık ${Math.round(comp.annualExportCapKwh).toLocaleString(localeTag())} kWh sınır` : ''}`;
 
   // Tariff source display
   const tariffSourceType = assessment.tariffSourceType;
@@ -753,6 +742,16 @@ function renderOnGridResultLayers(state, r) {
 
   // Engine parity — intentionalDifference=true only when backend pvlib was used
   const engineMode = r.calculationMode || r.authoritativeEngineMode || '—';
+  const engineModeLabels = {
+    'python-pvlib-backed': 'Detaylı mühendislik hesap motoru',
+    'python-backend': 'Detaylı mühendislik hesap motoru',
+    'browser-pvgis': 'Canlı güneş verisiyle standart hesap',
+    'pvgis-live': 'Canlı güneş verisiyle standart hesap',
+    'pvlib-service': 'Detaylı mühendislik hesap motoru',
+    'local-fallback': 'Yerel tahmin modeli',
+    'fallback-psh': 'Yerel tahmin modeli'
+  };
+  const engineModeText = engineModeLabels[engineMode] || engineMode;
   const parityData = r.engineParity || null;
   const parityIsReal = parityData?.intentionalDifference === true;
   let engineParityHtml = '';
@@ -778,6 +777,7 @@ function renderOnGridResultLayers(state, r) {
   wrap.innerHTML = `
     <section class="on-grid-result-card">
       <h3>${escapeHtml(i18n.t('onGridResult.technicalTitle'))}</h3>
+      <p class="result-helper">Bu alan sistemin boyutunu, ne kadar elektrik üreteceğini ve tüketiminizle nasıl örtüştüğünü hızlıca görmeniz içindir.</p>
       <div class="on-grid-result-metrics">
         <div class="on-grid-result-metric"><strong>${Number(r.systemPower || 0).toFixed(2)} kWp</strong><span>${escapeHtml(i18n.t('onGridResult.installedPower'))}</span></div>
         <div class="on-grid-result-metric"><strong>${Number(r.panelCount || 0).toLocaleString(localeTag())}</strong><span>${escapeHtml(i18n.t('onGridResult.panelCount'))}</span></div>
@@ -790,35 +790,37 @@ function renderOnGridResultLayers(state, r) {
         <div class="on-grid-result-metric"><strong>${r.ysp} kWh/kWp</strong><span>${escapeHtml(i18n.t('onGridResult.specificYield'))}</span></div>
         <div class="on-grid-result-metric"><strong>${escapeHtml(usageProfileText)}</strong><span>${escapeHtml(i18n.t('onGridResult.loadProfile'))}</span></div>
         <div class="on-grid-result-metric"><strong><span class="${profileSourceClass}">${escapeHtml(profileSourceText)}</span></strong><span>${escapeHtml(i18n.t('onGridResult.profileSourceLabel'))}</span></div>
-        <div class="on-grid-result-metric"><strong><span class="${productionProfileClass}">${escapeHtml(productionProfileText)}</span></strong><span>${escapeHtml(i18n.t('offgridL2.productionSource'))}</span></div>
+        <div class="on-grid-result-metric"><strong><span class="${productionProfileClass}">${escapeHtml(productionProfileText)}</span></strong><span>${escapeHtml(i18n.t('onGridResult.productionSourceLabel'))}</span></div>
         <div class="on-grid-result-metric"><strong><span class="${shadowClass}">${escapeHtml(shadowText)}</span></strong><span>${escapeHtml(i18n.t('onGridResult.shadowQualityLabel'))}</span></div>
       </div>
     </section>
     <section class="on-grid-result-card">
       <h3>${escapeHtml(i18n.t('onGridResult.economicTitle'))}</h3>
+      <p class="result-helper">Burada yatırım bütçesi, yıllık fayda ve geri ödeme tarafı sade bir dille özetlenir.</p>
       <div class="on-grid-result-metrics">
         <div class="on-grid-result-metric"><strong>${money(r.totalCost)}</strong><span>${escapeHtml(i18n.t('onGridResult.totalCost'))}</span></div>
         <div class="on-grid-result-metric"><strong>${money(r.financialCostBasis || r.totalCost)}</strong><span>${escapeHtml(i18n.t('onGridResult.financialBasis'))}</span></div>
         <div class="on-grid-result-metric"><strong>${money(r.annualSavings)}</strong><span>${escapeHtml(i18n.t('onGridResult.annualSavings'))}</span></div>
         <div class="on-grid-result-metric"><strong>${money(r.firstYearNetCashFlow ?? 0)}</strong><span>${escapeHtml(i18n.t('onGridResult.firstYearNetCashFlow'))}</span></div>
         <div class="on-grid-result-metric"><strong>${r.grossSimplePaybackYear ? Number(r.grossSimplePaybackYear).toFixed(1) : '>25'} ${escapeHtml(i18n.t('units.year'))}</strong><span>${escapeHtml(i18n.t('finance.grossSimplePayback'))}</span></div>
-        <div class="on-grid-result-metric"><strong>${money(r.npvTotal)}</strong><span>NPV</span></div>
-        <div class="on-grid-result-metric"><strong>${r.irr === 'N/A' ? 'N/A' : r.irr + '%'}</strong><span>IRR</span></div>
+        <div class="on-grid-result-metric"><strong>${money(r.npvTotal)}</strong><span>${escapeHtml(i18n.t('onGridResult.netGainPotential'))}</span></div>
+        <div class="on-grid-result-metric"><strong>${r.irr === 'N/A' ? 'N/A' : r.irr + '%'}</strong><span>${escapeHtml(i18n.t('onGridResult.averageAnnualReturn'))}</span></div>
         <div class="on-grid-result-metric"><strong>${moneyRate(r.compensatedLcoe || r.lcoe, 'kWh')}</strong><span>${escapeHtml(i18n.t(r.compensatedLcoe ? 'onGridResult.compensatedLcoeLabel' : 'onGridResult.lcoeLabel'))}</span></div>
         <div class="on-grid-result-metric"><strong>${r.roi}%</strong><span>${escapeHtml(i18n.t('onGridResult.roiLabel'))}</span></div>
         <div class="on-grid-result-metric"><strong>${escapeHtml(settlementBasisText)}</strong><span>${escapeHtml(i18n.t('onGridResult.settlementBasisLabel'))}</span></div>
-        <div class="on-grid-result-metric"><strong>${escapeHtml(tariffModeText)}</strong><span>${escapeHtml(i18n.t('onGridResult.tariffModeNet').replace('Enerji bedeli + ', '').replace('Energy rate + ', '').replace('Energiepreis + ', '') || 'Tarife modu')}</span></div>
+        <div class="on-grid-result-metric"><strong>${escapeHtml(tariffModeText)}</strong><span>${escapeHtml(i18n.t('onGridResult.pricingModeLabel'))}</span></div>
         <div class="on-grid-result-metric"><strong><span class="${costSourceClass}">${escapeHtml(costSourceText)}</span></strong><span>${escapeHtml(i18n.t('onGridResult.costConfidenceLabel'))}</span></div>
       </div>
     </section>
     <section class="on-grid-result-card">
       <h3>${escapeHtml(i18n.t('onGridResult.confidenceTitle'))}</h3>
+      <p class="result-helper">Bu bölüm, sonucun hangi veri kalitesiyle üretildiğini ve teklif aşamasında ne kadar sağlam olduğunu anlatır.</p>
       <div class="confidence-pill">${escapeHtml(levelLabels[assessment.level])} · ${assessment.score}/100</div>
       <p class="on-grid-explain on-grid-question"><strong>${escapeHtml(i18n.t('onGridResult.dataSourceQuestion'))}</strong></p>
       <div class="on-grid-data-source-table">
-        <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.engine'))}</span><span>${escapeHtml(engineMode)}</span></div>
+        <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.engine'))}</span><span>${escapeHtml(engineModeText)}</span></div>
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.profileSourceLabel'))}</span><span class="${profileSourceClass}">${escapeHtml(profileSourceText)}</span></div>
-        <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('offgridL2.productionSource'))}</span><span class="${productionProfileClass}">${escapeHtml(productionProfileText)}</span></div>
+        <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.productionSourceLabel'))}</span><span class="${productionProfileClass}">${escapeHtml(productionProfileText)}</span></div>
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.tariffSourceLabel'))}</span><span class="${tariffSourceClass}">${escapeHtml(tariffSourceText)}</span></div>
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.shadowQualityLabel'))}</span><span class="${shadowClass}">${escapeHtml(shadowText)}</span></div>
         <div class="on-grid-ds-row"><span>${escapeHtml(i18n.t('onGridResult.costConfidenceLabel'))}</span><span class="${costSourceClass}">${escapeHtml(costSourceText)}</span></div>
@@ -831,6 +833,7 @@ function renderOnGridResultLayers(state, r) {
     </section>
     <section class="on-grid-result-card">
       <h3>${escapeHtml(i18n.t('onGridResult.commercialTitle'))}</h3>
+      <p class="result-helper">Bir sonraki adımda teklif veya uygulama sürecine geçmek için hangi hazırlıkların gerektiğini burada görürsünüz.</p>
       <div class="confidence-pill">${escapeHtml(readinessStatus)}</div>
       <div class="on-grid-explain">${escapeHtml(state.scenarioContext?.nextAction || i18n.t('onGridResult.commercialNextAction'))}</div>
       <ul class="on-grid-missing-list">${blockers.length ? blockers.map(item => `<li>${escapeHtml(item)}</li>`).join('') : `<li>${escapeHtml(i18n.t('onGridResult.noCommercialBlockers'))}</li>`}</ul>
@@ -855,17 +858,20 @@ function renderBomResults(bom) {
   }
   card.style.display = 'block';
   card.innerHTML = `
-    <div class="card-title">Itemized BOM / CapEx</div>
-    <table class="tech-table">
-      <tbody>
-        ${bom.rows.map(row => `<tr><td>${escapeHtml(row.supplier)} — ${escapeHtml(row.name)}</td><td>${Number(row.quantity || 0).toFixed(row.unit === 'fixed' ? 0 : 1)} ${escapeHtml(row.unit)}</td><td>${money(row.total)}</td></tr>`).join('')}
-        <tr><td colspan="2"><strong>BOM Ara Toplam</strong></td><td><strong>${money(bom.subtotal)}</strong></td></tr>
-        ${window.state?.results?.proposalGovernance?.bomCommercials ? `
-        <tr><td colspan="2">Kontenjan / Risk Payı</td><td>${money(window.state.results.proposalGovernance.bomCommercials.contingency)}</td></tr>
-        <tr><td colspan="2">Brüt Marj</td><td>${money(window.state.results.proposalGovernance.bomCommercials.margin)} (${window.state.results.proposalGovernance.bomCommercials.grossMarginPct}%)</td></tr>
-        <tr><td colspan="2"><strong>Önerilen Satış Fiyatı</strong></td><td><strong>${money(window.state.results.proposalGovernance.bomCommercials.proposedSellPrice)}</strong></td></tr>` : ''}
-      </tbody>
-    </table>
+    <details class="advanced-details">
+      <summary class="advanced-details-summary">Kalem kalem maliyet listesi (isteğe bağlı)</summary>
+      <div class="result-helper" style="margin-bottom:12px">Bu alan teklif hazırlarken kullanılan kalem kalem maliyet listesini gösterir. İlk bakışta gerekli değilse kapalı bırakabilirsiniz.</div>
+      <table class="tech-table">
+        <tbody>
+          ${bom.rows.map(row => `<tr><td>${escapeHtml(row.supplier)} — ${escapeHtml(row.name)}</td><td>${Number(row.quantity || 0).toFixed(row.unit === 'fixed' ? 0 : 1)} ${escapeHtml(row.unit)}</td><td>${money(row.total)}</td></tr>`).join('')}
+          <tr><td colspan="2"><strong>BOM Ara Toplam</strong></td><td><strong>${money(bom.subtotal)}</strong></td></tr>
+          ${window.state?.results?.proposalGovernance?.bomCommercials ? `
+          <tr><td colspan="2">Kontenjan / Risk payı</td><td>${money(window.state.results.proposalGovernance.bomCommercials.contingency)}</td></tr>
+          <tr><td colspan="2">Brüt marj</td><td>${money(window.state.results.proposalGovernance.bomCommercials.margin)} (${window.state.results.proposalGovernance.bomCommercials.grossMarginPct}%)</td></tr>
+          <tr><td colspan="2"><strong>Önerilen satış fiyatı</strong></td><td><strong>${money(window.state.results.proposalGovernance.bomCommercials.proposedSellPrice)}</strong></td></tr>` : ''}
+        </tbody>
+      </table>
+    </details>
   `;
 }
 
@@ -941,48 +947,50 @@ function renderWarningsAndAudit(state, r) {
   const scrollHint = `<div class="ui-scroll-hint">${escapeHtml(i18n.t('common.scrollHint'))}</div>`;
 
   audit.innerHTML = `
-    <div class="card-title">${escapeHtml(i18n.t('governance.auditPanel'))}</div>
-    <div class="audit-purpose-note">
-      <strong>${escapeHtml(i18n.t('audit.purposeTitle'))}</strong>
-      <span>${escapeHtml(i18n.t('audit.purposeBody'))}</span>
-    </div>
-    ${offGridAuditNote}
-    ${warningHtml}
-    ${scrollHint}
-    <table class="tech-table">
-      <tbody>
-        <tr><td>${escapeHtml(i18n.t('audit.location'))}</td><td>${escapeHtml(state.cityName || '—')} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
-        <tr><td>${escapeHtml(i18n.t('audit.tariff'))}</td><td>${escapeHtml(r.tariffModel?.type || state.tariffType)} | ${escapeHtml(r.tariffModel?.effectiveRegime || '—')} | ${moneyRate(r.tariff, 'kWh')} | ${escapeHtml(i18n.t('audit.source'))}: ${escapeHtml(r.tariffModel?.sourceDate || '—')}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('audit.regulationEngine'))}</td><td>${escapeHtml(r.tariffModel?.regulation?.effectiveRegimeBasis || '—')} | SKTT activation: ${escapeHtml(r.tariffModel?.regulation?.activationDate || '—')} | eval: ${escapeHtml(r.tariffModel?.regulation?.evaluationDate || '—')}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('audit.consumption'))}</td><td>${Math.round(r.hourlySummary?.annualLoad || state.dailyConsumption * 365).toLocaleString(localeTag())} kWh/${escapeHtml(i18n.t('units.year'))}</td></tr>
-        <tr><td>${escapeHtml(energyBalanceLabel)}</td><td>${escapeHtml(energyBalanceValue)}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('audit.productionConfidenceRange'))}</td><td>${escapeHtml(i18n.t('audit.badYear'))}: ${Math.round(r.annualEnergy * 0.90).toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.baseYear'))}: ${r.annualEnergy.toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.goodYear'))}: ${Math.round(r.annualEnergy * 1.10).toLocaleString(localeTag())} kWh</td></tr>
-        <tr><td>${escapeHtml(i18n.t('governance.confidenceLevel'))}</td><td>${escapeHtml(statusLabel(r.confidenceLevel))} (${escapeHtml(r.calculationMode)})</td></tr>
-        <tr><td>${escapeHtml(i18n.t('scenario.label'))}</td><td>${escapeHtml(state.scenarioContext?.label || state.scenarioKey || 'On-Grid')} | ${escapeHtml(state.scenarioContext?.nextAction || '—')}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('engine.authoritative'))}</td><td>${escapeHtml(backendEngineText(r, state))} | ${escapeHtml(r.sourceQualityNote || '—')}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('engine.parity'))}</td><td>${escapeHtml(parityText)}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('engine.fallbackReason'))}</td><td>${escapeHtml(localizeKnownMessage(r.authoritativeEngineFallbackReason || '—'))}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('governance.quoteReadiness'))}</td><td>${escapeHtml(statusLabel(r.quoteReadiness?.status || '—'))}${quoteBlockers.length ? ' | ' + escapeHtml(quoteBlockers.join(' · ')) : ''}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('audit.regulationEngine'))}</td><td>${escapeHtml(r.quoteReadiness?.version || r.tariffModel?.exportCompensationPolicy?.version || '—')} | ${escapeHtml(r.tariffModel?.exportCompensationPolicy?.assumptionBasis || '—')}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('audit.tariffSourceGovernance'))}</td><td>${escapeHtml(tariffSource.sourceLabel || '—')} | ${escapeHtml(i18n.t('audit.sourceAge'))}: ${tariffSource.ageDays ?? '—'} ${escapeHtml(i18n.t('units.year')) === 'year' ? 'days' : 'gün'} | ${escapeHtml(tariffFreshness)}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('governance.proposalConfidence'))}</td><td>${confidence.score ?? '—'} / 100 · ${escapeHtml(statusLabel(confidence.level || '—'))}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('governance.approvalState'))}</td><td>${escapeHtml(statusLabel(approval.state || 'draft'))}${approval.approvalRecord ? ' | immutable: ' + escapeHtml(approval.approvalRecord.id) : ''}${approvalBlockers.length ? ' | ' + escapeHtml(approvalBlockers.join(' · ')) : ''}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('audit.financing'))}</td><td>${escapeHtml(i18n.t('audit.monthlyPayment'))}: ${financing.monthlyPayment ? money(financing.monthlyPayment) : '—'} | DSCR: ${financing.firstYearDebtServiceCoverage ?? '—'}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('audit.maintenanceContract'))}</td><td>${money(maintenance.annualBase || 0)}/${escapeHtml(i18n.t('units.year'))} | 10 ${escapeHtml(i18n.t('units.year'))}: ${money(maintenance.tenYearNominal || 0)} | ${escapeHtml(statusLabel(maintenance.contractStatus || '—'))}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('audit.gridApplication'))}</td><td>${escapeHtml(gridStatus)}</td></tr>
-        <tr><td>${escapeHtml(i18n.t('audit.dataPrivacy'))}</td><td>${escapeHtml(i18n.t('audit.privacyLocalOnly'))}</td></tr>
-      </tbody>
-    </table>
-    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.assumptionLedger'))}</div>
-    ${scrollHint}
-    <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.assumption'))}</th><th>${escapeHtml(i18n.t('audit.value'))}</th><th>${escapeHtml(i18n.t('audit.confidence'))}</th><th>${escapeHtml(i18n.t('audit.source'))}</th></tr></thead><tbody>${ledgerRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table>
-    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.evidenceRecords'))}</div>
-    ${scrollHint}
-    <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.evidence'))}</th><th>${escapeHtml(i18n.t('audit.status'))}</th><th>Ref</th><th>${escapeHtml(i18n.t('audit.checkedDate'))}</th><th>${escapeHtml(i18n.t('audit.validity'))}</th><th>File / SHA-256</th></tr></thead><tbody>${evidenceRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table>
-    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.revisionDiff'))}</div>
-    <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.field'))}</th><th>${escapeHtml(i18n.t('audit.before'))}</th><th>${escapeHtml(i18n.t('audit.after'))}</th></tr></thead><tbody>${revisionRows || `<tr><td colspan="3">${escapeHtml(i18n.t('audit.noRevisionDiff'))}</td></tr>`}</tbody></table>
-    <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.auditLog'))}</div>
-    <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.time'))}</th><th>${escapeHtml(i18n.t('audit.action'))}</th><th>${escapeHtml(i18n.t('audit.user'))}</th></tr></thead><tbody>${auditRows || `<tr><td colspan="3">${escapeHtml(i18n.t('audit.noAuditRecords'))}</td></tr>`}</tbody></table>
+    <details class="advanced-details">
+      <summary class="advanced-details-summary">Uzman inceleme kayıtları (isteğe bağlı)</summary>
+      <div class="audit-purpose-note">
+        <strong>${escapeHtml(i18n.t('audit.purposeTitle'))}</strong>
+        <span>${escapeHtml(i18n.t('audit.purposeBody'))}</span>
+      </div>
+      ${offGridAuditNote}
+      ${warningHtml}
+      ${scrollHint}
+      <table class="tech-table">
+        <tbody>
+          <tr><td>${escapeHtml(i18n.t('audit.location'))}</td><td>${escapeHtml(state.cityName || '—')} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
+          <tr><td>${escapeHtml(i18n.t('audit.tariff'))}</td><td>${escapeHtml(r.tariffModel?.type || state.tariffType)} | ${escapeHtml(r.tariffModel?.effectiveRegime || '—')} | ${moneyRate(r.tariff, 'kWh')} | ${escapeHtml(i18n.t('audit.source'))}: ${escapeHtml(r.tariffModel?.sourceDate || '—')}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('audit.regulationEngine'))}</td><td>${escapeHtml(r.tariffModel?.regulation?.effectiveRegimeBasis || '—')} | SKTT activation: ${escapeHtml(r.tariffModel?.regulation?.activationDate || '—')} | eval: ${escapeHtml(r.tariffModel?.regulation?.evaluationDate || '—')}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('audit.consumption'))}</td><td>${Math.round(r.hourlySummary?.annualLoad || state.dailyConsumption * 365).toLocaleString(localeTag())} kWh/${escapeHtml(i18n.t('units.year'))}</td></tr>
+          <tr><td>${escapeHtml(energyBalanceLabel)}</td><td>${escapeHtml(energyBalanceValue)}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('audit.productionConfidenceRange'))}</td><td>${escapeHtml(i18n.t('audit.badYear'))}: ${Math.round(r.annualEnergy * 0.90).toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.baseYear'))}: ${r.annualEnergy.toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.goodYear'))}: ${Math.round(r.annualEnergy * 1.10).toLocaleString(localeTag())} kWh</td></tr>
+          <tr><td>${escapeHtml(i18n.t('governance.confidenceLevel'))}</td><td>${escapeHtml(statusLabel(r.confidenceLevel))} (${escapeHtml(r.calculationMode)})</td></tr>
+          <tr><td>${escapeHtml(i18n.t('scenario.label'))}</td><td>${escapeHtml(state.scenarioContext?.label || state.scenarioKey || 'On-Grid')} | ${escapeHtml(state.scenarioContext?.nextAction || '—')}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('engine.authoritative'))}</td><td>${escapeHtml(backendEngineText(r, state))} | ${escapeHtml(r.sourceQualityNote || '—')}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('engine.parity'))}</td><td>${escapeHtml(parityText)}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('engine.fallbackReason'))}</td><td>${escapeHtml(localizeKnownMessage(r.authoritativeEngineFallbackReason || '—'))}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('governance.quoteReadiness'))}</td><td>${escapeHtml(statusLabel(r.quoteReadiness?.status || '—'))}${quoteBlockers.length ? ' | ' + escapeHtml(quoteBlockers.join(' · ')) : ''}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('audit.regulationEngine'))}</td><td>${escapeHtml(r.quoteReadiness?.version || r.tariffModel?.exportCompensationPolicy?.version || '—')} | ${escapeHtml(r.tariffModel?.exportCompensationPolicy?.assumptionBasis || '—')}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('audit.tariffSourceGovernance'))}</td><td>${escapeHtml(tariffSource.sourceLabel || '—')} | ${escapeHtml(i18n.t('audit.sourceAge'))}: ${tariffSource.ageDays ?? '—'} ${escapeHtml(i18n.t('units.year')) === 'year' ? 'days' : 'gün'} | ${escapeHtml(tariffFreshness)}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('governance.proposalConfidence'))}</td><td>${confidence.score ?? '—'} / 100 · ${escapeHtml(statusLabel(confidence.level || '—'))}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('governance.approvalState'))}</td><td>${escapeHtml(statusLabel(approval.state || 'draft'))}${approval.approvalRecord ? ' | immutable: ' + escapeHtml(approval.approvalRecord.id) : ''}${approvalBlockers.length ? ' | ' + escapeHtml(approvalBlockers.join(' · ')) : ''}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('audit.financing'))}</td><td>${escapeHtml(i18n.t('audit.monthlyPayment'))}: ${financing.monthlyPayment ? money(financing.monthlyPayment) : '—'} | DSCR: ${financing.firstYearDebtServiceCoverage ?? '—'}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('audit.maintenanceContract'))}</td><td>${money(maintenance.annualBase || 0)}/${escapeHtml(i18n.t('units.year'))} | 10 ${escapeHtml(i18n.t('units.year'))}: ${money(maintenance.tenYearNominal || 0)} | ${escapeHtml(statusLabel(maintenance.contractStatus || '—'))}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('audit.gridApplication'))}</td><td>${escapeHtml(gridStatus)}</td></tr>
+          <tr><td>${escapeHtml(i18n.t('audit.dataPrivacy'))}</td><td>${escapeHtml(i18n.t('audit.privacyLocalOnly'))}</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.assumptionLedger'))}</div>
+      ${scrollHint}
+      <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.assumption'))}</th><th>${escapeHtml(i18n.t('audit.value'))}</th><th>${escapeHtml(i18n.t('audit.confidence'))}</th><th>${escapeHtml(i18n.t('audit.source'))}</th></tr></thead><tbody>${ledgerRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table>
+      <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.evidenceRecords'))}</div>
+      ${scrollHint}
+      <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.evidence'))}</th><th>${escapeHtml(i18n.t('audit.status'))}</th><th>Ref</th><th>${escapeHtml(i18n.t('audit.checkedDate'))}</th><th>${escapeHtml(i18n.t('audit.validity'))}</th><th>File / SHA-256</th></tr></thead><tbody>${evidenceRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table>
+      <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.revisionDiff'))}</div>
+      <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.field'))}</th><th>${escapeHtml(i18n.t('audit.before'))}</th><th>${escapeHtml(i18n.t('audit.after'))}</th></tr></thead><tbody>${revisionRows || `<tr><td colspan="3">${escapeHtml(i18n.t('audit.noRevisionDiff'))}</td></tr>`}</tbody></table>
+      <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.auditLog'))}</div>
+      <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.time'))}</th><th>${escapeHtml(i18n.t('audit.action'))}</th><th>${escapeHtml(i18n.t('audit.user'))}</th></tr></thead><tbody>${auditRows || `<tr><td colspan="3">${escapeHtml(i18n.t('audit.noAuditRecords'))}</td></tr>`}</tbody></table>
+    </details>
   `;
 
   // Türkiye SVG haritasında şehir noktasını güncelle

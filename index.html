@@ -177,9 +177,16 @@ body>main{z-index:auto}
 .scenario-summary-grid{display:grid;grid-template-columns:max-content 1fr;gap:5px 10px;font-size:.76rem}
 .scenario-summary-grid span{color:var(--text-muted);font-weight:700}
 .scenario-summary-grid em{color:var(--text);font-style:normal}
-.result-trust-note,.audit-purpose-note{background:rgba(6,182,212,0.07);border:1px solid rgba(6,182,212,0.22);border-radius:10px;padding:12px 14px;color:var(--text);font-size:.8rem;line-height:1.55;margin-bottom:16px}
-.result-trust-note strong,.audit-purpose-note strong{color:var(--accent)}
+.result-helper{font-size:.78rem;color:var(--text-muted);line-height:1.6;margin-bottom:14px}
+.result-trust-note,.audit-purpose-note{background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.22);border-radius:10px;padding:12px 14px;color:var(--text);font-size:.8rem;line-height:1.55;margin-bottom:16px}
+.result-trust-note strong,.audit-purpose-note strong{color:var(--primary)}
 .result-trust-note span,.audit-purpose-note span{display:block;color:var(--text-muted);margin-top:4px}
+.advanced-details{border:1px solid var(--border-subtle);border-radius:12px;background:rgba(255,255,255,.02);padding:0}
+.advanced-details-summary{cursor:pointer;list-style:none;padding:14px 16px;font-family:var(--font-display);font-size:.88rem;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between}
+.advanced-details-summary::-webkit-details-marker{display:none}
+.advanced-details-summary::after{content:'+';color:var(--primary);font-size:1rem}
+.advanced-details[open] .advanced-details-summary::after{content:'−'}
+.advanced-details > :not(summary){padding:0 16px 16px}
 .result-context-main{display:block;color:var(--text)}
 .result-context-caution{display:block;color:var(--text-muted);margin-top:4px}
 .eng-report-title-text{display:flex;flex-direction:column;gap:2px}
@@ -2835,11 +2842,11 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   <div class="step-heading">
     <div class="step-heading-eyebrow">Adım 7 / 7</div>
     <h1 class="step-heading-title">Sonuçlarınız Hazır</h1>
-    <p class="step-heading-sub">25 yıllık enerji üretimi ve finansal projeksiyon. Tüm hesaplar aşağıda şeffaf biçimde gösterilmektedir.</p>
+    <p class="step-heading-sub">Sistemin yaklaşık üretimini, faturanıza etkisini ve yatırım tarafını kolay okunur şekilde aşağıda görebilirsiniz.</p>
   </div>
   <div class="result-context-strip">
     <div><strong id="result-scenario-label">On-Grid</strong> <span id="result-scenario-frame">Grid-connected savings and proposal readiness</span></div>
-    <div id="result-engine-source">Engine: PVGIS hybrid JS</div>
+    <div id="result-engine-source">Hesap özeti hazırlanıyor</div>
   </div>
   <div class="results-hero" aria-hidden="true"><div class="results-glow"></div></div>
   <div id="kpi-grid" class="kpi-grid">
@@ -2849,7 +2856,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       </div>
       <div class="kpi-value"><span id="kpi-energy">0</span></div>
       <div class="kpi-unit">kWh / yıl</div>
-      <div class="kpi-label">Yıllık Enerji Üretimi <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">PVGIS uydu veri tabanından alınan güneşlenme değerleri temel alınarak hesaplanan yıllık net elektrik üretimi.</span></span></div>
+      <div class="kpi-label">Yılda Üreteceği Elektrik <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Kurulacak sistemin bir yılda yaklaşık ne kadar elektrik üreteceğini gösterir.</span></span></div>
       <div id="kpi-energy-band" style="font-size:0.68rem;color:var(--text-secondary);margin-top:2px;display:none"></div>
     </div>
     <div class="kpi-card" style="--kpi-color:#10B981">
@@ -2858,15 +2865,15 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       </div>
       <div class="kpi-value" style="color:#10B981"><span id="kpi-savings">0</span></div>
       <div class="kpi-unit">TL / yıl</div>
-      <div class="kpi-label">Yıllık Tasarruf <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Üretilen enerjinin öz-tüketim ve şebeke satışından sağladığı yıllık toplam maliyet tasarrufu.</span></span></div>
+      <div class="kpi-label">Faturaya Yıllık Etkisi <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Üretilen elektriğin faturanızda oluşturduğu yaklaşık yıllık tasarruf etkisidir.</span></span></div>
     </div>
     <div class="kpi-card" style="--kpi-color:#06B6D4">
       <div class="kpi-icon-wrap">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </div>
       <div class="kpi-value" style="color:#06B6D4"><span id="kpi-power">0</span></div>
-      <div class="kpi-unit">kWp kurulu güç</div>
-      <div class="kpi-label">Sistem Gücü</div>
+      <div class="kpi-unit">toplam sistem gücü</div>
+      <div class="kpi-label">Sistemin Büyüklüğü</div>
       <div class="kpi-sub" id="kpi-panels-sub"></div>
     </div>
     <div class="kpi-card" style="--kpi-color:#34D399">
@@ -2875,7 +2882,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       </div>
       <div class="kpi-value" style="color:#34D399"><span id="kpi-co2">0</span></div>
       <div class="kpi-unit">ton CO₂ / yıl</div>
-      <div class="kpi-label">Karbon Tasarrufu</div>
+      <div class="kpi-label">Çevresel Katkı</div>
       <div class="kpi-sub" id="kpi-tree-sub"></div>
     </div>
   </div>
@@ -2883,44 +2890,45 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   <div class="on-grid-result-layers" id="on-grid-result-layers" style="display:none"></div>
 
   <div class="fin-box">
-    <div class="card-title" style="margin-bottom:8px">Finansal Analiz</div>
+    <div class="card-title" style="margin-bottom:8px">Yatırım Özeti</div>
+    <div class="result-helper">Bu bölüm sistemin yaklaşık kurulum bütçesini ve zaman içinde kendini nasıl geri ödeyebileceğini sade biçimde özetler.</div>
     <div class="fin-row">
-      <span class="fin-label">Toplam Sistem Maliyeti</span>
+      <span class="fin-label">Tahmini kurulum bütçesi</span>
       <span class="fin-val highlight" id="fin-cost">-</span>
     </div>
     <div class="fin-row" style="flex-wrap:wrap;gap:8px">
-      <span class="fin-label" data-i18n="finance.grossSimplePayback">Basit Geri Ödeme Süresi</span>
+      <span class="fin-label" data-i18n="finance.grossSimplePayback">Kendini geri ödeme süresi</span>
       <div style="display:flex;align-items:center;flex:1;min-width:200px">
         <div class="payback-bar-wrap"><div class="payback-bar-fill" id="payback-bar" style="width:0%"></div></div>
         <span class="fin-val" id="fin-payback" style="white-space:nowrap">-</span>
       </div>
     </div>
     <div class="fin-row">
-      <span class="fin-label">İskontolu Geri Ödeme Süresi <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">İskonto oranını hesaba katan gerçekçi geri ödeme süresi.</span></span></span>
+      <span class="fin-label">Daha temkinli geri ödeme <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Paranın zaman içindeki değerini de hesaba katar; bu yüzden daha gerçekçi ama daha temkinli bir süredir.</span></span></span>
       <span class="fin-val" id="fin-discounted-payback">-</span>
     </div>
     <div class="fin-row">
-      <span class="fin-label">Proje NPV <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Net Bugünkü Değer — 25 yıllık tüm nakit akışlarının bugünkü değere indirgenmesiyle hesaplanan net kazanç.</span></span></span>
+      <span class="fin-label">25 yılda net kazanç potansiyeli <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Bugünkü değerle bakıldığında, projenin uzun vadede artıda mı ekside mi kalacağını gösterir.</span></span></span>
       <span class="fin-val positive" id="fin-total">-</span>
     </div>
     <div class="fin-row">
-      <span class="fin-label">25 Yıllık Toplam ROI (İskontosuz) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">25 yıllık toplam net kazancın başlangıç yatırımına oranı — iskontosuz, vergi öncesi. Yıllık getiri için İRR değerini kullanın.</span></span></span>
+      <span class="fin-label">Toplam kazanç oranı <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Uzun dönemde yatırımın başlangıç maliyetine göre ne kadar kazanç üretebileceğini gösterir.</span></span></span>
       <span class="fin-val positive" id="fin-roi">-</span>
     </div>
     <div class="fin-row">
-      <span class="fin-label">İç Getiri Oranı (IRR) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Yatırımın yüzde cinsinden iç getiri oranı. IRR > iskonto oranı ise yatırım mantıklıdır.</span></span></span>
+      <span class="fin-label">Ortalama yıllık yatırım verimi <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Yatırımın yıllık ortalama performansını yüzde olarak düşünmek için kullanılır.</span></span></span>
       <span class="fin-val positive" id="fin-irr">-</span>
     </div>
     <div class="fin-row">
-      <span class="fin-label">Normalleştirilmiş Maliyet (LCOE) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">On-grid için ekonomik açıdan faydalı kWh (öz-tüketim + mahsuplanan ihracat) bazlı iskonto edilmiş maliyet; off-grid için PV+BESS ile yüke teslim edilen kWh bazlı.</span></span></span>
+      <span class="fin-label">Güneşten üretilen elektriğin ortalama maliyeti <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.65rem;padding:1px 5px">?</span><span class="tooltip-box">Sistemin ürettiği elektriğin size ortalamada kaç TL/kWh seviyesinde mal olduğunu gösterir.</span></span></span>
       <span class="fin-val" id="fin-lcoe">-</span>
     </div>
     <div class="fin-row" id="fin-om-row">
-      <span class="fin-label">Yıllık Bakım + Sigorta Gideri</span>
+      <span class="fin-label">Yıllık bakım ve koruma gideri</span>
       <span class="fin-val negative" id="fin-om-cost">-</span>
     </div>
     <div class="fin-row" id="fin-inverter-row">
-      <span class="fin-label">İnverter Yenileme (Yıl 12)</span>
+      <span class="fin-label">Olası inverter yenilemesi</span>
       <span class="fin-val negative" id="fin-inverter-cost">-</span>
     </div>
   </div>
@@ -2929,17 +2937,17 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   <div class="bess-result-wrap" id="bess-result-section" style="display:none">
     <div class="bess-result-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2"/></svg>
-      Batarya Depolama Analizi
+      Batarya Özeti
       <span id="bess-model-badge" style="font-size:0.72rem;background:rgba(139,92,246,0.15);color:#8B5CF6;border:1px solid rgba(139,92,246,0.3);border-radius:4px;padding:2px 8px;font-weight:500"></span>
     </div>
     <div class="bess-metrics">
       <div class="bess-metric">
         <div class="bess-metric-val" id="bess-independence">--%</div>
-        <div class="bess-metric-label" data-i18n="report.gridIndependence">PV ile karşılanan yük oranı (sentetik dispatch)</div>
+        <div class="bess-metric-label" data-i18n="report.gridIndependence">Yükün güneşle karşılanan kısmı</div>
       </div>
       <div class="bess-metric">
         <div class="bess-metric-val" id="bess-night">--%</div>
-        <div class="bess-metric-label" data-i18n="report.nightCoverage">Batarya ile kapatılan açık oranı (sentetik dispatch)</div>
+        <div class="bess-metric-label" data-i18n="report.nightCoverage">Akşam ve gece için batarya desteği</div>
       </div>
     </div>
     <div style="margin-top:12px;font-size:0.78rem;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:12px" id="bess-detail-row"></div>
@@ -2952,29 +2960,29 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div style="background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.25);border-radius:var(--radius,12px);padding:20px;margin-bottom:12px">
       <div style="font-family:var(--font-display,inherit);font-size:0.95rem;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;color:#8B5CF6">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-        <span data-i18n="offgridL2.dispatchSummaryTitle">Dispatch Özeti</span>
+        <span data-i18n="offgridL2.dispatchSummaryTitle">Enerji Akışı Özeti</span>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px" id="offgrid-dispatch-grid"></div>
     </div>
 
     <!-- Kapsama Metrikleri -->
     <div style="background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.25);border-radius:var(--radius,12px);padding:20px;margin-bottom:12px">
-      <div style="font-family:var(--font-display,inherit);font-size:0.88rem;font-weight:700;margin-bottom:12px;color:#8B5CF6" data-i18n="offgridL2.coverageTitle">Kapsama Metrikleri</div>
+      <div style="font-family:var(--font-display,inherit);font-size:0.88rem;font-weight:700;margin-bottom:12px;color:#8B5CF6" data-i18n="offgridL2.coverageTitle">Sistemin Karşılama Düzeyi</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div style="text-align:center;background:rgba(139,92,246,0.09);border:1px solid rgba(139,92,246,0.2);border-radius:10px;padding:14px">
           <div style="font-family:var(--font-display,inherit);font-size:1.8rem;font-weight:800;color:#8B5CF6" id="offgrid-total-coverage">--%</div>
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.totalCoverageLabel">Toplam Yük Kapsama</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.totalCoverageLabel">Toplam ihtiyacın karşılanan kısmı</div>
         </div>
         <div style="text-align:center;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:14px">
           <div style="font-family:var(--font-display,inherit);font-size:1.8rem;font-weight:800;color:#EF4444" id="offgrid-critical-coverage">--%</div>
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.criticalCoverageLabel">Kritik Yük Kapsama</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.criticalCoverageLabel">Kritik ihtiyaçların karşılanan kısmı</div>
         </div>
       </div>
     </div>
 
     <!-- Jeneratör Analizi (jeneratör etkinse görünür) -->
     <div id="offgrid-generator-result-wrap" style="display:none;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius,12px);padding:16px;margin-bottom:12px">
-      <div style="font-size:0.8rem;font-weight:600;color:#F59E0B;margin-bottom:8px" data-i18n="offgridL2.generatorResultTitle">Jeneratör Analizi</div>
+      <div style="font-size:0.8rem;font-weight:600;color:#F59E0B;margin-bottom:8px" data-i18n="offgridL2.generatorResultTitle">Jeneratör Desteği</div>
       <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:0.78rem" id="offgrid-generator-result-details"></div>
     </div>
 
@@ -2986,13 +2994,13 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
     <!-- Yaşam Döngüsü Maliyeti -->
     <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:var(--radius,12px);padding:14px;margin-bottom:12px">
-      <div style="font-size:0.78rem;font-weight:600;color:#06B6D4;margin-bottom:6px" data-i18n="offgridL2.lifecycleCostTitle">Yaşam Döngüsü Maliyeti (25 yıl bazlı)</div>
+      <div style="font-size:0.78rem;font-weight:600;color:#06B6D4;margin-bottom:6px" data-i18n="offgridL2.lifecycleCostTitle">Uzun Vadeli Kullanım Maliyeti</div>
       <div style="font-size:0.78rem;color:var(--text-muted)" id="offgrid-lifecycle-details"></div>
     </div>
 
     <!-- Genişletilmiş Dispatch Metrikleri -->
     <div id="offgrid-extended-metrics" style="display:none;background:rgba(6,182,212,0.05);border:1px solid rgba(6,182,212,0.18);border-radius:var(--radius,12px);padding:14px;margin-bottom:12px">
-      <div style="font-size:0.78rem;font-weight:600;color:#06B6D4;margin-bottom:8px" data-i18n="offgridL2.resultTotalLoad">Yıllık Enerji Dengesi</div>
+      <div style="font-size:0.78rem;font-weight:600;color:#06B6D4;margin-bottom:8px" data-i18n="offgridL2.resultTotalLoad">Yıllık Enerji Özeti</div>
       <div id="offgrid-extended-metrics-body" style="display:flex;flex-wrap:wrap;gap:10px;font-size:0.75rem"></div>
     </div>
 
@@ -3009,7 +3017,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div style="background:rgba(100,116,139,0.05);border:1px solid rgba(100,116,139,0.2);border-radius:8px;padding:12px">
       <div style="font-size:0.72rem;color:var(--text-muted);line-height:1.55">
         <div style="font-weight:600;margin-bottom:4px" data-i18n="offgridL2.methodologyTitle">Metodoloji Notu</div>
-        <div data-i18n="offgridL2.methodologyBody">Bu sonuçlar sentetik 8760-saat dispatch ön değerlendirmesidir. PV üretim saatleri aylık üretimin tipik güneş profiline dağıtılmasıyla türetilir; kritik yük önceliği ve jeneratör desteği basitleştirilmiş model üzerinden hesaplanır. Gerçek off-grid fizibilite analizi için saha ölçümü, yük ölçeri ve detaylı enerji analizi gereklidir.</div>
+        <div data-i18n="offgridL2.methodologyBody">Bu bölüm, sistemin yıl boyunca yüklerinizi ne ölçüde karşılayabildiğini anlaşılır biçimde özetler. Kesin off-grid tasarım için yine de saha ölçümü ve detaylı yük analizi gerekir.</div>
         <div id="offgrid-l2-version" style="margin-top:4px;font-size:0.65rem;opacity:0.5"></div>
         <div id="offgrid-l2-load-mode" style="margin-top:2px;font-size:0.65rem;opacity:0.5"></div>
       </div>
@@ -3022,21 +3030,21 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   <div class="nm-result-wrap" id="nm-result-section" style="display:none">
     <div class="nm-result-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/></svg>
-      Şebeke İhracatı / Saatlik Mahsuplaşma
+      Şebekeye Verilen Fazla Enerji
       <span class="nm-badge" id="nm-license-badge">-</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
       <div style="text-align:center;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:14px">
         <div style="font-family:var(--font-display);font-size:1.6rem;font-weight:800;color:#10B981" id="nm-export-kwh">-</div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px">ücretli / toplam kWh yıl ihracat</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px">yılda şebekeye giden enerji</div>
       </div>
       <div style="text-align:center;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:14px">
         <div style="font-family:var(--font-display);font-size:1.6rem;font-weight:800;color:#10B981" id="nm-export-revenue">-</div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px">TL / yıl sınır sonrası gelir</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px">yıllık mahsuplaşma veya satış etkisi</div>
       </div>
       <div style="text-align:center;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:14px">
         <div style="font-family:var(--font-display);font-size:1.6rem;font-weight:800;color:#10B981" id="nm-self-consumption">--%</div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px">Öz tüketim oranı</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px">anında kullanılan oran</div>
       </div>
     </div>
   </div>
@@ -3045,7 +3053,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   <div class="card" id="section-breakdown-card" style="display:none;margin-top:16px">
     <div class="card-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-      Çatı Yüzeyleri Kırılımı
+      Çatı Bazında Dağılım
     </div>
     <div style="overflow-x:auto">
       <table class="section-table" id="section-breakdown-table">
@@ -3056,13 +3064,14 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   </div>
 
   <div class="chart-wrap">
-    <div class="chart-title">Aylık Enerji Üretimi (kWh)</div>
+    <div class="chart-title">Aylık Elektrik Üretimi</div>
     <canvas id="monthly-chart-canvas"></canvas>
   </div>
 
   <!-- PR gauge -->
   <div class="pr-gauge-wrap card" style="margin-top:16px;padding:28px">
-    <div class="card-title" style="justify-content:center;margin-bottom:20px">Performans Oranı (PR) <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.7rem;padding:1px 6px">?</span><span class="tooltip-box">Gerçek üretimin teorik ideale oranı (%). %75-85 iyi, %85+ mükemmel.</span></span></div>
+    <div class="card-title" style="justify-content:center;margin-bottom:8px">Sistem Verim Skoru <span class="tooltip-wrap"><span class="tooltip-icon" style="font-size:0.7rem;padding:1px 6px">?</span><span class="tooltip-box">Bu skor, sistemin teorik potansiyeline ne kadar yakın çalıştığını özetler. Yüksek olması iyi bir yerleşim ve düşük kayıp anlamına gelir.</span></span></div>
+    <div class="result-helper" style="text-align:center;max-width:560px;margin:0 auto 18px">Bu gösterge, panel yerleşimi, sıcaklık, gölge ve diğer kayıpların toplam etkisini tek bir bakışta anlamanızı sağlar.</div>
     <svg id="pr-gauge-svg" viewBox="0 0 200 120" width="200" height="120" style="overflow:visible;display:block;margin:0 auto">
       <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(71,85,105,0.3)" stroke-width="12" stroke-linecap="round"/>
       <path id="pr-arc-fill" d="M 20 100 A 80 80 0 0 1 180 100" fill="none"
@@ -3090,7 +3099,8 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   </div>
 
   <div class="card" style="margin-top:16px">
-    <div class="card-title">Teknik Detaylar</div>
+    <div class="card-title">Kolay Okunan Sistem Özeti</div>
+    <div class="result-helper">Aşağıdaki tablo teknik jargon yerine, sonucu hızlı anlamanız için en önemli noktaları kısa açıklamalarla özetler.</div>
     <div class="ui-scroll-hint" data-i18n="common.scrollHint">Tabloyu yatay kaydırarak tüm sütunları görün.</div>
     <table class="tech-table">
       <thead><tr><th>Parametre</th><th>Değer</th></tr></thead>
@@ -3133,10 +3143,10 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <div class="eng-report-title">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
         <span class="eng-report-title-text">
-          <span data-i18n="report.engineeringReportTitle">Mühendis Hesap Raporu</span>
-          <span class="eng-report-subtitle" data-i18n="report.engineeringReportSubtitle">Yöntem, varsayım ve ara kontrolleri inceleyin.</span>
+          <span data-i18n="report.engineeringReportTitle">Uzman Detayları</span>
+          <span class="eng-report-subtitle" data-i18n="report.engineeringReportSubtitle">İsterseniz yöntemin ayrıntıları ve teknik varsayımlar burada yer alır.</span>
         </span>
-        <span style="font-size:0.7rem;font-weight:400;color:var(--text-muted);background:rgba(245,158,11,0.1);border-radius:4px;padding:2px 8px;border:1px solid rgba(245,158,11,0.2)" data-i18n="report.engineeringReportBadge">Varsayımlar açık</span>
+        <span style="font-size:0.7rem;font-weight:400;color:var(--text-muted);background:rgba(245,158,11,0.1);border-radius:4px;padding:2px 8px;border:1px solid rgba(245,158,11,0.2)" data-i18n="report.engineeringReportBadge">İsteğe bağlı</span>
       </div>
       <svg class="eng-chevron" id="eng-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
     </div>
@@ -3147,7 +3157,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
     <div>
       <strong data-i18n="report.actionsNoteTitle">Çıktılar ne için?</strong>
-      <span data-i18n="report.actionsNote">PDF müşteri ön fizibilitesi, Teknik Ek mühendislik kontrolü, JSON çıktıları entegrasyon ve CRM aktarımı içindir.</span>
+      <span data-i18n="report.actionsNote">İlk PDF müşteriye sunulabilecek sade özet içindir. Teknik PDF ve veri çıktıları ise proje ekibi veya ileri seviye kontrol amaçlıdır.</span>
     </div>
   </div>
   <div class="action-btns">
