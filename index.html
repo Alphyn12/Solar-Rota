@@ -529,7 +529,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           <div class="step-connector" id="conn-4-5"></div>
           <button type="button" class="step-dot" data-step="5" data-testid="step-dot-5" aria-controls="step-5" aria-label="5. adım: Ayarlar" onclick="goToStep(5)">
             <span class="step-dot-num">5</span>
-            <span class="step-dot-label">Finansal</span>
+            <span class="step-dot-label">Ayarlar</span>
           </button>
           <div class="step-connector" id="conn-5-6"></div>
           <button type="button" class="step-dot" data-step="6" data-testid="step-dot-6" aria-controls="step-6" aria-label="6. adım: Hesapla" onclick="goToStep(6)">
@@ -1815,7 +1815,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
         <div id="offgrid-l2-wrap" class="offgrid-l2-card" style="display:none">
           <div class="offgrid-l2-head">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            <span data-i18n="offgridL2.sectionTitle">Off-Grid Level 2 Ayarları</span>
+            <span data-i18n="offgridL2.sectionTitle">Off-Grid Sistem Boyutlandırma</span>
           </div>
 
           <!-- Boyutlandırma Hedefi -->
@@ -1872,6 +1872,10 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
           <!-- Basit Mod: Konut Profili + Kritik Yük Oranı -->
           <div id="offgrid-simple-mode-wrap" style="margin-bottom:14px">
+            <div id="offgrid-fill-roof-simple-note" class="offgrid-simple-intro" style="display:none">
+              <strong>Maksimum çatı kapasitesi seçili</strong>
+              <span>Bu modda sistem, konut tipi veya enerji ihtiyacı seçtirmeden çatının net kullanılabilir alanına göre panel kapasitesini hesaplar. Tüketim profili yalnızca batarya, jeneratör ve kapsama yorumlarında arka plan varsayımı olarak kalır.</span>
+            </div>
             <div class="offgrid-simple-intro">
               <strong>Basit off-grid hesabı nasıl çalışır?</strong>
               <span>Seçilen konut profili günlük kWh ihtiyacını, kritik yük payını ve varsayılan otonomi hedefini doldurur. Hesap motoru bu değeri 8760 saatlik sentetik yük eğrisine dağıtır; bu yüzden cihaz listesi eklemeden de batarya ve kapsama sonucu alınır.</span>
@@ -1883,14 +1887,14 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             </div>
             <div id="offgrid-residential-profile-grid" class="offgrid-profile-grid"></div>
             <div id="offgrid-simple-profile-summary" class="offgrid-profile-summary"></div>
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px">
+            <div id="offgrid-critical-fraction-row" style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px">
               <span data-i18n="offgridL2.criticalFractionLabel">Kritik Yük Oranı</span>
               <span id="offgrid-critical-fraction-val" style="font-weight:700;color:#8B5CF6;margin-left:6px">60%</span>
             </div>
             <input type="range" id="offgrid-critical-fraction" min="10" max="100" step="5" value="60"
               style="width:100%;accent-color:#8B5CF6"
               oninput="document.getElementById('offgrid-critical-fraction-val').textContent=this.value+'%'; updateOffgridL2Settings()"/>
-            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.criticalFractionHint">
+            <div id="offgrid-critical-fraction-hint" style="font-size:0.7rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.criticalFractionHint">
               Toplam günlük tüketimin yüzde kaçı kesintisiz çalışmalı? Buzdolabı, modem, güvenlik, temel aydınlatma ve zorunlu pompa yükleri genelde kritik sayılır.
             </div>
           </div>
@@ -2740,90 +2744,90 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   </div>
 </div>
 
-<!-- ═══════════════ STEP 6: HESAPLANIYOR (SİNEMATİK) ═══════════════ -->
+<!-- ═══════════════ STEP 6: HESAPLANIYOR ═══════════════ -->
 <div class="step-pane" id="step-6">
-  <div id="loading-pane">
+  <div id="loading-pane" class="calc-stage">
     <div class="loading-particles" id="loading-particles" aria-hidden="true"></div>
 
-    <!-- Sun rise animation -->
-    <div class="loading-sun-wrap" aria-hidden="true">
-      <svg viewBox="0 0 200 140" width="200" height="140" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="horizGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#0F172A"/>
-            <stop offset="100%" stop-color="#1E3A5F"/>
-          </linearGradient>
-          <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#FCD34D" stop-opacity="0.6"/>
-            <stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <!-- Horizon -->
-        <rect x="0" y="100" width="200" height="40" fill="url(#horizGrad)"/>
-        <line x1="0" y1="100" x2="200" y2="100" stroke="rgba(6,182,212,0.3)" stroke-width="1"/>
-        <!-- Glow -->
-        <ellipse cx="100" cy="100" rx="80" ry="30" fill="url(#sunGlow)" opacity="0.5" style="animation:horizonGlow 2s ease-in-out infinite alternate"/>
-        <!-- Sun -->
-        <circle cx="100" cy="72" r="22" fill="#FCD34D" style="animation:sunGlowPulse 2s ease-in-out infinite alternate"/>
-        <!-- Rays -->
-        <g stroke="#F59E0B" stroke-width="2" stroke-linecap="round" style="animation:spinSun 8s linear infinite;transform-origin:100px 72px">
-          <line x1="100" y1="44" x2="100" y2="38"/>
-          <line x1="100" y1="100" x2="100" y2="106"/>
-          <line x1="72" y1="72" x2="66" y2="72"/>
-          <line x1="128" y1="72" x2="134" y2="72"/>
-          <line x1="80.2" y1="52.2" x2="76" y2="48"/>
-          <line x1="119.8" y1="91.8" x2="124" y2="96"/>
-          <line x1="119.8" y1="52.2" x2="124" y2="48"/>
-          <line x1="80.2" y1="91.8" x2="76" y2="96"/>
-        </g>
-      </svg>
-    </div>
+    <div class="calc-stage-shell">
+      <section class="calc-stage-hero" aria-live="polite">
+        <div class="calc-stage-badge">Mühendislik hesap motoru</div>
+        <div class="calc-stage-visual" aria-hidden="true">
+          <div class="calc-sun-orb"></div>
+          <div class="calc-panel-rack">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="calc-energy-beam beam-a"></div>
+          <div class="calc-energy-beam beam-b"></div>
+          <div class="calc-energy-beam beam-c"></div>
+        </div>
+        <div class="calc-stage-copy">
+          <div class="loading-headline text-gradient">Hesap modeli kuruluyor</div>
+          <div class="loading-msg" id="loading-msg">PVGIS'ten güneş ışınım verisi alınıyor...</div>
+          <div class="calc-stage-highlights">
+            <div class="calc-stage-chip">
+              <span>Senaryo</span>
+              <strong id="calc-stage-scenario">On-Grid</strong>
+            </div>
+            <div class="calc-stage-chip">
+              <span>Çatı</span>
+              <strong id="calc-stage-roof">80 m²</strong>
+            </div>
+            <div class="calc-stage-chip">
+              <span>Boyut</span>
+              <strong id="calc-stage-power">0.00 kWp</strong>
+            </div>
+          </div>
+        </div>
+        <div class="calc-progress-row">
+          <div class="loading-ring-wrap">
+            <svg viewBox="0 0 120 120" width="118" height="118">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(71,85,105,0.3)" stroke-width="7"/>
+              <circle id="ring-fill-arc" cx="60" cy="60" r="52" fill="none"
+                stroke="url(#ringGrad)" stroke-width="7" stroke-linecap="round"
+                stroke-dasharray="326.7" stroke-dashoffset="326.7"
+                style="transform:rotate(-90deg);transform-origin:60px 60px;transition:stroke-dashoffset 0.7s ease"/>
+              <defs>
+                <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#F59E0B"/>
+                  <stop offset="100%" stop-color="#FCD34D"/>
+                </linearGradient>
+              </defs>
+              <text id="ring-pct-text" x="60" y="65" text-anchor="middle"
+                font-size="16" font-family="Space Grotesk,Inter" font-weight="800" fill="#F1F5F9">0%</text>
+            </svg>
+          </div>
+          <div class="calc-progress-meta">
+            <div class="calc-progress-label">Hesaplama ilerlemesi</div>
+            <div class="calc-progress-track"><div id="loading-progress-fill"></div></div>
+            <div class="loading-steps">
+              <div class="loading-step active" id="lstep-1"><span class="loading-step-dot"></span><span data-i18n="step6.loading1">Güneş ışınım verisi alınıyor</span></div>
+              <div class="loading-step" id="lstep-2"><span class="loading-step-dot"></span><span data-i18n="step6.loading2">Hava durumu analizi</span></div>
+              <div class="loading-step" id="lstep-3"><span class="loading-step-dot"></span><span data-i18n="step6.loading3">Enerji üretimi hesaplanıyor</span></div>
+              <div class="loading-step" id="lstep-4"><span class="loading-step-dot"></span><span data-i18n="step6.loading4">Finansal analiz tamamlanıyor</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <div class="loading-ring-wrap">
-      <svg viewBox="0 0 120 120" width="140" height="140">
-        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(71,85,105,0.3)" stroke-width="7"/>
-        <circle id="ring-fill-arc" cx="60" cy="60" r="52" fill="none"
-          stroke="url(#ringGrad)" stroke-width="7" stroke-linecap="round"
-          stroke-dasharray="326.7" stroke-dashoffset="326.7"
-          style="transform:rotate(-90deg);transform-origin:60px 60px;transition:stroke-dashoffset 0.7s ease"/>
-        <defs>
-          <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#F59E0B"/>
-            <stop offset="100%" stop-color="#06B6D4"/>
-          </linearGradient>
-        </defs>
-        <circle cx="60" cy="60" r="19" fill="#F59E0B" opacity="0.9"/>
-        <g stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round" style="animation:spinSun 3s linear infinite;transform-origin:60px 60px">
-          <line x1="60" y1="33" x2="60" y2="27"/>
-          <line x1="60" y1="87" x2="60" y2="93"/>
-          <line x1="33" y1="60" x2="27" y2="60"/>
-          <line x1="87" y1="60" x2="93" y2="60"/>
-          <line x1="41.5" y1="41.5" x2="36.9" y2="36.9"/>
-          <line x1="78.5" y1="78.5" x2="83.1" y2="83.1"/>
-          <line x1="78.5" y1="41.5" x2="83.1" y2="36.9"/>
-          <line x1="41.5" y1="78.5" x2="36.9" y2="83.1"/>
-        </g>
-        <text id="ring-pct-text" x="60" y="65" text-anchor="middle"
-          font-size="11" font-family="Space Grotesk,Inter" font-weight="700" fill="#F1F5F9">0%</text>
-      </svg>
-    </div>
-    <div class="loading-headline text-gradient">Hesaplanıyor...</div>
-    <div class="loading-msg" id="loading-msg">PVGIS'ten güneş ışınım verisi alınıyor...</div>
-    <div class="loading-steps">
-      <div class="loading-step active" id="lstep-1"><span class="loading-step-dot"></span><span data-i18n="step6.loading1">Güneş ışınım verisi alınıyor</span></div>
-      <div class="loading-step" id="lstep-2"><span class="loading-step-dot"></span><span data-i18n="step6.loading2">Hava durumu analizi</span></div>
-      <div class="loading-step" id="lstep-3"><span class="loading-step-dot"></span><span data-i18n="step6.loading3">Enerji üretimi hesaplanıyor</span></div>
-      <div class="loading-step" id="lstep-4"><span class="loading-step-dot"></span><span data-i18n="step6.loading4">Finansal analiz tamamlanıyor</span></div>
-    </div>
-    <div id="loading-progress-fill" style="display:none"></div>
-
-    <!-- Loading quote -->
-    <div class="loading-quote" data-i18n="step6.quote">
-      "Güneş enerjisi; sonsuz, temiz ve özgür — en büyük yatırım bugün yapılan."
+      <section class="calc-stage-side">
+        <div class="calc-side-kicker">Hesap ekranı</div>
+        <h2>Sonuçlar hazırlanıyor</h2>
+        <p id="calc-stage-summary">Konum, çatı, ekipman ve senaryo ayarları tek modelde işleniyor. Birkaç saniye içinde üretim, sistem kapasitesi ve ekonomik sonuçlar hazır olacak.</p>
+        <div class="calc-stage-insight" id="calc-stage-focus">Şu anda veri kaynağı ve üretim modeli hazırlanıyor.</div>
+        <div class="calc-side-metrics">
+          <div><span>Veri kaynağı</span><strong id="calc-stage-source">PVGIS + yerel model</strong></div>
+          <div><span>Yük profili</span><strong id="calc-stage-load">10.0 kWh/gün</strong></div>
+          <div><span>Hedef mod</span><strong id="calc-stage-target">Maksimum çatı kapasitesi</strong></div>
+        </div>
+        <div class="calc-stage-footnote">
+          <span class="calc-stage-footnote-dot"></span>
+          <span id="calc-stage-footnote-text">Hesaplama tamamlandığında sonuç ekranına otomatik geçilir.</span>
+        </div>
+      </section>
     </div>
   </div>
   <div id="fallback-banner" data-i18n="engine.pvgisFallbackBanner">⚠ PVGIS API'sine ulaşılamadı. Yerel güneşlenme verileriyle hesaplama yapılıyor.</div>
-  <div id="eng-calc-panel" style="display:none;max-width:700px;width:100%;margin:0 auto"></div>
 </div>
 
 <!-- ═══════════════ STEP 7: SONUÇLAR ═══════════════ -->

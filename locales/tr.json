@@ -12,7 +12,7 @@
     "step2": "Konum",
     "step3": "Çatı",
     "step4": "Ekipman",
-    "step5": "Finansal",
+    "step5": "Ayarlar",
     "step6": "Hesapla",
     "step7": "Sonuçlar",
     "stepPrefix": "adım",
@@ -172,8 +172,8 @@
     "advancedOptions": "Gelişmiş Seçenekler"
   },
   "step6": {
-    "title": "Hesaplanıyor...",
-    "subtitle": "PVGIS'ten güneş ışınım verisi alınıyor...",
+    "title": "Hesap modeli kuruluyor",
+    "subtitle": "PVGIS, 8760 saatlik profil ve mühendislik varsayımları birlikte işleniyor...",
     "loading1": "Güneş ışınım verisi alınıyor",
     "loading2": "Hava durumu analizi",
     "loading3": "Enerji üretimi hesaplanıyor",
@@ -846,7 +846,7 @@
     "pending": "-"
   },
   "offgridL2": {
-    "sectionTitle": "Off-Grid Level 2 Ayarları",
+    "sectionTitle": "Off-Grid Sistem Boyutlandırma",
     "calculationModeLabel": "Hesap Seviyesi",
     "calculationModeBasic": "Basit: günlük tüketim / cihaz listesi",
     "calculationModeAdvanced": "İleri: 8760 CSV ve saha kanıtları",

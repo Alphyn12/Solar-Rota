@@ -18,9 +18,9 @@ import {
 } from './panel-catalog.js';
 import { showToast, animateCounter, launchConfetti, resetConfetti, renderPRGauge } from './ui-charts.js';
 import { renderResults, renderMonthlyChart, downloadPDF, shareResults, loadFromHash } from './ui-render.js';
-import { toggleEngReport, renderEngReport, renderEngCalcPanel } from './eng-report.js';
+import { toggleEngReport, renderEngReport } from './eng-report.js';
 import { runCalculation, isCalculationInProgress } from './calculation-service.js';
-import { calculateBatteryMetrics, calculateNMMetrics } from './calc-engine.js';
+import { calculateBatteryMetrics, calculateNMMetrics, refreshCalculationStageMeta } from './calc-engine.js';
 import { calculateSystemLayout, resolvePanelSpec } from './calc-core.js';
 import { renderHourlyProfile, setHourlySeason } from './hourly-profile.js';
 import { toggleBillBlock, onBillToggle, onBillInput, billQuickFill, billClear } from './bill-analysis.js';
@@ -1643,6 +1643,21 @@ function syncOffgridDesignTargetCards() {
       ? 'Elektrik ihtiyacına göre sistem seçili: panel sayısı, seçilen profil veya cihaz listesinden türeyen yıllık yüke göre sınırlandırılır.'
       : 'Maksimum çatı kapasitesi seçili: panel sayısı çatının net kullanılabilir alanına göre sınırlandırılır; fazla üretim ve otonomi potansiyeli ayrıca değerlendirilir.';
   }
+  const hideLoadProfiles = target === 'fill-roof';
+  const simpleProfileElements = [
+    ...document.querySelectorAll('#offgrid-simple-mode-wrap > .offgrid-simple-intro:not(#offgrid-fill-roof-simple-note)'),
+    ...document.querySelectorAll('#offgrid-simple-mode-wrap > .offgrid-explain-grid'),
+    document.getElementById('offgrid-residential-profile-grid'),
+    document.getElementById('offgrid-simple-profile-summary'),
+    document.getElementById('offgrid-critical-fraction-row'),
+    document.getElementById('offgrid-critical-fraction'),
+    document.getElementById('offgrid-critical-fraction-hint')
+  ].filter(Boolean);
+  simpleProfileElements.forEach(el => {
+    el.style.display = hideLoadProfiles ? 'none' : '';
+  });
+  const fillRoofNote = document.getElementById('offgrid-fill-roof-simple-note');
+  if (fillRoofNote) fillRoofNote.style.display = hideLoadProfiles ? '' : 'none';
 }
 
 function setOffgridDesignTarget(target = 'fill-roof') {
@@ -2786,6 +2801,7 @@ function validateStep5() {
   if (tariffInput) window.state.tariff = parseFloat(tariffInput.value) || 7.16;
   updateTariffAssumptions();
   goToStep(6);
+  refreshCalculationStageMeta(0);
   const calcBtn = document.getElementById('calc-btn') || document.querySelector('[onclick*="validateStep5"]');
   if (calcBtn) { calcBtn.disabled = true; calcBtn.style.opacity = '0.6'; }
   runCalculation()

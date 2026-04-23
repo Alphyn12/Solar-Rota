@@ -48,6 +48,45 @@ const LOADING_MSGS = [
   "Finansal analiz yapılıyor..."
 ];
 
+const CALC_SCENARIO_LABELS = {
+  'on-grid': 'On-Grid',
+  'off-grid': 'Off-Grid',
+  'agricultural-irrigation': 'Sulama',
+  'heat-pump': 'Isı Pompası',
+  'ev-charging': 'EV Şarj',
+  'mobile-offgrid': 'Mobil Sistem'
+};
+
+const CALC_SCENARIO_SUMMARIES = {
+  'on-grid': 'Şebeke bağlantılı tasarım için üretim, öz tüketim ve geri ödeme dengesi birlikte çözülüyor.',
+  'off-grid': 'Bağımsız sistem için üretim, kritik yük, batarya ve yedekleme davranışı birlikte değerlendiriliyor.',
+  'agricultural-irrigation': 'Sulama senaryosunda mevsimsel yük, üretim penceresi ve saha uygunluğu birlikte analiz ediliyor.',
+  'heat-pump': 'Isı pompası yükü mevsimsel tüketim profiliyle eşleştirilerek sistem boyutu netleştiriliyor.',
+  'ev-charging': 'Araç şarj yükü ile çatı üretim profili eşleştirilip sistem kapasitesi dengeleniyor.',
+  'mobile-offgrid': 'Mobil bağımsız sistem için kompakt üretim ve depolama mimarisi değerlendiriliyor.'
+};
+
+const CALC_FOCUS_BY_STEP = {
+  'on-grid': [
+    'Çatı ve ışınım verisi çekiliyor; saha potansiyeli doğrulanıyor.',
+    'Saatlik üretim davranışı ve hava etkileri modele ekleniyor.',
+    'Üretim, öz tüketim ve şebeke etkileşimi dengeleniyor.',
+    'Tasarruf, nakit akışı ve geri ödeme hesapları tamamlanıyor.'
+  ],
+  'off-grid': [
+    'Çatı ve ışınım verisi çekiliyor; bağımsız çalışma potansiyeli doğrulanıyor.',
+    'Kritik yük ve saatlik davranış modeli kuruluyor.',
+    'Üretim, batarya ve yedek güç dengesi simüle ediliyor.',
+    'Toplam yatırım ve işletme maliyetleri tamamlanıyor.'
+  ],
+  default: [
+    'Kaynak verileri toplanıyor ve model başlatılıyor.',
+    'Saatlik iklim ve üretim davranışı işleniyor.',
+    'Enerji performansı ve sistem dengesi hesaplanıyor.',
+    'Ekonomik değerlendirme tamamlanıyor.'
+  ]
+};
+
 const COMMON_YEAR_MONTH_DAYS_LOCAL = [31,28,31,30,31,30,31,31,30,31,30,31];
 
 function completeHourlyArray(value) {
@@ -115,7 +154,7 @@ function spawnLoadingParticles() {
   const container = document.getElementById('loading-particles');
   if (!container) return;
   container.innerHTML = '';
-  const colors = ['#F59E0B','#FCD34D','#06B6D4','#F97316','#34D399'];
+  const colors = ['#F59E0B', '#FCD34D', '#F97316', '#FB923C', '#FBBF24'];
   for (let i = 0; i < 18; i++) {
     const el = document.createElement('div');
     el.className = 'lp';
@@ -125,11 +164,54 @@ function spawnLoadingParticles() {
   }
 }
 
+function formatStageArea(value) {
+  const n = Math.max(0, Number(value) || 0);
+  return `${n.toFixed(n >= 100 ? 0 : 1)} m²`;
+}
+
+function formatStageEnergy(state) {
+  const annual = Math.max(0, Number(state.annualConsumptionKwh) || Math.max(0, Number(state.dailyConsumption) || 0) * 365 || 0);
+  if (state.scenarioKey === 'off-grid' || state.scenarioKey === 'mobile-offgrid') {
+    return `${(annual / 365).toFixed(1)} kWh/gün`;
+  }
+  return `${Math.round(annual).toLocaleString('tr-TR')} kWh/yıl`;
+}
+
+function formatStageTarget(state) {
+  if (state.designTarget === 'bill-offset') return 'Tüketime göre boyutlandırma';
+  return 'Maksimum çatı kapasitesi';
+}
+
+export function refreshCalculationStageMeta(msgIdx = 0) {
+  if (typeof document === 'undefined') return;
+  const state = window.state || {};
+  const scenarioKey = state.scenarioKey || 'on-grid';
+  const layout = calculateSystemLayout(state);
+  const scenarioLabel = CALC_SCENARIO_LABELS[scenarioKey] || 'Solar Senaryo';
+  const focusMessages = CALC_FOCUS_BY_STEP[scenarioKey] || CALC_FOCUS_BY_STEP.default;
+  const focusText = focusMessages[Math.max(0, Math.min(focusMessages.length - 1, msgIdx))];
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+  setText('calc-stage-scenario', scenarioLabel);
+  setText('calc-stage-roof', formatStageArea(state.roofArea));
+  setText('calc-stage-power', `${(Number(layout.systemPower) || 0).toFixed(2)} kWp`);
+  setText('calc-stage-summary', CALC_SCENARIO_SUMMARIES[scenarioKey] || CALC_SCENARIO_SUMMARIES['on-grid']);
+  setText('calc-stage-focus', focusText);
+  setText('calc-stage-source', scenarioKey === 'off-grid' ? 'PVGIS + dispatch modeli' : 'PVGIS + yerel model');
+  setText('calc-stage-load', formatStageEnergy(state));
+  setText('calc-stage-target', formatStageTarget(state));
+  setText('calc-stage-footnote-text', `${scenarioLabel} senaryosu için sonuç ekranına otomatik geçiş yapılacak.`);
+}
+
 function setLoadingProgress(pct, msgIdx) {
   const arc = document.getElementById('ring-fill-arc');
   const txt = document.getElementById('ring-pct-text');
+  const bar = document.getElementById('loading-progress-fill');
   if (arc) arc.style.strokeDashoffset = 326.7 - (326.7 * pct / 100);
   if (txt) txt.textContent = Math.round(pct) + '%';
+  if (bar) bar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
   for (let i = 1; i <= 4; i++) {
     const el = document.getElementById(`lstep-${i}`);
     if (!el) continue;
@@ -140,6 +222,7 @@ function setLoadingProgress(pct, msgIdx) {
   }
   const msgEl = document.getElementById('loading-msg');
   if (msgEl && LOADING_MSGS[msgIdx]) msgEl.textContent = LOADING_MSGS[msgIdx];
+  refreshCalculationStageMeta(msgIdx);
 }
 
 function modelBatteryCost(battery) {

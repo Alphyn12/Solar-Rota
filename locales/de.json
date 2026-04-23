@@ -12,7 +12,7 @@
     "step2": "Standort",
     "step3": "Dach",
     "step4": "Ausrüstung",
-    "step5": "Finanzen",
+    "step5": "Einstellungen",
     "step6": "Berechnen",
     "step7": "Ergebnisse",
     "stepPrefix": "Schritt",
@@ -172,8 +172,8 @@
     "advancedOptions": "Erweiterte Optionen"
   },
   "step6": {
-    "title": "Berechnung läuft...",
-    "subtitle": "PVGIS-Solarstrahlungsdaten werden abgerufen...",
+    "title": "Berechnungsmodell wird aufgebaut",
+    "subtitle": "PVGIS, das 8760-Stunden-Profil und technische Annahmen werden verarbeitet...",
     "loading1": "Solarstrahlung wird geladen",
     "loading2": "Wetterdaten werden analysiert",
     "loading3": "Energieproduktion wird berechnet",
@@ -846,7 +846,7 @@
     "pending": "-"
   },
   "offgridL2": {
-    "sectionTitle": "Off-Grid Level 2 Einstellungen",
+    "sectionTitle": "Off-Grid-Systemdimensionierung",
     "calculationModeLabel": "Berechnungsniveau",
     "calculationModeBasic": "Einfach: Tagesverbrauch / Geräteliste",
     "calculationModeAdvanced": "Erweitert: 8760-CSV und Feldnachweise",

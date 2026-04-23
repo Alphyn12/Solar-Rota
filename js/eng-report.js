@@ -415,90 +415,10 @@ ${escapeHtml(report('exportRevenue'))} = ${money(nm.annualExportRevenue)}/${esca
   body.innerHTML = html;
 }
 
-// ─── Scientific notation formatting ──────────────────────────────────────────
-function formatSci(n, digits = 3) {
-  if (!Number.isFinite(n) || n === 0) return '0';
-  const exp = Math.floor(Math.log10(Math.abs(n)));
-  const coeff = (n / Math.pow(10, exp)).toFixed(digits);
-  return `${coeff} × 10<sup>${exp}</sup>`;
-}
-
-// ─── Step-4 calculation summary panel ────────────────────────────────────────
+// Eski Step-6 mühendislik paneli çağrılarıyla uyumluluk için tutulur.
 export function renderEngCalcPanel() {
-  const state = window.state;
-  const r = state?.results;
   const panel = document.getElementById('eng-calc-panel');
-  if (!panel || !r) return;
-
-  const p = resolvePanelSpec(state, state.panelType);
-  if (!p) return;
-
-  const currency = state.displayCurrency || 'TRY';
-  const usdToTry = Math.max(0.0001, Number(state.usdToTry) || 38.5);
-  const activeLocale = localeTag();
-  const report = key => i18n.t(`report.${key}`);
-  const yearUnit = i18n.t('units.year');
-  const moneyFmt = v => {
-    const converted = currency === 'USD' ? (Number(v) || 0) / usdToTry : (Number(v) || 0);
-    return converted.toLocaleString(currency === 'USD' ? 'en-US' : activeLocale, { maximumFractionDigits: 0 }) + ' ' + currency;
-  };
-  const lcoeValue = r.lcoe != null ? Number.parseFloat(r.lcoe) : null;
-  const lcoeShortNote = state.scenarioKey === 'off-grid'
-    ? report('lcoeShortNoteOffGrid')
-    : report('lcoeShortNote');
-  const co2Value = Number.parseFloat(r.co2Savings);
-  const paybackValue = Number(r.grossSimplePaybackYear || r.simplePaybackYear || r.paybackYear || 0);
-
-  panel.style.display = 'block';
-  panel.innerHTML = `
-    <div style="background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.2);border-radius:10px;padding:16px;margin-top:16px">
-      <div style="font-family:var(--font-display);font-weight:700;font-size:0.9rem;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
-        ${escapeHtml(i18n.t('report.calcPanelTitle'))}
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;font-size:0.8rem">
-        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
-          <div style="color:var(--text-muted);margin-bottom:4px">${escapeHtml(report('physicsInstalledPower'))} (P<sub>dc</sub>)</div>
-          <div style="font-family:monospace;font-size:0.85rem">${r.panelCount} × ${p.wattPeak} Wp = <strong style="color:var(--accent)">${(r.systemPower * 1000).toFixed(0)} W<sub>p</sub></strong></div>
-          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${formatSci(r.systemPower * 1000, 3)} W</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
-          <div style="color:var(--text-muted);margin-bottom:4px">${escapeHtml(report('annualEnergyProduction'))} (E<sub>year</sub>)</div>
-          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--primary)">${r.annualEnergy.toLocaleString(activeLocale)} kWh/${escapeHtml(i18n.t('units.year'))}</strong></div>
-          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${formatSci(r.annualEnergy * 3.6e6, 3)} J/${escapeHtml(i18n.t('units.year'))}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
-          <div style="color:var(--text-muted);margin-bottom:4px">${escapeHtml(report('cumulativeEnergy25y'))}</div>
-          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--primary)">${r.yearlyTable.reduce((s,y)=>s+y.energy,0).toLocaleString(activeLocale)} kWh</strong></div>
-          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${formatSci(r.yearlyTable.reduce((s,y)=>s+y.energy,0) * 3.6e6, 3)} J</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
-          <div style="color:var(--text-muted);margin-bottom:4px">${escapeHtml(report('totalInvestment'))}</div>
-          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--text)">${moneyFmt(r.totalCost)}</strong></div>
-          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${formatSci(r.totalCost, 3)} TL</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
-          <div style="color:var(--text-muted);margin-bottom:4px">LCOE (${escapeHtml(report('lcoeTitle'))})</div>
-          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--accent)">${Number.isFinite(lcoeValue) ? lcoeValue.toFixed(2) : '—'} TL/kWh</strong></div>
-          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${escapeHtml(lcoeShortNote)}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
-          <div style="color:var(--text-muted);margin-bottom:4px">${escapeHtml(report('performanceRatio'))} (PR)</div>
-          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--success)">${r.pr}%</strong></div>
-          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${escapeHtml(report('performanceRatioMetric'))}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
-          <div style="color:var(--text-muted);margin-bottom:4px">${escapeHtml(report('co2SavingsAnnual'))}</div>
-          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--success)">${Number.isFinite(co2Value) ? co2Value.toFixed(1) : '—'} t CO₂</strong></div>
-          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${formatSci((Number.isFinite(co2Value) ? co2Value : 0) * 1000, 3)} kg CO₂/${escapeHtml(i18n.t('units.year'))}</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:10px">
-          <div style="color:var(--text-muted);margin-bottom:4px">${escapeHtml(i18n.t('report.simplePayback'))}</div>
-          <div style="font-family:monospace;font-size:0.85rem"><strong style="color:var(--text)">${paybackValue ? paybackValue.toFixed(1) : '>25'} ${escapeHtml(yearUnit)}</strong></div>
-          <div style="color:var(--text-muted);font-size:0.75rem;margin-top:3px">${escapeHtml(report('simplePaybackPreTax'))}</div>
-        </div>
-      </div>
-    </div>`;
+  if (panel) panel.innerHTML = '';
 }
 
 // window'a expose et

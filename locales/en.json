@@ -12,7 +12,7 @@
     "step2": "Location",
     "step3": "Roof",
     "step4": "Equipment",
-    "step5": "Finance",
+    "step5": "Settings",
     "step6": "Calculate",
     "step7": "Results",
     "stepPrefix": "step",
@@ -172,8 +172,8 @@
     "advancedOptions": "Advanced Options"
   },
   "step6": {
-    "title": "Calculating...",
-    "subtitle": "Fetching PVGIS solar irradiance data...",
+    "title": "Building the calculation model",
+    "subtitle": "PVGIS, the 8760-hour profile, and engineering assumptions are being processed...",
     "loading1": "Fetching solar irradiance",
     "loading2": "Analyzing weather data",
     "loading3": "Calculating energy production",
@@ -846,7 +846,7 @@
     "pending": "-"
   },
   "offgridL2": {
-    "sectionTitle": "Off-Grid Level 2 Settings",
+    "sectionTitle": "Off-Grid System Sizing",
     "calculationModeLabel": "Calculation Level",
     "calculationModeBasic": "Basic: daily load / device list",
     "calculationModeAdvanced": "Advanced: 8760 CSV and field evidence",
