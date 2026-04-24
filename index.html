@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="css/components.css"/>
 <link rel="stylesheet" href="css/redesign.css"/>
 <link rel="stylesheet" href="css/mobile.css"/>
+<link rel="stylesheet" href="css/landing.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <!-- TODO(csp): migrate remaining inline event handlers/styles to JS modules, then remove 'unsafe-inline' from CSP. -->
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
@@ -597,8 +598,438 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 #location-warning{display:none;color:var(--danger);font-size:0.8rem;margin-top:6px;padding:8px 12px;background:rgba(239,68,68,0.08);border-radius:6px;border:1px solid rgba(239,68,68,0.2)}
 </style>
 </head>
-<body>
+<body class="landing-active">
 <a class="skip-link" href="#main-content" data-i18n="common.skipToMain">Ana içeriğe geç</a>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LANDING PAGE — Uygulama giriş deneyimi
+     "Hesaplamaya Başla" CTA'sı uygulamayı (7-adımlı motoru) açar.
+     Calc motoruna dokunulmamıştır.
+     ═══════════════════════════════════════════════════════════ -->
+<div id="landing-root">
+
+  <!-- LP NAV -->
+  <nav class="lp-nav" aria-label="Landing navigation">
+    <a href="#" class="lp-nav-brand" onclick="event.preventDefault();goToLandingTop()">
+      <img src="new_version_logo.png" alt="Solar Rota"/>
+      <div class="lp-nav-brand-col">
+        <span class="lp-nav-brand-text">Solar Rota</span>
+        <span class="lp-nav-brand-tag">GES tasarım ve fizibilite stüdyosu</span>
+      </div>
+    </a>
+    <div class="lp-nav-links">
+      <a href="#lp-scenarios">Senaryolar</a>
+      <a href="#lp-features">Özellikler</a>
+      <a href="#lp-how">Kullanım</a>
+      <a href="#lp-trust">Güven</a>
+    </div>
+    <div class="lp-nav-spacer"></div>
+    <button type="button" class="lp-nav-cta" onclick="startCalculator()">
+      Hesaplamaya Başla
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
+  </nav>
+
+  <!-- LP HERO -->
+  <section class="lp-hero">
+    <div class="lp-container">
+      <div class="lp-hero-inner">
+        <div>
+          <span class="lp-hero-pill">
+            <span class="dot"></span>
+            PVGIS v5.3 · 2026 Tarifeleri · Türkiye
+          </span>
+          <h1 class="lp-hero-title">
+            Güneş enerjisi sisteminizi<br/>
+            <span class="amber">güvenle tasarlayın.</span>
+          </h1>
+          <p class="lp-hero-sub">
+            Senaryo seçin, konumu belirleyin, çatınızı ölçün. PVGIS verisiyle
+            saatlik simülasyon; KDV, dağıtım bedeli ve tarife farkları dahil
+            finansal analiz. Teklife hazır rapor çıktısı 7 adımda.
+          </p>
+          <div class="lp-hero-ctas">
+            <button type="button" class="lp-btn lp-btn-primary lp-btn-lg" onclick="startCalculator()">
+              Hesaplamaya Başla
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+            <a href="#lp-features" class="lp-btn lp-btn-secondary lp-btn-lg">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+              Özellikleri Gör
+            </a>
+          </div>
+          <div class="lp-hero-trust">
+            <span><strong>Ücretsiz.</strong> Kayıt gerekmez.</span>
+            <span class="sep"></span>
+            <span>PVGIS v5.3 + EPDK tarifeleri ile senkron</span>
+          </div>
+        </div>
+
+        <!-- ürün mockup (hesaplama ekranı önizlemesi) -->
+        <div class="lp-peek">
+          <div class="lp-glass lp-peek-inner">
+            <div class="lp-peek-head">
+              <div>
+                <div class="lp-peek-title">Antalya · Ticarethane çatı</div>
+                <div class="lp-peek-subtitle">On-Grid · 12.8 kWp · 36.89°K, 30.71°D</div>
+              </div>
+              <span class="lp-chip lp-chip-ok">
+                <span class="dot"></span> TEKLİFE HAZIR
+              </span>
+            </div>
+
+            <!-- wizard progress -->
+            <div class="lp-wiz-row">
+              <div class="lp-wiz-label">Adım 07 / 07</div>
+              <div class="lp-wiz-dots">
+                <div class="lp-wiz-dot done"></div>
+                <div class="lp-wiz-dot done"></div>
+                <div class="lp-wiz-dot done"></div>
+                <div class="lp-wiz-dot done"></div>
+                <div class="lp-wiz-dot done"></div>
+                <div class="lp-wiz-dot done"></div>
+                <div class="lp-wiz-dot active"></div>
+              </div>
+            </div>
+
+            <div class="lp-kpi-grid">
+              <div class="lp-kpi" style="--kpi-c:var(--primary)">
+                <div class="lp-kpi-label">Yıllık Üretim</div>
+                <div class="lp-kpi-value">19.4<span class="lp-kpi-unit">MWh</span></div>
+                <div class="lp-kpi-trend">▲ %2.8 PVGIS üzeri</div>
+              </div>
+              <div class="lp-kpi" style="--kpi-c:#06B6D4">
+                <div class="lp-kpi-label">Öz Tüketim</div>
+                <div class="lp-kpi-value" style="color:#06B6D4">72<span class="lp-kpi-unit">%</span></div>
+                <div class="lp-kpi-trend">▲ Saatlik mahsup</div>
+              </div>
+              <div class="lp-kpi" style="--kpi-c:var(--success)">
+                <div class="lp-kpi-label">Geri Dönüş</div>
+                <div class="lp-kpi-value" style="color:var(--success)">4.8<span class="lp-kpi-unit">yıl</span></div>
+              </div>
+              <div class="lp-kpi" style="--kpi-c:#FCD34D">
+                <div class="lp-kpi-label">Fatura Tasarrufu</div>
+                <div class="lp-kpi-value" style="color:#FCD34D">₺412<span class="lp-kpi-unit">b/yıl</span></div>
+              </div>
+            </div>
+
+            <div class="lp-bar-panel">
+              <div class="lp-bar-head">
+                <span class="lp-wiz-label">Aylık kWh · saatlik modelli</span>
+                <span class="lp-chip" style="background:rgba(245,158,11,0.12);color:#F59E0B;border-color:rgba(245,158,11,0.3)">2,340 · Tem</span>
+              </div>
+              <div class="lp-bar-chart">
+                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:26%"></div><div class="lp-bar-label">O</div></div>
+                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:36%"></div><div class="lp-bar-label">Ş</div></div>
+                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:54%"></div><div class="lp-bar-label">M</div></div>
+                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:70%"></div><div class="lp-bar-label">N</div></div>
+                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:86%"></div><div class="lp-bar-label">M</div></div>
+                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:96%"></div><div class="lp-bar-label">H</div></div>
+                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:100%"></div><div class="lp-bar-label">T</div></div>
+                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:94%"></div><div class="lp-bar-label">A</div></div>
+                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:76%"></div><div class="lp-bar-label">E</div></div>
+                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:58%"></div><div class="lp-bar-label">E</div></div>
+                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:38%"></div><div class="lp-bar-label">K</div></div>
+                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:26%"></div><div class="lp-bar-label">A</div></div>
+              </div>
+            </div>
+
+            <div class="lp-evidence">
+              <div class="lp-evidence-row">
+                <span class="dot"></span> PVGIS doğrulandı · 24 Nis 2026
+              </div>
+              <div class="lp-evidence-row">
+                <span class="dot"></span> Mühendislik raporu hazır (24 sayfa)
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GÜVEN BANDI -->
+  <div class="lp-trust" id="lp-trust">
+    <div class="lp-container">
+      <div class="lp-trust-row">
+        <span class="lp-trust-label">Entegrasyonlar &amp; Kaynaklar</span>
+        <span class="lp-trust-slot">PVGIS v5.3</span>
+        <span class="lp-trust-slot">EPDK Tarifeler</span>
+        <span class="lp-trust-slot">Trina · Jinko · LONGi</span>
+        <span class="lp-trust-slot">Huawei · Sungrow</span>
+        <span class="lp-trust-slot">TS EN 1991</span>
+        <span class="lp-trust-slot">TEDAŞ · TEİAŞ</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ÜRÜN TANITIMI / SENARYOLAR -->
+  <section class="lp-section" id="lp-scenarios">
+    <div class="lp-container">
+      <div class="lp-section-head">
+        <div>
+          <div class="lp-eyebrow"><span class="dot"></span> Senaryolar</div>
+          <h2><span class="grad">Her proje için doğru hesap motoru.</span></h2>
+        </div>
+        <p>On-Grid veya Off-Grid — seçiminiz hesaplama mantığını, rapor şablonunu ve önerilen ekipman listesini şekillendirir.</p>
+      </div>
+      <div class="lp-scen-grid">
+        <button type="button" class="lp-scen-card" style="--scen-c:#F59E0B" onclick="startCalculatorWithScenario('on-grid')">
+          <div class="lp-scen-tile">
+            <!-- On-Grid icon (sun + grid lines) -->
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="32" cy="20" r="8"/>
+              <path d="M32 6v3M32 31v3M18 20h3M43 20h3M22 10l2 2M40 28l2 2M42 10l-2 2M24 28l-2 2"/>
+              <rect x="8" y="40" width="48" height="18" rx="2"/>
+              <line x1="20" y1="40" x2="20" y2="58"/>
+              <line x1="32" y1="40" x2="32" y2="58"/>
+              <line x1="44" y1="40" x2="44" y2="58"/>
+              <line x1="8" y1="49" x2="56" y2="49"/>
+            </svg>
+          </div>
+          <h3>On-Grid Çatı Sistemi</h3>
+          <p>Şebekeye bağlı kurulumlar için fatura tasarrufu, öz tüketim, ihracat geliri ve geri dönüş analizi. Saatlik mahsuplaşma modeli ile.</p>
+          <div class="lp-scen-meta">
+            <span class="mdot"></span>
+            <span>Mesken · Ticarethane · Sanayi · Tarım tarifelerine göre</span>
+          </div>
+          <span class="lp-scen-cta">
+            On-Grid akışını başlat
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </span>
+        </button>
+
+        <button type="button" class="lp-scen-card" style="--scen-c:#8B5CF6" onclick="startCalculatorWithScenario('off-grid')">
+          <div class="lp-scen-tile">
+            <!-- Off-Grid icon (battery + panel) -->
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="6" y="8" width="28" height="18" rx="2"/>
+              <line x1="14" y1="8" x2="14" y2="26"/>
+              <line x1="22" y1="8" x2="22" y2="26"/>
+              <line x1="30" y1="8" x2="30" y2="26"/>
+              <line x1="6" y1="17" x2="34" y2="17"/>
+              <rect x="38" y="32" width="20" height="24" rx="2"/>
+              <line x1="42" y1="32" x2="42" y2="28"/>
+              <line x1="54" y1="32" x2="54" y2="28"/>
+              <line x1="42" y1="42" x2="54" y2="42"/>
+              <line x1="44" y1="48" x2="52" y2="48"/>
+            </svg>
+          </div>
+          <h3>Off-Grid + Depolama</h3>
+          <p>Şebekeden bağımsız sistemler. Günlük yük profili ve otonomi günü girişleriyle batarya kapasite hesabı ve dispatch analizi.</p>
+          <div class="lp-scen-meta">
+            <span class="mdot"></span>
+            <span>Ön fizibilite · LFP batarya · Kritik yük analizi</span>
+          </div>
+          <span class="lp-scen-cta">
+            Off-Grid akışını başlat
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ÖZELLİKLER -->
+  <section class="lp-section" id="lp-features" style="background:linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.015) 50%, transparent 100%)">
+    <div class="lp-container">
+      <div class="lp-section-head">
+        <div>
+          <div class="lp-eyebrow"><span class="dot"></span> Neler Yapar?</div>
+          <h2><span class="grad">Teklife hazır raporun arkasındaki motor.</span></h2>
+        </div>
+        <p>Solar Rota, tasarımdan finansa kadar her sayısal değeri PVGIS ve Türkiye regülasyonu üzerinden doğrular. Teknik disiplin, açık varsayımlar.</p>
+      </div>
+      <div class="lp-feat-grid">
+        <div class="lp-feat-card">
+          <div class="lp-feat-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>
+          </div>
+          <h3>Saatlik PVGIS Simülasyonu</h3>
+          <p>Yıl boyu 8.760 adımda üretim modellemesi. Hücre sıcaklığı, inverter verimi, kırpma ve yaşlanma dahil — aylık ortalama kısayolu yok.</p>
+        </div>
+        <div class="lp-feat-card">
+          <div class="lp-feat-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894L8.106 3.447a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>
+          </div>
+          <h3>Çatı Araçları &amp; Uydu</h3>
+          <p>Harita üzerinden pin düşürün, çokgen çizin veya parametrik olarak girin. Eğim, azimut, gölgelenme ve OSM bina verisi otomatik işlenir.</p>
+        </div>
+        <div class="lp-feat-card">
+          <div class="lp-feat-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg>
+          </div>
+          <h3>Ekipman Kataloğu</h3>
+          <p>Trina, Jinko, LONGi paneller; Huawei, Sungrow inverterler. Wp, verim, birim fiyat ve stok; güncel teklif için hazır altyapı.</p>
+        </div>
+        <div class="lp-feat-card">
+          <div class="lp-feat-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/></svg>
+          </div>
+          <h3>KDV &amp; Dağıtım Bedeli Dahil Finans</h3>
+          <p>Tarife tipi, KDV, dağıtım bedeli, kWh başı yatırım, USD/TRY kuru, yıllık zam senaryoları. NPV, IRR ve geri dönüş varsayımlarıyla birlikte.</p>
+        </div>
+        <div class="lp-feat-card">
+          <div class="lp-feat-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6"/></svg>
+          </div>
+          <h3>Mühendislik Raporu &amp; PDF</h3>
+          <p>Panel dizilimi, BoM, statik yük uyarısı (TS EN 1991), tarife uygunluk analizi. Müşteriye sunulmaya hazır tek tıkla PDF çıktısı.</p>
+        </div>
+        <div class="lp-feat-card">
+          <div class="lp-feat-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          </div>
+          <h3>Türkiye Regülasyonu</h3>
+          <p>Mesken, ticarethane, sanayi, tarımsal tarifeler. Saatlik mahsuplaşma ve lisanssız üretim kuralları hesaplamanın içinde.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- KULLANIM ADIMLARI -->
+  <section class="lp-section" id="lp-how">
+    <div class="lp-container">
+      <div class="lp-section-head">
+        <div>
+          <div class="lp-eyebrow"><span class="dot"></span> Kullanım</div>
+          <h2><span class="grad">Yedi adım. Tahmine yer yok.</span></h2>
+        </div>
+        <p>Haritadaki bir nokta, teklif dosyasına 40 dakikada dönüşür. Her adım bir sonraki hesaplama zinciri için kanıt üretir.</p>
+      </div>
+      <div class="lp-steps-grid">
+        <div class="lp-step">
+          <div class="lp-step-num">01</div>
+          <div class="lp-step-title">Senaryo</div>
+          <div class="lp-step-desc">On-Grid veya Off-Grid. Motor ve rapor şablonu buna göre seçilir.</div>
+        </div>
+        <div class="lp-step">
+          <div class="lp-step-num">02</div>
+          <div class="lp-step-title">Konum</div>
+          <div class="lp-step-desc">Harita üzerinde pin veya şehir ara. PVGIS ışınım ve sıcaklık verisi çekilir.</div>
+        </div>
+        <div class="lp-step">
+          <div class="lp-step-num">03</div>
+          <div class="lp-step-title">Çatı</div>
+          <div class="lp-step-desc">Eğim, azimut, gölgelenme. Çokgen çizim veya parametrik giriş.</div>
+        </div>
+        <div class="lp-step">
+          <div class="lp-step-num">04</div>
+          <div class="lp-step-title">Ekipman</div>
+          <div class="lp-step-desc">Panel, inverter, batarya seçimi. Wp · verim · birim fiyat üzerinden.</div>
+        </div>
+        <div class="lp-step">
+          <div class="lp-step-num">05</div>
+          <div class="lp-step-title">Ayarlar</div>
+          <div class="lp-step-desc">Tarife, tüketim, KDV, dağıtım bedeli, yatırım maliyeti kalemleri.</div>
+        </div>
+        <div class="lp-step">
+          <div class="lp-step-num">06</div>
+          <div class="lp-step-title">Hesapla</div>
+          <div class="lp-step-desc">8.760 adım saatlik simülasyon, 6–9 saniyede çalışır.</div>
+        </div>
+        <div class="lp-step">
+          <div class="lp-step-num">07</div>
+          <div class="lp-step-title">Sonuçlar</div>
+          <div class="lp-step-desc">KPI'lar, aylık üretim, geri dönüş, NPV. Mühendislik raporu PDF.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AVANTAJLAR / GÜVEN -->
+  <section class="lp-section lp-section-tight">
+    <div class="lp-container">
+      <div class="lp-section-head">
+        <div>
+          <div class="lp-eyebrow"><span class="dot"></span> Neden Solar Rota?</div>
+          <h2><span class="grad">Denetlenen kurulumcunun aracı.</span></h2>
+        </div>
+      </div>
+      <div class="lp-adv-grid">
+        <div class="lp-adv">
+          <div class="lp-adv-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h4>40 Dakikada Teklif</h4>
+          <p>Pin düşürmekten PDF'e kadar, her veri doğrulanarak ilerler. Tek oturumda tamamlanabilir.</p>
+        </div>
+        <div class="lp-adv">
+          <div class="lp-adv-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          </div>
+          <h4>Kanıt Temelli</h4>
+          <p>Her KPI arkasında PVGIS referansı, tarife kaynağı ve varsayım zinciri bulunur.</p>
+        </div>
+        <div class="lp-adv">
+          <div class="lp-adv-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+          </div>
+          <h4>Türkiye Odaklı</h4>
+          <p>EPDK tarifeleri, lisanssız üretim kuralları, TS EN 1991 statik uyarıları motorda bütünleşik.</p>
+        </div>
+        <div class="lp-adv">
+          <div class="lp-adv-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h4>Tarayıcıda, Kayıtsız</h4>
+          <p>Tüm hesap cihazınızda çalışır. Veri paylaşımı yok; sonuçları istediğiniz zaman kaydedin.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FİNAL CTA -->
+  <section class="lp-section" id="lp-cta">
+    <div class="lp-container">
+      <div class="lp-cta-band">
+        <div class="lp-eyebrow" style="justify-content:center;display:inline-flex"><span class="dot"></span> Hazır mısınız?</div>
+        <h2>Bir sonraki teklifiniz ilk tıklamadan itibaren disiplinli.</h2>
+        <p>Kayıt gerekmez. PVGIS, KDV, dağıtım bedeli ve saatlik mahsuplaşma dahil tüm hesaplamalar anında kullanımınıza açık.</p>
+        <div class="lp-cta-row">
+          <button type="button" class="lp-btn lp-btn-primary lp-btn-lg" onclick="startCalculator()">
+            Hesaplamaya Başla
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+          <a href="#lp-features" class="lp-btn lp-btn-secondary lp-btn-lg">
+            Özellikleri İncele
+          </a>
+        </div>
+        <div class="lp-cta-notes">
+          <span>✓ Ücretsiz</span>
+          <span>✓ Kayıtsız kullanım</span>
+          <span>✓ PVGIS v5.3</span>
+          <span>✓ EPDK tarifeleri</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="lp-footer">
+    <div class="lp-container">
+      <div class="lp-footer-inner">
+        <div class="lp-footer-brand">
+          <img src="new_version_logo.png" alt="Solar Rota"/>
+          <div>
+            <strong>Solar Rota</strong>
+            <div class="lp-footer-tag">Türkiye'nin GES tasarım ve fizibilite stüdyosu.</div>
+          </div>
+        </div>
+        <div class="lp-footer-links">
+          <a onclick="startCalculator()">Hesaplama Aracı</a>
+          <a href="#lp-features">Özellikler</a>
+          <a href="#lp-scenarios">Senaryolar</a>
+          <a href="#lp-how">Kullanım</a>
+        </div>
+      </div>
+      <div class="lp-footer-bottom">
+        <span>© 2026 Solar Rota · Tüm hakları saklıdır</span>
+        <span>PVGIS · EPDK · TS EN 1991 verilerine göre modellenmiştir.</span>
+      </div>
+    </div>
+  </footer>
+</div>
 
 <!-- HEADER -->
 <header id="app-header">
@@ -616,6 +1047,10 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
         <span class="brand-assurance" data-i18n="app.headerAssurance">Türkiye odaklı mühendislik aracı</span>
       </div>
       <div class="header-actions">
+        <button class="app-home-btn" id="back-to-landing-btn" onclick="goToLanding()" title="Anasayfa" aria-label="Anasayfa">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Anasayfa</span>
+        </button>
         <button class="header-icon-btn icon-only" id="settings-open-btn" data-testid="open-settings" onclick="openSettings()" title="Ayarlar" aria-label="Ayarlar"
                 data-i18n-title="settings.title" data-i18n-aria-label="settings.title"
                 style="border-color:var(--border);position:relative">
@@ -3567,5 +4002,108 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 </div>
 
 <script type="module" src="js/app.js"></script>
+
+<!-- ═══════════════════════════════════════════════════════════
+     Landing ↔ Uygulama Geçişi
+     Calc motoru module olarak yüklendiği için landing CTA'ları
+     window.goToStep ve window.selectScenario hazır olmadan tıklanırsa
+     hash'e route edip motoru beklerler. Hesaplama logic'i bozulmaz.
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+(function(){
+  'use strict';
+  var LP_ROUTE = '#/app';
+  var pendingScenario = null;
+
+  function showApp(){
+    document.body.classList.remove('landing-active');
+    // Scroll app'in başına
+    window.scrollTo({top:0, behavior:'auto'});
+    // Hash'i senkronla
+    if (location.hash !== LP_ROUTE) {
+      history.replaceState(null, '', LP_ROUTE);
+    }
+    // Pending senaryo varsa uygula
+    if (pendingScenario) {
+      applyPendingScenario();
+    }
+  }
+
+  function showLanding(){
+    document.body.classList.add('landing-active');
+    window.scrollTo({top:0, behavior:'auto'});
+    if (location.hash === LP_ROUTE) {
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+  }
+
+  function applyPendingScenario(){
+    var key = pendingScenario;
+    if (!key) return;
+    var tryApply = function(){
+      if (typeof window.selectScenario === 'function') {
+        try { window.selectScenario(key); } catch(e){}
+        pendingScenario = null;
+        return true;
+      }
+      return false;
+    };
+    if (!tryApply()) {
+      // Motor henüz yüklenmediyse kısa aralıklarla tekrar dene
+      var tries = 0;
+      var iv = setInterval(function(){
+        tries++;
+        if (tryApply() || tries > 60) clearInterval(iv);
+      }, 100);
+    }
+  }
+
+  // Public API (HTML onclick'ler için)
+  window.startCalculator = function(){
+    showApp();
+    // Adım 1'e emin olmak için
+    if (typeof window.goToStep === 'function') {
+      try {
+        if (window.state && window.state.step !== 1) window.goToStep(1);
+      } catch(e){}
+    }
+  };
+
+  window.startCalculatorWithScenario = function(scenarioKey){
+    pendingScenario = scenarioKey;
+    showApp();
+  };
+
+  window.goToLanding = function(){
+    showLanding();
+  };
+
+  window.goToLandingTop = function(){
+    var root = document.getElementById('landing-root');
+    if (root) root.scrollIntoView({behavior:'auto', block:'start'});
+    window.scrollTo({top:0, behavior:'smooth'});
+  };
+
+  // İlk açılışta hash'e göre mod
+  function initialRoute(){
+    if (location.hash === LP_ROUTE) {
+      document.body.classList.remove('landing-active');
+    } else {
+      document.body.classList.add('landing-active');
+    }
+  }
+
+  // Hash değişirse mod değiştir
+  window.addEventListener('hashchange', function(){
+    if (location.hash === LP_ROUTE) {
+      document.body.classList.remove('landing-active');
+    } else if (location.hash === '' || location.hash === '#') {
+      document.body.classList.add('landing-active');
+    }
+  });
+
+  initialRoute();
+})();
+</script>
 </body>
 </html>
