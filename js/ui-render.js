@@ -1151,8 +1151,8 @@ function updateTurkeyMapDot(lat, lon, cityName) {
 
   const rawX = ((lon - lonMin) / (lonMax - lonMin)) * svgW;
   const rawY = svgH - ((lat - latMin) / (latMax - latMin)) * svgH;
-  const x = Math.max(22, Math.min(svgW - 22, rawX));
-  const y = Math.max(18, Math.min(svgH - 18, rawY));
+  const x = Math.max(28, Math.min(svgW - 28, rawX));
+  const y = Math.max(28, Math.min(svgH - 24, rawY));
 
   const pulse = document.getElementById('city-pulse-dot');
   const inner = document.getElementById('city-dot-inner');
@@ -1163,9 +1163,9 @@ function updateTurkeyMapDot(lat, lon, cityName) {
   if (label) {
     const isNearLeft = rawX < 70;
     const isNearRight = rawX > (svgW - 70);
-    const placeBelow = rawY < 42;
+    const placeBelow = rawY < 58;
     const labelX = isNearLeft ? x + 10 : isNearRight ? x - 10 : x;
-    const labelY = placeBelow ? y + 18 : y - 14;
+    const labelY = placeBelow ? Math.max(42, y + 18) : y - 16;
     const anchor = isNearLeft ? 'start' : isNearRight ? 'end' : 'middle';
     label.setAttribute('x', x.toFixed(0));
     label.setAttribute('x', labelX.toFixed(0));
@@ -1316,25 +1316,38 @@ function renderStructuralResults(sc) {
   const windStatus = sc.windPressure <= 0.5 ? 'ok' : sc.windPressure <= 1.0 ? 'warn' : 'danger';
   const statusColors = { ok: '#10B981', warn: '#F59E0B', danger: '#EF4444' };
   const statusLabels = { ok: 'OK', warn: 'Dikkat', danger: 'Kritik' };
+  const overallStatus = snowStatus === 'danger' || windStatus === 'danger'
+    ? { label: 'Detaylı statik inceleme gerekli', color: 'danger', note: 'Yükler yüksek göründüğü için mühendislik onayı olmadan uygulama önerilmez.' }
+    : snowStatus === 'warn' || windStatus === 'warn'
+      ? { label: 'Saha ve taşıyıcı kontrol önerilir', color: 'warn', note: 'Kurulum öncesi çatı taşıyıcısı ve bağlantı detayları yerinde doğrulanmalıdır.' }
+      : { label: 'İlk bakışta uygulanabilir görünüyor', color: 'good', note: 'Yine de nihai taşıyıcı kararını statik proje ve saha kontrolü vermelidir.' };
 
   card.innerHTML = `
     <div class="result-card-header">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
       <span>Yapısal Kontrol</span>
     </div>
-    <div class="structural-checks">
-      <div class="structural-check-row">
-        <span>Kar Yükü (${sc.snowZone})</span>
-        <span>${sc.snowLoad.toFixed(2)} kN/m²</span>
-        <span class="status-badge" style="background:${statusColors[snowStatus]}22;color:${statusColors[snowStatus]};border:1px solid ${statusColors[snowStatus]}44;padding:2px 8px;border-radius:20px;font-size:0.75rem">${statusLabels[snowStatus]}</span>
-      </div>
-      <div class="structural-check-row">
-        <span>Rüzgar Basıncı (${sc.windZone})</span>
-        <span>${sc.windPressure.toFixed(2)} kN/m²</span>
-        <span class="status-badge" style="background:${statusColors[windStatus]}22;color:${statusColors[windStatus]};border:1px solid ${statusColors[windStatus]}44;padding:2px 8px;border-radius:20px;font-size:0.75rem">${statusLabels[windStatus]}</span>
-      </div>
+    <div class="structural-insight-grid">
+      <article class="structural-insight-card">
+        <div class="structural-insight-value" style="color:${statusColors[snowStatus]}">${sc.snowLoad.toFixed(2)} kN/m²</div>
+        <div class="structural-insight-label">Kar yükü · ${sc.snowZone}</div>
+        <div class="structural-insight-note">Kış koşullarında çatının taşıması beklenen ek yük. Bölge ağırlaştıkça bağlantı detayları daha kritik hale gelir.</div>
+      </article>
+      <article class="structural-insight-card">
+        <div class="structural-insight-value" style="color:${statusColors[windStatus]}">${sc.windPressure.toFixed(2)} kN/m²</div>
+        <div class="structural-insight-label">Rüzgar basıncı · ${sc.windZone}</div>
+        <div class="structural-insight-note">Rüzgarın panel ve taşıyıcı sistem üzerinde oluşturabileceği emme ve baskı etkisini temsil eder.</div>
+      </article>
+      <article class="structural-insight-card">
+        <div class="structural-insight-value ${overallStatus.color}">${overallStatus.label}</div>
+        <div class="structural-insight-label">Genel yorum</div>
+        <div class="structural-insight-note">${overallStatus.note}</div>
+      </article>
     </div>
-    <p style="font-size:0.78rem;color:var(--text-muted);margin-top:8px">${sc.recommendation}</p>
+    <div class="structural-recommendation">
+      <strong>Nasıl yorumlanmalı?</strong>
+      ${sc.recommendation}
+    </div>
   `;
 }
 

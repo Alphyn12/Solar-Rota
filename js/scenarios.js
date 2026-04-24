@@ -40,6 +40,31 @@ export function renderScenarioAnalysis() {
   // Özel senaryo
   const customRate = parseFloat(document.getElementById('scenario-custom-rate')?.value) / 100 || 0.30;
   const customScenario = computeScenario(r, customRate, state);
+  const summaryEl = document.getElementById('scenario-summary-strip');
+  if (summaryEl) {
+    const bestScenario = scenarios.reduce((best, current) => Number(current.npv) > Number(best.npv) ? current : best, scenarios[0]);
+    const worstScenario = scenarios.reduce((worst, current) => Number(current.npv) < Number(worst.npv) ? current : worst, scenarios[0]);
+    const scenarioKeyByRate = rate => Object.entries(INFLATION_SCENARIOS).find(([, sc]) => sc.rate === rate)?.[1];
+    const bestMeta = scenarioKeyByRate(bestScenario.inflationRate) || { labelKey: 'scenarioAnalysis.midInflation' };
+    const worstMeta = scenarioKeyByRate(worstScenario.inflationRate) || { labelKey: 'scenarioAnalysis.lowInflation' };
+    summaryEl.innerHTML = `
+      <article class="scenario-insight-card">
+        <div class="scenario-insight-value">${bestScenario.paybackYear ? t('scenarioAnalysis.paybackYears').replace('{n}', bestScenario.paybackYear) : t('scenarioAnalysis.paybackOver25')}</div>
+        <div class="scenario-insight-label">En hızlı geri dönen senaryo</div>
+        <div class="scenario-insight-note">${t(bestMeta.labelKey)} koşulunda yatırım en hızlı şekilde kendini geri ödüyor.</div>
+      </article>
+      <article class="scenario-insight-card">
+        <div class="scenario-insight-value">${money(customScenario.npv)}</div>
+        <div class="scenario-insight-label">Seçtiğiniz özel senaryonun 25 yıllık etkisi</div>
+        <div class="scenario-insight-note">%${(customRate * 100).toFixed(0)} yıllık artış varsayımıyla yatırımın uzun vadeli toplam etkisi.</div>
+      </article>
+      <article class="scenario-insight-card">
+        <div class="scenario-insight-value">${money(bestScenario.npv - worstScenario.npv)}</div>
+        <div class="scenario-insight-label">İyimser ve zorlayıcı senaryo farkı</div>
+        <div class="scenario-insight-note">${t(bestMeta.labelKey)} ile ${t(worstMeta.labelKey)} arasında beklenen fark bu seviyeye çıkıyor.</div>
+      </article>
+    `;
+  }
 
   // Metric tablosu
   const tableEl = document.getElementById('scenario-table');
@@ -268,6 +293,7 @@ function computeScenario(r, inflationRate, state) {
   const cashFlows = [-totalCost, ...financial.rows.map(row => row.netCashFlow)];
 
   return {
+    inflationRate,
     paybackYear: financial.grossSimplePaybackYear ? Number(financial.grossSimplePaybackYear).toFixed(1) : financial.simplePaybackYear,
     npv: Math.round(financial.projectNPV),
     irr: calcIRR(cashFlows),

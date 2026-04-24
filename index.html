@@ -215,6 +215,21 @@ body>main{z-index:auto}
 .audit-raw-wrap{margin-top:14px}
 .audit-raw-title{font-family:var(--font-display);font-size:.86rem;font-weight:700;color:var(--text);margin:18px 0 10px}
 .audit-offgrid-note{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.22);border-radius:12px;padding:12px 14px;font-size:.78rem;color:var(--text-muted);line-height:1.6;margin-bottom:16px}
+.scenario-insight-grid,.structural-insight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:14px 0 16px}
+.scenario-insight-card,.structural-insight-card{background:rgba(255,255,255,.03);border:1px solid var(--border-subtle);border-radius:14px;padding:16px;box-shadow:var(--shadow-card)}
+.scenario-insight-value,.structural-insight-value{font-family:var(--font-display);font-size:1.25rem;font-weight:800;letter-spacing:-.03em;color:var(--primary);line-height:1.05}
+.structural-insight-value.good{color:var(--success)}
+.structural-insight-value.warn{color:var(--primary)}
+.structural-insight-value.danger{color:var(--danger)}
+.scenario-insight-label,.structural-insight-label{font-size:.74rem;color:var(--text);font-weight:600;margin-top:8px}
+.scenario-insight-note,.structural-insight-note{font-size:.72rem;color:var(--text-muted);line-height:1.55;margin-top:6px}
+.scenario-explainer{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px}
+.scenario-explainer-card{background:rgba(255,255,255,.025);border:1px solid var(--border-subtle);border-radius:12px;padding:14px}
+.scenario-explainer-card strong{display:block;color:var(--text);margin-bottom:6px;font-size:.82rem}
+.scenario-explainer-card span{display:block;color:var(--text-muted);font-size:.76rem;line-height:1.6}
+.scenario-control-row{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.structural-recommendation{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:12px;padding:14px 16px;font-size:.78rem;color:var(--text-muted);line-height:1.6;margin-top:14px}
+.structural-recommendation strong{display:block;color:var(--text);margin-bottom:6px}
 .eng-report-body.open{display:block}
 .eng-report-body:not(.open){display:none}
 .eng-report-body{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.01))}
@@ -3432,7 +3447,19 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       Senaryo Analizi — Enflasyon Etkisi
     </div>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+    <div class="result-helper">Bu bölüm, elektrik fiyatı artış hızının yatırım geri dönüşünü nasıl değiştirebileceğini gösterir. Amaç kesin tahmin vermek değil; iyimser, dengeli ve zorlayıcı koşullarda sonucun nasıl davranacağını hızlıca karşılaştırmaktır.</div>
+    <div class="scenario-explainer">
+      <article class="scenario-explainer-card">
+        <strong>Ne anlatır?</strong>
+        <span>Elektrik fiyatları daha hızlı artarsa güneş yatırımı genelde daha erken geri döner. Artış daha yavaş kalırsa geri ödeme süresi uzar.</span>
+      </article>
+      <article class="scenario-explainer-card">
+        <strong>Nasıl okunur?</strong>
+        <span>Önce en dengeli senaryoya bakın. Sonra iyimser ve zorlayıcı senaryolar arasındaki farkın ne kadar açıldığını kontrol edin.</span>
+      </article>
+    </div>
+    <div id="scenario-summary-strip" class="scenario-insight-grid"></div>
+    <div class="scenario-control-row">
       <label style="font-size:0.85rem;color:var(--text-muted)">Özel Enflasyon:</label>
       <input type="range" id="scenario-custom-rate" min="5" max="80" value="30"
         oninput="document.getElementById('scenario-custom-label').textContent='%'+this.value;onScenarioCustomChange()"
@@ -3484,6 +3511,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
       Yapısal Yük Analizi (TS EN 1991)
     </div>
+    <div class="result-helper">Bu kart, çatının kar ve rüzgar yükleri açısından daha dikkatli incelenmesi gerekip gerekmediğini gösterir. Buradaki sonuç ilk teknik uyarıdır; nihai statik proje yerine geçmez.</div>
     <div id="structural-result-body"></div>
   </div>
 

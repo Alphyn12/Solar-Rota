@@ -665,7 +665,10 @@ textarea {
   .audit-summary-grid,
   .audit-section-grid,
   .eng-report-intro,
-  .perf-badges {
+  .perf-badges,
+  .scenario-insight-grid,
+  .structural-insight-grid,
+  .scenario-explainer {
     grid-template-columns: 1fr !important;
   }
 
