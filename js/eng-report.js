@@ -68,6 +68,21 @@ export function renderEngReport() {
   const comp = r.compensationSummary || {};
 
   let html = `
+  <div class="eng-report-intro">
+    <section class="eng-intro-card">
+      <div class="eng-intro-kicker">Uzman görünümü</div>
+      <div class="eng-intro-title">Bu bölüm proje ekibi ve ileri kontrol için hazırlanır</div>
+      <div class="eng-intro-copy">Aşağıda üretim hesabının dayanağı, yerleşim varsayımları, kayıp zinciri, yatırım hesapları ve uzun dönem projeksiyonlar daha ayrıntılı biçimde gösterilir. İlk görüşmede tamamını okumak gerekmez.</div>
+    </section>
+    <section class="eng-intro-card">
+      <div class="eng-intro-kicker">Hızlı okuma</div>
+      <ul class="eng-intro-list">
+        <li>Önce üretim motoru ve veri kaynağına bakın.</li>
+        <li>Sonra panel yerleşimi ve kayıp zincirini kontrol edin.</li>
+        <li>En son maliyet ve 25 yıl projeksiyonuna geçin.</li>
+      </ul>
+    </section>
+  </div>
   <div class="eng-section-header">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
     ${escapeHtml(i18n.t('report.authoritativeProductionEngine'))}

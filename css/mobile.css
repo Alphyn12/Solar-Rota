@@ -662,6 +662,18 @@ textarea {
     min-height: 0;
   }
 
+  .audit-summary-grid,
+  .audit-section-grid,
+  .eng-report-intro,
+  .perf-badges {
+    grid-template-columns: 1fr !important;
+  }
+
+  .loss-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
   .fin-row {
     align-items: flex-start;
     gap: 8px;
@@ -703,7 +715,8 @@ textarea {
   }
 
   .tech-table,
-  .section-table {
+  .section-table,
+  .cost-breakdown-table {
     display: block;
     width: 100%;
     overflow-x: auto;
@@ -715,7 +728,9 @@ textarea {
   .tech-table th,
   .tech-table td,
   .section-table th,
-  .section-table td {
+  .section-table td,
+  .cost-breakdown-table th,
+  .cost-breakdown-table td {
     white-space: nowrap;
   }
 

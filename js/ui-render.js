@@ -982,11 +982,21 @@ function renderWarningsAndAudit(state, r) {
   const auditRows = (state.auditLog || []).slice(-10).reverse().map(entry =>
     `<tr><td>${escapeHtml(entry.timestamp || '—')}</td><td>${escapeHtml(entry.action || '—')}</td><td>${escapeHtml(entry.user?.name || '—')} (${escapeHtml(entry.user?.role || '—')})</td></tr>`
   ).join('');
-  const warningHtml = warnings.length
-    ? `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:12px;margin-bottom:12px;color:#FCA5A5;font-size:0.82rem">
-        <strong>${escapeHtml(i18n.t('audit.warningsTitle'))}:</strong><br>${warnings.map(w => `• ${escapeHtml(w)}`).join('<br>')}
-      </div>`
-    : `<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:12px;margin-bottom:12px;color:#A7F3D0;font-size:0.82rem">${escapeHtml(i18n.t('audit.noCriticalAnomalies'))}</div>`;
+  const simplifyAuditWarning = warning => {
+    const text = String(warning || '').trim();
+    if (!text) return '';
+    return text
+      .replace(/PVGIS verisi alınamadı; fallback PSH hesabı düşük güven seviyesidir\./i, 'Canlı güneş verisi alınamadı. Sonuç geçici yerel tahmin modeliyle üretildiği için güven düşer.')
+      .replace(/Off-grid doğruluk puanı düşük:[^.]*\./i, 'Off-grid sonucu şu an kaba ön değerlendirme seviyesinde; saha verisi olmadan belirsizlik yüksektir.')
+      .replace(/Gerçek 8760 saatlik PV üretim serisi yok; dispatch aylık üretimden türetilmiş sentetik profil kullanıyor\./i, 'Saatlik gerçek üretim verisi yok. Sistem yıl içine tahmini profil ile dağıtıldı.')
+      .replace(/Faz 1 saha dispatch girdileri tamamlanmadan Faz 2 kanıt kapısı açılamaz\./i, 'Saha ölçümü ve saatlik veri olmadan ikinci doğrulama aşamasına geçilemez.')
+      .replace(/Faz 1 saatlik dispatch girdileri tamamlanmadan Faz 3 model olgunluğu kabul edilemez\./i, 'Modelin güvenini artırmak için önce gerçek saatlik saha verisi gerekir.')
+      .replace(/Faz 1 saatlik dispatch girdileri tamamlanmadan Faz 4 saha kabul kapısı açılamaz\./i, 'Saha kabulü için önce temel ölçüm ve yük kayıtları tamamlanmalıdır.')
+      .replace(/Faz 4 saha kabul kapısı tamamlanmadan Faz 5 garanti operasyon kapısı açılamaz\./i, 'Garanti ve işletme aşamasına geçmeden önce saha kabulü tamamlanmalıdır.')
+      .replace(/Faz 5 aktif izleme\/operasyon kapısı tamamlanmadan Faz 6 revalidasyon kapısı açılamaz\./i, 'Yıllık yeniden doğrulama için önce aktif izleme dönemi gerekir.')
+      .replace(/Kurulu güç sözleşme gücünü aşıyor; bağlantı görüşü ve mahsuplaşma sınırları proje bazında kontrol edilmeli\./i, 'Kurulu güç mevcut sınırları aşıyor olabilir. Bağlantı ve mahsuplaşma tarafı ayrıca kontrol edilmelidir.')
+      .replace(/Quote-ready değil \| /i, 'Bu sonuç henüz teklif sunumuna hazır değil: ');
+  };
 
   const quoteBlockers = localizeMessageList(r.quoteReadiness?.blockers || []).slice(0, 3);
   const approvalBlockers = localizeMessageList(approval.blockers || []);
@@ -1007,6 +1017,16 @@ function renderWarningsAndAudit(state, r) {
       ? i18n.t('audit.selfConsumptionOffGrid')
       : i18n.t('audit.selfConsumptionSurplus');
   const L2 = isOffGrid ? r.offgridL2Results : null;
+  const missingEvidenceCount = Object.values(evidence.registry || {}).filter(record => record?.status !== 'verified').length;
+  const simplifiedWarnings = warnings.map(simplifyAuditWarning).filter(Boolean);
+  const visibleWarnings = simplifiedWarnings.slice(0, 6);
+  const readinessStatus = statusLabel(r.quoteReadiness?.status || confidence.level || '—');
+  const reliabilityScore = isOffGrid ? `${L2?.accuracyScore ?? '—'}/100` : `${confidence.score ?? '—'}/100`;
+  const reliabilityNote = isOffGrid ? `Belirsizlik bandı ${L2?.accuracyAssessment?.expectedUncertaintyPct ? `±${Number(L2.accuracyAssessment.expectedUncertaintyPct.lowPct || 0).toFixed(0)}-${Number(L2.accuracyAssessment.expectedUncertaintyPct.highPct || 0).toFixed(0)}%` : '—'} seviyesinde.` : `Teklif güven skoru ${confidence.score ?? '—'}/100 seviyesinde.`;
+  const annualLoad = Math.round(r.hourlySummary?.annualLoad || state.dailyConsumption * 365).toLocaleString(localeTag());
+  const rawWarningsHtml = warnings.length
+    ? `<ul class="audit-warning-list">${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`
+    : `<div class="audit-summary-note">${escapeHtml(i18n.t('audit.noCriticalAnomalies'))}</div>`;
   const energyBalanceValue = L2
     ? `${i18n.t('offgridL2.pvBessCoverageLabel')}: ${((L2.pvBatteryLoadCoverage ?? L2.totalLoadCoverage) * 100).toFixed(1)}% / ${i18n.t('offgridL2.accuracyScoreLabel')}: ${L2.accuracyScore ?? '—'}/100 / ${i18n.t('offgridL2.generatorLabel')}: ${Math.round(L2.generatorEnergyKwh || L2.generatorKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.unservedLoad')}: ${Math.round(L2.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.curtailedPv')}: ${Math.round(L2.curtailedPvKwh || 0).toLocaleString(localeTag())} kWh`
     : state.netMeteringEnabled
@@ -1025,42 +1045,97 @@ function renderWarningsAndAudit(state, r) {
         <span>${escapeHtml(i18n.t('audit.purposeBody'))}</span>
       </div>
       ${offGridAuditNote}
-      ${warningHtml}
-      ${scrollHint}
-      <table class="tech-table">
-        <tbody>
-          <tr><td>${escapeHtml(i18n.t('audit.location'))}</td><td>${escapeHtml(state.cityName || '—')} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
-          <tr><td>${escapeHtml(i18n.t('audit.tariff'))}</td><td>${escapeHtml(r.tariffModel?.type || state.tariffType)} | ${escapeHtml(r.tariffModel?.effectiveRegime || '—')} | ${moneyRate(r.tariff, 'kWh')} | ${escapeHtml(i18n.t('audit.source'))}: ${escapeHtml(r.tariffModel?.sourceDate || '—')}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('audit.regulationEngine'))}</td><td>${escapeHtml(r.tariffModel?.regulation?.effectiveRegimeBasis || '—')} | SKTT activation: ${escapeHtml(r.tariffModel?.regulation?.activationDate || '—')} | eval: ${escapeHtml(r.tariffModel?.regulation?.evaluationDate || '—')}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('audit.consumption'))}</td><td>${Math.round(r.hourlySummary?.annualLoad || state.dailyConsumption * 365).toLocaleString(localeTag())} kWh/${escapeHtml(i18n.t('units.year'))}</td></tr>
-          <tr><td>${escapeHtml(energyBalanceLabel)}</td><td>${escapeHtml(energyBalanceValue)}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('audit.productionConfidenceRange'))}</td><td>${escapeHtml(i18n.t('audit.badYear'))}: ${Math.round(r.annualEnergy * 0.90).toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.baseYear'))}: ${r.annualEnergy.toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.goodYear'))}: ${Math.round(r.annualEnergy * 1.10).toLocaleString(localeTag())} kWh</td></tr>
-          <tr><td>${escapeHtml(i18n.t('governance.confidenceLevel'))}</td><td>${escapeHtml(statusLabel(r.confidenceLevel))} (${escapeHtml(r.calculationMode)})</td></tr>
-          <tr><td>${escapeHtml(i18n.t('scenario.label'))}</td><td>${escapeHtml(state.scenarioContext?.label || state.scenarioKey || 'On-Grid')} | ${escapeHtml(state.scenarioContext?.nextAction || '—')}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('engine.authoritative'))}</td><td>${escapeHtml(backendEngineText(r, state))} | ${escapeHtml(r.sourceQualityNote || '—')}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('engine.parity'))}</td><td>${escapeHtml(parityText)}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('engine.fallbackReason'))}</td><td>${escapeHtml(localizeKnownMessage(r.authoritativeEngineFallbackReason || '—'))}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('governance.quoteReadiness'))}</td><td>${escapeHtml(statusLabel(r.quoteReadiness?.status || '—'))}${quoteBlockers.length ? ' | ' + escapeHtml(quoteBlockers.join(' · ')) : ''}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('audit.regulationEngine'))}</td><td>${escapeHtml(r.quoteReadiness?.version || r.tariffModel?.exportCompensationPolicy?.version || '—')} | ${escapeHtml(r.tariffModel?.exportCompensationPolicy?.assumptionBasis || '—')}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('audit.tariffSourceGovernance'))}</td><td>${escapeHtml(tariffSource.sourceLabel || '—')} | ${escapeHtml(i18n.t('audit.sourceAge'))}: ${tariffSource.ageDays ?? '—'} ${escapeHtml(i18n.t('units.year')) === 'year' ? 'days' : 'gün'} | ${escapeHtml(tariffFreshness)}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('governance.proposalConfidence'))}</td><td>${confidence.score ?? '—'} / 100 · ${escapeHtml(statusLabel(confidence.level || '—'))}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('governance.approvalState'))}</td><td>${escapeHtml(statusLabel(approval.state || 'draft'))}${approval.approvalRecord ? ' | immutable: ' + escapeHtml(approval.approvalRecord.id) : ''}${approvalBlockers.length ? ' | ' + escapeHtml(approvalBlockers.join(' · ')) : ''}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('audit.financing'))}</td><td>${escapeHtml(i18n.t('audit.monthlyPayment'))}: ${financing.monthlyPayment ? money(financing.monthlyPayment) : '—'} | DSCR: ${financing.firstYearDebtServiceCoverage ?? '—'}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('audit.maintenanceContract'))}</td><td>${money(maintenance.annualBase || 0)}/${escapeHtml(i18n.t('units.year'))} | 10 ${escapeHtml(i18n.t('units.year'))}: ${money(maintenance.tenYearNominal || 0)} | ${escapeHtml(statusLabel(maintenance.contractStatus || '—'))}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('audit.gridApplication'))}</td><td>${escapeHtml(gridStatus)}</td></tr>
-          <tr><td>${escapeHtml(i18n.t('audit.dataPrivacy'))}</td><td>${escapeHtml(i18n.t('audit.privacyLocalOnly'))}</td></tr>
-        </tbody>
-      </table>
-      <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.assumptionLedger'))}</div>
-      ${scrollHint}
-      <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.assumption'))}</th><th>${escapeHtml(i18n.t('audit.value'))}</th><th>${escapeHtml(i18n.t('audit.confidence'))}</th><th>${escapeHtml(i18n.t('audit.source'))}</th></tr></thead><tbody>${ledgerRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table>
-      <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.evidenceRecords'))}</div>
-      ${scrollHint}
-      <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.evidence'))}</th><th>${escapeHtml(i18n.t('audit.status'))}</th><th>Ref</th><th>${escapeHtml(i18n.t('audit.checkedDate'))}</th><th>${escapeHtml(i18n.t('audit.validity'))}</th><th>File / SHA-256</th></tr></thead><tbody>${evidenceRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table>
-      <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.revisionDiff'))}</div>
-      <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.field'))}</th><th>${escapeHtml(i18n.t('audit.before'))}</th><th>${escapeHtml(i18n.t('audit.after'))}</th></tr></thead><tbody>${revisionRows || `<tr><td colspan="3">${escapeHtml(i18n.t('audit.noRevisionDiff'))}</td></tr>`}</tbody></table>
-      <div style="margin-top:14px;font-size:0.9rem;font-weight:700;color:var(--primary)">${escapeHtml(i18n.t('audit.auditLog'))}</div>
-      <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.time'))}</th><th>${escapeHtml(i18n.t('audit.action'))}</th><th>${escapeHtml(i18n.t('audit.user'))}</th></tr></thead><tbody>${auditRows || `<tr><td colspan="3">${escapeHtml(i18n.t('audit.noAuditRecords'))}</td></tr>`}</tbody></table>
+      <div class="audit-summary-grid">
+        <article class="audit-summary-card">
+          <div class="audit-summary-kicker">Hazırlık Seviyesi</div>
+          <div class="audit-summary-value ${isOffGrid && (L2?.accuracyScore || 0) < 60 ? 'bad' : 'warn'}">${escapeHtml(readinessStatus)}</div>
+          <div class="audit-summary-note">${escapeHtml(isOffGrid ? 'Bu sonuç saha verisi geldikçe güçlenecek bir ön değerlendirmedir.' : 'Bu sonuç hangi veri eksikleriyle üretildiğini gösterir.')}</div>
+        </article>
+        <article class="audit-summary-card">
+          <div class="audit-summary-kicker">Güven Skoru</div>
+          <div class="audit-summary-value ${isOffGrid && (L2?.accuracyScore || 0) < 60 ? 'bad' : 'warn'}">${escapeHtml(reliabilityScore)}</div>
+          <div class="audit-summary-note">${escapeHtml(reliabilityNote)}</div>
+        </article>
+        <article class="audit-summary-card">
+          <div class="audit-summary-kicker">Eksik Kanıt</div>
+          <div class="audit-summary-value ${missingEvidenceCount > 5 ? 'bad' : 'warn'}">${missingEvidenceCount}</div>
+          <div class="audit-summary-note">Doğrulanmamış evrak ve kayıt sayısı. Bu sayı düştükçe sonuç daha savunulabilir hale gelir.</div>
+        </article>
+      </div>
+      <div class="audit-next-step">
+        <strong>Bir sonraki mantıklı adım</strong>
+        ${escapeHtml(state.scenarioContext?.nextAction || i18n.t('onGridResult.commercialNextAction'))}
+      </div>
+      <div class="audit-warning-wrap">
+        <div class="audit-warning-head">
+          <div class="audit-warning-title">Dikkat Gerektiren Noktalar</div>
+          <span class="audit-pill">${visibleWarnings.length} madde</span>
+        </div>
+        ${visibleWarnings.length ? `<ul class="audit-warning-list">${visibleWarnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>` : `<div class="audit-summary-note">${escapeHtml(i18n.t('audit.noCriticalAnomalies'))}</div>`}
+      </div>
+      <div class="audit-section-grid">
+        <article class="audit-data-card">
+          <span class="audit-data-label">Konum ve senaryo</span>
+          <span class="audit-data-value">${escapeHtml(state.cityName || '—')} · ${escapeHtml(state.scenarioContext?.label || state.scenarioKey || '—')}</span>
+          <span class="audit-data-note">${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)} · ${escapeHtml(state.scenarioContext?.nextAction || '—')}</span>
+        </article>
+        <article class="audit-data-card">
+          <span class="audit-data-label">Tüketim ve kapsama</span>
+          <span class="audit-data-value">${annualLoad} kWh/yıl</span>
+          <span class="audit-data-note">${escapeHtml(energyBalanceValue)}</span>
+        </article>
+        <article class="audit-data-card">
+          <span class="audit-data-label">Üretim bandı</span>
+          <span class="audit-data-value">${Math.round(r.annualEnergy * 0.90).toLocaleString(localeTag())} - ${Math.round(r.annualEnergy * 1.10).toLocaleString(localeTag())} kWh/yıl</span>
+          <span class="audit-data-note">Baz tahmin: ${r.annualEnergy.toLocaleString(localeTag())} kWh/yıl</span>
+        </article>
+        <article class="audit-data-card">
+          <span class="audit-data-label">Tarife ve kaynak</span>
+          <span class="audit-data-value">${escapeHtml(r.tariffModel?.type || state.tariffType)} · ${escapeHtml(r.tariffModel?.effectiveRegime || '—')}</span>
+          <span class="audit-data-note">${moneyRate(r.tariff, 'kWh')} · ${escapeHtml(tariffSource.sourceLabel || 'Kaynak girilmedi')}</span>
+        </article>
+      </div>
+      <details class="advanced-details audit-raw-wrap">
+        <summary class="advanced-details-summary">Ham kayıtlar ve teknik dökümler</summary>
+        <div class="audit-raw-title">Ham uyarı metinleri</div>
+        ${rawWarningsHtml}
+        <div class="audit-raw-title">Teknik veri özeti</div>
+        ${scrollHint}
+        <table class="tech-table">
+          <tbody>
+            <tr><td>${escapeHtml(i18n.t('audit.location'))}</td><td>${escapeHtml(state.cityName || '—')} (${Number(state.lat || 0).toFixed(4)}, ${Number(state.lon || 0).toFixed(4)})</td></tr>
+            <tr><td>${escapeHtml(i18n.t('audit.tariff'))}</td><td>${escapeHtml(r.tariffModel?.type || state.tariffType)} | ${escapeHtml(r.tariffModel?.effectiveRegime || '—')} | ${moneyRate(r.tariff, 'kWh')} | ${escapeHtml(i18n.t('audit.source'))}: ${escapeHtml(r.tariffModel?.sourceDate || '—')}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('audit.regulationEngine'))}</td><td>${escapeHtml(r.tariffModel?.regulation?.effectiveRegimeBasis || '—')} | SKTT activation: ${escapeHtml(r.tariffModel?.regulation?.activationDate || '—')} | eval: ${escapeHtml(r.tariffModel?.regulation?.evaluationDate || '—')}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('audit.consumption'))}</td><td>${annualLoad} kWh/${escapeHtml(i18n.t('units.year'))}</td></tr>
+            <tr><td>${escapeHtml(energyBalanceLabel)}</td><td>${escapeHtml(energyBalanceValue)}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('audit.productionConfidenceRange'))}</td><td>${escapeHtml(i18n.t('audit.badYear'))}: ${Math.round(r.annualEnergy * 0.90).toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.baseYear'))}: ${r.annualEnergy.toLocaleString(localeTag())} kWh | ${escapeHtml(i18n.t('audit.goodYear'))}: ${Math.round(r.annualEnergy * 1.10).toLocaleString(localeTag())} kWh</td></tr>
+            <tr><td>${escapeHtml(i18n.t('governance.confidenceLevel'))}</td><td>${escapeHtml(statusLabel(r.confidenceLevel))} (${escapeHtml(r.calculationMode)})</td></tr>
+            <tr><td>${escapeHtml(i18n.t('scenario.label'))}</td><td>${escapeHtml(state.scenarioContext?.label || state.scenarioKey || 'On-Grid')} | ${escapeHtml(state.scenarioContext?.nextAction || '—')}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('engine.authoritative'))}</td><td>${escapeHtml(backendEngineText(r, state))} | ${escapeHtml(r.sourceQualityNote || '—')}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('engine.parity'))}</td><td>${escapeHtml(parityText)}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('engine.fallbackReason'))}</td><td>${escapeHtml(localizeKnownMessage(r.authoritativeEngineFallbackReason || '—'))}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('governance.quoteReadiness'))}</td><td>${escapeHtml(statusLabel(r.quoteReadiness?.status || '—'))}${quoteBlockers.length ? ' | ' + escapeHtml(quoteBlockers.join(' · ')) : ''}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('audit.regulationEngine'))}</td><td>${escapeHtml(r.quoteReadiness?.version || r.tariffModel?.exportCompensationPolicy?.version || '—')} | ${escapeHtml(r.tariffModel?.exportCompensationPolicy?.assumptionBasis || '—')}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('audit.tariffSourceGovernance'))}</td><td>${escapeHtml(tariffSource.sourceLabel || '—')} | ${escapeHtml(i18n.t('audit.sourceAge'))}: ${tariffSource.ageDays ?? '—'} ${escapeHtml(i18n.t('units.year')) === 'year' ? 'days' : 'gün'} | ${escapeHtml(tariffFreshness)}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('governance.proposalConfidence'))}</td><td>${confidence.score ?? '—'} / 100 · ${escapeHtml(statusLabel(confidence.level || '—'))}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('governance.approvalState'))}</td><td>${escapeHtml(statusLabel(approval.state || 'draft'))}${approval.approvalRecord ? ' | immutable: ' + escapeHtml(approval.approvalRecord.id) : ''}${approvalBlockers.length ? ' | ' + escapeHtml(approvalBlockers.join(' · ')) : ''}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('audit.financing'))}</td><td>${escapeHtml(i18n.t('audit.monthlyPayment'))}: ${financing.monthlyPayment ? money(financing.monthlyPayment) : '—'} | DSCR: ${financing.firstYearDebtServiceCoverage ?? '—'}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('audit.maintenanceContract'))}</td><td>${money(maintenance.annualBase || 0)}/${escapeHtml(i18n.t('units.year'))} | 10 ${escapeHtml(i18n.t('units.year'))}: ${money(maintenance.tenYearNominal || 0)} | ${escapeHtml(statusLabel(maintenance.contractStatus || '—'))}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('audit.gridApplication'))}</td><td>${escapeHtml(gridStatus)}</td></tr>
+            <tr><td>${escapeHtml(i18n.t('audit.dataPrivacy'))}</td><td>${escapeHtml(i18n.t('audit.privacyLocalOnly'))}</td></tr>
+          </tbody>
+        </table>
+        <div class="audit-raw-title">${escapeHtml(i18n.t('audit.assumptionLedger'))}</div>
+        ${scrollHint}
+        <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.assumption'))}</th><th>${escapeHtml(i18n.t('audit.value'))}</th><th>${escapeHtml(i18n.t('audit.confidence'))}</th><th>${escapeHtml(i18n.t('audit.source'))}</th></tr></thead><tbody>${ledgerRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table>
+        <div class="audit-raw-title">${escapeHtml(i18n.t('audit.evidenceRecords'))}</div>
+        ${scrollHint}
+        <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.evidence'))}</th><th>${escapeHtml(i18n.t('audit.status'))}</th><th>Ref</th><th>${escapeHtml(i18n.t('audit.checkedDate'))}</th><th>${escapeHtml(i18n.t('audit.validity'))}</th><th>File / SHA-256</th></tr></thead><tbody>${evidenceRows || '<tr><td colspan="6">—</td></tr>'}</tbody></table>
+        <div class="audit-raw-title">${escapeHtml(i18n.t('audit.revisionDiff'))}</div>
+        <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.field'))}</th><th>${escapeHtml(i18n.t('audit.before'))}</th><th>${escapeHtml(i18n.t('audit.after'))}</th></tr></thead><tbody>${revisionRows || `<tr><td colspan="3">${escapeHtml(i18n.t('audit.noRevisionDiff'))}</td></tr>`}</tbody></table>
+        <div class="audit-raw-title">${escapeHtml(i18n.t('audit.auditLog'))}</div>
+        <table class="tech-table"><thead><tr><th>${escapeHtml(i18n.t('audit.time'))}</th><th>${escapeHtml(i18n.t('audit.action'))}</th><th>${escapeHtml(i18n.t('audit.user'))}</th></tr></thead><tbody>${auditRows || `<tr><td colspan="3">${escapeHtml(i18n.t('audit.noAuditRecords'))}</td></tr>`}</tbody></table>
+      </details>
     </details>
   `;
 
@@ -1074,8 +1149,10 @@ function updateTurkeyMapDot(lat, lon, cityName) {
   const lonMin = 26, lonMax = 45, latMin = 36, latMax = 42;
   if (!lat || !lon) return;
 
-  const x = ((lon - lonMin) / (lonMax - lonMin)) * svgW;
-  const y = svgH - ((lat - latMin) / (latMax - latMin)) * svgH;
+  const rawX = ((lon - lonMin) / (lonMax - lonMin)) * svgW;
+  const rawY = svgH - ((lat - latMin) / (latMax - latMin)) * svgH;
+  const x = Math.max(22, Math.min(svgW - 22, rawX));
+  const y = Math.max(18, Math.min(svgH - 18, rawY));
 
   const pulse = document.getElementById('city-pulse-dot');
   const inner = document.getElementById('city-dot-inner');
@@ -1084,8 +1161,16 @@ function updateTurkeyMapDot(lat, lon, cityName) {
   if (pulse) { pulse.setAttribute('cx', x.toFixed(0)); pulse.setAttribute('cy', y.toFixed(0)); pulse.setAttribute('opacity', '0.9'); }
   if (inner) { inner.setAttribute('cx', x.toFixed(0)); inner.setAttribute('cy', y.toFixed(0)); inner.setAttribute('opacity', '1'); }
   if (label) {
+    const isNearLeft = rawX < 70;
+    const isNearRight = rawX > (svgW - 70);
+    const placeBelow = rawY < 42;
+    const labelX = isNearLeft ? x + 10 : isNearRight ? x - 10 : x;
+    const labelY = placeBelow ? y + 18 : y - 14;
+    const anchor = isNearLeft ? 'start' : isNearRight ? 'end' : 'middle';
     label.setAttribute('x', x.toFixed(0));
-    label.setAttribute('y', (y - 14).toFixed(0));
+    label.setAttribute('x', labelX.toFixed(0));
+    label.setAttribute('y', labelY.toFixed(0));
+    label.setAttribute('text-anchor', anchor);
     label.setAttribute('opacity', '1');
     label.textContent = cityName || '';
   }
