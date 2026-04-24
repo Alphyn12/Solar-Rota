@@ -32,7 +32,13 @@
       "Bash(git *)",
       "Bash(python3 *)",
       "Bash(echo \"exit: $?\")",
-      "Bash(python -m pytest tests/ -q)"
+      "Bash(python -m pytest tests/ -q)",
+      "Bash(python -m http.server 8765)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{size_download}\" http://localhost:8765/index.html)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8765/css/landing.css)",
+      "Bash(curl -s http://localhost:8765/css/landing.css)",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"http.server 8765\")"
     ]
   }
 }
