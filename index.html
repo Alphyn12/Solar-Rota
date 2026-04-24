@@ -416,13 +416,55 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .payback-bar-fill{height:100%;background:linear-gradient(90deg,var(--success),var(--primary));border-radius:3px;transition:width 1s ease;}
 
 /* BESS / NM result wrappers */
-.bess-result-wrap,.nm-result-wrap{background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:20px;margin-top:16px;}
-.bess-result-title,.nm-result-title{font-family:var(--font-display);font-size:0.95rem;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.bess-result-wrap,.nm-result-wrap,.offgrid-result-card{background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:20px;margin-top:16px;box-shadow:var(--shadow-card);position:relative;overflow:hidden}
+.bess-result-wrap::before,.nm-result-wrap::before,.offgrid-result-card::before{content:'';position:absolute;left:18px;right:18px;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--offgrid-accent,rgba(245,158,11,0.55)),transparent)}
+.bess-result-title,.nm-result-title,.offgrid-result-title{font-family:var(--font-display);font-size:0.95rem;font-weight:700;display:flex;align-items:center;gap:8px;color:var(--text)}
+.result-badge-neutral{font-size:0.72rem;background:rgba(245,158,11,0.12);color:var(--primary);border:1px solid rgba(245,158,11,0.26);border-radius:999px;padding:2px 10px;font-weight:600}
 .bess-metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.bess-metric{text-align:center;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);border-radius:10px;padding:14px;}
-.bess-metric-val{font-family:var(--font-display);font-size:1.6rem;font-weight:800;color:#8B5CF6}
+.bess-metric{text-align:center;background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:12px;padding:16px;position:relative;overflow:hidden}
+.bess-metric::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--metric-color,var(--primary));opacity:.6}
+.bess-metric--primary{--metric-color:var(--primary)}
+.bess-metric--success{--metric-color:var(--success)}
+.bess-metric-val{font-family:var(--font-display);font-size:1.9rem;font-weight:800;color:var(--metric-color,var(--primary))}
 .bess-metric-label{font-size:0.72rem;color:var(--text-muted);margin-top:3px}
+.bess-metric-note{font-size:0.72rem;color:var(--text-muted);margin-top:6px;line-height:1.45}
+.bess-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:14px}
+.bess-detail-card{background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:12px;padding:12px 14px}
+.bess-detail-label{display:block;font-size:0.72rem;color:var(--text-muted);margin-bottom:4px}
+.bess-detail-value{display:block;font-family:var(--font-display);font-size:0.95rem;font-weight:700;color:var(--text)}
+.bess-detail-note{display:block;font-size:0.7rem;color:var(--text-muted);margin-top:5px;line-height:1.45}
+.offgrid-note-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-top:14px}
+.offgrid-note{padding:12px 14px;border-radius:12px;border:1px solid var(--border-subtle);background:rgba(255,255,255,0.03);font-size:0.78rem;color:var(--text-muted);line-height:1.6}
+.offgrid-note strong{color:var(--text)}
+.offgrid-note--warn{background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.24)}
+.offgrid-note--danger{background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.24);color:#FCA5A5}
 .nm-badge{font-size:0.72rem;background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3);border-radius:4px;padding:2px 8px;font-weight:500}
+.offgrid-result-stack{display:grid;gap:12px;margin-top:16px}
+.offgrid-result-card{margin-top:0;--offgrid-accent:rgba(245,158,11,0.55);--offgrid-kicker:var(--primary)}
+.offgrid-result-card--accent{--offgrid-accent:rgba(245,158,11,0.55);--offgrid-kicker:var(--primary)}
+.offgrid-result-card--success{--offgrid-accent:rgba(16,185,129,0.5);--offgrid-kicker:var(--success)}
+.offgrid-result-card--danger{--offgrid-accent:rgba(239,68,68,0.5);--offgrid-kicker:var(--danger)}
+.offgrid-result-card--slate{--offgrid-accent:rgba(148,163,184,0.45);--offgrid-kicker:#CBD5E1}
+.offgrid-result-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.offgrid-result-kicker{font-size:0.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--offgrid-kicker,var(--primary));margin-bottom:6px}
+.offgrid-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:12px}
+.offgrid-stat-card{background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:12px;padding:16px;min-height:114px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden}
+.offgrid-stat-card::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--metric-color,var(--primary));opacity:.65}
+.offgrid-stat-value{font-family:var(--font-display);font-size:1.55rem;font-weight:800;letter-spacing:-0.03em;color:var(--metric-color,var(--primary));line-height:1.05}
+.offgrid-stat-label{font-size:0.76rem;color:var(--text);font-weight:600;margin-top:8px}
+.offgrid-stat-note{font-size:0.72rem;color:var(--text-muted);line-height:1.5;margin-top:4px}
+.offgrid-chip-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px}
+.offgrid-chip-card{background:rgba(255,255,255,0.025);border:1px solid var(--border-subtle);border-radius:12px;padding:12px 14px}
+.offgrid-chip-label{display:block;font-size:0.72rem;color:var(--text-muted);margin-bottom:4px}
+.offgrid-chip-value{display:block;font-size:0.85rem;font-weight:700;color:var(--text);line-height:1.45}
+.offgrid-body-copy{font-size:0.8rem;color:var(--text-muted);line-height:1.7;margin-top:8px}
+.offgrid-list-title{font-family:var(--font-display);font-size:0.84rem;font-weight:700;color:var(--text);margin-top:14px}
+.offgrid-list{margin:10px 0 0;padding-left:18px;color:var(--text-muted);font-size:0.78rem;line-height:1.6}
+.offgrid-list li+li{margin-top:6px}
+.offgrid-inline-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.offgrid-inline-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.035);border:1px solid var(--border-subtle);font-size:0.74rem;color:var(--text-muted)}
+.offgrid-inline-badge strong{color:var(--text)}
+.offgrid-method-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:0.72rem;color:var(--text-muted)}
 
 /* section breakdown */
 .section-table{width:100%;border-collapse:collapse;font-size:0.82rem}
@@ -2936,90 +2978,163 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   <!-- BESS results -->
   <div class="bess-result-wrap" id="bess-result-section" style="display:none">
     <div class="bess-result-title">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-4 0v2"/></svg>
       Batarya Özeti
-      <span id="bess-model-badge" style="font-size:0.72rem;background:rgba(139,92,246,0.15);color:#8B5CF6;border:1px solid rgba(139,92,246,0.3);border-radius:4px;padding:2px 8px;font-weight:500"></span>
+      <span id="bess-model-badge" class="result-badge-neutral"></span>
     </div>
+    <div class="result-helper">Bu bölüm bataryanın gündüz üretilen enerjiyi ne kadar saklayabildiğini ve akşam kullanımını ne kadar desteklediğini sade şekilde açıklar.</div>
     <div class="bess-metrics">
-      <div class="bess-metric">
+      <div class="bess-metric bess-metric--primary">
         <div class="bess-metric-val" id="bess-independence">--%</div>
         <div class="bess-metric-label" data-i18n="report.gridIndependence">Yükün güneşle karşılanan kısmı</div>
+        <div class="bess-metric-note">Gündüz üretiminin doğrudan kullanım ve batarya desteğiyle ne kadar yük taşıdığını gösterir.</div>
       </div>
-      <div class="bess-metric">
+      <div class="bess-metric bess-metric--success">
         <div class="bess-metric-val" id="bess-night">--%</div>
         <div class="bess-metric-label" data-i18n="report.nightCoverage">Akşam ve gece için batarya desteği</div>
+        <div class="bess-metric-note">Güneş yokken bataryanın akşam ve gece yüklerini ne ölçüde desteklediğini gösterir.</div>
       </div>
     </div>
-    <div style="margin-top:12px;font-size:0.78rem;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:12px" id="bess-detail-row"></div>
+    <div class="bess-detail-grid" id="bess-detail-row"></div>
+    <div class="offgrid-note-strip" id="bess-note-strip"></div>
   </div>
 
   <!-- ═══ OFF-GRID LEVEL 2 SONUÇ EKRANı — yalnızca off-grid senaryosunda görünür ═══ -->
-  <div id="offgrid-l2-result-section" style="display:none;margin-top:16px">
+  <div id="offgrid-l2-result-section" class="offgrid-result-stack" style="display:none">
 
     <!-- Dispatch Özeti -->
-    <div style="background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.25);border-radius:var(--radius,12px);padding:20px;margin-bottom:12px">
-      <div style="font-family:var(--font-display,inherit);font-size:0.95rem;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;color:#8B5CF6">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-        <span data-i18n="offgridL2.dispatchSummaryTitle">Enerji Akışı Özeti</span>
+    <div class="offgrid-result-card offgrid-result-card--accent">
+      <div class="offgrid-result-head">
+        <div>
+          <div class="offgrid-result-kicker">Off-Grid Özeti</div>
+          <div class="offgrid-result-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <span data-i18n="offgridL2.dispatchSummaryTitle">Enerji Akışı Özeti</span>
+          </div>
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px" id="offgrid-dispatch-grid"></div>
+      <div class="result-helper">Üretilen elektriğin yıl boyunca doğrudan kullanım, batarya ve varsa jeneratör desteği arasında nasıl dağıldığını burada görürsünüz.</div>
+      <div class="offgrid-stat-grid" id="offgrid-dispatch-grid"></div>
     </div>
 
     <!-- Kapsama Metrikleri -->
-    <div style="background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.25);border-radius:var(--radius,12px);padding:20px;margin-bottom:12px">
-      <div style="font-family:var(--font-display,inherit);font-size:0.88rem;font-weight:700;margin-bottom:12px;color:#8B5CF6" data-i18n="offgridL2.coverageTitle">Sistemin Karşılama Düzeyi</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div style="text-align:center;background:rgba(139,92,246,0.09);border:1px solid rgba(139,92,246,0.2);border-radius:10px;padding:14px">
-          <div style="font-family:var(--font-display,inherit);font-size:1.8rem;font-weight:800;color:#8B5CF6" id="offgrid-total-coverage">--%</div>
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.totalCoverageLabel">Toplam ihtiyacın karşılanan kısmı</div>
+    <div class="offgrid-result-card offgrid-result-card--accent">
+      <div class="offgrid-result-head">
+        <div>
+          <div class="offgrid-result-kicker">Karşılama Gücü</div>
+          <div class="offgrid-result-title" data-i18n="offgridL2.coverageTitle">Sistemin Karşılama Düzeyi</div>
         </div>
-        <div style="text-align:center;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:14px">
-          <div style="font-family:var(--font-display,inherit);font-size:1.8rem;font-weight:800;color:#EF4444" id="offgrid-critical-coverage">--%</div>
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:3px" data-i18n="offgridL2.criticalCoverageLabel">Kritik ihtiyaçların karşılanan kısmı</div>
+      </div>
+      <div class="result-helper">İlk oran tüm tüketimi, ikinci oran ise elektrik kesilmemesi gereken kritik yükleri ne ölçüde karşılayabildiğini gösterir.</div>
+      <div class="offgrid-stat-grid">
+        <div class="offgrid-stat-card" style="--metric-color:var(--primary)">
+          <div class="offgrid-stat-value" id="offgrid-total-coverage">--%</div>
+          <div class="offgrid-stat-label" data-i18n="offgridL2.totalCoverageLabel">Toplam ihtiyacın karşılanan kısmı</div>
+          <div class="offgrid-stat-note">Evin veya tesisin toplam elektrik ihtiyacının sistem tarafından karşılanan bölümü.</div>
+        </div>
+        <div class="offgrid-stat-card" style="--metric-color:var(--danger)">
+          <div class="offgrid-stat-value" id="offgrid-critical-coverage">--%</div>
+          <div class="offgrid-stat-label" data-i18n="offgridL2.criticalCoverageLabel">Kritik ihtiyaçların karşılanan kısmı</div>
+          <div class="offgrid-stat-note">Buzdolabı, modem, aydınlatma gibi kesintide öncelikli yüklerin ne kadarının korunabildiği.</div>
         </div>
       </div>
     </div>
 
     <!-- Jeneratör Analizi (jeneratör etkinse görünür) -->
-    <div id="offgrid-generator-result-wrap" style="display:none;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius,12px);padding:16px;margin-bottom:12px">
-      <div style="font-size:0.8rem;font-weight:600;color:#F59E0B;margin-bottom:8px" data-i18n="offgridL2.generatorResultTitle">Jeneratör Desteği</div>
-      <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:0.78rem" id="offgrid-generator-result-details"></div>
+    <div id="offgrid-generator-result-wrap" class="offgrid-result-card offgrid-result-card--accent" style="display:none">
+      <div class="offgrid-result-head">
+        <div>
+          <div class="offgrid-result-kicker">Yedek Güç</div>
+          <div class="offgrid-result-title" data-i18n="offgridL2.generatorResultTitle">Jeneratör Desteği</div>
+        </div>
+      </div>
+      <div class="result-helper">Jeneratör açıksa, yıl içinde hangi noktalarda devreye girdiğini ve sisteme nasıl destek olduğunu burada özetleriz.</div>
+      <div id="offgrid-generator-result-details"></div>
     </div>
 
     <!-- Kötü Hava Senaryosu (seçildiyse görünür) -->
-    <div id="offgrid-badweather-result-wrap" style="display:none;background:rgba(100,116,139,0.07);border:1px solid rgba(100,116,139,0.25);border-radius:var(--radius,12px);padding:16px;margin-bottom:12px">
-      <div style="font-size:0.8rem;font-weight:600;color:var(--text-muted);margin-bottom:8px" data-i18n="offgridL2.badWeatherResultTitle">Kötü Hava Senaryosu</div>
-      <div id="offgrid-badweather-result-details" style="font-size:0.78rem;color:var(--text-muted)"></div>
+    <div id="offgrid-badweather-result-wrap" class="offgrid-result-card offgrid-result-card--slate" style="display:none">
+      <div class="offgrid-result-head">
+        <div>
+          <div class="offgrid-result-kicker">Dayanıklılık</div>
+          <div class="offgrid-result-title" data-i18n="offgridL2.badWeatherResultTitle">Kötü Hava Senaryosu</div>
+        </div>
+      </div>
+      <div class="result-helper">Bulutlu veya zor hava pencerelerinde sistemin ne kadar zorlandığını anlaşılır biçimde özetler.</div>
+      <div id="offgrid-badweather-result-details"></div>
     </div>
 
     <!-- Yaşam Döngüsü Maliyeti -->
-    <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:var(--radius,12px);padding:14px;margin-bottom:12px">
-      <div style="font-size:0.78rem;font-weight:600;color:#06B6D4;margin-bottom:6px" data-i18n="offgridL2.lifecycleCostTitle">Uzun Vadeli Kullanım Maliyeti</div>
-      <div style="font-size:0.78rem;color:var(--text-muted)" id="offgrid-lifecycle-details"></div>
+    <div class="offgrid-result-card offgrid-result-card--success">
+      <div class="offgrid-result-head">
+        <div>
+          <div class="offgrid-result-kicker">İşletme Tarafı</div>
+          <div class="offgrid-result-title" data-i18n="offgridL2.lifecycleCostTitle">Uzun Vadeli Kullanım Maliyeti</div>
+        </div>
+      </div>
+      <div class="result-helper">Sistemin yıllık işletme yükünü tek kalemde görmek için bu kartı kullanabilirsiniz.</div>
+      <div id="offgrid-lifecycle-details"></div>
     </div>
 
     <!-- Genişletilmiş Dispatch Metrikleri -->
-    <div id="offgrid-extended-metrics" style="display:none;background:rgba(6,182,212,0.05);border:1px solid rgba(6,182,212,0.18);border-radius:var(--radius,12px);padding:14px;margin-bottom:12px">
-      <div style="font-size:0.78rem;font-weight:600;color:#06B6D4;margin-bottom:8px" data-i18n="offgridL2.resultTotalLoad">Yıllık Enerji Özeti</div>
-      <div id="offgrid-extended-metrics-body" style="display:flex;flex-wrap:wrap;gap:10px;font-size:0.75rem"></div>
+    <div id="offgrid-extended-metrics" class="offgrid-result-card offgrid-result-card--slate" style="display:none">
+      <div class="offgrid-result-head">
+        <div>
+          <div class="offgrid-result-kicker">Sistem Sınırları</div>
+          <div class="offgrid-result-title" data-i18n="offgridL2.resultTotalLoad">Yıllık Enerji Özeti</div>
+        </div>
+      </div>
+      <div class="result-helper">Boyutlandırmayı etkileyen ana limitleri ve öne çıkan teknik sınırları burada kısa kartlar halinde görürsünüz.</div>
+      <div class="offgrid-chip-grid" id="offgrid-extended-metrics-body"></div>
     </div>
 
     <!-- Cihaz Özet Metrikleri (cihaz listesi modunda görünür) -->
-    <div id="offgrid-device-metrics" style="display:none;background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.18);border-radius:8px;padding:10px 14px;margin-bottom:12px"></div>
+    <div id="offgrid-device-metrics" class="offgrid-result-card offgrid-result-card--accent" style="display:none">
+      <div class="offgrid-result-head">
+        <div>
+          <div class="offgrid-result-kicker">Yük Profili</div>
+          <div class="offgrid-result-title">Cihaz ve Tüketim Özeti</div>
+        </div>
+      </div>
+      <div class="result-helper">Cihaz listesi kullandıysanız günlük toplam ve kritik yük dağılımını burada görürsünüz.</div>
+      <div id="offgrid-device-metrics-body"></div>
+    </div>
 
     <!-- Kaynak Şeffaflığı -->
-    <div id="offgrid-source-transparency" style="display:none;background:rgba(100,116,139,0.05);border:1px solid rgba(100,116,139,0.18);border-radius:8px;padding:10px 14px;margin-bottom:12px"></div>
+    <div id="offgrid-source-transparency" class="offgrid-result-card offgrid-result-card--slate" style="display:none">
+      <div class="offgrid-result-head">
+        <div>
+          <div class="offgrid-result-kicker">Veri Dayanağı</div>
+          <div class="offgrid-result-title">Bu Sonuç Nasıl Oluştu?</div>
+        </div>
+      </div>
+      <div class="result-helper">Burada hangi veri tiplerinin kullanıldığını, sonucun ne kadar kaba veya güçlü olduğunu ve kesin projeye geçmek için nelerin eksik kaldığını görürsünüz.</div>
+      <div id="offgrid-source-transparency-body"></div>
+    </div>
 
     <!-- Karşılanamayan yük uyarısı -->
-    <div id="offgrid-unmet-warn" style="display:none;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:0.78rem;color:#EF4444"></div>
+    <div id="offgrid-unmet-warn" class="offgrid-result-card offgrid-result-card--danger" style="display:none">
+      <div class="offgrid-result-head">
+        <div>
+          <div class="offgrid-result-kicker">Dikkat Gerektiren Nokta</div>
+          <div class="offgrid-result-title">Karşılanamayan Enerji İhtiyacı</div>
+        </div>
+      </div>
+      <div id="offgrid-unmet-warn-body"></div>
+    </div>
 
     <!-- Dürüstlük / Metodoloji Açıklaması -->
-    <div style="background:rgba(100,116,139,0.05);border:1px solid rgba(100,116,139,0.2);border-radius:8px;padding:12px">
-      <div style="font-size:0.72rem;color:var(--text-muted);line-height:1.55">
-        <div style="font-weight:600;margin-bottom:4px" data-i18n="offgridL2.methodologyTitle">Metodoloji Notu</div>
-        <div data-i18n="offgridL2.methodologyBody">Bu bölüm, sistemin yıl boyunca yüklerinizi ne ölçüde karşılayabildiğini anlaşılır biçimde özetler. Kesin off-grid tasarım için yine de saha ölçümü ve detaylı yük analizi gerekir.</div>
-        <div id="offgrid-l2-version" style="margin-top:4px;font-size:0.65rem;opacity:0.5"></div>
-        <div id="offgrid-l2-load-mode" style="margin-top:2px;font-size:0.65rem;opacity:0.5"></div>
+    <div class="offgrid-result-card offgrid-result-card--slate">
+      <div class="offgrid-result-head">
+        <div>
+          <div class="offgrid-result-kicker">Yorum Rehberi</div>
+          <div class="offgrid-result-title" data-i18n="offgridL2.methodologyTitle">Nasıl Yorumlanmalı?</div>
+        </div>
+      </div>
+      <div class="offgrid-body-copy" data-i18n="offgridL2.methodologyBody">Bu bölüm, sistemin yıl boyunca yüklerinizi ne ölçüde karşılayabildiğini anlaşılır biçimde özetler. Kesin off-grid tasarım için yine de saha ölçümü ve detaylı yük analizi gerekir.</div>
+      <div class="offgrid-method-meta">
+        <div id="offgrid-l2-version"></div>
+        <div id="offgrid-l2-load-mode"></div>
       </div>
     </div>
 

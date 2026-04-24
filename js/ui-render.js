@@ -58,6 +58,36 @@ function backendEngineText(results = {}, state = window.state || {}) {
     : i18n.t('engine.browserActive');
 }
 
+function offgridStatCard({ value, label, note = '', color = 'var(--primary)' }) {
+  return `
+    <article class="offgrid-stat-card" style="--metric-color:${color}">
+      <div class="offgrid-stat-value">${escapeHtml(String(value))}</div>
+      <div class="offgrid-stat-label">${escapeHtml(label)}</div>
+      ${note ? `<div class="offgrid-stat-note">${escapeHtml(note)}</div>` : ''}
+    </article>
+  `;
+}
+
+function offgridChipCard({ label, value, note = '' }) {
+  return `
+    <article class="offgrid-chip-card">
+      <span class="offgrid-chip-label">${escapeHtml(label)}</span>
+      <span class="offgrid-chip-value">${escapeHtml(String(value))}</span>
+      ${note ? `<span class="bess-detail-note">${escapeHtml(note)}</span>` : ''}
+    </article>
+  `;
+}
+
+function offgridDetailCard({ label, value, note = '' }) {
+  return `
+    <article class="bess-detail-card">
+      <span class="bess-detail-label">${escapeHtml(label)}</span>
+      <span class="bess-detail-value">${escapeHtml(String(value))}</span>
+      ${note ? `<span class="bess-detail-note">${escapeHtml(note)}</span>` : ''}
+    </article>
+  `;
+}
+
 export function renderResults() {
   const state = window.state;
   const r = state.results;
@@ -245,28 +275,73 @@ function renderBESSResults(bess) {
   if (!section) return;
   if (!bess) { section.style.display = 'none'; return; }
   const isOffGrid = window.state?.scenarioKey === 'off-grid';
+  const detailRow = document.getElementById('bess-detail-row');
+  const noteStrip = document.getElementById('bess-note-strip');
   section.style.display = 'block';
   document.getElementById('bess-model-badge').textContent = bess.modelName || 'Batarya';
   document.getElementById('bess-independence').textContent = `${bess.gridIndependence}%`;
   document.getElementById('bess-night').textContent = `${bess.nightCoverage}%`;
-  // Faz-4 Fix-14: Show autonomy metrics when available (off-grid scenario)
-  const autonomyHtml = (bess.autonomousDaysPct != null)
-    ? `<span>${escapeHtml(i18n.t('offGrid.autonomousDaysNote'))}: <strong>${bess.autonomousDaysPct}%</strong> (${bess.autonomousDays} gün/yıl)</span>
-    <span>${escapeHtml(i18n.t('offgridL2.unmetLabel'))}: <strong>${Number(bess.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh/${escapeHtml(i18n.t('units.year'))}</strong></span>`
-    : '';
-  const offgridPowerHtml = isOffGrid
-    ? `<span>${escapeHtml(i18n.t('offgridL2.batteryPowerLimitLabel'))}: <strong>${bess.batteryMaxChargeKw || '—'} / ${bess.batteryMaxDischargeKw || '—'} kW</strong></span>
-       <span>${escapeHtml(i18n.t('offgridL2.inverterLimitLabel'))}: <strong>${bess.inverterAcLimitKw || '—'} kW AC</strong></span>`
-    : '';
-  document.getElementById('bess-detail-row').innerHTML = `
-    <span>Kullanılabilir kapasite: <strong>${bess.usableCapacity} kWh</strong></span>
-    <span>Yıllık batarya deşarjı: <strong>${Number(bess.batteryStored || 0).toLocaleString(localeTag())} kWh</strong></span>
-    <span>Tahmini çevrim/yıl: <strong>${bess.cyclesPerYear || '—'}</strong></span>
-    <span>Batarya maliyeti: <strong>${money(bess.batteryCost)}</strong></span>
-    ${offgridPowerHtml}
-    ${autonomyHtml}
-    ${isOffGrid ? `<div class="off-grid-honesty-note">${escapeHtml(i18n.t('offGrid.syntheticDispatchNote'))}</div><div class="off-grid-honesty-note off-grid-honesty-warn">${escapeHtml(i18n.t('offGrid.notFeasibilityAnalysis'))}</div>` : ''}
-  `;
+  const autonomyPct = Number.isFinite(Number(bess.autonomousDaysPct)) ? `${Number(bess.autonomousDaysPct).toFixed(1)}%` : '—';
+  const autonomyDays = Number.isFinite(Number(bess.autonomousDays)) ? `${Math.round(Number(bess.autonomousDays))} gün/yıl` : '—';
+  const detailItems = [
+    {
+      label: 'Kullanılabilir kapasite',
+      value: `${bess.usableCapacity} kWh`,
+      note: 'Bataryada gerçek kullanıma ayrılan enerji'
+    },
+    {
+      label: 'Yıllık batarya kullanımı',
+      value: `${Number(bess.batteryStored || 0).toLocaleString(localeTag())} kWh`,
+      note: 'Gündüz depolanıp sonra kullanılan toplam enerji'
+    },
+    {
+      label: 'Tahmini çevrim',
+      value: `${bess.cyclesPerYear || '—'} / yıl`,
+      note: 'Bataryanın yıl içindeki yaklaşık şarj-deşarj sayısı'
+    },
+    {
+      label: 'Batarya maliyeti',
+      value: money(bess.batteryCost),
+      note: 'Seçili batarya paketi için tahmini yatırım'
+    }
+  ];
+  if (isOffGrid) {
+    detailItems.push(
+      {
+        label: 'Batarya güç sınırı',
+        value: `${bess.batteryMaxChargeKw || '—'} / ${bess.batteryMaxDischargeKw || '—'} kW`,
+        note: 'Bataryanın aynı anda şarj ve deşarj limiti'
+      },
+      {
+        label: 'İnverter çıkış sınırı',
+        value: `${bess.inverterAcLimitKw || '—'} kW AC`,
+        note: 'Aynı anda taşınabilecek en yüksek AC güç'
+      }
+    );
+  }
+  if (bess.autonomousDaysPct != null) {
+    detailItems.push(
+      {
+        label: 'Tahmini bağımsız gün',
+        value: autonomyDays,
+        note: `Yalnız güneş ve batarya ile idare edebileceği süre (${autonomyPct})`
+      },
+      {
+        label: 'Karşılanamayan enerji',
+        value: `${Number(bess.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh/yıl`,
+        note: 'Bu kısım için ek batarya, jeneratör veya daha büyük sistem gerekir'
+      }
+    );
+  }
+  if (detailRow) detailRow.innerHTML = detailItems.map(offgridDetailCard).join('');
+  if (noteStrip) {
+    noteStrip.innerHTML = isOffGrid
+      ? `
+        <div class="offgrid-note offgrid-note--warn"><strong>Ön değerlendirme:</strong> ${escapeHtml(i18n.t('offGrid.syntheticDispatchNote'))}</div>
+        <div class="offgrid-note offgrid-note--danger"><strong>Dikkat:</strong> ${escapeHtml(i18n.t('offGrid.notFeasibilityAnalysis'))}</div>
+      `
+      : '';
+  }
 }
 
 function renderOffgridL2Results(offgridL2Results, state) {
@@ -294,19 +369,15 @@ function renderOffgridL2Results(offgridL2Results, state) {
   const dispatchGrid = document.getElementById('offgrid-dispatch-grid');
   if (dispatchGrid) {
     const items = [
-      { label: i18n.t('offgridL2.directPvLabel'),  value: `${Math.round(L.directPvKwh).toLocaleString(locale)} kWh`, color: '#F59E0B' },
-      { label: i18n.t('offgridL2.batteryLabel'),   value: `${Math.round(L.batteryKwh).toLocaleString(locale)} kWh`, color: '#8B5CF6' },
-      { label: i18n.t('offgridL2.curtailedLabel'), value: `${Math.round(L.curtailedPvKwh).toLocaleString(locale)} kWh`, color: '#94A3B8' },
-      { label: i18n.t('offgridL2.unmetLabel'),     value: `${Math.round(L.unmetLoadKwh).toLocaleString(locale)} kWh`, color: '#EF4444' },
+      { label: i18n.t('offgridL2.directPvLabel'),  value: `${Math.round(L.directPvKwh).toLocaleString(locale)} kWh`, color: 'var(--primary)', note: 'Üretilip aynı anda kullanılan enerji' },
+      { label: i18n.t('offgridL2.batteryLabel'),   value: `${Math.round(L.batteryKwh).toLocaleString(locale)} kWh`, color: 'var(--success)', note: 'Bataryada depolanıp sonra kullanılan enerji' },
+      { label: i18n.t('offgridL2.curtailedLabel'), value: `${Math.round(L.curtailedPvKwh).toLocaleString(locale)} kWh`, color: '#94A3B8', note: 'Sistemin kullanamadığı fazla üretim' },
+      { label: i18n.t('offgridL2.unmetLabel'),     value: `${Math.round(L.unmetLoadKwh).toLocaleString(locale)} kWh`, color: 'var(--danger)', note: 'Sistemin yetişemediği enerji ihtiyacı' },
     ];
     if (L.generatorEnabled) {
-      items.splice(2, 0, { label: i18n.t('offgridL2.generatorLabel'), value: `${Math.round(L.generatorKwh).toLocaleString(locale)} kWh`, color: '#F59E0B' });
+      items.splice(2, 0, { label: i18n.t('offgridL2.generatorLabel'), value: `${Math.round(L.generatorKwh).toLocaleString(locale)} kWh`, color: '#F97316', note: 'Jeneratörün devraldığı destek enerjisi' });
     }
-    dispatchGrid.innerHTML = items.map(it => `
-      <div style="text-align:center;background:rgba(30,41,59,0.5);border:1px solid rgba(148,163,184,0.15);border-radius:8px;padding:10px">
-        <div style="font-family:var(--font-display,inherit);font-size:1.05rem;font-weight:700;color:${it.color}">${escapeHtml(it.value)}</div>
-        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px">${escapeHtml(it.label)}</div>
-      </div>`).join('');
+    dispatchGrid.innerHTML = items.map(offgridStatCard).join('');
   }
 
   // Kapsama metrikleri
@@ -326,16 +397,25 @@ function renderOffgridL2Results(offgridL2Results, state) {
       const narrative = i18n.t('offgridL2.genNarrativeActive')
         .replace('{hours}', hoursStr).replace('{kwh}', kwhStr)
         .replace('{cost}', Math.round(L.generatorFuelCostAnnual).toLocaleString(locale));
-      genResultDetails.innerHTML = [
-        `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genRunHours'))}: <strong style="color:var(--text)">${hoursStr} h/yıl</strong></span>`,
-        `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genFuelCost'))}: <strong style="color:var(--text)">${money(L.generatorFuelCostAnnual)} / yıl</strong></span>`,
-        `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.genKwh'))}: <strong style="color:var(--text)">${kwhStr} kWh/yıl</strong></span>`,
-        L.generatorMaintenanceCostAnnual ? `<span style="color:var(--text-muted)">Servis gideri: <strong style="color:var(--text)">${money(L.generatorMaintenanceCostAnnual)} / yıl</strong></span>` : '',
-        L.generatorStrategy ? `<span style="color:var(--text-muted)">Strateji: <strong style="color:var(--text)">${escapeHtml(String(L.generatorStrategy))}</strong></span>` : '',
-        `<span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.generatorCapex'))}: <strong style="color:var(--text)">${money(L.generatorCapex || 0)}</strong></span>`,
-        L.generatorCapexMissing ? `<span style="color:#F59E0B">${escapeHtml(i18n.t('offgridL2.generatorCapexMissing'))}</span>` : '',
-        `<div style="margin-top:6px;font-size:0.72rem;color:var(--text-muted);font-style:italic;width:100%">${escapeHtml(narrative)}</div>`,
-      ].filter(Boolean).join('');
+      const strategyLabel = L.generatorStrategy === 'critical-only'
+        ? 'Sadece kritik yükleri koru'
+        : L.generatorStrategy === 'support-all-loads'
+          ? 'Toplam yükü destekle'
+          : 'Akıllı destek modu';
+      genResultDetails.innerHTML = `
+        <div class="offgrid-stat-grid">
+          ${offgridStatCard({ label: i18n.t('offgridL2.genRunHours'), value: `${hoursStr} saat/yıl`, note: 'Jeneratörün yaklaşık çalışma süresi', color: '#F97316' })}
+          ${offgridStatCard({ label: i18n.t('offgridL2.genKwh'), value: `${kwhStr} kWh/yıl`, note: 'Yıl boyunca ürettiği destek enerjisi', color: '#F97316' })}
+          ${offgridStatCard({ label: i18n.t('offgridL2.genFuelCost'), value: `${money(L.generatorFuelCostAnnual)} / yıl`, note: 'Tahmini yıllık yakıt gideri', color: '#F97316' })}
+        </div>
+        <div class="offgrid-chip-grid">
+          ${offgridChipCard({ label: 'Çalışma yaklaşımı', value: strategyLabel })}
+          ${offgridChipCard({ label: 'Tahmini jeneratör yatırımı', value: money(L.generatorCapex || 0) })}
+          ${L.generatorMaintenanceCostAnnual ? offgridChipCard({ label: 'Yıllık servis gideri', value: `${money(L.generatorMaintenanceCostAnnual)} / yıl` }) : ''}
+        </div>
+        ${L.generatorCapexMissing ? `<div class="offgrid-note-strip"><div class="offgrid-note offgrid-note--warn">${escapeHtml(i18n.t('offgridL2.generatorCapexMissing'))}</div></div>` : ''}
+        <div class="offgrid-body-copy">${escapeHtml(narrative)}</div>
+      `;
     } else {
       genResultWrap.style.display = 'none';
     }
@@ -365,27 +445,29 @@ function renderOffgridL2Results(offgridL2Results, state) {
         .replace('{risk}', risk);
       const windowDay = bw.worstWindowDayOfYear;
       const windowCoveragePart = Number.isFinite(Number(bw.windowCoverage))
-        ? `<span>${escapeHtml(i18n.t('offgridL2.badWeatherWindowCoverage'))}: <strong style="color:var(--text)">${(Number(bw.windowCoverage) * 100).toFixed(1)}%</strong></span>`
+        ? `${i18n.t('offgridL2.badWeatherWindowCoverage')}: ${(Number(bw.windowCoverage) * 100).toFixed(1)}%`
         : '';
       const windowCriticalCoveragePart = Number.isFinite(Number(bw.windowCriticalCoverage))
-        ? `<span>${escapeHtml(i18n.t('offgridL2.badWeatherWindowCriticalCoverage'))}: <strong style="color:var(--text)">${(Number(bw.windowCriticalCoverage) * 100).toFixed(1)}%</strong></span>`
+        ? `${i18n.t('offgridL2.badWeatherWindowCriticalCoverage')}: ${(Number(bw.windowCriticalCoverage) * 100).toFixed(1)}%`
         : '';
       const windowPart = windowDay
-        ? `<span style="color:var(--text-muted);font-size:0.72rem">${escapeHtml(i18n.t('offgridL2.badWeatherWindowDay') || 'En kötü pencere: gün')} ${windowDay}</span>`
+        ? `${i18n.t('offgridL2.badWeatherWindowDay') || 'En kötü pencere'} ${windowDay}`
         : '';
       const addGenPart = bw.additionalGeneratorKwh > 0
-        ? `<div style="margin-top:4px">${escapeHtml(i18n.t('offgridL2.addGenKwh'))}: <strong>${Math.round(bw.additionalGeneratorKwh).toLocaleString(locale)} kWh</strong></div>`
+        ? `<div class="offgrid-chip-grid">${offgridChipCard({ label: i18n.t('offgridL2.addGenKwh'), value: `${Math.round(bw.additionalGeneratorKwh).toLocaleString(locale)} kWh`, note: 'Bu hava penceresinde gerekebilecek ek jeneratör desteği' })}</div>`
         : '';
       bwDetails.innerHTML = `
-        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px">
-          <span>${escapeHtml(i18n.t('offgridL2.badWeatherLevel'))}: <strong style="color:var(--text)">${escapeHtml(i18n.t(levelKey))}</strong></span>
-          <span>${escapeHtml(i18n.t('offgridL2.criticalDropLabel'))}: <strong style="color:#EF4444">−${critDrop}%</strong></span>
-          <span>${escapeHtml(i18n.t('offgridL2.totalDropLabel'))}: <strong style="color:#F59E0B">−${totalDrop}%</strong></span>
-          ${windowCoveragePart}
-          ${windowCriticalCoveragePart}
-          ${windowPart}
+        <div class="offgrid-stat-grid">
+          ${offgridStatCard({ label: i18n.t('offgridL2.badWeatherLevel'), value: i18n.t(levelKey), note: 'Seçilen stres testi seviyesi', color: '#94A3B8' })}
+          ${offgridStatCard({ label: i18n.t('offgridL2.criticalDropLabel'), value: `−${critDrop}%`, note: 'Kritik yük korumasındaki düşüş', color: 'var(--danger)' })}
+          ${offgridStatCard({ label: i18n.t('offgridL2.totalDropLabel'), value: `−${totalDrop}%`, note: 'Toplam kapsamadaki düşüş', color: 'var(--primary)' })}
         </div>
-        <div style="font-size:0.72rem;color:var(--text-muted);font-style:italic">${escapeHtml(narrative)}</div>
+        <div class="offgrid-inline-badges">
+          ${windowCoveragePart ? `<span class="offgrid-inline-badge">${escapeHtml(windowCoveragePart)}</span>` : ''}
+          ${windowCriticalCoveragePart ? `<span class="offgrid-inline-badge">${escapeHtml(windowCriticalCoveragePart)}</span>` : ''}
+          ${windowPart ? `<span class="offgrid-inline-badge">${escapeHtml(windowPart)}</span>` : ''}
+        </div>
+        <div class="offgrid-body-copy">${escapeHtml(narrative)}</div>
         ${addGenPart}
       `;
     } else {
@@ -396,7 +478,13 @@ function renderOffgridL2Results(offgridL2Results, state) {
   // Yaşam döngüsü maliyeti
   const lcWrap = document.getElementById('offgrid-lifecycle-details');
   if (lcWrap) {
-    lcWrap.innerHTML = `${escapeHtml(i18n.t('offgridL2.lifecycleAnnual'))}: <strong>${money(L.lifecycleCostAnnual)} / ${escapeHtml(i18n.t('units.year'))}</strong>`;
+    const monthlyLifecycle = (Number(L.lifecycleCostAnnual) || 0) / 12;
+    lcWrap.innerHTML = `
+      <div class="offgrid-stat-grid">
+        ${offgridStatCard({ label: i18n.t('offgridL2.lifecycleAnnual'), value: `${money(L.lifecycleCostAnnual)} / yıl`, note: 'Yakıt, bakım ve işletme tarafının tahmini yıllık toplamı', color: 'var(--success)' })}
+        ${offgridStatCard({ label: 'Aylık ortalama maliyet', value: `${money(monthlyLifecycle)} / ay`, note: 'Uzun vadeli maliyeti aylık okumak için yaklaşık karşılığı', color: 'var(--primary)' })}
+      </div>
+    `;
   }
 
   // Genişletilmiş dispatch metrikleri
@@ -404,46 +492,44 @@ function renderOffgridL2Results(offgridL2Results, state) {
   const extMetricsBody = document.getElementById('offgrid-extended-metrics-body');
   if (extMetricsEl && extMetricsBody) {
     extMetricsEl.style.display = '';
-    const stat = (label, val, color) =>
-      `<span style="color:var(--text-muted);font-size:0.75rem">${escapeHtml(label)}: <strong style="color:${color||'var(--text)'}">${escapeHtml(val)}</strong></span>`;
     const items = [
-      stat(i18n.t('offgridL2.resultTotalLoad'), `${Math.round(L.annualTotalLoadKwh || 0).toLocaleString(locale)} kWh/yıl`, 'var(--text)'),
-      L.annualCriticalLoadKwh > 0 ? stat(i18n.t('offgridL2.resultCriticalLoad'), `${Math.round(L.annualCriticalLoadKwh).toLocaleString(locale)} kWh/yıl`, '#EF4444') : '',
-      L.accuracyScore != null ? stat(i18n.t('offgridL2.accuracyScoreLabel'), `${L.accuracyScore}/100 · ${uncertaintyText}`, accuracyColor) : '',
-      stat(i18n.t('offgridL2.pvBessCoverageLabel'), `${((L.pvBatteryLoadCoverage ?? L.totalLoadCoverage) * 100).toFixed(1)}%`, '#22C55E'),
-      stat(i18n.t('offgridL2.pvBessCriticalCoverageLabel'), `${((L.pvBatteryCriticalCoverage ?? L.criticalLoadCoverage) * 100).toFixed(1)}%`, '#22C55E'),
-      stat(i18n.t('offgridL2.directPvLabel'), `${Math.round(L.directPvKwh || 0).toLocaleString(locale)} kWh/yıl`, '#F59E0B'),
-      stat(i18n.t('offgridL2.batteryLabel'), `${Math.round(L.batteryKwh || 0).toLocaleString(locale)} kWh/yıl`, '#8B5CF6'),
-      L.minimumSoc != null ? stat(i18n.t('offgridL2.minSocLabel'), `${(L.minimumSoc * 100).toFixed(1)}%`, '#94A3B8') : '',
-      L.averageSoc != null ? stat(i18n.t('offgridL2.avgSocLabel'), `${(L.averageSoc * 100).toFixed(1)}%`, '#94A3B8') : '',
-      L.inverterAcLimitKw != null ? stat(i18n.t('offgridL2.inverterLimitLabel'), `${Number(L.inverterAcLimitKw).toFixed(1)} kW AC`, '#F59E0B') : '',
-      L.batteryMaxChargeKw != null || L.batteryMaxDischargeKw != null ? stat(i18n.t('offgridL2.batteryPowerLimitLabel'), `${L.batteryMaxChargeKw ?? '—'} / ${L.batteryMaxDischargeKw ?? '—'} kW`, '#8B5CF6') : '',
-      (L.inverterPowerLimitedKwh || 0) > 0 ? stat(i18n.t('offgridL2.powerLimitedLabel'), `${Math.round(L.inverterPowerLimitedKwh).toLocaleString(locale)} kWh (${L.inverterPowerLimitHours || 0} h)`, '#EF4444') : '',
-      L.autonomousDays != null ? stat(i18n.t('offgridL2.resultAutonomousDays'), `${L.autonomousDays} gün (${L.autonomousDaysPct != null ? L.autonomousDaysPct.toFixed(1) : '—'}%)`, '#22C55E') : '',
-      L.generatorEnabled && L.autonomousDaysWithGenerator != null ? stat(i18n.t('offgridL2.resultAutonomousDaysWithGenerator'), `${L.autonomousDaysWithGenerator} gün (${L.autonomousDaysWithGeneratorPct != null ? L.autonomousDaysWithGeneratorPct.toFixed(1) : '—'}%)`, '#F59E0B') : '',
-      L.cyclesPerYear != null ? stat(i18n.t('offgridL2.resultCyclesPerYear'), L.cyclesPerYear.toFixed(0), 'var(--text-muted)') : '',
+      { label: i18n.t('offgridL2.resultTotalLoad'), value: `${Math.round(L.annualTotalLoadKwh || 0).toLocaleString(locale)} kWh/yıl`, note: 'Tüm yıl boyunca beklenen toplam tüketim' },
+      L.annualCriticalLoadKwh > 0 ? { label: i18n.t('offgridL2.resultCriticalLoad'), value: `${Math.round(L.annualCriticalLoadKwh).toLocaleString(locale)} kWh/yıl`, note: 'Kesintide öncelikli tutulacak kritik kısım' } : '',
+      { label: i18n.t('offgridL2.directPvLabel'), value: `${Math.round(L.directPvKwh || 0).toLocaleString(locale)} kWh/yıl`, note: 'Güneşten gelip anında kullanılan enerji' },
+      { label: i18n.t('offgridL2.batteryLabel'), value: `${Math.round(L.batteryKwh || 0).toLocaleString(locale)} kWh/yıl`, note: 'Bataryanın devreye girip taşıdığı enerji' },
+      L.minimumSoc != null ? { label: i18n.t('offgridL2.minSocLabel'), value: `${(L.minimumSoc * 100).toFixed(1)}%`, note: 'Bataryada korunan en düşük doluluk seviyesi' } : '',
+      L.averageSoc != null ? { label: i18n.t('offgridL2.avgSocLabel'), value: `${(L.averageSoc * 100).toFixed(1)}%`, note: 'Bataryanın yıl içindeki ortalama doluluğu' } : '',
+      L.inverterAcLimitKw != null ? { label: i18n.t('offgridL2.inverterLimitLabel'), value: `${Number(L.inverterAcLimitKw).toFixed(1)} kW AC`, note: 'Aynı anda çekilebilecek üst güç sınırı' } : '',
+      (L.inverterPowerLimitedKwh || 0) > 0 ? { label: i18n.t('offgridL2.powerLimitedLabel'), value: `${Math.round(L.inverterPowerLimitedKwh).toLocaleString(locale)} kWh`, note: `${L.inverterPowerLimitHours || 0} saat boyunca güç sınırı etkisi görüldü` } : '',
+      L.autonomousDays != null ? { label: i18n.t('offgridL2.resultAutonomousDays'), value: `${L.autonomousDays} gün`, note: `Yalnız güneş ve batarya ile idare edebildiği süre (${L.autonomousDaysPct != null ? L.autonomousDaysPct.toFixed(1) : '—'}%)` } : '',
+      L.generatorEnabled && L.autonomousDaysWithGenerator != null ? { label: i18n.t('offgridL2.resultAutonomousDaysWithGenerator'), value: `${L.autonomousDaysWithGenerator} gün`, note: 'Jeneratör desteğiyle uzayan tahmini süre' } : '',
     ].filter(Boolean);
-    extMetricsBody.innerHTML = items.join('');
+    extMetricsBody.innerHTML = items.map(offgridChipCard).join('');
   }
 
   // Cihaz özet metrikleri (cihaz listesi modunda)
   const deviceMetricsEl = document.getElementById('offgrid-device-metrics');
+  const deviceMetricsBody = document.getElementById('offgrid-device-metrics-body');
   if (deviceMetricsEl) {
     if (L.loadMode === 'device-list' && L.deviceCount > 0) {
       const totalWh = L.annualTotalLoadKwh > 0 ? (L.annualTotalLoadKwh / 365 * 1000).toFixed(0) : '—';
       const critWh  = L.annualCriticalLoadKwh > 0 ? (L.annualCriticalLoadKwh / 365 * 1000).toFixed(0) : '0';
       deviceMetricsEl.style.display = '';
-      deviceMetricsEl.innerHTML = `
-        <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:0.75rem">
-          <span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.deviceCount'))}: <strong style="color:var(--text)">${L.deviceCount}</strong></span>
-          <span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.totalDailyWh'))}: <strong style="color:var(--text)">${totalWh} Wh/gün</strong></span>
-          <span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.criticalDailyWh'))}: <strong style="color:#EF4444">${critWh} Wh/gün</strong></span>
-          <span style="color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.criticalDeviceCount'))}: <strong style="color:#EF4444">${L.criticalDeviceCount || 0}</strong></span>
-        </div>`;
+      if (deviceMetricsBody) {
+        deviceMetricsBody.innerHTML = `
+          <div class="offgrid-chip-grid">
+            ${offgridChipCard({ label: i18n.t('offgridL2.deviceCount'), value: L.deviceCount, note: 'Listeye eklenen toplam cihaz sayısı' })}
+            ${offgridChipCard({ label: i18n.t('offgridL2.totalDailyWh'), value: `${totalWh} Wh/gün`, note: 'Günlük toplam enerji ihtiyacı' })}
+            ${offgridChipCard({ label: i18n.t('offgridL2.criticalDailyWh'), value: `${critWh} Wh/gün`, note: 'Kesintide mutlaka korunması gereken günlük tüketim' })}
+            ${offgridChipCard({ label: i18n.t('offgridL2.criticalDeviceCount'), value: L.criticalDeviceCount || 0, note: 'Kritik olarak işaretlenen cihaz adedi' })}
+          </div>`;
+      }
     } else {
       if (L.loadMode === 'hourly-8760') {
         deviceMetricsEl.style.display = '';
-        deviceMetricsEl.innerHTML = `<div style="font-size:0.75rem;color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.loadSourceHourly'))}</div>`;
+        if (deviceMetricsBody) {
+          deviceMetricsBody.innerHTML = `<div class="offgrid-body-copy">${escapeHtml(i18n.t('offgridL2.loadSourceHourly'))}</div>`;
+        }
       } else {
         deviceMetricsEl.style.display = 'none';
       }
@@ -452,6 +538,7 @@ function renderOffgridL2Results(offgridL2Results, state) {
 
   // Karşılanamayan yük uyarısı
   const unmetWarnEl = document.getElementById('offgrid-unmet-warn');
+  const unmetWarnBody = document.getElementById('offgrid-unmet-warn-body');
   if (unmetWarnEl) {
     const unmetKwh = Math.round(L.unmetLoadKwh || 0);
     if (unmetKwh > 10) {
@@ -460,7 +547,15 @@ function renderOffgridL2Results(offgridL2Results, state) {
         : 'offgridL2.honestUnmetWarning')
         .replace('{unmet}', unmetKwh.toLocaleString(locale));
       unmetWarnEl.style.display = '';
-      unmetWarnEl.textContent = msg;
+      if (unmetWarnBody) {
+        unmetWarnBody.innerHTML = `
+          <div class="offgrid-stat-grid">
+            ${offgridStatCard({ label: 'Karşılanamayan yıllık ihtiyaç', value: `${unmetKwh.toLocaleString(locale)} kWh`, note: 'Bu açık mevcut kurulumla tamamen kapanmıyor', color: 'var(--danger)' })}
+            ${offgridStatCard({ label: 'Önerilen aksiyon', value: L.generatorEnabled ? 'Batarya veya jeneratör desteğini büyüt' : 'Batarya ya da jeneratör ekle', note: 'Kesin çözüm için yük profili ve saha şartı birlikte gözden geçirilmeli', color: 'var(--primary)' })}
+          </div>
+          <div class="offgrid-body-copy">${escapeHtml(msg)}</div>
+        `;
+      }
     } else {
       unmetWarnEl.style.display = 'none';
     }
@@ -468,6 +563,7 @@ function renderOffgridL2Results(offgridL2Results, state) {
 
   // Kaynak şeffaflığı (üretim + yük kaynağı)
   const sourceTransEl = document.getElementById('offgrid-source-transparency');
+  const sourceTransBody = document.getElementById('offgrid-source-transparency-body');
   if (sourceTransEl) {
     const prodSource = L.productionSourceLabel || (L.productionFallback ? i18n.t('pvgis.fallbackUsed') : i18n.t('pvgis.liveSuccess'));
     const loadSrc = L.loadMode === 'hourly-8760'
@@ -480,88 +576,63 @@ function renderOffgridL2Results(offgridL2Results, state) {
       ? i18n.t('offgridL2.productionDispatchReal')
       : i18n.t('offgridL2.productionDispatchSynthetic');
     const parityText = L.parityAvailable
-      ? `<span style="color:#22C55E">✓ ${escapeHtml(i18n.t('offgridL2.parityAvailable'))}</span>`
-      : `<span style="color:#94A3B8">${escapeHtml(i18n.t('offgridL2.parityNotAvailable'))}</span>`;
-    const fallbackBadge = L.productionFallback
-      ? `<span style="background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 6px;font-size:0.68rem;margin-left:4px">${escapeHtml(i18n.t('offgridL2.fallbackUsed'))}</span>`
-      : `<span style="background:rgba(34,197,94,0.12);color:#22C55E;border:1px solid rgba(34,197,94,0.25);border-radius:4px;padding:1px 6px;font-size:0.68rem;margin-left:4px">${escapeHtml(i18n.t('offgridL2.liveData'))}</span>`;
+      ? 'Ek doğrulama mevcut'
+      : 'Ek karşılaştırma yapılmadı';
     const tierLabel = i18n.t(`offgridL2.accuracyTier_${accuracy?.tier || L.accuracyTier || 'basic-synthetic'}`);
     const modeLabel = i18n.t(`offgridL2.calculationMode_${accuracy?.calculationMode || L.calculationMode || 'basic'}`);
     const mainAccuracyBlocker = accuracy?.blockers?.[0] || '';
     sourceTransEl.style.display = '';
-    sourceTransEl.innerHTML = `
-      ${accuracy ? `
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:8px">
-        <div style="background:rgba(15,23,42,0.35);border:1px solid rgba(148,163,184,0.14);border-radius:8px;padding:8px">
-          <div style="font-size:0.66rem;color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.accuracyScoreLabel'))}</div>
-          <div style="font-size:1rem;font-weight:800;color:${accuracyColor}">${L.accuracyScore}/100</div>
+    const gateReadyState = gate => {
+      const readyKey = Object.keys(gate || {}).find(k => /^phase\d+Ready$/.test(k));
+      return readyKey ? gate?.[readyKey] : null;
+    };
+    const pendingSteps = [
+      ['Saha üretim doğrulaması', L.fieldGuaranteeReadiness],
+      ['Saha kanıtları', L.fieldEvidenceGate],
+      ['Model olgunluğu', L.fieldModelMaturityGate],
+      ['Saha kabulü', L.fieldAcceptanceGate],
+      ['Garanti operasyonu', L.fieldOperationGate],
+      ['Yıllık yeniden doğrulama', L.fieldRevalidationGate]
+    ].filter(([, gate]) => gate && gateReadyState(gate) === false)
+      .map(([label, gate]) => `${label}: ${gate.blockers?.[0] || 'İlgili saha verisi tamamlanmalı.'}`);
+    const confidenceCopy = accuracy?.interpretation || i18n.t('offgridL2.accuracyInterpretationFallback');
+    if (sourceTransBody) {
+      sourceTransBody.innerHTML = `
+        ${accuracy ? `
+        <div class="offgrid-stat-grid">
+          ${offgridStatCard({ label: i18n.t('offgridL2.accuracyScoreLabel'), value: `${L.accuracyScore}/100`, note: 'Skor yükseldikçe sonuç daha savunulabilir hale gelir', color: accuracyColor })}
+          ${offgridStatCard({ label: i18n.t('offgridL2.expectedUncertaintyLabel'), value: uncertaintyText, note: 'Gerçek saha davranışı bu bant içinde değişebilir', color: accuracyColor })}
+          ${offgridStatCard({ label: i18n.t('offgridL2.calculationModeLabel'), value: `${modeLabel} · ${tierLabel}`, note: 'Sonucun hangi veri yoğunluğu ile üretildiği', color: 'var(--primary)' })}
+        </div>` : ''}
+        <div class="offgrid-body-copy">${escapeHtml(confidenceCopy)}${mainAccuracyBlocker ? ` ${escapeHtml(mainAccuracyBlocker)}` : ''}</div>
+        <div class="offgrid-chip-grid">
+          ${offgridChipCard({ label: i18n.t('offgridL2.productionSource'), value: prodSource, note: productionDispatchText })}
+          ${offgridChipCard({ label: i18n.t('offgridL2.loadSourceLabel'), value: loadSrc, note: 'Tüketim tarafında esas alınan veri kaynağı' })}
+          ${offgridChipCard({ label: i18n.t('offgridL2.dispatchLabel'), value: dispatchLabel, note: 'Hesabın yıl içine nasıl yayıldığı' })}
+          ${offgridChipCard({ label: 'Ek doğrulama durumu', value: parityText, note: L.productionFallback ? i18n.t('offgridL2.fallbackUsed') : i18n.t('offgridL2.liveData') })}
         </div>
-        <div style="background:rgba(15,23,42,0.35);border:1px solid rgba(148,163,184,0.14);border-radius:8px;padding:8px">
-          <div style="font-size:0.66rem;color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.expectedUncertaintyLabel'))}</div>
-          <div style="font-size:1rem;font-weight:800;color:${accuracyColor}">${escapeHtml(uncertaintyText)}</div>
+        <div class="offgrid-list-title">${pendingSteps.length ? 'Kesin projeye geçmeden önce tamamlanması gerekenler' : 'Bu aşama için durum'}</div>
+        ${pendingSteps.length
+          ? `<ul class="offgrid-list">${pendingSteps.slice(0, 4).map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+          : `<div class="offgrid-body-copy">Bu sonuçta kritik bir saha engeli görünmüyor. Yine de nihai proje için yerinde ölçüm ve ekipman doğrulaması önerilir.</div>`}
+        <div class="offgrid-inline-badges">
+          <span class="offgrid-inline-badge"><strong>Not:</strong> ${escapeHtml(i18n.t('offgridL2.honestSyntheticNote'))}</span>
+          <span class="offgrid-inline-badge"><strong>Seviye:</strong> ${escapeHtml(i18n.t('offgridL2.honestPreFeasibility'))}</span>
+          <span class="offgrid-inline-badge"><strong>Sonraki adım:</strong> ${escapeHtml(i18n.t('offgridL2.honestSiteRequired'))}</span>
         </div>
-        <div style="background:rgba(15,23,42,0.35);border:1px solid rgba(148,163,184,0.14);border-radius:8px;padding:8px">
-          <div style="font-size:0.66rem;color:var(--text-muted)">${escapeHtml(i18n.t('offgridL2.calculationModeLabel'))}</div>
-          <div style="font-size:0.82rem;font-weight:700;color:var(--text)">${escapeHtml(modeLabel)} · ${escapeHtml(tierLabel)}</div>
-        </div>
-      </div>
-      <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.45">
-        ${escapeHtml(accuracy.interpretation || i18n.t('offgridL2.accuracyInterpretationFallback'))}
-        ${mainAccuracyBlocker ? `<br><span style="color:#F59E0B">${escapeHtml(mainAccuracyBlocker)}</span>` : ''}
-      </div>` : ''}
-      <div style="font-size:0.72rem;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-        <span>${escapeHtml(i18n.t('offgridL2.productionSource'))}: <strong style="color:var(--text)">${escapeHtml(prodSource)}</strong>${fallbackBadge}</span>
-        <span>${escapeHtml(productionDispatchText)}</span>
-        <span>${escapeHtml(i18n.t('offgridL2.loadSourceLabel'))}: <strong style="color:var(--text)">${escapeHtml(loadSrc)}</strong></span>
-        <span>${escapeHtml(i18n.t('offgridL2.dispatchLabel'))}: <strong style="color:var(--text)">${escapeHtml(dispatchLabel)}</strong></span>
-        ${parityText}
-      </div>
-      ${L.fieldGuaranteeReadiness ? `
-      <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldGuaranteeReadiness.phase1Ready ? '#22C55E' : '#F59E0B'}">
-        ${escapeHtml(i18n.t('offgridL2.fieldGuaranteeStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldGuaranteeReadiness.phase1Ready ? 'offgridL2.fieldGuaranteePhase1Ready' : 'offgridL2.fieldGuaranteeBlocked'))}</strong>
-        ${L.fieldGuaranteeReadiness.blockers?.length ? ` — ${escapeHtml(L.fieldGuaranteeReadiness.blockers[0])}` : ''}
-      </div>` : ''}
-      ${L.fieldEvidenceGate ? `
-      <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldEvidenceGate.phase2Ready ? '#22C55E' : '#F59E0B'}">
-        ${escapeHtml(i18n.t('offgridL2.fieldEvidenceStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldEvidenceGate.phase2Ready ? 'offgridL2.fieldEvidenceReady' : 'offgridL2.fieldEvidenceBlocked'))}</strong>
-        ${L.fieldEvidenceGate.blockers?.length ? ` — ${escapeHtml(L.fieldEvidenceGate.blockers[0])}` : ''}
-      </div>` : ''}
-      ${L.fieldModelMaturityGate ? `
-      <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldModelMaturityGate.phase3Ready ? '#22C55E' : '#F59E0B'}">
-        ${escapeHtml(i18n.t('offgridL2.fieldModelStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldModelMaturityGate.phase3Ready ? 'offgridL2.fieldModelReady' : 'offgridL2.fieldModelBlocked'))}</strong>
-        ${L.fieldModelMaturityGate.blockers?.length ? ` — ${escapeHtml(L.fieldModelMaturityGate.blockers[0])}` : ''}
-      </div>` : ''}
-      ${L.fieldAcceptanceGate ? `
-      <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldAcceptanceGate.phase4Ready ? '#22C55E' : '#F59E0B'}">
-        ${escapeHtml(i18n.t('offgridL2.fieldAcceptanceStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldAcceptanceGate.phase4Ready ? 'offgridL2.fieldAcceptanceReady' : 'offgridL2.fieldAcceptanceBlocked'))}</strong>
-        ${L.fieldAcceptanceGate.blockers?.length ? ` — ${escapeHtml(L.fieldAcceptanceGate.blockers[0])}` : ''}
-      </div>` : ''}
-      ${L.fieldOperationGate ? `
-      <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldOperationGate.phase5Ready ? '#22C55E' : '#F59E0B'}">
-        ${escapeHtml(i18n.t('offgridL2.fieldOperationStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldOperationGate.phase5Ready ? 'offgridL2.fieldOperationReady' : 'offgridL2.fieldOperationBlocked'))}</strong>
-        ${L.fieldOperationGate.blockers?.length ? ` — ${escapeHtml(L.fieldOperationGate.blockers[0])}` : ''}
-      </div>` : ''}
-      ${L.fieldRevalidationGate ? `
-      <div style="margin-top:6px;font-size:0.68rem;color:${L.fieldRevalidationGate.phase6Ready ? '#22C55E' : '#F59E0B'}">
-        ${escapeHtml(i18n.t('offgridL2.fieldRevalidationStatus'))}: <strong>${escapeHtml(i18n.t(L.fieldRevalidationGate.phase6Ready ? 'offgridL2.fieldRevalidationReady' : 'offgridL2.fieldRevalidationBlocked'))}</strong>
-        ${L.fieldRevalidationGate.blockers?.length ? ` — ${escapeHtml(L.fieldRevalidationGate.blockers[0])}` : ''}
-      </div>` : ''}
-      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;font-size:0.68rem;color:var(--text-muted)">
-        <span>⚗ ${escapeHtml(i18n.t('offgridL2.honestSyntheticNote'))}</span>
-        <span>📊 ${escapeHtml(i18n.t('offgridL2.honestPreFeasibility'))}</span>
-        <span>🏗 ${escapeHtml(i18n.t('offgridL2.honestSiteRequired'))}</span>
-      </div>`;
+      `;
+    }
   }
 
   // Versiyon damgası ve yük modu
   const versionEl = document.getElementById('offgrid-l2-version');
-  if (versionEl) versionEl.textContent = L.dispatchVersion || '';
+  if (versionEl) versionEl.textContent = L.dispatchVersion ? `Model sürümü: ${L.dispatchVersion}` : '';
   const loadModeEl = document.getElementById('offgrid-l2-load-mode');
   if (loadModeEl) {
     const modeKey = L.loadMode === 'hourly-8760'
       ? 'offgridL2.loadModeHourly'
       : (L.loadMode === 'device-list' ? 'offgridL2.loadModeDeviceList' : 'offgridL2.loadModeSimple');
-    loadModeEl.textContent = i18n.t(modeKey);
+    loadModeEl.textContent = `Yük modeli: ${i18n.t(modeKey)}`;
   }
 }
 

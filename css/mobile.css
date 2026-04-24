@@ -152,7 +152,11 @@ textarea {
   .two-col,
   .equipment-layout,
   .bess-metrics,
-  .result-metrics-grid {
+  .result-metrics-grid,
+  .offgrid-stat-grid,
+  .offgrid-chip-grid,
+  .bess-detail-grid,
+  .offgrid-note-strip {
     grid-template-columns: 1fr !important;
   }
 
@@ -642,6 +646,20 @@ textarea {
 
   .fin-box {
     padding: 16px;
+  }
+
+  .offgrid-result-card,
+  .bess-result-wrap {
+    padding: 16px;
+  }
+
+  .offgrid-result-head {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .offgrid-stat-card {
+    min-height: 0;
   }
 
   .fin-row {
