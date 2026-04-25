@@ -608,16 +608,25 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
      ═══════════════════════════════════════════════════════════ -->
 <div id="landing-root">
 
+  <!-- arka plan: gradient mesh + grid -->
+  <div class="lp-bg" aria-hidden="true">
+    <div class="lp-bg-grid"></div>
+    <div class="lp-bg-mesh lp-bg-mesh-1"></div>
+    <div class="lp-bg-mesh lp-bg-mesh-2"></div>
+    <div class="lp-bg-mesh lp-bg-mesh-3"></div>
+  </div>
+
   <!-- LP NAV -->
   <nav class="lp-nav" aria-label="Landing navigation">
     <a href="#" class="lp-nav-brand" onclick="event.preventDefault();goToLandingTop()">
       <img src="new_version_logo.png" alt="Solar Rota"/>
       <div class="lp-nav-brand-col">
         <span class="lp-nav-brand-text">Solar Rota</span>
-        <span class="lp-nav-brand-tag">GES tasarım ve fizibilite stüdyosu</span>
+        <span class="lp-nav-brand-tag">GES tasarım stüdyosu</span>
       </div>
     </a>
     <div class="lp-nav-links">
+      <a href="#lp-showcase">Ürün</a>
       <a href="#lp-scenarios">Senaryolar</a>
       <a href="#lp-features">Özellikler</a>
       <a href="#lp-how">Kullanım</a>
@@ -630,117 +639,156 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     </button>
   </nav>
 
-  <!-- LP HERO -->
+  <!-- LP HERO (cinematic) -->
   <section class="lp-hero">
     <div class="lp-container">
-      <div class="lp-hero-inner">
-        <div>
-          <span class="lp-hero-pill">
-            <span class="dot"></span>
-            Türkçe güneş enerjisi hesaplama aracı
-          </span>
-          <h1 class="lp-hero-title">
-            Güneş enerjisi sisteminizi<br/>
-            <span class="amber">güvenle tasarlayın.</span>
-          </h1>
-          <p class="lp-hero-sub">
-            Senaryo seçin, konumu belirleyin, çatınızı ölçün. Saatlik üretim
-            simülasyonu; KDV, dağıtım bedeli ve tarife farkları dahil finansal
-            analiz. 7 adımda ön fizibilite çıktınız hazır.
-          </p>
-          <div class="lp-hero-ctas">
-            <button type="button" class="lp-btn lp-btn-primary lp-btn-lg" onclick="startCalculator()">
-              Hesaplamaya Başla
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            </button>
-            <a href="#lp-features" class="lp-btn lp-btn-secondary lp-btn-lg">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-              Özellikleri Gör
-            </a>
-          </div>
-          <div class="lp-hero-trust">
-            <span><strong>Ücretsiz.</strong> Kayıt gerekmez.</span>
-            <span class="sep"></span>
-            <span>Tarayıcıda çalışır · Verileriniz cihazınızda kalır</span>
+      <div class="lp-hero-cluster">
+        <span class="lp-hero-pill">
+          <span class="dot"></span>
+          Türkçe güneş enerjisi hesaplama stüdyosu
+        </span>
+        <h1 class="lp-hero-title">
+          <span class="line">Güneş enerjisini</span>
+          <span class="line"><span class="amber">tasarlamanın</span></span>
+          <span class="line">en disiplinli yolu.</span>
+        </h1>
+        <p class="lp-hero-sub">
+          Senaryo seçin, çatınızı çizin, ekipmanınızı kıyaslayın. Saatlik üretim
+          simülasyonu, KDV ve dağıtım bedeli dahil finansal analiz — yedi adımda
+          ön fizibilite çıktınız hazır.
+        </p>
+        <div class="lp-hero-ctas">
+          <button type="button" class="lp-btn lp-btn-primary lp-btn-xl" onclick="startCalculator()">
+            Hesaplamaya Başla
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+          <a href="#lp-showcase" class="lp-btn lp-btn-ghost lp-btn-xl">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+            Ürünü incele
+          </a>
+        </div>
+        <div class="lp-hero-meta">
+          <span><strong>Ücretsiz.</strong> Kayıt gerekmez.</span>
+          <span class="sep"></span>
+          <span>Tarayıcıda çalışır · Verileriniz cihazınızda kalır</span>
+        </div>
+      </div>
+
+      <!-- Hero showcase: ana ekran (Sonuçlar) önde, arkada secondary peek -->
+      <div class="lp-hero-stage">
+        <div class="lp-stage-back">
+          <!-- arka mockup: çatı çizim ekranı küçük preview -->
+          <div class="lp-browser lp-browser-sm">
+            <div class="lp-browser-bar">
+              <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+              <span class="lp-url">solarrota.app · 03 / Çatı</span>
+            </div>
+            <div class="lp-browser-body lp-browser-body-map">
+              <svg viewBox="0 0 320 200" preserveAspectRatio="none" class="lp-map-preview">
+                <defs>
+                  <pattern id="mapgrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+                  </pattern>
+                  <linearGradient id="rooftop" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="rgba(245,158,11,0.42)"/>
+                    <stop offset="100%" stop-color="rgba(245,158,11,0.12)"/>
+                  </linearGradient>
+                </defs>
+                <rect width="320" height="200" fill="#0F172A"/>
+                <rect width="320" height="200" fill="url(#mapgrid)"/>
+                <path d="M 80 60 L 230 50 L 240 140 L 90 150 Z" fill="url(#rooftop)" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <circle cx="80" cy="60" r="4" fill="#F59E0B"/>
+                <circle cx="230" cy="50" r="4" fill="#F59E0B"/>
+                <circle cx="240" cy="140" r="4" fill="#F59E0B"/>
+                <circle cx="90" cy="150" r="4" fill="#F59E0B"/>
+                <text x="14" y="22" font-family="Space Grotesk" font-size="10" font-weight="700" fill="#94A3B8">ÇATI ÇİZİMİ · POLİGON</text>
+                <text x="14" y="186" font-family="Space Grotesk" font-size="10" font-weight="600" fill="#F59E0B">68 m² · eğim 30° · azimut 178°</text>
+              </svg>
+            </div>
           </div>
         </div>
 
-        <!-- ürün mockup (hesaplama ekranı önizlemesi) -->
-        <div class="lp-peek">
-          <div class="lp-glass lp-peek-inner">
-            <div class="lp-peek-head">
-              <div>
-                <div class="lp-peek-title">Antalya · Ticarethane çatı</div>
-                <div class="lp-peek-subtitle">On-Grid · 12.8 kWp · 36.89°K, 30.71°D</div>
-              </div>
-              <span class="lp-chip lp-chip-ok">
-                <span class="dot"></span> ÖN ANALİZ TAMAMLANDI
-              </span>
+        <div class="lp-stage-front">
+          <!-- ana mockup: Sonuçlar ekranı browser frame -->
+          <div class="lp-browser lp-browser-lg">
+            <div class="lp-browser-bar">
+              <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+              <span class="lp-url">solarrota.app · 07 / Sonuçlar</span>
+              <span class="lp-bar-spacer"></span>
+              <span class="lp-bar-chip">PDF Dışa Aktar</span>
             </div>
+            <div class="lp-browser-body">
+              <div class="lp-result-head">
+                <div>
+                  <div class="lp-result-title">Antalya · Ticarethane çatı sistemi</div>
+                  <div class="lp-result-sub">On-Grid · 12.8 kWp · 2 string · saatlik mahsuplaşma</div>
+                </div>
+                <span class="lp-pill-ok">
+                  <span class="d"></span> ÖN ANALİZ HAZIR
+                </span>
+              </div>
 
-            <!-- wizard progress -->
-            <div class="lp-wiz-row">
-              <div class="lp-wiz-label">Adım 07 / 07</div>
-              <div class="lp-wiz-dots">
-                <div class="lp-wiz-dot done"></div>
-                <div class="lp-wiz-dot done"></div>
-                <div class="lp-wiz-dot done"></div>
-                <div class="lp-wiz-dot done"></div>
-                <div class="lp-wiz-dot done"></div>
-                <div class="lp-wiz-dot done"></div>
-                <div class="lp-wiz-dot active"></div>
+              <div class="lp-kpi-row">
+                <div class="lp-kpi-card" style="--c:var(--primary)">
+                  <div class="lp-kpi-l">Yıllık Üretim</div>
+                  <div class="lp-kpi-v">19.4<span>MWh</span></div>
+                  <div class="lp-kpi-t">▲ Saatlik modelleme</div>
+                </div>
+                <div class="lp-kpi-card" style="--c:#06B6D4">
+                  <div class="lp-kpi-l">Öz Tüketim</div>
+                  <div class="lp-kpi-v">72<span>%</span></div>
+                  <div class="lp-kpi-t">▲ Mahsuplaşma</div>
+                </div>
+                <div class="lp-kpi-card" style="--c:var(--success)">
+                  <div class="lp-kpi-l">Geri Dönüş</div>
+                  <div class="lp-kpi-v">4.8<span>yıl</span></div>
+                  <div class="lp-kpi-t">▲ NPV pozitif</div>
+                </div>
+                <div class="lp-kpi-card" style="--c:#FCD34D">
+                  <div class="lp-kpi-l">Yıllık Tasarruf</div>
+                  <div class="lp-kpi-v">412<span>b ₺</span></div>
+                  <div class="lp-kpi-t">▲ KDV dahil</div>
+                </div>
               </div>
-            </div>
 
-            <div class="lp-kpi-grid">
-              <div class="lp-kpi" style="--kpi-c:var(--primary)">
-                <div class="lp-kpi-label">Yıllık Üretim</div>
-                <div class="lp-kpi-value">19.4<span class="lp-kpi-unit">MWh</span></div>
-                <div class="lp-kpi-trend">▲ Saatlik modelleme</div>
-              </div>
-              <div class="lp-kpi" style="--kpi-c:#06B6D4">
-                <div class="lp-kpi-label">Öz Tüketim</div>
-                <div class="lp-kpi-value" style="color:#06B6D4">72<span class="lp-kpi-unit">%</span></div>
-                <div class="lp-kpi-trend">▲ Saatlik mahsup</div>
-              </div>
-              <div class="lp-kpi" style="--kpi-c:var(--success)">
-                <div class="lp-kpi-label">Geri Dönüş</div>
-                <div class="lp-kpi-value" style="color:var(--success)">4.8<span class="lp-kpi-unit">yıl</span></div>
-              </div>
-              <div class="lp-kpi" style="--kpi-c:#FCD34D">
-                <div class="lp-kpi-label">Fatura Tasarrufu</div>
-                <div class="lp-kpi-value" style="color:#FCD34D">₺412<span class="lp-kpi-unit">b/yıl</span></div>
-              </div>
-            </div>
-
-            <div class="lp-bar-panel">
-              <div class="lp-bar-head">
-                <span class="lp-wiz-label">Aylık kWh · saatlik modelli</span>
-                <span class="lp-chip" style="background:rgba(245,158,11,0.12);color:#F59E0B;border-color:rgba(245,158,11,0.3)">2,340 · Tem</span>
-              </div>
-              <div class="lp-bar-chart">
-                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:26%"></div><div class="lp-bar-label">O</div></div>
-                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:36%"></div><div class="lp-bar-label">Ş</div></div>
-                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:54%"></div><div class="lp-bar-label">M</div></div>
-                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:70%"></div><div class="lp-bar-label">N</div></div>
-                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:86%"></div><div class="lp-bar-label">M</div></div>
-                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:96%"></div><div class="lp-bar-label">H</div></div>
-                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:100%"></div><div class="lp-bar-label">T</div></div>
-                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:94%"></div><div class="lp-bar-label">A</div></div>
-                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:76%"></div><div class="lp-bar-label">E</div></div>
-                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:58%"></div><div class="lp-bar-label">E</div></div>
-                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:38%"></div><div class="lp-bar-label">K</div></div>
-                <div class="lp-bar-col"><div class="lp-bar-inner" style="height:26%"></div><div class="lp-bar-label">A</div></div>
+              <div class="lp-prod-block">
+                <div class="lp-prod-head">
+                  <span class="lp-eyebrow-sm">Aylık Üretim · saatlik modelli</span>
+                  <span class="lp-bar-chip lp-bar-chip-amber">2,340 kWh · Tem</span>
+                </div>
+                <div class="lp-bars">
+                  <div class="lp-bar-col"><div class="lp-bar-i" style="height:26%"></div><span>O</span></div>
+                  <div class="lp-bar-col"><div class="lp-bar-i" style="height:36%"></div><span>Ş</span></div>
+                  <div class="lp-bar-col"><div class="lp-bar-i" style="height:54%"></div><span>M</span></div>
+                  <div class="lp-bar-col"><div class="lp-bar-i" style="height:70%"></div><span>N</span></div>
+                  <div class="lp-bar-col"><div class="lp-bar-i" style="height:86%"></div><span>M</span></div>
+                  <div class="lp-bar-col"><div class="lp-bar-i" style="height:96%"></div><span>H</span></div>
+                  <div class="lp-bar-col lp-bar-col-peak"><div class="lp-bar-i" style="height:100%"></div><span>T</span></div>
+                  <div class="lp-bar-col"><div class="lp-bar-i" style="height:94%"></div><span>A</span></div>
+                  <div class="lp-bar-col"><div class="lp-bar-i" style="height:76%"></div><span>E</span></div>
+                  <div class="lp-bar-col"><div class="lp-bar-i" style="height:58%"></div><span>E</span></div>
+                  <div class="lp-bar-col"><div class="lp-bar-i" style="height:38%"></div><span>K</span></div>
+                  <div class="lp-bar-col"><div class="lp-bar-i" style="height:26%"></div><span>A</span></div>
+                </div>
               </div>
             </div>
+          </div>
 
-            <div class="lp-evidence">
-              <div class="lp-evidence-row">
-                <span class="dot"></span> Hesaplama tamamlandı
-              </div>
-              <div class="lp-evidence-row">
-                <span class="dot"></span> Ön analiz özeti hazır
-              </div>
+          <!-- floating callout: KPI üzerinde annotation -->
+          <div class="lp-callout lp-callout-1">
+            <span class="lp-callout-arrow"></span>
+            <strong>Saatlik üretim modeli</strong>
+            <span>8.760 zaman adımı; hücre sıcaklığı ve inverter eğrisi dahil</span>
+          </div>
+
+          <!-- floating mini-card: scenario chip -->
+          <div class="lp-mini-card lp-mini-card-1">
+            <div class="lp-mini-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+            </div>
+            <div>
+              <div class="lp-mini-l">Senaryo</div>
+              <div class="lp-mini-v">On-Grid çatı</div>
             </div>
           </div>
         </div>
@@ -748,21 +796,555 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     </div>
   </section>
 
-  <!-- ÜRÜN TANITIMI / SENARYOLAR -->
+  <!-- MARQUEE BAND -->
+  <div class="lp-marquee">
+    <div class="lp-marquee-track" aria-hidden="true">
+      <span class="m-item">Saatlik üretim simülasyonu</span><span class="m-dot">●</span>
+      <span class="m-item">Çatı poligon çizimi</span><span class="m-dot">●</span>
+      <span class="m-item">KDV &amp; dağıtım bedeli</span><span class="m-dot">●</span>
+      <span class="m-item">Saatlik mahsuplaşma</span><span class="m-dot">●</span>
+      <span class="m-item">Off-Grid batarya hesabı</span><span class="m-dot">●</span>
+      <span class="m-item">USD/TRY etkisi</span><span class="m-dot">●</span>
+      <span class="m-item">Senaryo karşılaştırma</span><span class="m-dot">●</span>
+      <span class="m-item">Tek tıkla PDF</span><span class="m-dot">●</span>
+      <!-- duplicate for seamless loop -->
+      <span class="m-item">Saatlik üretim simülasyonu</span><span class="m-dot">●</span>
+      <span class="m-item">Çatı poligon çizimi</span><span class="m-dot">●</span>
+      <span class="m-item">KDV &amp; dağıtım bedeli</span><span class="m-dot">●</span>
+      <span class="m-item">Saatlik mahsuplaşma</span><span class="m-dot">●</span>
+      <span class="m-item">Off-Grid batarya hesabı</span><span class="m-dot">●</span>
+      <span class="m-item">USD/TRY etkisi</span><span class="m-dot">●</span>
+      <span class="m-item">Senaryo karşılaştırma</span><span class="m-dot">●</span>
+      <span class="m-item">Tek tıkla PDF</span><span class="m-dot">●</span>
+    </div>
+  </div>
+
+  <!-- ÜRÜN TURU — 7 ADIM TAB SHOWCASE -->
+  <section class="lp-section" id="lp-showcase">
+    <div class="lp-container">
+      <div class="lp-section-head">
+        <div>
+          <div class="lp-eyebrow"><span class="dot"></span> Ürün Turu</div>
+          <h2><span class="grad">Yedi adımın hepsini içeriden görün.</span></h2>
+        </div>
+        <p>Senaryo seçiminden teslime kadar; her ekran sonraki adıma temiz bir veri devreder. Aşağıdaki sekmelerle akışın her bölümünü tek tek inceleyin.</p>
+      </div>
+
+      <!-- TAB NAV -->
+      <div class="lp-tour-tabs" role="tablist">
+        <button type="button" class="lp-tour-tab active" data-step="1" role="tab" onclick="lpTourStep(1)">
+          <span class="lp-tour-tab-num">01</span>
+          <span class="lp-tour-tab-name">Senaryo</span>
+        </button>
+        <button type="button" class="lp-tour-tab" data-step="2" role="tab" onclick="lpTourStep(2)">
+          <span class="lp-tour-tab-num">02</span>
+          <span class="lp-tour-tab-name">Konum</span>
+        </button>
+        <button type="button" class="lp-tour-tab" data-step="3" role="tab" onclick="lpTourStep(3)">
+          <span class="lp-tour-tab-num">03</span>
+          <span class="lp-tour-tab-name">Çatı</span>
+        </button>
+        <button type="button" class="lp-tour-tab" data-step="4" role="tab" onclick="lpTourStep(4)">
+          <span class="lp-tour-tab-num">04</span>
+          <span class="lp-tour-tab-name">Ekipman</span>
+        </button>
+        <button type="button" class="lp-tour-tab" data-step="5" role="tab" onclick="lpTourStep(5)">
+          <span class="lp-tour-tab-num">05</span>
+          <span class="lp-tour-tab-name">Ayarlar</span>
+        </button>
+        <button type="button" class="lp-tour-tab" data-step="6" role="tab" onclick="lpTourStep(6)">
+          <span class="lp-tour-tab-num">06</span>
+          <span class="lp-tour-tab-name">Hesapla</span>
+        </button>
+        <button type="button" class="lp-tour-tab" data-step="7" role="tab" onclick="lpTourStep(7)">
+          <span class="lp-tour-tab-num">07</span>
+          <span class="lp-tour-tab-name">Sonuçlar</span>
+        </button>
+      </div>
+
+      <!-- STAGE -->
+      <div class="lp-tour-stage">
+        <!-- Sol açıklama paneli -->
+        <div class="lp-tour-side">
+          <!-- Step 01 -->
+          <div class="lp-tour-text active" data-step="1">
+            <div class="lp-tour-tag">Adım 01</div>
+            <h3>Doğru motor, doğru rapor.</h3>
+            <p>İlk seçiminiz tüm akışı şekillendirir. <strong>On-Grid</strong> şebekeye bağlı sistemler için; fatura tasarrufu, öz tüketim oranı ve saatlik mahsuplaşma hesaplanır. <strong>Off-Grid</strong> ise şebekeden bağımsız kurulumlar için; günlük yük profili, otonomi günü ve batarya kapasitesi üzerinden planlama yapılır.</p>
+            <ul class="lp-tour-bullets">
+              <li>Motor ve rapor şablonu otomatik seçilir</li>
+              <li>Sonraki adımlarda istenen girdiler buna göre filtrelenir</li>
+            </ul>
+          </div>
+          <!-- Step 02 -->
+          <div class="lp-tour-text" data-step="2">
+            <div class="lp-tour-tag">Adım 02</div>
+            <h3>Pin düşürün, ışınım otomatik gelsin.</h3>
+            <p>Adres yazın, şehir arayın veya doğrudan haritada bir noktaya tıklayın. Konuma göre yıllık ışınım, sıcaklık serisi ve gün uzunluğu çekilerek motora aktarılır.</p>
+            <ul class="lp-tour-bullets">
+              <li>Tüm Türkiye için adres bazlı arama</li>
+              <li>Konum başına yıllık global yatay ışınım</li>
+              <li>Bağlantı yoksa yerel tahmin modeline otomatik geçiş</li>
+            </ul>
+          </div>
+          <!-- Step 03 -->
+          <div class="lp-tour-text" data-step="3">
+            <div class="lp-tour-tag">Adım 03</div>
+            <h3>Uydudan çokgen, doğrudan motora.</h3>
+            <p>Uydu görünümünde çatı köşelerini işaretleyerek poligon çizebilir, alan/eğim/azimut değerlerini elle girebilir veya birden çok yüzey ekleyebilirsiniz. Gölgelenme faktörü ve bina yönlenmesi de modele girer.</p>
+            <ul class="lp-tour-bullets">
+              <li>Çoklu çatı yüzeyi · farklı azimut yönleri</li>
+              <li>Eğim 0–60°, azimut 0–360° aralığı</li>
+              <li>Gölgelenme yüzdesi yıllık üretime yansır</li>
+            </ul>
+          </div>
+          <!-- Step 04 -->
+          <div class="lp-tour-text" data-step="4">
+            <div class="lp-tour-tag">Adım 04</div>
+            <h3>Doğru panel, doğru inverter.</h3>
+            <p>Farklı güç sınıflarında panel ve inverter modelleri arasından Wp, verim ve birim fiyat üzerinden hızlı kıyaslama yapın. String veya mikro-inverter topolojisini ihtiyacınıza göre seçin.</p>
+            <ul class="lp-tour-bullets">
+              <li>Mono PERC · TOPCon · Bifacial seçenekleri</li>
+              <li>String / mikro-inverter topolojileri</li>
+              <li>Off-Grid'de batarya kimyası ve kapasitesi (LFP, NMC)</li>
+            </ul>
+          </div>
+          <!-- Step 05 -->
+          <div class="lp-tour-text" data-step="5">
+            <div class="lp-tour-tag">Adım 05</div>
+            <h3>Tarife, vergi ve kur — hepsi tek ekranda.</h3>
+            <p>Tarife tipini seçin, KDV oranını ve dağıtım bedelini girin, yıllık tarife zam senaryosunu belirleyin. USD/TRY kuru üzerinden kur etkisi de simüle edilir.</p>
+            <ul class="lp-tour-bullets">
+              <li>Mesken · Ticarethane · Sanayi · Tarımsal</li>
+              <li>KDV · dağıtım bedeli · birim yatırım maliyeti</li>
+              <li>USD/TRY kuru projeksiyonu ve yıllık zam</li>
+            </ul>
+          </div>
+          <!-- Step 06 -->
+          <div class="lp-tour-text" data-step="6">
+            <div class="lp-tour-tag">Adım 06</div>
+            <h3>8.760 adımlık simülasyon — saniyeler içinde.</h3>
+            <p>Yıl boyu saatlik üretim modellemesi: hücre sıcaklığı, inverter verim eğrisi, kırpma ve yaşlanma dahil. Süreç boyunca her adım şeffaf şekilde takip edilebilir.</p>
+            <ul class="lp-tour-bullets">
+              <li>Yıllık 8.760 zaman adımı saatlik çözünürlükle</li>
+              <li>Hücre sıcaklığı &amp; inverter verim eğrisi</li>
+              <li>Genelde 6–9 saniye içinde tamamlanır</li>
+            </ul>
+          </div>
+          <!-- Step 07 -->
+          <div class="lp-tour-text" data-step="7">
+            <div class="lp-tour-tag">Adım 07</div>
+            <h3>KPI'lar, grafikler, tek tıkla PDF.</h3>
+            <p>Yıllık üretim, öz tüketim, geri dönüş ve net bugünkü değer gibi KPI'lar; aylık üretim grafiği; finansal projeksiyon. Senaryoları kaydedip yan yana karşılaştırabilir, tek tıkla PDF çıktısı alabilirsiniz.</p>
+            <ul class="lp-tour-bullets">
+              <li>Yıllık üretim · öz tüketim · geri dönüş · NPV · IRR</li>
+              <li>Aylık üretim grafiği &amp; saatlik dağılım</li>
+              <li>Senaryo karşılaştırma &amp; PDF dışa aktarma</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Sağ ürün ekranı -->
+        <div class="lp-tour-screen">
+          <div class="lp-browser lp-browser-tour">
+            <div class="lp-browser-bar">
+              <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+              <span class="lp-url" id="lpTourUrl">solarrota.app · 01 / Senaryo</span>
+              <span class="lp-bar-spacer"></span>
+              <span class="lp-bar-chip" id="lpTourChip">Adım 1 / 7</span>
+            </div>
+            <div class="lp-browser-body lp-tour-body">
+
+              <!-- Pane 01 — Senaryo -->
+              <div class="lp-tour-pane active" data-step="1">
+                <div class="lp-pane-eyebrow">SENARYO SEÇİMİ</div>
+                <div class="lp-pane-h">Hangi sistem türünü hesaplayacağız?</div>
+                <div class="lp-pane-scen">
+                  <div class="lp-pane-scen-card lp-pane-scen-on">
+                    <div class="lp-pane-scen-tile" style="color:#F59E0B;background:linear-gradient(135deg,rgba(245,158,11,.18),rgba(245,158,11,.04));border-color:rgba(245,158,11,.45)">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="6" r="3"/><rect x="3" y="14" width="18" height="6" rx="1"/><path d="M7 14v6M12 14v6M17 14v6M3 17h18"/></svg>
+                    </div>
+                    <div>
+                      <div class="lp-pane-scen-name">On-Grid Çatı Sistemi</div>
+                      <div class="lp-pane-scen-desc">Şebekeye bağlı · fatura tasarrufu · saatlik mahsuplaşma · ihracat geliri</div>
+                    </div>
+                    <div class="lp-pane-scen-check">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                  </div>
+                  <div class="lp-pane-scen-card">
+                    <div class="lp-pane-scen-tile" style="color:#8B5CF6;background:linear-gradient(135deg,rgba(139,92,246,.16),rgba(139,92,246,.04));border-color:rgba(139,92,246,.4)">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="4" y="6" width="14" height="12" rx="1"/><path d="M8 6v12M12 6v12M4 12h14"/><rect x="20" y="10" width="2" height="4"/></svg>
+                    </div>
+                    <div>
+                      <div class="lp-pane-scen-name">Off-Grid + Depolama</div>
+                      <div class="lp-pane-scen-desc">Bağımsız sistem · günlük yük · otonomi günü · batarya kapasitesi</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="lp-pane-summary">
+                  <span class="lp-pane-summary-l">Seçili akış</span>
+                  <strong>On-Grid · Ticarethane · Saatlik mahsuplaşma</strong>
+                  <span class="lp-pane-summary-go">Sonraki Adım →</span>
+                </div>
+              </div>
+
+              <!-- Pane 02 — Konum -->
+              <div class="lp-tour-pane" data-step="2">
+                <div class="lp-pane-search">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <span>Antalya, Muratpaşa</span>
+                  <span class="lp-pane-search-cur">|</span>
+                </div>
+                <div class="lp-pane-mapwrap">
+                  <svg viewBox="0 0 600 320" preserveAspectRatio="xMidYMid slice" class="lp-pane-map">
+                    <defs>
+                      <pattern id="mp1" width="24" height="24" patternUnits="userSpaceOnUse">
+                        <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+                      </pattern>
+                      <radialGradient id="solarRG" cx="55%" cy="40%" r="55%">
+                        <stop offset="0%" stop-color="rgba(245,158,11,0.4)"/>
+                        <stop offset="100%" stop-color="rgba(245,158,11,0)"/>
+                      </radialGradient>
+                    </defs>
+                    <rect width="600" height="320" fill="#0F172A"/>
+                    <rect width="600" height="320" fill="url(#mp1)"/>
+                    <path d="M 50 220 Q 150 180 220 200 T 380 170 T 540 140" stroke="rgba(6,182,212,0.35)" stroke-width="1.5" fill="none" stroke-dasharray="4 4"/>
+                    <path d="M 80 80 Q 180 100 260 70 T 400 90 T 560 60" stroke="rgba(6,182,212,0.25)" stroke-width="1.5" fill="none" stroke-dasharray="4 4"/>
+                    <rect width="600" height="320" fill="url(#solarRG)"/>
+                    <g transform="translate(330,140)">
+                      <circle r="36" fill="rgba(245,158,11,0.18)"/>
+                      <circle r="22" fill="rgba(245,158,11,0.4)"/>
+                      <circle r="11" fill="#F59E0B"/>
+                      <circle r="3" fill="#0F172A"/>
+                    </g>
+                    <text x="20" y="34" font-family="Space Grotesk" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="2">KONUM</text>
+                    <text x="20" y="54" font-family="Space Grotesk" font-size="14" font-weight="700" fill="#F1F5F9">Antalya · Muratpaşa</text>
+                    <text x="20" y="74" font-family="Inter" font-size="11" fill="#F59E0B">36.8841° K · 30.7056° D</text>
+                  </svg>
+                  <div class="lp-pane-locinfo">
+                    <div><span>YILLIK IŞINIM</span><strong>1.840 kWh/m²</strong></div>
+                    <div><span>ORT. SICAKLIK</span><strong>18.7 °C</strong></div>
+                    <div><span>BÖLGE</span><strong>Akdeniz · Z6</strong></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pane 03 — Çatı -->
+              <div class="lp-tour-pane" data-step="3">
+                <div class="lp-pane-roofgrid">
+                  <div class="lp-pane-mapwrap">
+                    <svg viewBox="0 0 520 320" preserveAspectRatio="xMidYMid slice" class="lp-pane-map">
+                      <defs>
+                        <pattern id="mp2" width="22" height="22" patternUnits="userSpaceOnUse">
+                          <path d="M 22 0 L 0 0 0 22" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+                        </pattern>
+                        <linearGradient id="rfg" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stop-color="rgba(245,158,11,0.45)"/>
+                          <stop offset="100%" stop-color="rgba(245,158,11,0.12)"/>
+                        </linearGradient>
+                      </defs>
+                      <rect width="520" height="320" fill="#0A0F1E"/>
+                      <rect width="520" height="320" fill="url(#mp2)"/>
+                      <path d="M 100 80 L 400 64 L 432 248 L 118 264 Z" fill="url(#rfg)" stroke="#F59E0B" stroke-width="2"/>
+                      <path d="M 100 80 L 400 64 L 432 248 L 118 264 Z" fill="none" stroke="#F59E0B" stroke-width="1.4" stroke-dasharray="6 5"/>
+                      <!-- panel grid içinde -->
+                      <g opacity="0.55">
+                        <rect x="135" y="110" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="173" y="110" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="211" y="110" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="249" y="110" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="287" y="110" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="325" y="110" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="363" y="110" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="135" y="170" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="173" y="170" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="211" y="170" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="249" y="170" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="287" y="170" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="325" y="170" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                        <rect x="363" y="170" width="34" height="48" fill="none" stroke="#FCD34D" stroke-width="1"/>
+                      </g>
+                      <circle cx="100" cy="80" r="6" fill="#F59E0B" stroke="#0F172A" stroke-width="2"/>
+                      <circle cx="400" cy="64" r="6" fill="#F59E0B" stroke="#0F172A" stroke-width="2"/>
+                      <circle cx="432" cy="248" r="6" fill="#F59E0B" stroke="#0F172A" stroke-width="2"/>
+                      <circle cx="118" cy="264" r="6" fill="#F59E0B" stroke="#0F172A" stroke-width="2"/>
+                      <text x="266" y="160" text-anchor="middle" font-family="Space Grotesk" font-size="22" font-weight="800" fill="#FCD34D" letter-spacing="-0.02em">68 m²</text>
+                      <text x="266" y="178" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#94A3B8">14 panel · tek yüzey</text>
+                    </svg>
+                    <div class="lp-map-tools">
+                      <div class="lp-tool active">✎ Çiz</div>
+                      <div class="lp-tool">⊕ Yüzey</div>
+                      <div class="lp-tool">◇ Gölgelenme</div>
+                    </div>
+                  </div>
+                  <div class="lp-pane-roofparams">
+                    <div class="lp-pane-param">
+                      <span class="lp-pane-param-l">Alan</span>
+                      <span class="lp-pane-param-v">68 <i>m²</i></span>
+                    </div>
+                    <div class="lp-pane-param">
+                      <span class="lp-pane-param-l">Eğim</span>
+                      <span class="lp-pane-param-v">30 <i>°</i></span>
+                    </div>
+                    <div class="lp-pane-param">
+                      <span class="lp-pane-param-l">Azimut</span>
+                      <span class="lp-pane-param-v">178 <i>° (G)</i></span>
+                    </div>
+                    <div class="lp-pane-param">
+                      <span class="lp-pane-param-l">Gölgelenme</span>
+                      <span class="lp-pane-param-v">5 <i>%</i></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pane 04 — Ekipman -->
+              <div class="lp-tour-pane" data-step="4">
+                <div class="lp-pane-eyebrow">PANEL SEÇİMİ · MONO PERC ≥ 540 W</div>
+                <div class="lp-pane-eqlist">
+                  <div class="lp-pane-eqrow lp-pane-eqrow-active">
+                    <div class="lp-pane-eqrow-l">
+                      <div class="lp-pane-eqrow-name">TOPCon 580 W · Bifacial</div>
+                      <div class="lp-pane-eqrow-meta">N-tipi · 2-cam · 30 yıl garanti</div>
+                    </div>
+                    <div class="lp-pane-eqcell">580 <i>Wp</i></div>
+                    <div class="lp-pane-eqcell">22.6 <i>%</i></div>
+                    <div class="lp-pane-eqcell lp-pane-eqcell-price">₺ 4.250</div>
+                    <div class="lp-pane-eqcheck">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                  </div>
+                  <div class="lp-pane-eqrow">
+                    <div class="lp-pane-eqrow-l">
+                      <div class="lp-pane-eqrow-name">Mono PERC 545 W</div>
+                      <div class="lp-pane-eqrow-meta">P-tipi · 1-cam · 25 yıl</div>
+                    </div>
+                    <div class="lp-pane-eqcell">545 <i>Wp</i></div>
+                    <div class="lp-pane-eqcell">21.3 <i>%</i></div>
+                    <div class="lp-pane-eqcell lp-pane-eqcell-price">₺ 3.180</div>
+                    <div class="lp-pane-eqcheck"></div>
+                  </div>
+                  <div class="lp-pane-eqrow">
+                    <div class="lp-pane-eqrow-l">
+                      <div class="lp-pane-eqrow-name">TOPCon 620 W · Bifacial</div>
+                      <div class="lp-pane-eqrow-meta">N-tipi · 2-cam · 30 yıl</div>
+                    </div>
+                    <div class="lp-pane-eqcell">620 <i>Wp</i></div>
+                    <div class="lp-pane-eqcell">22.9 <i>%</i></div>
+                    <div class="lp-pane-eqcell lp-pane-eqcell-price">₺ 4.890</div>
+                    <div class="lp-pane-eqcheck"></div>
+                  </div>
+                </div>
+                <div class="lp-pane-arrayinfo">
+                  <div class="lp-pane-arrayinfo-l">
+                    <span>DİZİ ÖZETİ</span>
+                    <strong>14 panel · 1 string · 8.12 kWp</strong>
+                  </div>
+                  <div class="lp-pane-arrayinfo-r">
+                    <span>STRİNG İNVERTER · 8 kW</span>
+                    <strong>Verim 98.4% · MPPT 2 girişli</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pane 05 — Ayarlar -->
+              <div class="lp-tour-pane" data-step="5">
+                <div class="lp-pane-eyebrow">TARİFE TİPİ</div>
+                <div class="lp-pane-tariffs">
+                  <div class="lp-pane-tariff">Mesken</div>
+                  <div class="lp-pane-tariff lp-pane-tariff-active">Ticarethane</div>
+                  <div class="lp-pane-tariff">Sanayi</div>
+                  <div class="lp-pane-tariff">Tarımsal</div>
+                </div>
+                <div class="lp-pane-settings">
+                  <div class="lp-pane-set">
+                    <div class="lp-pane-set-h">
+                      <span>KDV oranı</span>
+                      <strong>%20</strong>
+                    </div>
+                    <div class="lp-pane-slider">
+                      <div class="lp-pane-slider-fill" style="width:25%"></div>
+                      <div class="lp-pane-slider-knob" style="left:25%"></div>
+                    </div>
+                  </div>
+                  <div class="lp-pane-set">
+                    <div class="lp-pane-set-h">
+                      <span>Dağıtım bedeli</span>
+                      <strong>₺ 0.62 / kWh</strong>
+                    </div>
+                    <div class="lp-pane-slider">
+                      <div class="lp-pane-slider-fill" style="width:42%"></div>
+                      <div class="lp-pane-slider-knob" style="left:42%"></div>
+                    </div>
+                  </div>
+                  <div class="lp-pane-set">
+                    <div class="lp-pane-set-h">
+                      <span>Yıllık tarife zammı</span>
+                      <strong>%35</strong>
+                    </div>
+                    <div class="lp-pane-slider">
+                      <div class="lp-pane-slider-fill" style="width:58%"></div>
+                      <div class="lp-pane-slider-knob" style="left:58%"></div>
+                    </div>
+                  </div>
+                  <div class="lp-pane-set">
+                    <div class="lp-pane-set-h">
+                      <span>USD / TRY kuru</span>
+                      <strong>39.50 ₺</strong>
+                    </div>
+                    <div class="lp-pane-slider">
+                      <div class="lp-pane-slider-fill" style="width:65%"></div>
+                      <div class="lp-pane-slider-knob" style="left:65%"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="lp-pane-summary">
+                  <span class="lp-pane-summary-l">Aylık tüketim tahmini</span>
+                  <strong>1.350 kWh · ₺ 5.420 fatura</strong>
+                  <span class="lp-pane-summary-go">Hesapla →</span>
+                </div>
+              </div>
+
+              <!-- Pane 06 — Hesapla -->
+              <div class="lp-tour-pane" data-step="6">
+                <div class="lp-pane-calc">
+                  <div class="lp-pane-calc-head">
+                    <div>
+                      <div class="lp-pane-eyebrow" style="margin-bottom:10px">SAATLİK SİMÜLASYON</div>
+                      <div class="lp-pane-calc-title">Yıl boyu 8.760 zaman adımı işleniyor…</div>
+                    </div>
+                    <div class="lp-pane-calc-pct">
+                      <svg viewBox="0 0 60 60" class="lp-pane-spinner">
+                        <circle cx="30" cy="30" r="26" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4"/>
+                        <circle cx="30" cy="30" r="26" fill="none" stroke="url(#calcg)" stroke-width="4" stroke-linecap="round" stroke-dasharray="163.36" stroke-dashoffset="48" transform="rotate(-90 30 30)"/>
+                        <defs>
+                          <linearGradient id="calcg" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#F59E0B"/>
+                            <stop offset="100%" stop-color="#FCD34D"/>
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                      <span>71<i>%</i></span>
+                    </div>
+                  </div>
+                  <div class="lp-pane-calc-log">
+                    <div class="lp-pane-log-row done"><span class="d"></span> Konum verisi alındı · ışınım serisi yüklendi</div>
+                    <div class="lp-pane-log-row done"><span class="d"></span> Çatı geometrisi işlendi · 14 panel yerleşti</div>
+                    <div class="lp-pane-log-row done"><span class="d"></span> Hücre sıcaklığı modellendi · Sandia</div>
+                    <div class="lp-pane-log-row done"><span class="d"></span> DC kayıplar · uyumsuzluk · kablo dahil</div>
+                    <div class="lp-pane-log-row active"><span class="d d-active"></span> Saatlik dispatch &amp; mahsuplaşma…</div>
+                    <div class="lp-pane-log-row"><span class="d d-pending"></span> Finansal projeksiyon · NPV · IRR</div>
+                    <div class="lp-pane-log-row"><span class="d d-pending"></span> Rapor hazırlanıyor · PDF</div>
+                  </div>
+                  <div class="lp-pane-calc-foot">
+                    <span>Tahmini bitiş</span><strong>~3 saniye</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pane 07 — Sonuçlar -->
+              <div class="lp-tour-pane" data-step="7">
+                <div class="lp-pane-result-head">
+                  <div>
+                    <div class="lp-pane-eyebrow" style="margin-bottom:6px">SONUÇLAR</div>
+                    <div class="lp-pane-h">Antalya · Ticarethane çatı sistemi</div>
+                  </div>
+                  <span class="lp-pill-ok"><span class="d"></span> ÖN ANALİZ HAZIR</span>
+                </div>
+                <div class="lp-kpi-row">
+                  <div class="lp-kpi-card" style="--c:var(--primary)">
+                    <div class="lp-kpi-l">Yıllık Üretim</div>
+                    <div class="lp-kpi-v">12.4<span>MWh</span></div>
+                    <div class="lp-kpi-t">▲ Saatlik modelleme</div>
+                  </div>
+                  <div class="lp-kpi-card" style="--c:#06B6D4">
+                    <div class="lp-kpi-l">Öz Tüketim</div>
+                    <div class="lp-kpi-v">68<span>%</span></div>
+                    <div class="lp-kpi-t">▲ Mahsuplaşma</div>
+                  </div>
+                  <div class="lp-kpi-card" style="--c:var(--success)">
+                    <div class="lp-kpi-l">Geri Dönüş</div>
+                    <div class="lp-kpi-v">5.2<span>yıl</span></div>
+                    <div class="lp-kpi-t">▲ NPV pozitif</div>
+                  </div>
+                  <div class="lp-kpi-card" style="--c:#FCD34D">
+                    <div class="lp-kpi-l">Yıllık Tasarruf</div>
+                    <div class="lp-kpi-v">268<span>b ₺</span></div>
+                    <div class="lp-kpi-t">▲ KDV dahil</div>
+                  </div>
+                </div>
+                <div class="lp-pane-resultviz">
+                  <div class="lp-prod-block" style="margin-top:0">
+                    <div class="lp-prod-head">
+                      <span class="lp-eyebrow-sm">Aylık Üretim · saatlik modelli</span>
+                      <span class="lp-bar-chip lp-bar-chip-amber">1.580 kWh · Tem</span>
+                    </div>
+                    <div class="lp-bars">
+                      <div class="lp-bar-col"><div class="lp-bar-i" style="height:30%"></div><span>O</span></div>
+                      <div class="lp-bar-col"><div class="lp-bar-i" style="height:42%"></div><span>Ş</span></div>
+                      <div class="lp-bar-col"><div class="lp-bar-i" style="height:58%"></div><span>M</span></div>
+                      <div class="lp-bar-col"><div class="lp-bar-i" style="height:74%"></div><span>N</span></div>
+                      <div class="lp-bar-col"><div class="lp-bar-i" style="height:88%"></div><span>M</span></div>
+                      <div class="lp-bar-col"><div class="lp-bar-i" style="height:96%"></div><span>H</span></div>
+                      <div class="lp-bar-col lp-bar-col-peak"><div class="lp-bar-i" style="height:100%"></div><span>T</span></div>
+                      <div class="lp-bar-col"><div class="lp-bar-i" style="height:94%"></div><span>A</span></div>
+                      <div class="lp-bar-col"><div class="lp-bar-i" style="height:74%"></div><span>E</span></div>
+                      <div class="lp-bar-col"><div class="lp-bar-i" style="height:54%"></div><span>E</span></div>
+                      <div class="lp-bar-col"><div class="lp-bar-i" style="height:38%"></div><span>K</span></div>
+                      <div class="lp-bar-col"><div class="lp-bar-i" style="height:28%"></div><span>A</span></div>
+                    </div>
+                  </div>
+                  <div class="lp-pane-pdf">
+                    <div class="lp-pane-pdf-icon">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6"/></svg>
+                    </div>
+                    <div>
+                      <div class="lp-pane-pdf-name">SolarRota_Antalya_TicaretCatı.pdf</div>
+                      <div class="lp-pane-pdf-meta">24 sayfa · panel dizilimi · finansal özet</div>
+                    </div>
+                    <span class="lp-pane-pdf-cta">İndir →</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stepper alt navigation -->
+      <div class="lp-tour-foot">
+        <button type="button" class="lp-tour-prev" onclick="lpTourPrev()" aria-label="Önceki adım">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        </button>
+        <div class="lp-tour-pages">
+          <span class="lp-tour-current">01</span>
+          <span class="lp-tour-divider">/</span>
+          <span class="lp-tour-total">07</span>
+        </div>
+        <button type="button" class="lp-tour-next" onclick="lpTourNext()" aria-label="Sonraki adım">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SENARYOLAR -->
   <section class="lp-section" id="lp-scenarios">
     <div class="lp-container">
       <div class="lp-section-head">
         <div>
           <div class="lp-eyebrow"><span class="dot"></span> Senaryolar</div>
-          <h2><span class="grad">Her proje için doğru hesap motoru.</span></h2>
+          <h2><span class="grad">Her proje için doğru motor.</span></h2>
         </div>
-        <p>On-Grid veya Off-Grid — seçiminiz hesaplama mantığını, rapor şablonunu ve önerilen ekipman listesini şekillendirir.</p>
+        <p>Seçiminiz hesaplama mantığını, rapor şablonunu ve önerilen girdileri belirler.</p>
       </div>
       <div class="lp-scen-grid">
-        <button type="button" class="lp-scen-card" style="--scen-c:#F59E0B" onclick="startCalculatorWithScenario('on-grid')">
+        <button type="button" class="lp-scen-card" style="--c:#F59E0B" onclick="startCalculatorWithScenario('on-grid')">
+          <div class="lp-scen-num">01</div>
           <div class="lp-scen-tile">
-            <!-- On-Grid icon (sun + grid lines) -->
-            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="32" cy="20" r="8"/>
               <path d="M32 6v3M32 31v3M18 20h3M43 20h3M22 10l2 2M40 28l2 2M42 10l-2 2M24 28l-2 2"/>
               <rect x="8" y="40" width="48" height="18" rx="2"/>
@@ -772,22 +1354,23 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
               <line x1="8" y1="49" x2="56" y2="49"/>
             </svg>
           </div>
-          <h3>On-Grid Çatı Sistemi</h3>
-          <p>Şebekeye bağlı kurulumlar için fatura tasarrufu, öz tüketim, ihracat geliri ve geri dönüş analizi. Saatlik mahsuplaşma modeli ile.</p>
-          <div class="lp-scen-meta">
-            <span class="mdot"></span>
-            <span>Mesken · Ticarethane · Sanayi · Tarım tarifelerine göre</span>
-          </div>
+          <h3>On-Grid Çatı</h3>
+          <p>Şebekeye bağlı sistemler için fatura tasarrufu, öz tüketim, saatlik mahsuplaşma ve geri dönüş analizi.</p>
+          <ul class="lp-scen-list">
+            <li>Mesken · Ticarethane · Sanayi · Tarımsal tarifeler</li>
+            <li>KDV · dağıtım bedeli · yıllık zam senaryosu</li>
+            <li>USD/TRY kuru projeksiyonu</li>
+          </ul>
           <span class="lp-scen-cta">
             On-Grid akışını başlat
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </span>
         </button>
 
-        <button type="button" class="lp-scen-card" style="--scen-c:#8B5CF6" onclick="startCalculatorWithScenario('off-grid')">
+        <button type="button" class="lp-scen-card" style="--c:#8B5CF6" onclick="startCalculatorWithScenario('off-grid')">
+          <div class="lp-scen-num">02</div>
           <div class="lp-scen-tile">
-            <!-- Off-Grid icon (battery + panel) -->
-            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="6" y="8" width="28" height="18" rx="2"/>
               <line x1="14" y1="8" x2="14" y2="26"/>
               <line x1="22" y1="8" x2="22" y2="26"/>
@@ -801,11 +1384,12 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             </svg>
           </div>
           <h3>Off-Grid + Depolama</h3>
-          <p>Şebekeden bağımsız sistemler. Günlük yük profili ve otonomi günü girişleriyle batarya kapasite hesabı ve dispatch analizi.</p>
-          <div class="lp-scen-meta">
-            <span class="mdot"></span>
-            <span>Ön fizibilite · LFP batarya · Kritik yük analizi</span>
-          </div>
+          <p>Şebekeden bağımsız sistemler için günlük yük profili, otonomi günü ve batarya kapasite hesabı.</p>
+          <ul class="lp-scen-list">
+            <li>Günlük tüketim · kritik yük · otonomi günü</li>
+            <li>LFP / Lityum / Kurşun-asit kimyaları</li>
+            <li>Saatlik dispatch ön analizi</li>
+          </ul>
           <span class="lp-scen-cta">
             Off-Grid akışını başlat
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
@@ -815,64 +1399,94 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     </div>
   </section>
 
-  <!-- ÖZELLİKLER -->
-  <section class="lp-section" id="lp-features" style="background:linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.015) 50%, transparent 100%)">
+  <!-- BENTO FEATURES -->
+  <section class="lp-section" id="lp-features">
     <div class="lp-container">
       <div class="lp-section-head">
         <div>
           <div class="lp-eyebrow"><span class="dot"></span> Neler Yapar?</div>
           <h2><span class="grad">Ön fizibilitenin arkasındaki motor.</span></h2>
         </div>
-        <p>Tasarımdan finansal analize kadar her adım şeffaf varsayımlarla ilerler. Teknik disiplin, açık veri girişi.</p>
+        <p>Tasarımdan finansal analize kadar her adım şeffaf varsayımlarla ilerler.</p>
       </div>
-      <div class="lp-feat-grid">
-        <div class="lp-feat-card">
-          <div class="lp-feat-icon">
+
+      <div class="lp-bento">
+        <!-- 1: hourly sim — büyük -->
+        <div class="lp-bento-card lp-bento-1">
+          <div class="lp-bento-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>
           </div>
           <h3>Saatlik Üretim Simülasyonu</h3>
-          <p>Yıl boyu 8.760 adımlı üretim modellemesi. Hücre sıcaklığı, inverter verimi, kırpma ve yaşlanma dahil — aylık ortalama kısayolu yok.</p>
+          <p>Yıl boyu 8.760 zaman adımı. Hücre sıcaklığı, inverter verim eğrisi, kırpma ve yaşlanma dahil — aylık ortalama kısayolu yok.</p>
+          <div class="lp-bento-viz">
+            <svg viewBox="0 0 320 80" preserveAspectRatio="none" class="lp-spark">
+              <defs>
+                <linearGradient id="sparkfill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="rgba(245,158,11,0.4)"/>
+                  <stop offset="100%" stop-color="rgba(245,158,11,0)"/>
+                </linearGradient>
+              </defs>
+              <path d="M 0 70 Q 20 60 40 55 T 80 38 T 120 22 T 160 12 T 200 18 T 240 32 T 280 50 T 320 68 L 320 80 L 0 80 Z" fill="url(#sparkfill)"/>
+              <path d="M 0 70 Q 20 60 40 55 T 80 38 T 120 22 T 160 12 T 200 18 T 240 32 T 280 50 T 320 68" fill="none" stroke="#F59E0B" stroke-width="2"/>
+            </svg>
+            <span class="lp-bento-chip">8.760 adım · saatlik</span>
+          </div>
         </div>
-        <div class="lp-feat-card">
-          <div class="lp-feat-icon">
+
+        <!-- 2: roof tools -->
+        <div class="lp-bento-card lp-bento-2">
+          <div class="lp-bento-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894L8.106 3.447a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>
           </div>
           <h3>Çatı Araçları &amp; Uydu</h3>
-          <p>Harita üzerinde pin düşürün, çokgen çizin veya parametrik ölçü girin. Eğim, azimut ve gölgelenme girdileri otomatik işlenir.</p>
+          <p>Uydu görünümünde çokgen çizimi veya parametrik giriş. Çoklu yüzey, eğim, azimut, gölgelenme.</p>
         </div>
-        <div class="lp-feat-card">
-          <div class="lp-feat-icon">
+
+        <!-- 3: equipment -->
+        <div class="lp-bento-card lp-bento-3">
+          <div class="lp-bento-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg>
           </div>
           <h3>Ekipman Seçimi</h3>
-          <p>Farklı panel ve inverter seçenekleri arasından hızlıca karşılaştırma yapın. Wp, verim ve birim fiyat üzerinden karar verin.</p>
+          <p>Panel ve inverter modelleri arasında Wp, verim ve birim fiyat üzerinden hızlı kıyaslama.</p>
         </div>
-        <div class="lp-feat-card">
-          <div class="lp-feat-icon">
+
+        <!-- 4: finance — büyük -->
+        <div class="lp-bento-card lp-bento-4">
+          <div class="lp-bento-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/></svg>
           </div>
           <h3>KDV &amp; Dağıtım Bedeli Dahil Finans</h3>
-          <p>Tarife tipi, KDV, dağıtım bedeli, kWh başı yatırım, USD/TRY kuru ve yıllık zam senaryoları. NPV, IRR ve geri dönüş varsayımlarıyla birlikte.</p>
+          <p>Tarife tipi, KDV oranı, dağıtım bedeli, kWh başı yatırım, USD/TRY kuru ve yıllık zam senaryoları. NPV, IRR ve geri dönüş varsayımlarıyla.</p>
+          <div class="lp-bento-stats">
+            <div><span class="l">Geri Dönüş</span><span class="v">4.8<i>yıl</i></span></div>
+            <div><span class="l">10y NPV</span><span class="v">2.4<i>M ₺</i></span></div>
+            <div><span class="l">IRR</span><span class="v">28<i>%</i></span></div>
+          </div>
         </div>
-        <div class="lp-feat-card">
-          <div class="lp-feat-icon">
+
+        <!-- 5: report -->
+        <div class="lp-bento-card lp-bento-5">
+          <div class="lp-bento-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6"/></svg>
           </div>
           <h3>Özet Rapor &amp; PDF</h3>
-          <p>Panel dizilimi, bileşen listesi, statik yük ön uyarısı ve tarife uygunluk notları. Tek tıkla PDF çıktısı alın.</p>
+          <p>Panel dizilimi, bileşen listesi, statik yük ön uyarısı. Tek tıkla PDF.</p>
         </div>
-        <div class="lp-feat-card">
-          <div class="lp-feat-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+
+        <!-- 6: turkey -->
+        <div class="lp-bento-card lp-bento-6">
+          <div class="lp-bento-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
           <h3>Türkiye Tarife Tipleri</h3>
-          <p>Mesken, ticarethane, sanayi ve tarımsal tarife tiplerine göre hesaplama. Saatlik mahsuplaşma ve lisanssız üretim senaryoları motorda bütünleşik.</p>
+          <p>Mesken, ticarethane, sanayi, tarımsal. Saatlik mahsuplaşma ve lisanssız üretim senaryoları motorda.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- KULLANIM ADIMLARI -->
+  <!-- 7-ADIM TIMELINE -->
   <section class="lp-section" id="lp-how">
     <div class="lp-container">
       <div class="lp-section-head">
@@ -880,49 +1494,22 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           <div class="lp-eyebrow"><span class="dot"></span> Kullanım</div>
           <h2><span class="grad">Yedi adım. Tahmine yer yok.</span></h2>
         </div>
-        <p>Haritadaki bir noktadan ön analiz çıktısına kadar her adım önceki girdilerle birlikte ilerler.</p>
+        <p>Her adım bir sonraki için temiz bir veri devreder. İstediğiniz adıma geri dönebilirsiniz.</p>
       </div>
-      <div class="lp-steps-grid">
-        <div class="lp-step">
-          <div class="lp-step-num">01</div>
-          <div class="lp-step-title">Senaryo</div>
-          <div class="lp-step-desc">On-Grid veya Off-Grid. Motor ve rapor şablonu buna göre seçilir.</div>
-        </div>
-        <div class="lp-step">
-          <div class="lp-step-num">02</div>
-          <div class="lp-step-title">Konum</div>
-          <div class="lp-step-desc">Harita üzerinde pin düşürün ya da şehir arayın; güneş ışınım ve sıcaklık verisi çekilir.</div>
-        </div>
-        <div class="lp-step">
-          <div class="lp-step-num">03</div>
-          <div class="lp-step-title">Çatı</div>
-          <div class="lp-step-desc">Eğim, azimut, gölgelenme. Çokgen çizim veya parametrik giriş.</div>
-        </div>
-        <div class="lp-step">
-          <div class="lp-step-num">04</div>
-          <div class="lp-step-title">Ekipman</div>
-          <div class="lp-step-desc">Panel, inverter, batarya seçimi. Wp · verim · birim fiyat üzerinden.</div>
-        </div>
-        <div class="lp-step">
-          <div class="lp-step-num">05</div>
-          <div class="lp-step-title">Ayarlar</div>
-          <div class="lp-step-desc">Tarife, tüketim, KDV, dağıtım bedeli, yatırım maliyeti kalemleri.</div>
-        </div>
-        <div class="lp-step">
-          <div class="lp-step-num">06</div>
-          <div class="lp-step-title">Hesapla</div>
-          <div class="lp-step-desc">8.760 adım saatlik simülasyon, 6–9 saniyede çalışır.</div>
-        </div>
-        <div class="lp-step">
-          <div class="lp-step-num">07</div>
-          <div class="lp-step-title">Sonuçlar</div>
-          <div class="lp-step-desc">KPI'lar, aylık üretim, geri dönüş, NPV. Mühendislik raporu PDF.</div>
-        </div>
+      <div class="lp-timeline">
+        <div class="lp-tl-line" aria-hidden="true"></div>
+        <div class="lp-tl-step"><div class="lp-tl-num">01</div><div class="lp-tl-t">Senaryo</div><div class="lp-tl-d">On-Grid ya da Off-Grid. Motor ve rapor şablonu seçilir.</div></div>
+        <div class="lp-tl-step"><div class="lp-tl-num">02</div><div class="lp-tl-t">Konum</div><div class="lp-tl-d">Harita üzerinde pin ya da şehir; ışınım ve sıcaklık verisi çekilir.</div></div>
+        <div class="lp-tl-step"><div class="lp-tl-num">03</div><div class="lp-tl-t">Çatı</div><div class="lp-tl-d">Eğim, azimut, gölgelenme; çokgen veya parametrik giriş.</div></div>
+        <div class="lp-tl-step"><div class="lp-tl-num">04</div><div class="lp-tl-t">Ekipman</div><div class="lp-tl-d">Panel, inverter, batarya seçimi; Wp · verim · fiyat.</div></div>
+        <div class="lp-tl-step"><div class="lp-tl-num">05</div><div class="lp-tl-t">Ayarlar</div><div class="lp-tl-d">Tarife, tüketim, KDV, dağıtım bedeli, yatırım kalemleri.</div></div>
+        <div class="lp-tl-step"><div class="lp-tl-num">06</div><div class="lp-tl-t">Hesapla</div><div class="lp-tl-d">8.760 adım saatlik simülasyon; 6–9 saniyede çalışır.</div></div>
+        <div class="lp-tl-step lp-tl-step-end"><div class="lp-tl-num">07</div><div class="lp-tl-t">Sonuçlar</div><div class="lp-tl-d">KPI'lar, aylık üretim, geri dönüş, NPV, PDF çıktı.</div></div>
       </div>
     </div>
   </section>
 
-  <!-- AVANTAJLAR / GÜVEN -->
+  <!-- AVANTAJLAR -->
   <section class="lp-section lp-section-tight">
     <div class="lp-container">
       <div class="lp-section-head">
@@ -937,28 +1524,28 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </div>
           <h4>Hızlı Ön Analiz</h4>
-          <p>Pin düşürmekten PDF çıktısına kadar tek oturumda ilerleyebilirsiniz. Her adımda girdiniz görünür kalır.</p>
+          <p>Pin düşürmekten PDF çıktısına kadar tek oturumda ilerleyebilirsiniz.</p>
         </div>
         <div class="lp-adv">
           <div class="lp-adv-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           </div>
           <h4>Şeffaf Varsayımlar</h4>
-          <p>Her KPI'nın arkasında kullanılan girdi değerlerini ve varsayımları görebilirsiniz.</p>
+          <p>Her KPI'nın arkasında kullanılan girdi ve varsayımlar görünür kalır.</p>
         </div>
         <div class="lp-adv">
           <div class="lp-adv-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
           </div>
           <h4>Türkiye Odaklı</h4>
-          <p>Türkiye tarife tipleri, lisanssız üretim kuralları ve statik yük ön uyarıları motora entegre.</p>
+          <p>Türkiye tarife tipleri, lisanssız üretim ve statik yük ön uyarıları motora entegre.</p>
         </div>
         <div class="lp-adv">
           <div class="lp-adv-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           </div>
           <h4>Tarayıcıda, Kayıtsız</h4>
-          <p>Tüm hesap cihazınızda çalışır. Veri paylaşımı yok; sonuçları istediğiniz zaman kaydedin.</p>
+          <p>Tüm hesap cihazınızda çalışır. Veri paylaşımı yok; istediğiniz zaman kaydedin.</p>
         </div>
       </div>
     </div>
@@ -977,156 +1564,72 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
         <div class="lp-faq-item" onclick="toggleFaq(this)">
           <div class="lp-faq-q">
             <span>Bu araç kimler için uygundur?</span>
-            <div class="lp-faq-plus" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </div>
+            <div class="lp-faq-plus" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
           </div>
-          <div class="lp-faq-a">
-            Solar Rota; ev sahipleri, KOBİ'ler, GES kurulumcuları ve teknik ekipler için
-            bir ön fizibilite aracıdır. Bir çatıya yaklaşık ne kadar panel sığacağını,
-            beklenen yıllık üretimi ve fatura üzerindeki etkisini hızlıca görmek için
-            tasarlanmıştır. Saha ölçümü ve nihai projenin yerine geçmez.
-          </div>
+          <div class="lp-faq-a">Solar Rota; ev sahipleri, KOBİ'ler, GES kurulumcuları ve teknik ekipler için bir ön fizibilite aracıdır. Bir çatıya yaklaşık ne kadar panel sığacağını, beklenen yıllık üretimi ve fatura üzerindeki etkisini hızlıca görmek için tasarlanmıştır. Saha ölçümü ve nihai projenin yerine geçmez.</div>
         </div>
-
         <div class="lp-faq-item" onclick="toggleFaq(this)">
           <div class="lp-faq-q">
             <span>Ücretsiz mi? Kayıt gerekiyor mu?</span>
-            <div class="lp-faq-plus" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </div>
+            <div class="lp-faq-plus" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
           </div>
-          <div class="lp-faq-a">
-            Evet, tamamen ücretsizdir ve kayıt gerektirmez. On-Grid ve Off-Grid
-            senaryolarına, saatlik üretim simülasyonuna, finansal analize ve PDF
-            çıktısına herhangi bir sınırlama olmadan erişebilirsiniz.
-          </div>
+          <div class="lp-faq-a">Evet, tamamen ücretsizdir ve kayıt gerektirmez. On-Grid ve Off-Grid senaryolarına, saatlik üretim simülasyonuna, finansal analize ve PDF çıktısına herhangi bir sınırlama olmadan erişebilirsiniz.</div>
         </div>
-
         <div class="lp-faq-item" onclick="toggleFaq(this)">
           <div class="lp-faq-q">
             <span>Verilerim nereye gidiyor? Güvende mi?</span>
-            <div class="lp-faq-plus" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </div>
+            <div class="lp-faq-plus" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
           </div>
-          <div class="lp-faq-a">
-            Hesaplamalar doğrudan tarayıcınızda çalışır. Girdiğiniz tüketim, konum
-            ve fatura bilgileri cihazınızda kalır; bizim tarafımıza gönderilmez.
-            Kaydettiğiniz senaryolar yalnızca tarayıcının yerel depolama alanında
-            (localStorage) tutulur. Tarayıcı verilerinizi temizlediğinizde kayıtlı
-            hesaplar da silinir.
-          </div>
+          <div class="lp-faq-a">Hesaplamalar doğrudan tarayıcınızda çalışır. Girdiğiniz tüketim, konum ve fatura bilgileri cihazınızda kalır; bizim tarafımıza gönderilmez. Kaydettiğiniz senaryolar yalnızca tarayıcının yerel depolama alanında (localStorage) tutulur.</div>
         </div>
-
         <div class="lp-faq-item" onclick="toggleFaq(this)">
           <div class="lp-faq-q">
             <span>On-Grid ve Off-Grid senaryoları arasındaki fark nedir?</span>
-            <div class="lp-faq-plus" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </div>
+            <div class="lp-faq-plus" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
           </div>
-          <div class="lp-faq-a">
-            On-Grid, şebekeye bağlı sistemler içindir: fatura tasarrufu, öz tüketim
-            oranı, saatlik mahsuplaşma ve geri dönüş süresi hesaplanır. Off-Grid ise
-            şebekeden bağımsız kurulumlar içindir: günlük yük profili, otonomi gün
-            sayısı ve batarya kapasitesi üzerinden planlama yapılır. Seçtiğiniz
-            senaryo; rapor şablonunu, hesap motorunu ve istenen girdileri belirler.
-          </div>
+          <div class="lp-faq-a">On-Grid, şebekeye bağlı sistemler içindir: fatura tasarrufu, öz tüketim oranı, saatlik mahsuplaşma ve geri dönüş süresi hesaplanır. Off-Grid ise şebekeden bağımsız kurulumlar içindir: günlük yük profili, otonomi gün sayısı ve batarya kapasitesi üzerinden planlama yapılır.</div>
         </div>
-
         <div class="lp-faq-item" onclick="toggleFaq(this)">
           <div class="lp-faq-q">
             <span>Çatımı nasıl tanımlayabilirim?</span>
-            <div class="lp-faq-plus" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </div>
+            <div class="lp-faq-plus" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
           </div>
-          <div class="lp-faq-a">
-            İki yöntem vardır: uydu görünümünde çatının köşelerini işaretleyerek
-            çokgen çizebilir ya da doğrudan alan (m²), eğim açısı ve azimut
-            (yön) değerlerini elle girebilirsiniz. Birden fazla çatı yüzeyi, farklı
-            azimut yönleri ve gölgelenme faktörü de desteklenir.
-          </div>
+          <div class="lp-faq-a">İki yöntem vardır: uydu görünümünde çatının köşelerini işaretleyerek çokgen çizebilir ya da doğrudan alan (m²), eğim açısı ve azimut (yön) değerlerini elle girebilirsiniz. Birden fazla çatı yüzeyi, farklı azimut yönleri ve gölgelenme faktörü de desteklenir.</div>
         </div>
-
         <div class="lp-faq-item" onclick="toggleFaq(this)">
           <div class="lp-faq-q">
             <span>KDV, dağıtım bedeli ve saatlik mahsuplaşma hesaplamaya dahil mi?</span>
-            <div class="lp-faq-plus" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </div>
+            <div class="lp-faq-plus" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
           </div>
-          <div class="lp-faq-a">
-            Evet. Ayarlar adımında tarife tipini (mesken, ticarethane, sanayi,
-            tarımsal) seçebilir; KDV oranını, dağıtım bedelini, birim yatırım
-            maliyetini ve yıllık tarife zam senaryosunu tanımlayabilirsiniz.
-            On-Grid senaryosunda saatlik mahsuplaşma modeli de otomatik
-            uygulanır. USD/TRY kuru üzerinden kur etkisi de simüle edilir.
-          </div>
+          <div class="lp-faq-a">Evet. Ayarlar adımında tarife tipini (mesken, ticarethane, sanayi, tarımsal) seçebilir; KDV oranını, dağıtım bedelini, birim yatırım maliyetini ve yıllık tarife zam senaryosunu tanımlayabilirsiniz. On-Grid senaryosunda saatlik mahsuplaşma modeli de otomatik uygulanır. USD/TRY kuru üzerinden kur etkisi de simüle edilir.</div>
         </div>
-
         <div class="lp-faq-item" onclick="toggleFaq(this)">
           <div class="lp-faq-q">
             <span>Hangi panel ve inverter seçenekleri mevcut?</span>
-            <div class="lp-faq-plus" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </div>
+            <div class="lp-faq-plus" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
           </div>
-          <div class="lp-faq-a">
-            Farklı güç sınıflarında yaygın panel ve inverter modellerinden oluşan
-            bir seçim listesi vardır. Wp (güç), verim ve birim fiyat üzerinden
-            karşılaştırma yapabilir; string veya mikro-inverter gibi farklı
-            topolojiler için uygun modeli seçebilirsiniz.
-          </div>
+          <div class="lp-faq-a">Farklı güç sınıflarında yaygın panel ve inverter modellerinden oluşan bir seçim listesi vardır. Wp (güç), verim ve birim fiyat üzerinden karşılaştırma yapabilir; string veya mikro-inverter gibi farklı topolojiler için uygun modeli seçebilirsiniz.</div>
         </div>
-
         <div class="lp-faq-item" onclick="toggleFaq(this)">
           <div class="lp-faq-q">
             <span>Hesaplarımı kaydedip sonradan karşılaştırabilir miyim?</span>
-            <div class="lp-faq-plus" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </div>
+            <div class="lp-faq-plus" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
           </div>
-          <div class="lp-faq-a">
-            Evet. Yaptığınız her hesabı kaydedebilir; ayarlar panelindeki
-            "Kayıtlı Hesaplar" bölümünden görüntüleyebilir, silebilir veya birden
-            çok senaryoyu yan yana karşılaştırabilirsiniz. Farklı panel/inverter
-            kombinasyonlarının geri dönüş sürelerini kolayca kıyaslayabilirsiniz.
-          </div>
+          <div class="lp-faq-a">Evet. Yaptığınız her hesabı kaydedebilir; ayarlar panelindeki "Kayıtlı Hesaplar" bölümünden görüntüleyebilir, silebilir veya birden çok senaryoyu yan yana karşılaştırabilirsiniz.</div>
         </div>
-
         <div class="lp-faq-item" onclick="toggleFaq(this)">
           <div class="lp-faq-q">
             <span>Mobil cihazda kullanılabilir mi? Çevrimdışı çalışır mı?</span>
-            <div class="lp-faq-plus" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </div>
+            <div class="lp-faq-plus" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
           </div>
-          <div class="lp-faq-a">
-            Araç; masaüstü, tablet ve telefonda çalışır. PWA olarak tasarlandığı
-            için ana ekranınıza ekleyebilir, ilk açılışın ardından büyük ölçüde
-            çevrimdışı kullanabilirsiniz. Güneş ışınım verisi çekimi için kısa
-            süreli internet gerekir; bağlantı yoksa yerel tahmin modeline
-            otomatik geçilir.
-          </div>
+          <div class="lp-faq-a">Araç; masaüstü, tablet ve telefonda çalışır. PWA olarak tasarlandığı için ana ekrana ekleyebilir, ilk açılışın ardından büyük ölçüde çevrimdışı kullanabilirsiniz. Güneş ışınım verisi çekimi için kısa süreli internet gerekir; bağlantı yoksa yerel tahmin modeline otomatik geçilir.</div>
         </div>
-
         <div class="lp-faq-item" onclick="toggleFaq(this)">
           <div class="lp-faq-q">
             <span>Sonuçlar ne kadar kesindir?</span>
-            <div class="lp-faq-plus" aria-hidden="true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </div>
+            <div class="lp-faq-plus" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
           </div>
-          <div class="lp-faq-a">
-            Solar Rota bir ön fizibilite aracıdır. Sonuçlar; konum, çatı
-            parametreleri, ekipman seçimi ve tarife girdilerinize göre yıllık
-            8.760 adımlı saatlik model üzerinden hesaplanır. Ancak gerçek üretim
-            yerel hava koşulları, saha detayları ve yaşlanma faktörlerine bağlıdır.
-            Nihai yatırım kararı; saha ölçümü, elektrik tesisat değerlendirmesi ve
-            tedarikçi tekliflerinin ardından alınmalıdır.
-          </div>
+          <div class="lp-faq-a">Solar Rota bir ön fizibilite aracıdır. Sonuçlar; konum, çatı parametreleri, ekipman seçimi ve tarife girdilerinize göre yıllık 8.760 adımlı saatlik model üzerinden hesaplanır. Gerçek üretim yerel hava koşulları ve saha detaylarına bağlıdır. Nihai yatırım kararı; saha ölçümü, elektrik tesisat değerlendirmesi ve tedarikçi tekliflerinin ardından alınmalıdır.</div>
         </div>
       </div>
     </div>
@@ -1136,21 +1639,20 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   <section class="lp-section" id="lp-cta">
     <div class="lp-container">
       <div class="lp-cta-band">
-        <div class="lp-eyebrow" style="justify-content:center;display:inline-flex"><span class="dot"></span> Hazır mısınız?</div>
-        <h2>Güneş enerjisi projenizin ön analizini hemen başlatın.</h2>
+        <div class="lp-cta-stars" aria-hidden="true"></div>
+        <div class="lp-eyebrow lp-eyebrow-center"><span class="dot"></span> Hazır mısınız?</div>
+        <h2>Güneş enerjisi projenizin <span class="amber">ön analizini</span> hemen başlatın.</h2>
         <p>Kayıt gerekmez. KDV, dağıtım bedeli ve saatlik mahsuplaşma dahil tüm hesaplamalar anında kullanımınıza açık.</p>
         <div class="lp-cta-row">
-          <button type="button" class="lp-btn lp-btn-primary lp-btn-lg" onclick="startCalculator()">
+          <button type="button" class="lp-btn lp-btn-primary lp-btn-xl" onclick="startCalculator()">
             Hesaplamaya Başla
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </button>
-          <a href="#lp-features" class="lp-btn lp-btn-secondary lp-btn-lg">
-            Özellikleri İncele
-          </a>
+          <a href="#lp-features" class="lp-btn lp-btn-ghost lp-btn-xl">Özellikleri incele</a>
         </div>
         <div class="lp-cta-notes">
           <span>✓ Ücretsiz</span>
-          <span>✓ Kayıtsız kullanım</span>
+          <span>✓ Kayıtsız</span>
           <span>✓ Tarayıcıda çalışır</span>
         </div>
       </div>
@@ -1173,6 +1675,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           <a href="#lp-features">Özellikler</a>
           <a href="#lp-scenarios">Senaryolar</a>
           <a href="#lp-how">Kullanım</a>
+          <a href="#lp-faq">SSS</a>
         </div>
       </div>
       <div class="lp-footer-bottom">
@@ -1181,7 +1684,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     </div>
   </footer>
 </div>
-
 <!-- HEADER -->
 <header id="app-header">
   <!-- Marka Satırı: Logo + Aksiyon Butonları -->
@@ -4227,6 +4729,37 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('open');
     if (!isOpen) el.classList.add('open');
   };
+
+  // Ürün Turu — 7 adım tab navigation
+  var lpTourCurrent = 1;
+  var lpTourLabels = {
+    1: 'Senaryo', 2: 'Konum', 3: 'Çatı',
+    4: 'Ekipman', 5: 'Ayarlar', 6: 'Hesapla', 7: 'Sonuçlar'
+  };
+  window.lpTourStep = function(n){
+    if (n < 1 || n > 7) return;
+    lpTourCurrent = n;
+    var tabs = document.querySelectorAll('.lp-tour-tab');
+    tabs.forEach(function(t){
+      t.classList.toggle('active', parseInt(t.getAttribute('data-step'),10) === n);
+    });
+    var texts = document.querySelectorAll('.lp-tour-text');
+    texts.forEach(function(t){
+      t.classList.toggle('active', parseInt(t.getAttribute('data-step'),10) === n);
+    });
+    var panes = document.querySelectorAll('.lp-tour-pane');
+    panes.forEach(function(p){
+      p.classList.toggle('active', parseInt(p.getAttribute('data-step'),10) === n);
+    });
+    var url = document.getElementById('lpTourUrl');
+    if (url) url.textContent = 'solarrota.app · 0' + n + ' / ' + (lpTourLabels[n] || '');
+    var chip = document.getElementById('lpTourChip');
+    if (chip) chip.textContent = 'Adım ' + n + ' / 7';
+    var cur = document.querySelector('.lp-tour-current');
+    if (cur) cur.textContent = '0' + n;
+  };
+  window.lpTourPrev = function(){ window.lpTourStep(lpTourCurrent === 1 ? 7 : lpTourCurrent - 1); };
+  window.lpTourNext = function(){ window.lpTourStep(lpTourCurrent === 7 ? 1 : lpTourCurrent + 1); };
 
   // İlk açılışta hash'e göre mod
   function initialRoute(){

@@ -43,7 +43,15 @@
       "Bash(python -m http.server 8766)",
       "Bash(curl -s -o /dev/null -w \"index:%{http_code} size:%{size_download}\\\\n\" http://localhost:8766/index.html)",
       "Bash(curl -s -o /dev/null -w \"css:%{http_code} size:%{size_download}\\\\n\" http://localhost:8766/css/landing.css)",
-      "Bash(pkill -f \"http.server 8766\")"
+      "Bash(pkill -f \"http.server 8766\")",
+      "Bash(python -m http.server 8767)",
+      "Bash(curl -s -o /dev/null -w \"index:%{http_code} %{size_download}b\\\\n\" http://localhost:8767/index.html)",
+      "Bash(curl -s -o /dev/null -w \"css  :%{http_code} %{size_download}b\\\\n\" http://localhost:8767/css/landing.css)",
+      "Bash(pkill -f \"http.server 8767\")",
+      "Bash(python -m http.server 8768)",
+      "Bash(curl -s -o /dev/null -w \"index:%{http_code} %{size_download}b\\\\n\" http://localhost:8768/index.html)",
+      "Bash(curl -s -o /dev/null -w \"css  :%{http_code} %{size_download}b\\\\n\" http://localhost:8768/css/landing.css)",
+      "Bash(pkill -f \"http.server 8768\")"
     ]
   }
 }
