@@ -38,7 +38,12 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8765/css/landing.css)",
       "Bash(curl -s http://localhost:8765/css/landing.css)",
       "Bash(kill %1)",
-      "Bash(pkill -f \"http.server 8765\")"
+      "Bash(pkill -f \"http.server 8765\")",
+      "Bash(awk '/<div id=\"landing-root\">/,/<\\\\/div>$/{if\\(/<\\\\/div>$/\\)p=1; print NR\": \"$0; if\\(p\\)exit}' index.html)",
+      "Bash(python -m http.server 8766)",
+      "Bash(curl -s -o /dev/null -w \"index:%{http_code} size:%{size_download}\\\\n\" http://localhost:8766/index.html)",
+      "Bash(curl -s -o /dev/null -w \"css:%{http_code} size:%{size_download}\\\\n\" http://localhost:8766/css/landing.css)",
+      "Bash(pkill -f \"http.server 8766\")"
     ]
   }
 }

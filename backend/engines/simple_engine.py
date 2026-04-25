@@ -33,6 +33,23 @@ INVERTER_EFF = {
     "optimizer": 0.985,
 }
 
+TILT_COEFFS = {
+    0: 0.78,
+    10: 0.90,
+    15: 0.94,
+    20: 0.97,
+    25: 0.99,
+    30: 1.00,
+    33: 1.00,
+    35: 1.00,
+    40: 0.99,
+    45: 0.97,
+    50: 0.94,
+    60: 0.87,
+    75: 0.75,
+    90: 0.62,
+}
+
 
 def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
@@ -87,8 +104,19 @@ def _annual_ghi_to_psh(ghi: float | None, city_name: str | None = None) -> float
 
 
 def _tilt_factor(tilt: float) -> float:
-    delta = abs(tilt - 33)
-    return _clamp(1 - delta * 0.0045, 0.62, 1.0)
+    tilt = _clamp(float(tilt), 0, 90)
+    keys = sorted(TILT_COEFFS)
+    if tilt <= keys[0]:
+        return TILT_COEFFS[keys[0]]
+    if tilt >= keys[-1]:
+        return TILT_COEFFS[keys[-1]]
+    for low, high in zip(keys, keys[1:]):
+        if low <= tilt <= high:
+            if low == high:
+                return TILT_COEFFS[low]
+            ratio = (tilt - low) / (high - low)
+            return TILT_COEFFS[low] + ratio * (TILT_COEFFS[high] - TILT_COEFFS[low])
+    return TILT_COEFFS[33]
 
 
 def _azimuth_factor(azimuth: float) -> float:

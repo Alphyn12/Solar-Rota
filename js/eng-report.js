@@ -66,6 +66,21 @@ export function renderEngReport() {
   const statusText = value => statusLabel(value);
   const financialRate = Number(r.financialSavingsRate || r.tariff || 0);
   const comp = r.compensationSummary || {};
+  const prDisplayText = r.usedFallback ? i18n.t('onGridResult.prUnavailableShort') : `${r.pr}%`;
+  const prLongText = r.usedFallback ? i18n.t('onGridResult.prUnavailableLong') : `${r.pr}%`;
+  const offgridFinancialBasisText = (() => {
+    switch (r.financialSavingsBasis) {
+      case 'off-grid-user-alternative-energy-cost':
+        return i18n.t('offgridL2.financialBasisUserAlternative');
+      case 'off-grid-grid-tariff-times-2_5-proxy':
+        return i18n.t('offgridL2.financialBasisGridProxy');
+      default:
+        return r.financialSavingsBasis || '—';
+    }
+  })();
+  const offgridFinancialBasisWarning = r.financialSavingsBasis === 'off-grid-grid-tariff-times-2_5-proxy'
+    ? i18n.t('offgridL2.financialBasisProxyWarning')
+    : '';
 
   let html = `
   <div class="eng-report-intro">
@@ -207,7 +222,7 @@ GHI: ${state.ghi} kWh/m²/${escapeHtml(yearUnit)}${r.usedFallback ? `\n⚠ ${esc
     5. ${escapeHtml(i18n.t('report.performanceMetrics'))}
   </div>
   <div class="perf-badges">
-    <div class="perf-badge"><div class="perf-badge-val">${r.pr}%</div><div class="perf-badge-label">${escapeHtml(report('performanceRatio'))} (PR)</div></div>
+    <div class="perf-badge"><div class="perf-badge-val">${escapeHtml(prDisplayText)}</div><div class="perf-badge-label">${escapeHtml(report('performanceRatio'))} (PR)</div></div>
     <div class="perf-badge"><div class="perf-badge-val">${r.psh}</div><div class="perf-badge-label">${escapeHtml(report('psh'))} (${escapeHtml(report('hoursPerDay'))})</div></div>
     <div class="perf-badge"><div class="perf-badge-val">${r.ysp}</div><div class="perf-badge-label">${escapeHtml(i18n.t('report.specificYield'))} (kWh/kWp)</div></div>
     <div class="perf-badge"><div class="perf-badge-val">${r.cf}%</div><div class="perf-badge-label">${escapeHtml(report('capacityFactor'))} (CF)</div></div>
@@ -217,7 +232,7 @@ GHI: ${state.ghi} kWh/m²/${escapeHtml(yearUnit)}${r.usedFallback ? `\n⚠ ${esc
   <div class="formula-card">
     <div class="formula-title">PR — ${escapeHtml(report('performanceRatio'))} (IEC 61724)</div>
     <div class="formula-body">PR = E_net ÷ (P_stc × POA)
-= ${fmt(netEnergy)} kWh ÷ (${r.systemPower.toFixed(2)} kWp × ${r.pvgisPoa || state.ghi || 'N/A'} kWh/m²) = ${r.pr}%
+= ${fmt(netEnergy)} kWh ÷ (${r.systemPower.toFixed(2)} kWp × ${r.pvgisPoa || state.ghi || 'N/A'} kWh/m²) = ${escapeHtml(prLongText)}
 
 P_stc: kWp, POA: kWh/m²/${escapeHtml(yearUnit)} → ${escapeHtml(report('dimensionlessResult'))}</div>
     <div class="formula-note">${escapeHtml(report('prFormulaNote'))}</div>
@@ -237,7 +252,7 @@ LCOE = ${r.compensatedLcoe != null ? moneyRate(r.compensatedLcoe, 'kWh') + ' (ek
   <div class="formula-card">
     <div class="formula-title">IRR — ${escapeHtml(report('irrTitle'))} (${escapeHtml(report('rootSearch'))})</div>
     <div class="formula-body">NPV(r) = −C₀ + Σₜ [NCFₜ ÷ (1+r)ᵗ] = 0
-C₀ = ${money(r.totalCost)}   (${escapeHtml(report('initialInvestment'))})
+C₀ = ${money(r.financialCostBasis || r.totalCost)}   (${escapeHtml(report('initialInvestment'))})
 NCFₜ = ${escapeHtml(report('savingsMinusExpenses'))}
 Eₜ = E₁ × (1−LID) × (1−δ)ⁿ⁻¹   LID=${r.lidFactor}%, δ=${(p.degradation*100).toFixed(2)}%/${escapeHtml(yearUnit)}
 Pₜ = P₀ × (1+g)ᵗ⁻¹   g=${(r.annualPriceIncrease*100).toFixed(0)}%/${escapeHtml(yearUnit)}
@@ -305,7 +320,7 @@ ${escapeHtml(report('totalProduction25y'))}: ${fmt(totalEnergy25y)} kWh</div>
         </tbody>
       </table>
     </div>
-    <div class="formula-note">${escapeHtml(report('paybackRowNote'))}: O&M ${money(r.annualOMCost)} + ${escapeHtml(report('annualInsurance'))} ${money(r.annualInsurance)} = ${money(r.annualOMCost + r.annualInsurance)}/${escapeHtml(yearUnit)}.</div>
+    <div class="formula-note">${escapeHtml(report('paybackRowNote'))}: O&M ${money(r.annualOMCost)} + ${escapeHtml(report('annualInsurance'))} ${money(r.annualInsurance)} = ${money(r.annualOMCost + r.annualInsurance)}/${escapeHtml(yearUnit)}. ${escapeHtml(i18n.t('onGridResult.financialBasis'))}: ${money(r.omCostBasis || r.financialCostBasis || r.totalCost)}.</div>
   </div>`;
 
   if (gov.confidence) {
@@ -361,6 +376,12 @@ ${escapeHtml(report('batteryInstalledCost'))}: ${money(bm.batteryCost)}${offGrid
   // ── 8b. Off-grid L2 dispatch source of truth ──────────────────────────────
   if (state.scenarioKey === 'off-grid' && r.offgridL2Results) {
     const L = r.offgridL2Results;
+    const dispatchProfileText = L.productionDispatchProfile === 'real-hourly-pv-8760'
+      ? i18n.t('offgridL2.productionDispatchReal')
+      : i18n.t('offgridL2.productionDispatchSynthetic');
+    const criticalCoverageWithGenerator = L.criticalCoverageWithGenerator ?? L.criticalLoadCoverage;
+    const criticalCoverageWithoutGenerator = L.criticalCoverageWithoutGenerator ?? L.criticalLoadCoverageWithoutGenerator ?? L.pvBatteryCriticalCoverage;
+    const stress = L.fieldStressAnalysis || null;
     html += `
   <div class="eng-section-header">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16"/><path d="M12 4v16"/><path d="M7 7l10 10"/><path d="M17 7L7 17"/></svg>
@@ -369,20 +390,26 @@ ${escapeHtml(report('batteryInstalledCost'))}: ${money(bm.batteryCost)}${offGrid
   <div class="formula-card">
     <div class="formula-title">${escapeHtml(i18n.t('offGrid.preFeasibilityOnly'))}</div>
     <div class="formula-body">${escapeHtml(i18n.t('offgridL2.productionSource'))}: ${escapeHtml(L.productionSourceLabel || L.productionSource || '—')}
-${escapeHtml(i18n.t('offgridL2.productionDispatchSynthetic'))} (${escapeHtml(L.productionDispatchProfile || 'monthly-production-derived-synthetic-8760')})
+${escapeHtml(dispatchProfileText)} (${escapeHtml(L.productionDispatchProfile || 'monthly-production-derived-synthetic-8760')})
 ${escapeHtml(i18n.t('offgridL2.loadSourceLabel'))}: ${escapeHtml(L.loadSource || L.loadMode || '—')}
 ${escapeHtml(i18n.t('offgridL2.dispatchLabel'))}: ${escapeHtml(L.dispatchType || 'synthetic-8760-dispatch')}
 ${escapeHtml(i18n.t('offgridL2.pvBessCoverageLabel'))}: ${((L.pvBatteryLoadCoverage ?? L.totalLoadCoverage) * 100).toFixed(1)}%
 ${escapeHtml(i18n.t('offgridL2.totalCoverageWithGeneratorLabel'))}: ${(L.totalLoadCoverage * 100).toFixed(1)}%
-${escapeHtml(i18n.t('offgridL2.pvBessCriticalCoverageLabel'))}: ${((L.pvBatteryCriticalCoverage ?? L.criticalLoadCoverage) * 100).toFixed(1)}%
-${escapeHtml(i18n.t('offgridL2.criticalCoverageWithGeneratorLabel'))}: ${(L.criticalLoadCoverage * 100).toFixed(1)}%
-${escapeHtml(i18n.t('offgridL2.resultAutonomousDays'))}: ${L.autonomousDays ?? '—'} ${escapeHtml(yearUnit)}; ${escapeHtml(i18n.t('offgridL2.resultAutonomousDaysWithGenerator'))}: ${L.autonomousDaysWithGenerator ?? '—'} ${escapeHtml(yearUnit)}
+${escapeHtml(i18n.t('offgridL2.pvBessCriticalCoverageLabel'))}: ${((criticalCoverageWithoutGenerator ?? L.criticalLoadCoverage) * 100).toFixed(1)}%
+${escapeHtml(i18n.t('offgridL2.criticalCoverageWithGeneratorLabel'))}: ${(criticalCoverageWithGenerator * 100).toFixed(1)}%
+${escapeHtml(i18n.t('offgridL2.resultAutonomousDays'))}: ${L.autonomousDays ?? '—'} ${escapeHtml(dayUnit)}; ${escapeHtml(i18n.t('offgridL2.resultAutonomousDaysWithGenerator'))}: ${L.autonomousDaysWithGenerator ?? '—'} ${escapeHtml(dayUnit)}
+${escapeHtml(i18n.t('offgridL2.autonomyThresholdLabel'))}: %${Number(L.autonomyThresholdPct || 1).toFixed(1)}
 ${escapeHtml(i18n.t('offgridL2.unmetLabel'))}: ${fmt(L.unmetLoadKwh || 0)} kWh/${escapeHtml(yearUnit)}
 ${escapeHtml(i18n.t('offgridL2.curtailedLabel'))}: ${fmt(L.curtailedPvKwh || 0)} kWh/${escapeHtml(yearUnit)}
 ${escapeHtml(i18n.t('offgridL2.generatorLabel'))}: ${fmt(L.generatorEnergyKwh || L.generatorKwh || 0)} kWh/${escapeHtml(yearUnit)}; ${escapeHtml(i18n.t('offgridL2.generatorCapex'))}: ${money(L.generatorCapex || 0)}
+${escapeHtml(i18n.t('offgridL2.generatorMinLoadLabel'))}: %${Math.round(Number(L.generatorMinLoadRatePct) || 0)}; ${escapeHtml(i18n.t('offgridL2.generatorStopSocLabel'))}: %${Math.round(Number(L.generatorStartSocPct) || 0)} → %${Math.round(Number(L.generatorStopSocPct) || 0)}
+${escapeHtml(i18n.t('offgridL2.generatorChargeBatteryLabel'))}: ${escapeHtml(i18n.t(L.generatorChargeBatteryEnabled ? 'yes' : 'no'))}
+${escapeHtml(i18n.t('offgridL2.financialBasisLabel'))}: ${escapeHtml(offgridFinancialBasisText)}
 ${escapeHtml(i18n.t('offgridL2.minSocLabel'))}: ${L.minimumSoc != null ? (L.minimumSoc * 100).toFixed(1) + '%' : '—'}; ${escapeHtml(i18n.t('offgridL2.avgSocLabel'))}: ${L.averageSoc != null ? (L.averageSoc * 100).toFixed(1) + '%' : '—'}
+${escapeHtml(i18n.t('offgridL2.batteryReserveLabel'))}: %${Number(L.batteryReservePct || 0).toFixed(0)}; ${escapeHtml(i18n.t('offgridL2.batteryChargeEfficiencyLabel'))}: %${Number(L.batteryChargeEfficiencyPct || 0).toFixed(1)}; ${escapeHtml(i18n.t('offgridL2.batteryDischargeEfficiencyLabel'))}: %${Number(L.batteryDischargeEfficiencyPct || 0).toFixed(1)}
 ${escapeHtml(i18n.t('offgridL2.inverterLimitLabel'))}: ${L.inverterAcLimitKw || '—'} kW; ${escapeHtml(i18n.t('offgridL2.batteryPowerLimitLabel'))}: ${L.batteryMaxChargeKw || '—'} / ${L.batteryMaxDischargeKw || '—'} kW
 ${escapeHtml(i18n.t('offgridL2.powerLimitedLabel'))}: ${fmt(L.inverterPowerLimitedKwh || 0)} kWh (${L.inverterPowerLimitHours || 0} h)
+${escapeHtml(i18n.t('offgridL2.lifecycleAnnual'))}: ${money(L.lifecycleCostAnnual || 0)}; ${escapeHtml(i18n.t('offgridL2.lifecycleGeneratorOverhaulLabel'))}: ${money(L.generatorOverhaulAnnual || 0)}
 ${escapeHtml(i18n.t('offgridL2.fieldGuaranteeStatus'))}: ${escapeHtml(i18n.t(L.fieldGuaranteeReadiness?.phase1Ready ? 'offgridL2.fieldGuaranteePhase1Ready' : 'offgridL2.fieldGuaranteeBlocked'))}
 ${(L.fieldGuaranteeReadiness?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
 ${escapeHtml(i18n.t('offgridL2.fieldEvidenceStatus'))}: ${escapeHtml(i18n.t(L.fieldEvidenceGate?.phase2Ready ? 'offgridL2.fieldEvidenceReady' : 'offgridL2.fieldEvidenceBlocked'))}
@@ -395,9 +422,12 @@ ${escapeHtml(i18n.t('offgridL2.fieldOperationStatus'))}: ${escapeHtml(i18n.t(L.f
 ${(L.fieldOperationGate?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
 ${escapeHtml(i18n.t('offgridL2.fieldRevalidationStatus'))}: ${escapeHtml(i18n.t(L.fieldRevalidationGate?.phase6Ready ? 'offgridL2.fieldRevalidationReady' : 'offgridL2.fieldRevalidationBlocked'))}
 ${(L.fieldRevalidationGate?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
+${stress?.worstCriticalScenario ? `\n${escapeHtml(i18n.t('offgridL2.stressWorstCriticalLabel'))}: ${escapeHtml(stress.worstCriticalScenario.label || stress.worstCriticalScenario.key || '—')} — ${((stress.worstCriticalScenario.criticalLoadCoverage || 0) * 100).toFixed(1)}%` : ''}
+${stress?.worstTotalScenario ? `\n${escapeHtml(i18n.t('offgridL2.stressWorstTotalLabel'))}: ${escapeHtml(stress.worstTotalScenario.label || stress.worstTotalScenario.key || '—')} — ${((stress.worstTotalScenario.totalLoadCoverage || 0) * 100).toFixed(1)}%` : ''}
+${stress?.maxUnmetCriticalScenario ? `\n${escapeHtml(i18n.t('offgridL2.stressMaxUnmetCriticalLabel'))}: ${escapeHtml(stress.maxUnmetCriticalScenario.label || stress.maxUnmetCriticalScenario.key || '—')} — ${fmt(stress.maxUnmetCriticalScenario.unmetCriticalKwh || 0)} kWh` : ''}
 
 ${escapeHtml(i18n.t('offGrid.notFeasibilityAnalysis'))}</div>
-    <div class="formula-note">${escapeHtml(i18n.t('offGrid.syntheticDispatchNote'))}</div>
+    <div class="formula-note">${escapeHtml(i18n.t('offGrid.syntheticDispatchNote'))}${offgridFinancialBasisWarning ? ` ${escapeHtml(offgridFinancialBasisWarning)}` : ''}</div>
   </div>`;
   }
 

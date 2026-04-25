@@ -411,7 +411,7 @@ describe('runOffgridDispatch — jeneratör', () => {
     const gen = { enabled: true, capacityKw: 20, fuelCostPerKwh: 8 };
 
     const withoutGen = runOffgridDispatch(pv, load, critical, tinyBat, NO_GENERATOR, {});
-    const withGen = runOffgridDispatch(pv, load, critical, tinyBat, gen, {});
+    const withGen = runOffgridDispatch(pv, load, critical, tinyBat, gen, { generatorStrategy: 'full-backup' });
 
     assert.equal(withGen.autonomousDays, withoutGen.autonomousDays,
       'PV+BESS otonom gün jeneratörden etkilenmemeli');
@@ -419,6 +419,93 @@ describe('runOffgridDispatch — jeneratör', () => {
       'jeneratör dahil kapsama ayrı metrikte artmalı');
     assert.equal(withGen.autonomousDaysWithGenerator, 365,
       'yeterli jeneratör final unmet yükü kapatmalı');
+  });
+
+  it('günlük jeneratör saat limitini uygular', () => {
+    const noBattery = {
+      usableCapacityKwh: 0,
+      efficiency: 1.0,
+      socReserveKwh: 0,
+      initialSocKwh: 0,
+      maxChargePowerKw: 0,
+      maxDischargePowerKw: 0
+    };
+    const pv = makeLoadHourly(0);
+    const load = makeLoadHourly(24); // 1 kWh/h
+    const critical = makeLoadHourly(24);
+    const gen = { enabled: true, capacityKw: 1, fuelCostPerKwh: 5 };
+    const result = runOffgridDispatch(pv, load, critical, noBattery, gen, { generatorMaxHoursPerDay: 4 });
+
+    nearly(result.generatorRunHours, 4 * 365, 0.01, 'generatorRunHours daily cap');
+    nearly(result.generatorToLoadKwh, 4 * 365, 0.01, 'generator kWh daily cap');
+    assert.ok(result.unmetLoadKwh > 0, 'günlük limit unmet load üretmeli');
+  });
+
+  it('generatorStartSocPct eşiği yükseldikçe jeneratör daha erken devreye girer', () => {
+    const constrainedBattery = {
+      usableCapacityKwh: 20,
+      efficiency: 1.0,
+      socReserveKwh: 0,
+      initialSocKwh: 20,
+      maxChargePowerKw: 0,
+      maxDischargePowerKw: 1
+    };
+    const pv = makeLoadHourly(0);
+    const load = makeLoadHourly(48); // 2 kWh/h
+    const critical = makeLoadHourly(48);
+    const gen = { enabled: true, capacityKw: 2, fuelCostPerKwh: 5 };
+
+    const lowThreshold = runOffgridDispatch(pv, load, critical, constrainedBattery, gen, { generatorStartSocPct: 0 });
+    const highThreshold = runOffgridDispatch(pv, load, critical, constrainedBattery, gen, { generatorStartSocPct: 50 });
+
+    assert.ok(highThreshold.generatorRunHours > lowThreshold.generatorRunHours, 'yüksek SOC eşiği jeneratör saatini artırmalı');
+    assert.ok(highThreshold.unmetLoadKwh < lowThreshold.unmetLoadKwh, 'yüksek SOC eşiği unmet load azaltmalı');
+  });
+
+  it('generator min load ve battery-charge-from-generator etkinse yakıt çıkışı yükten büyük olabilir', () => {
+    const battery = {
+      usableCapacityKwh: 10,
+      efficiency: 1.0,
+      socReserveKwh: 0,
+      initialSocKwh: 0,
+      maxChargePowerKw: 2,
+      maxDischargePowerKw: 2
+    };
+    const pv = makeLoadHourly(0);
+    const load = makeLoadHourly(6); // 0.25 kWh/h
+    const critical = makeLoadHourly(6);
+    const gen = { enabled: true, capacityKw: 2, fuelCostPerKwh: 5 };
+    const result = runOffgridDispatch(pv, load, critical, battery, gen, {
+      generatorStartSocPct: 20,
+      generatorStopSocPct: 60,
+      generatorMinLoadRatePct: 50,
+      generatorChargeBatteryEnabled: true
+    });
+
+    assert.ok(result.generatorOutputKwh > result.generatorToLoadKwh, 'min load nedeniyle toplam çıkış yüke giden enerjiden büyük olmalı');
+    assert.ok(result.generatorToBatteryKwh > 0, 'jeneratör bataryayı da şarj etmeli');
+    nearly(result.generatorFuelCostAnnual, result.generatorOutputKwh * 5, 0.05, 'yakıt maliyeti çıkış enerjisinden hesaplanmalı');
+  });
+
+  it('critical-backup ile full-backup farklı dispatch davranışı üretir', () => {
+    const battery = {
+      usableCapacityKwh: 0,
+      efficiency: 1,
+      socReserveKwh: 0,
+      initialSocKwh: 0,
+      maxChargePowerKw: 0,
+      maxDischargePowerKw: 0
+    };
+    const pv = makeLoadHourly(0);
+    const load = makeLoadHourly(12);
+    const critical = makeLoadHourly(4);
+    const gen = { enabled: true, capacityKw: 1, fuelCostPerKwh: 5 };
+    const criticalBackup = runOffgridDispatch(pv, load, critical, battery, gen, { generatorStrategy: 'critical-backup' });
+    const fullBackup = runOffgridDispatch(pv, load, critical, battery, gen, { generatorStrategy: 'full-backup' });
+
+    assert.ok(fullBackup.generatorToLoadKwh > criticalBackup.generatorToLoadKwh, 'full-backup toplam yükte daha fazla enerji taşımalı');
+    assert.ok(fullBackup.unmetLoadKwh < criticalBackup.unmetLoadKwh, 'full-backup unmet load azaltmalı');
+    nearly(criticalBackup.generatorToCriticalKwh, criticalBackup.generatorToLoadKwh, 0.01, 'critical-backup kritik dışına taşmamalı');
   });
 });
 
@@ -517,6 +604,8 @@ describe('buildOffgridResults', () => {
     assert.equal(typeof result.minimumSoc, 'number');
     assert.equal(typeof result.accuracyScore, 'number');
     assert.equal(result.accuracyAssessment.tier, 'basic-synthetic');
+    assert.equal(result.criticalCoverageWithGenerator, result.criticalLoadCoverage);
+    assert.equal(result.criticalCoverageWithoutGenerator, result.criticalLoadCoverage);
   });
 
   it('badWeatherScenario null olabilir', () => {
@@ -527,6 +616,59 @@ describe('buildOffgridResults', () => {
     const loadProfile = buildOffgridLoadProfile([], { fallbackDailyKwh: 8, criticalFraction: 0.4 });
     const result = buildOffgridResults(normal, null, loadProfile, { enabled: false }, { systemCapexTry: 50000, alternativeEnergyCostPerKwh: 15 });
     assert.equal(result.badWeatherScenario, null);
+  });
+
+  it('generator overhaul ve replacement fraction lifecycle maliyetine eklenir', () => {
+    const pv = makeLoadHourly(0);
+    const load = makeLoadHourly(12);
+    const critical = makeLoadHourly(6);
+    const battery = { usableCapacityKwh: 0, efficiency: 1.0, socReserveKwh: 0, initialSocKwh: 0 };
+    const normal = runOffgridDispatch(pv, load, critical, battery, { enabled: true, capacityKw: 1, fuelCostPerKwh: 4 }, { generatorMaxHoursPerDay: 12 });
+    const loadProfile = buildOffgridLoadProfile([], { fallbackDailyKwh: 12, criticalFraction: 0.5 });
+    const result = buildOffgridResults(normal, null, loadProfile, { enabled: true, capacityKw: 1, fuelCostPerKwh: 4 }, {
+      systemCapexTry: 100000,
+      generatorCapexTry: 20000,
+      generatorMaintenanceCostTry: 3000,
+      generatorOverhaulHours: 2000,
+      generatorOverhaulCostTry: 50000,
+      batteryCapexTry: 40000,
+      batteryLifetimeYears: 10,
+      batteryReplacementFractionPct: 50,
+      alternativeEnergyCostPerKwh: 17
+    });
+    assert.ok(result.generatorOverhaulAnnual > 0, 'generator overhaul annual > 0');
+    assert.ok(result.lifecycleCostAnnual > ((120000 / 25) + normal.generatorFuelCostAnnual + 3000), 'lifecycle overhaul ve battery replacement içermeli');
+    nearly(result.batteryReplacementFractionPct, 50, 0.01, 'replacement fraction stored');
+  });
+});
+
+describe('runOffgridDispatch — Faz 3 parametreleri', () => {
+  it('autonomyThresholdPct yükseldikçe otonom gün sayısı artar', () => {
+    const pv = makeLoadHourly(9.8);
+    const load = makeLoadHourly(10);
+    const critical = makeLoadHourly(4);
+    const strict = runOffgridDispatch(pv, load, critical, { usableCapacityKwh: 0, efficiency: 1, socReserveKwh: 0, initialSocKwh: 0 }, NO_GENERATOR, { autonomyThresholdPct: 0.5 });
+    const loose = runOffgridDispatch(pv, load, critical, { usableCapacityKwh: 0, efficiency: 1, socReserveKwh: 0, initialSocKwh: 0 }, NO_GENERATOR, { autonomyThresholdPct: 5 });
+    assert.ok(loose.autonomousDays >= strict.autonomousDays, 'daha gevşek eşik daha az değil daha çok otonom gün saymalı');
+  });
+
+  it('ayrı charge/discharge efficiency alanları dispatch çıktısına yansır', () => {
+    const pv = makeDaytimePvHourly(20);
+    const load = makeLoadHourly(10);
+    const critical = makeLoadHourly(4);
+    const battery = {
+      usableCapacityKwh: 5,
+      efficiency: 0.81,
+      chargeEfficiency: 0.95,
+      dischargeEfficiency: 0.85,
+      socReserveKwh: 0,
+      initialSocKwh: 0,
+      maxChargePowerKw: 5,
+      maxDischargePowerKw: 5
+    };
+    const result = runOffgridDispatch(pv, load, critical, battery, NO_GENERATOR, {});
+    nearly(result.chargeEfficiency, 0.95, 0.0001, 'charge eff');
+    nearly(result.dischargeEfficiency, 0.85, 0.0001, 'discharge eff');
   });
 });
 

@@ -62,7 +62,16 @@ export function renderPRGauge(prValue) {
   const needle = document.getElementById('pr-needle');
   const valEl  = document.getElementById('pr-gauge-val');
   const lblEl  = document.getElementById('pr-gauge-label');
+  const unavailableShort = window.i18n?.t?.('onGridResult.prUnavailableShort') || 'N/A';
+  const unavailableLong = window.i18n?.t?.('onGridResult.prUnavailableLong') || 'N/A (PR is not shown on the PSH fallback path)';
   if (!arc || !needle) return;
+  if (!Number.isFinite(Number(prValue))) {
+    arc.style.strokeDashoffset = 251.3;
+    needle.style.transform = 'rotate(-90deg)';
+    if (valEl) valEl.textContent = unavailableShort;
+    if (lblEl) lblEl.textContent = unavailableLong;
+    return;
+  }
   const pct = Math.min(Math.max(prValue / 100, 0), 1);
   arc.style.strokeDashoffset = 251.3 - (251.3 * pct);
   needle.style.transform = `rotate(${-90 + pct * 180}deg)`;

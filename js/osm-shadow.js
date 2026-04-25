@@ -163,6 +163,7 @@ function renderShadowSummary(result, sourceLabel) {
       Kaynak: ${sourceLabel}
     </div>
   `;
+  window.syncOsmShadowDoubleCountWarning?.();
 }
 
 export async function refreshOSMShadowAnalysis() {
@@ -221,6 +222,7 @@ export function toggleOSMShadow(enabled) {
   } else {
     refreshOSMShadowAnalysis();
   }
+  window.syncOsmShadowDoubleCountWarning?.();
 }
 
 if (typeof window !== 'undefined') {

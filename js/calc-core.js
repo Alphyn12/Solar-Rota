@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════
 import {
   PANEL_TYPES, HOURLY_SOLAR_PROFILE, RESIDENTIAL_LOAD, COMMERCIAL_LOAD,
-  INDUSTRIAL_LOAD, MONTH_WEIGHTS, TARIFF_META, normalizePanelTypeKey
+  INDUSTRIAL_LOAD, MONTH_WEIGHTS, TARIFF_META, normalizePanelTypeKey, INVERTER_TYPES
 } from './data.js';
 import {
   applyExportCompensation, buildExportCompensationPolicy, determineSkttRegime, TARIFF_DATA_LIFECYCLE
@@ -131,6 +131,16 @@ export function normalizeMonthlyProductionToAnnual(monthlyProduction, annualEner
   return rounded;
 }
 
+export function normalizeHourlyProfileToAnnual(hourly, annualTarget) {
+  if (!Array.isArray(hourly) || hourly.length < 8760) return null;
+  const base = hourly.slice(0, 8760).map(v => Math.max(0, Number(v) || 0));
+  const total = base.reduce((sum, value) => sum + value, 0);
+  const target = Math.max(0, Number(annualTarget) || 0);
+  if (total <= 0 || target <= 0) return null;
+  const scale = target / total;
+  return base.map(value => value * scale);
+}
+
 export function resolveProductionTemperatureAdjustment({ source = 'fallback-psh', panelTempCoeff = -0.0037, avgSummerTemp = 25 } = {}) {
   const coeff = Number.isFinite(Number(panelTempCoeff)) ? Number(panelTempCoeff) : -0.0037;
   const summerTemp = Number.isFinite(Number(avgSummerTemp)) ? Number(avgSummerTemp) : 25;
@@ -214,6 +224,69 @@ export function combineHourlyLoads(...loads) {
     for (let i = 0; i < Math.min(8760, load.length); i++) out[i] += Math.max(0, Number(load[i]) || 0);
   });
   return out;
+}
+
+export function resolvePermitCost(systemPowerKwp = 0) {
+  const systemPower = Math.max(0, Number(systemPowerKwp) || 0);
+  if (systemPower < 5) return 8000;
+  if (systemPower < 10) return 6000;
+  if (systemPower < 20) return 5000;
+  return 4000;
+}
+
+export function estimateSolarCapex({
+  systemPowerKwp = 0,
+  panel = null,
+  panelPricePerWatt = null,
+  inverterTypeKey = 'string',
+  mountingPerKwp = 2200,
+  dcCablePerKwp = 600,
+  acElecPerKwp = 900,
+  laborPerKwp = 1800,
+  panelKdvRate = 0,
+  nonPanelKdvRate = 0.20
+} = {}) {
+  const systemPower = Math.max(0, Number(systemPowerKwp) || 0);
+  const inverterType = INVERTER_TYPES[inverterTypeKey] || INVERTER_TYPES.string;
+  const inverterPrices = inverterType?.pricePerKWp || {};
+  const invUnit = systemPower < 10
+    ? Number(inverterPrices.lt10) || 0
+    : systemPower < 50
+      ? Number(inverterPrices.lt50) || 0
+      : Number(inverterPrices.gt50) || 0;
+  const panelUnitPrice = Math.max(0, Number(panelPricePerWatt ?? panel?.pricePerWatt) || 0);
+  const permitCost = resolvePermitCost(systemPower);
+  const panelCost = systemPower * 1000 * panelUnitPrice;
+  const inverterCost = systemPower * invUnit;
+  const mountingCost = systemPower * (Number(mountingPerKwp) || 0);
+  const dcCableCost = systemPower * (Number(dcCablePerKwp) || 0);
+  const acElecCost = systemPower * (Number(acElecPerKwp) || 0);
+  const laborCost = systemPower * (Number(laborPerKwp) || 0);
+  const subtotal = panelCost + inverterCost + mountingCost + dcCableCost + acElecCost + laborCost + permitCost;
+  const nonPanelSubtotal = subtotal - panelCost;
+  const solarKdv = panelCost * (Number(panelKdvRate) || 0) + nonPanelSubtotal * (Number(nonPanelKdvRate) || 0);
+  const solarCost = subtotal + solarKdv;
+  const kdvRate = subtotal > 0 ? solarKdv / subtotal : 0;
+
+  return {
+    inverterTypeKey,
+    invUnit,
+    panelPricePerWatt: panelUnitPrice,
+    permitCost,
+    panelCost,
+    inverterCost,
+    mountingCost,
+    dcCableCost,
+    acElecCost,
+    laborCost,
+    subtotal,
+    nonPanelSubtotal,
+    solarKdv,
+    solarCost,
+    kdvRate,
+    panelKdvRate: Number(panelKdvRate) || 0,
+    nonPanelKdvRate: Number(nonPanelKdvRate) || 0
+  };
 }
 
 export function calculateSystemLayout(state, panelType = state.panelType) {
@@ -415,6 +488,25 @@ export function simulateHourlyEnergy(monthlyProduction, monthlyLoad, options = {
   };
 }
 
+export function buildHourlySimulationOptions({
+  state = {},
+  tariffModel = null,
+  hourlyLoad8760 = null,
+  hourlyProduction8760 = null
+} = {}) {
+  return {
+    tariffType: state.tariffType,
+    loadProfileKey: state.usageProfile || state.onGridUsageProfile,
+    hourlyLoad8760,
+    hourlyProduction8760,
+    exportPolicy: tariffModel?.exportCompensationPolicy,
+    previousYearConsumptionKwh: state.previousYearConsumptionKwh,
+    currentYearConsumptionKwh: state.currentYearConsumptionKwh,
+    sellableExportCapKwh: state.sellableExportCapKwh,
+    settlementDate: state.settlementDate
+  };
+}
+
 export function capPaidExportByMonth(monthly) {
   return applyExportCompensation(monthly, { interval: 'monthly' });
 }
@@ -567,6 +659,17 @@ export function resolveTaxTreatment({ grossTotalCost = 0, solarKdv = 0, taxEnabl
     vatTreatment: recoverableKdv > 0
       ? 'recoverable-kdv-excluded-from-financial-cost-basis'
       : 'kdv-included-in-financial-cost-basis'
+  };
+}
+
+export function resolveAnnualOperatingCosts({ costBasis = 0, omEnabled = false, omRate = 0, insuranceRate = 0 } = {}) {
+  const basis = Math.max(0, Number(costBasis) || 0);
+  const omPct = Math.max(0, Number(omRate) || 0) / 100;
+  const insurancePct = Math.max(0, Number(insuranceRate) || 0) / 100;
+  return {
+    costBasis: basis,
+    annualOMCost: omEnabled ? Math.round(basis * omPct) : 0,
+    annualInsurance: omEnabled ? Math.round(basis * insurancePct) : 0
   };
 }
 
@@ -723,6 +826,36 @@ export function computeFinancialTable({
   };
 }
 
+export function calculateDiscountedLcoe({
+  initialCostBasis = 0,
+  yearlyTable = [],
+  discountRate = 0,
+  scenarioKey = 'on-grid'
+} = {}) {
+  let lcoeCostSum = Math.max(0, Number(initialCostBasis) || 0);
+  let lcoeEnergySum = 0;
+  let compensatedLcoeEnergySum = 0;
+
+  yearlyTable.forEach(row => {
+    const year = Math.max(1, Number(row?.year) || 1);
+    const df = Math.pow(1 + Math.max(0, Number(discountRate) || 0), year);
+    lcoeCostSum += (Number(row?.expenses) || 0) / df;
+    const deliveredEnergyForLcoe = scenarioKey === 'off-grid'
+      ? (Number(row?.selfConsumptionKwh) || Number(row?.compensatedConsumptionKwh) || 0)
+      : (Number(row?.energy) || 0);
+    lcoeEnergySum += deliveredEnergyForLcoe / df;
+    const compensatedEnergyForLcoe = scenarioKey === 'off-grid'
+      ? deliveredEnergyForLcoe
+      : (Number(row?.compensatedConsumptionKwh) || 0) + (Number(row?.paidExportKwh) || 0);
+    compensatedLcoeEnergySum += compensatedEnergyForLcoe / df;
+  });
+
+  return {
+    lcoe: lcoeEnergySum > 0 ? Number((lcoeCostSum / lcoeEnergySum).toFixed(2)) : null,
+    compensatedLcoe: compensatedLcoeEnergySum > 0 ? Number((lcoeCostSum / compensatedLcoeEnergySum).toFixed(2)) : null
+  };
+}
+
 export function calcIRR(cfs) {
   const cashFlows = Array.isArray(cfs) ? cfs.map(v => Number(v) || 0) : [];
   let signChanges = 0;
@@ -753,6 +886,67 @@ export function calcIRR(cfs) {
   }
   const r = (lo + hi) / 2;
   return isFinite(r) ? (r * 100).toFixed(1) : 'N/A';
+}
+
+export function evaluateProjectEconomics({
+  annualEnergy,
+  hourlySummary,
+  batterySummary,
+  totalCost,
+  tariffModel,
+  panel,
+  annualOMCost,
+  annualInsurance,
+  inverterLifetime,
+  inverterReplaceCost,
+  netMeteringEnabled,
+  exportRateOverride,
+  batteryLifetime = 0,
+  batteryReplaceCost = 0,
+  batteryPriceEscalationRate = 0,
+  annualLoadGrowth = 0,
+  annualGeneratorCost = 0,
+  annualGeneratorKwh = 0,
+  generatorAlternativeCostPerKwh = 0,
+  generatorFuelCostPerKwh = 0,
+  scenarioKey = 'on-grid'
+} = {}) {
+  const financial = computeFinancialTable({
+    annualEnergy,
+    hourlySummary,
+    batterySummary,
+    totalCost,
+    tariffModel,
+    panel,
+    annualOMCost,
+    annualInsurance,
+    inverterLifetime,
+    inverterReplaceCost,
+    netMeteringEnabled,
+    exportRateOverride,
+    batteryLifetime,
+    batteryReplaceCost,
+    batteryPriceEscalationRate,
+    annualLoadGrowth,
+    annualGeneratorCost,
+    annualGeneratorKwh,
+    generatorAlternativeCostPerKwh,
+    generatorFuelCostPerKwh
+  });
+  const yearlyTable = financial.rows;
+  const irr = calcIRR([-(Number(totalCost) || 0), ...yearlyTable.map(y => y.netCashFlow)]);
+  const lcoeMetrics = calculateDiscountedLcoe({
+    initialCostBasis: totalCost,
+    yearlyTable,
+    discountRate: tariffModel?.discountRate || 0,
+    scenarioKey
+  });
+  return {
+    ...financial,
+    yearlyTable,
+    irr,
+    ...lcoeMetrics
+  };
 }
 
 export function detectCalculationWarnings(results) {

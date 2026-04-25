@@ -148,6 +148,26 @@ function finiteOrInfinity(value) {
   return Number.isFinite(n) && n > 0 ? n : Infinity;
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function normalizedFraction(value, fallback = 0) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw)) return fallback;
+  if (raw > 1) return clamp(raw / 100, 0, 1);
+  return clamp(raw, 0, 1);
+}
+
+function finitePositive(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function isCriticalOnlyGeneratorStrategy(strategy = '') {
+  return strategy === 'critical-backup' || strategy === 'critical-only';
+}
+
 function isComplete8760(arr) {
   return Array.isArray(arr)
     && arr.length >= HOURS_PER_YEAR
@@ -182,10 +202,12 @@ function scaleOptional8760(arr, factor = 1) {
 
 function eolBatteryConfig(battery = {}) {
   const usable = Math.max(0, Number(battery.usableCapacityKwh) || 0);
-  const eolUsable = usable * 0.80;
+  const eolCapacityPct = normalizedFraction(battery.eolCapacityPct, 0.80);
+  const eolEfficiencyLossPct = normalizedFraction(battery.eolEfficiencyLossPct, 0.03);
+  const eolUsable = usable * eolCapacityPct;
   const reservePct = usable > 0 ? Math.max(0, Math.min(0.5, (Number(battery.socReserveKwh) || 0) / usable)) : 0;
   const initialPct = usable > 0 ? Math.max(reservePct, Math.min(1, (Number(battery.initialSocKwh) || 0) / usable)) : reservePct;
-  const eff = Math.max(0.5, Math.min(1, (Number(battery.efficiency) || 0.92) - 0.03));
+  const eff = Math.max(0.5, Math.min(1, (Number(battery.efficiency) || 0.92) - eolEfficiencyLossPct));
   const scaledPower = (value) => {
     const n = Number(value);
     return Number.isFinite(n) && n > 0 ? n * 0.90 : value;
@@ -697,10 +719,23 @@ export function buildOffgridLoadProfile(devices, options = {}) {
 export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHourly8760, battery, generator, options = {}) {
   const pvScale = Math.max(0, Math.min(2, Number(options.pvScaleFactor) || 1.0));
   const usableCap = Math.max(0, Number(battery.usableCapacityKwh) || 0);
-  const efficiency = Math.max(0.5, Math.min(1, Number(battery.efficiency) || 0.92));
-  const chargeEff = Math.sqrt(efficiency);
-  const dischargeEff = chargeEff;
+  const roundTripEfficiency = Math.max(0.5, Math.min(1, Number(battery.efficiency) || 0.92));
+  const explicitChargeEff = finitePositive(battery.chargeEfficiency ?? options.chargeEfficiency);
+  const explicitDischargeEff = finitePositive(battery.dischargeEfficiency ?? options.dischargeEfficiency);
+  let chargeEff = Math.sqrt(roundTripEfficiency);
+  let dischargeEff = chargeEff;
+  if (explicitChargeEff && explicitDischargeEff) {
+    chargeEff = clamp(explicitChargeEff, 0.5, 1);
+    dischargeEff = clamp(explicitDischargeEff, 0.5, 1);
+  } else if (explicitChargeEff) {
+    chargeEff = clamp(explicitChargeEff, 0.5, 1);
+    dischargeEff = clamp(roundTripEfficiency / chargeEff, 0.5, 1);
+  } else if (explicitDischargeEff) {
+    dischargeEff = clamp(explicitDischargeEff, 0.5, 1);
+    chargeEff = clamp(roundTripEfficiency / dischargeEff, 0.5, 1);
+  }
   const socReserveKwh = Math.max(0, Math.min(usableCap * 0.5, Number(battery.socReserveKwh) || 0));
+  const socReservePct = usableCap > 0 ? socReserveKwh / usableCap : 0;
 
   const maxChargePowerKw = finiteOrInfinity(battery.maxChargePowerKw ?? battery.maxChargeKw ?? options.maxChargePowerKw);
   const maxDischargePowerKw = finiteOrInfinity(battery.maxDischargePowerKw ?? battery.maxDischargeKw ?? options.maxDischargePowerKw);
@@ -713,6 +748,21 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
   const genEnabled = !!(generator && generator.enabled && Number(generator.capacityKw) > 0);
   const genCapKwh = genEnabled ? Math.max(0, Number(generator.capacityKw) || 0) : 0;
   const genFuelCostPerKwh = genEnabled ? Math.max(0, Number(generator.fuelCostPerKwh) || 0) : 0;
+  const generatorStrategy = options.generatorStrategy || generator.strategy || 'critical-backup';
+  const generatorStartSocPct = Math.max(0, Math.min(100, Number(options.generatorStartSocPct) || 0));
+  const generatorStartSocKwh = Math.max(socReserveKwh, usableCap * (generatorStartSocPct / 100));
+  const generatorStopSocPct = Math.max(generatorStartSocPct, Math.min(100, Number(options.generatorStopSocPct) || (generatorStartSocPct > 0 ? generatorStartSocPct + 15 : 100)));
+  const generatorStopSocKwh = Math.max(generatorStartSocKwh, usableCap * (generatorStopSocPct / 100));
+  const generatorMinLoadRate = normalizedFraction(options.generatorMinLoadRatePct ?? generator.minLoadRatePct, 0);
+  const generatorChargeBatteryEnabled = !!(options.generatorChargeBatteryEnabled ?? generator.chargeBatteryEnabled);
+  const autonomyThresholdPct = clamp(Number(options.autonomyThresholdPct) || 1, 0, 25);
+  const hasGeneratorHourCap = options.generatorMaxHoursPerDay !== null
+    && options.generatorMaxHoursPerDay !== undefined
+    && options.generatorMaxHoursPerDay !== ''
+    && Number.isFinite(Number(options.generatorMaxHoursPerDay));
+  const generatorMaxHoursPerDay = hasGeneratorHourCap
+    ? Math.max(0, Math.min(24, Number(options.generatorMaxHoursPerDay) || 0))
+    : Infinity;
 
   let soc = Math.max(socReserveKwh, Math.min(usableCap, Number(battery.initialSocKwh) || socReserveKwh));
 
@@ -720,6 +770,9 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
   let batteryToLoadKwh = 0;
   let generatorToLoadKwh = 0;
   let generatorToCriticalKwh = 0;
+  let generatorToBatteryKwh = 0;
+  let generatorOutputKwh = 0;
+  let generatorWastedKwh = 0;
   let curtailedPvKwh = 0;
   let unmetLoadKwh = 0;
   let unmetCriticalLoadKwh = 0;
@@ -745,8 +798,11 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
   let dailyUnmet = 0;
   let dailyUnmetWithGenerator = 0;
   let dailyLoad = 0;
+  let generatorRunHoursToday = 0;
+  let generatorRunning = false;
 
   for (let i = 0; i < N; i++) {
+    if (i > 0 && i % 24 === 0) generatorRunHoursToday = 0;
     const rawPv = Math.max(0, Number(pvHourly8760[i]) || 0);
     const pv = rawPv * pvScale;
     const load = Math.max(0, Number(loadHourly8760[i]) || 0);
@@ -758,7 +814,6 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
 
     totalPvGeneratedKwh += pv;
 
-    // PV+BESS tarafının AC inverter altında karşılayabileceği saatlik yük.
     let pvBatteryCriticalTarget = criticalLoad;
     let pvBatteryNonCriticalTarget = nonCriticalLoad;
     if (inverterAcLimitKw !== Infinity) {
@@ -785,14 +840,12 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
       inverterPowerLimitHours += 1;
     }
 
-    // 1. Doğrudan PV → kritik yük, sonra kritik olmayan yük.
     const directToCritical = Math.min(pv, pvBatteryCriticalTarget);
     const directToNonCritical = Math.min(Math.max(0, pv - directToCritical), pvBatteryNonCriticalTarget);
     const directSelf = directToCritical + directToNonCritical;
     directPvToLoadKwh += directSelf;
     let pvSurplus = Math.max(0, pv - directSelf);
 
-    // 2. PV fazlası → batarya şarj; enerji kapasitesi ve kW limiti ayrı uygulanır.
     const chargeRoom = usableCap > 0 ? Math.max(0, (usableCap - soc) / chargeEff) : 0;
     const potentialChargeFromPv = Math.min(pvSurplus, chargeRoom);
     const chargeFromPv = Math.min(potentialChargeFromPv, maxChargePowerKw);
@@ -809,7 +862,6 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
     const nonCriticalDeficitForBattery = Math.max(0, pvBatteryNonCriticalTarget - directToNonCritical);
     const totalDeficitForBattery = criticalDeficitForBattery + nonCriticalDeficitForBattery;
 
-    // 3. Batarya → kritik yük önce, sonra kritik olmayan yük.
     let batteryDischargeThisHour = 0;
     let batteryToCritical = 0;
     let batteryToNonCritical = 0;
@@ -838,21 +890,66 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
     const remainingCriticalDeficit = Math.max(0, criticalLoad - directToCritical - batteryToCritical);
     const remainingTotalDeficit = Math.max(0, load - directSelf - batteryDischargeThisHour);
 
-    // 4. Jeneratör (etkinse) kalan kritik yükü önce kapatır.
-    let genKwhThisHour = 0;
+    let genOutputThisHour = 0;
+    let genServedLoadThisHour = 0;
     let genToCritical = 0;
-    if (genEnabled && remainingTotalDeficit > 1e-6) {
+    let genToBattery = 0;
+    const generatorWithinDailyHourLimit = generatorRunHoursToday + 1e-9 < generatorMaxHoursPerDay;
+    const generatorSocGateOpen = usableCap <= 0 || soc <= generatorStartSocKwh + 1e-9;
+    const criticalOnlyGenerator = isCriticalOnlyGeneratorStrategy(generatorStrategy);
+    const loadSupportNeeded = criticalOnlyGenerator
+      ? remainingCriticalDeficit > 1e-6
+      : remainingTotalDeficit > 1e-6;
+    const chargeTargetSocKwh = generatorChargeBatteryEnabled ? Math.min(usableCap, generatorStopSocKwh) : soc;
+    const generatorChargeRoomKwh = generatorChargeBatteryEnabled && usableCap > 0 && soc < chargeTargetSocKwh - 1e-9
+      ? Math.max(0, (chargeTargetSocKwh - soc) / chargeEff)
+      : 0;
+    const startForBatteryRecovery = generatorChargeBatteryEnabled && usableCap > 0 && generatorSocGateOpen && generatorChargeRoomKwh > 1e-6;
+    const keepRunningForBatteryRecovery = generatorRunning && generatorChargeBatteryEnabled && usableCap > 0 && soc < generatorStopSocKwh - 1e-9;
+    const generatorShouldRun = genEnabled
+      && generatorWithinDailyHourLimit
+      && (loadSupportNeeded ? (generatorSocGateOpen || generatorRunning) : (startForBatteryRecovery || keepRunningForBatteryRecovery));
+
+    if (generatorShouldRun) {
+      const genMinOutputKwh = genCapKwh * generatorMinLoadRate;
       genToCritical = Math.min(remainingCriticalDeficit, genCapKwh);
-      const genToNonCritical = Math.min(Math.max(0, remainingTotalDeficit - genToCritical), Math.max(0, genCapKwh - genToCritical));
-      genKwhThisHour = genToCritical + genToNonCritical;
-      generatorToLoadKwh += genKwhThisHour;
+      const supportNonCritical = !criticalOnlyGenerator;
+      const genToNonCritical = supportNonCritical
+        ? Math.min(Math.max(0, remainingTotalDeficit - genToCritical), Math.max(0, genCapKwh - genToCritical))
+        : 0;
+      genServedLoadThisHour = genToCritical + genToNonCritical;
+      const desiredGenOutput = generatorChargeBatteryEnabled
+        ? Math.min(genCapKwh, genServedLoadThisHour + Math.min(generatorChargeRoomKwh, maxChargePowerKw))
+        : genServedLoadThisHour;
+      genOutputThisHour = Math.min(
+        genCapKwh,
+        Math.max(
+          genServedLoadThisHour,
+          desiredGenOutput,
+          genServedLoadThisHour > 1e-9 || generatorChargeRoomKwh > 1e-9 ? genMinOutputKwh : 0
+        )
+      );
+      let genRemaining = Math.max(0, genOutputThisHour - genServedLoadThisHour);
+      if (generatorChargeBatteryEnabled && genRemaining > 1e-9 && generatorChargeRoomKwh > 1e-9) {
+        genToBattery = Math.min(genRemaining, generatorChargeRoomKwh, maxChargePowerKw);
+        soc += genToBattery * chargeEff;
+        totalChargedKwh += genToBattery * chargeEff;
+        genRemaining -= genToBattery;
+      }
+      generatorToLoadKwh += genServedLoadThisHour;
       generatorToCriticalKwh += genToCritical;
+      generatorToBatteryKwh += genToBattery;
+      generatorOutputKwh += genOutputThisHour;
+      generatorWastedKwh += Math.max(0, genRemaining);
       generatorRunHours += 1;
-      generatorFuelCostAnnual += genKwhThisHour * genFuelCostPerKwh;
+      generatorRunHoursToday += 1;
+      generatorFuelCostAnnual += genOutputThisHour * genFuelCostPerKwh;
+      generatorRunning = true;
+    } else {
+      generatorRunning = false;
     }
 
-    // 5. Karşılanamayan yük
-    const finalUnmet = Math.max(0, remainingTotalDeficit - genKwhThisHour);
+    const finalUnmet = Math.max(0, remainingTotalDeficit - genServedLoadThisHour);
     const finalUnmetCritical = Math.max(0, remainingCriticalDeficit - genToCritical);
     unmetLoadKwh += finalUnmet;
     unmetCriticalLoadKwh += finalUnmetCritical;
@@ -861,8 +958,7 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
     dailyLoad += load;
 
     if (i % 24 === 23) {
-      // Göreceli eşik: günlük yükün %1'i veya minimum 1 Wh
-      const autonomyThreshold = Math.max(0.001, dailyLoad * 0.01);
+      const autonomyThreshold = Math.max(0.001, dailyLoad * (autonomyThresholdPct / 100));
       if (dailyUnmet < autonomyThreshold) autonomousDays++;
       if (dailyUnmetWithGenerator < autonomyThreshold) autonomousDaysWithGenerator++;
       dailyUnmet = 0;
@@ -881,8 +977,10 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
       directToCritical,
       batteryDischarge: batteryDischargeThisHour,
       batteryToCritical,
-      generatorKwh: genKwhThisHour,
+      generatorKwh: genServedLoadThisHour,
+      generatorOutputKwh: genOutputThisHour,
       generatorToCritical: genToCritical,
+      generatorToBattery: genToBattery,
       curtailed: Math.max(0, pvSurplus),
       unmet: finalUnmet,
       unmetCritical: finalUnmetCritical,
@@ -908,52 +1006,58 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
   const averageSocKwh = N > 0 ? socSumKwh / N : 0;
 
   return {
-    // Enerji dengesi toplamları (kWh/yıl)
     directPvToLoadKwh,
     batteryToLoadKwh,
     generatorToLoadKwh,
     generatorToCriticalKwh,
+    generatorToBatteryKwh,
+    generatorOutputKwh,
+    generatorWastedKwh,
     curtailedPvKwh,
     unmetLoadKwh,
     unmetCriticalLoadKwh,
     totalPvGeneratedKwh,
     chargedFromPvKwh,
 
-    // Kapsama metrikleri (0-1 arası)
     totalLoadCoverage,
     criticalLoadCoverage,
     solarBatteryLoadCoverage,
     solarBatteryCriticalCoverage,
 
-    // Güç limitleri
     batteryChargeLimitedKwh,
     batteryDischargeLimitedKwh,
     inverterPowerLimitedLoadKwh,
     inverterPowerLimitHours,
     maxChargePowerKw: maxChargePowerKw === Infinity ? null : maxChargePowerKw,
     maxDischargePowerKw: maxDischargePowerKw === Infinity ? null : maxDischargePowerKw,
+    chargeEfficiency: chargeEff,
+    dischargeEfficiency: dischargeEff,
+    roundTripEfficiency,
+    socReservePct,
     inverterAcLimitKw: inverterAcLimitKw === Infinity ? null : inverterAcLimitKw,
     inverterSurgeMultiplier,
     inverterSurgeLimitKw: inverterSurgeLimitKw === Infinity ? null : inverterSurgeLimitKw,
 
-    // Özerklik
     autonomousDays,
     autonomousDaysPct,
     autonomousDaysWithGenerator,
     autonomousDaysWithGeneratorPct,
+    autonomyThresholdPct,
 
-    // Jeneratör
     generatorRunHours,
     generatorFuelCostAnnual,
+    generatorStrategy,
+    generatorMinLoadRatePct: generatorMinLoadRate * 100,
+    generatorChargeBatteryEnabled,
+    generatorStartSocPct,
+    generatorStopSocPct,
 
-    // Batarya sağlığı
     cyclesPerYear,
     minimumSocKwh: minSocKwh,
     averageSocKwh,
     minimumSocPct: usableCap > 0 ? minSocKwh / usableCap : 0,
     averageSocPct: usableCap > 0 ? averageSocKwh / usableCap : 0,
 
-    // Saatlik iz
     hourly8760
   };
 }
@@ -1150,13 +1254,25 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
   const generatorMaintenanceAnnual = Math.max(0, Number(financialInputs.generatorMaintenanceCostTry) || 0);
   const totalCapex = capex + genCapex;
 
-  // Yaşam döngüsü maliyeti: düz amortisman + jeneratör yakıt/bakım + pil değişimi
+  // Yaşam döngüsü maliyeti: düz amortisman + jeneratör yakıt/bakım + pil değişimi + overhaul
   const battCapex = Math.max(0, Number(financialInputs.batteryCapexTry) || 0);
   const battLifetime = Math.max(0, Number(financialInputs.batteryLifetimeYears) || 0);
-  const battReplaceFraction = 0.85;
+  const battReplaceFraction = normalizedFraction(financialInputs.batteryReplacementFractionPct, 0.85);
   const battReplacementsIn25y = battLifetime > 0 ? Math.floor(24 / battLifetime) : 0;
   const battReplacementAnnual = battLifetime > 0 ? (battCapex * battReplaceFraction * battReplacementsIn25y) / 25 : 0;
-  const lifecycleCostAnnual = (totalCapex / 25) + (normalDispatch.generatorFuelCostAnnual || 0) + generatorMaintenanceAnnual + battReplacementAnnual;
+  const generatorOverhaulHours = Math.max(0, Number(financialInputs.generatorOverhaulHours) || 0);
+  const generatorOverhaulCostTry = Math.max(0, Number(financialInputs.generatorOverhaulCostTry) || 0);
+  const generatorOverhaulCount25y = generatorOverhaulHours > 0
+    ? Math.floor(((normalDispatch.generatorRunHours || 0) * 25) / generatorOverhaulHours)
+    : 0;
+  const generatorOverhaulAnnual = generatorOverhaulCount25y > 0
+    ? (generatorOverhaulCostTry * generatorOverhaulCount25y) / 25
+    : 0;
+  const lifecycleCostAnnual = (totalCapex / 25)
+    + (normalDispatch.generatorFuelCostAnnual || 0)
+    + generatorMaintenanceAnnual
+    + battReplacementAnnual
+    + generatorOverhaulAnnual;
 
   const generatorEnabled = !!(generatorConfig && generatorConfig.enabled && Number(generatorConfig.capacityKw) > 0);
   const accuracyAssessment = buildOffgridAccuracyAssessment({
@@ -1175,6 +1291,9 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     batteryKwh: normalDispatch.batteryToLoadKwh,
     generatorKwh: normalDispatch.generatorToLoadKwh,
     generatorEnergyKwh: normalDispatch.generatorToLoadKwh,
+    generatorOutputKwh: normalDispatch.generatorOutputKwh || normalDispatch.generatorToLoadKwh,
+    generatorToBatteryKwh: normalDispatch.generatorToBatteryKwh || 0,
+    generatorWastedKwh: normalDispatch.generatorWastedKwh || 0,
     curtailedPvKwh: normalDispatch.curtailedPvKwh,
     unmetLoadKwh: normalDispatch.unmetLoadKwh,
     unmetCriticalKwh: normalDispatch.unmetCriticalLoadKwh,
@@ -1182,6 +1301,7 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     // Kapsama metrikleri
     totalLoadCoverage: normalDispatch.totalLoadCoverage,
     criticalLoadCoverage: normalDispatch.criticalLoadCoverage,
+    criticalCoverageWithGenerator: normalDispatch.criticalLoadCoverage,
     totalLoadCoverageWithGenerator: normalDispatch.totalLoadCoverage,
     criticalLoadCoverageWithGenerator: normalDispatch.criticalLoadCoverage,
     // Jeneratörsüz karşılaştırma (jeneratör etkinse hesaplanır)
@@ -1189,6 +1309,9 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
       ? withoutGeneratorDispatch.totalLoadCoverage
       : (generatorEnabled ? null : normalDispatch.totalLoadCoverage),
     criticalLoadCoverageWithoutGenerator: withoutGeneratorDispatch
+      ? withoutGeneratorDispatch.criticalLoadCoverage
+      : (generatorEnabled ? null : normalDispatch.criticalLoadCoverage),
+    criticalCoverageWithoutGenerator: withoutGeneratorDispatch
       ? withoutGeneratorDispatch.criticalLoadCoverage
       : (generatorEnabled ? null : normalDispatch.criticalLoadCoverage),
     unmetLoadWithoutGeneratorKwh: withoutGeneratorDispatch
@@ -1207,6 +1330,10 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     averageSoc: normalDispatch.averageSocPct,
     minimumSocKwh: normalDispatch.minimumSocKwh,
     averageSocKwh: normalDispatch.averageSocKwh,
+    batteryReservePct: (normalDispatch.socReservePct || 0) * 100,
+    batteryChargeEfficiencyPct: (normalDispatch.chargeEfficiency || 0) * 100,
+    batteryDischargeEfficiencyPct: (normalDispatch.dischargeEfficiency || 0) * 100,
+    batteryRoundTripEfficiencyPct: (normalDispatch.roundTripEfficiency || 0) * 100,
 
     // Güç limitleri
     batteryMaxChargeKw: normalDispatch.maxChargePowerKw,
@@ -1231,7 +1358,10 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     generatorSizePreset: financialInputs.generatorSizePreset || 'auto',
     generatorReservePct: Math.max(0, Number(financialInputs.generatorReservePct) || 0),
     generatorStartSocPct: Math.max(0, Number(financialInputs.generatorStartSocPct) || 0),
+    generatorStopSocPct: Math.max(0, Number(financialInputs.generatorStopSocPct) || 0),
     generatorMaxHoursPerDay: Math.max(0, Number(financialInputs.generatorMaxHoursPerDay) || 0),
+    generatorMinLoadRatePct: Math.max(0, Number(financialInputs.generatorMinLoadRatePct) || 0),
+    generatorChargeBatteryEnabled: !!financialInputs.generatorChargeBatteryEnabled,
     generatorCapex: genCapex,
     generatorCapexTry: genCapex,
     generatorCapexMissing: generatorEnabled && genCapex <= 0,
@@ -1244,6 +1374,11 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     lifecycleCostAnnual,
     battReplacementAnnual,
     battReplacementsIn25y,
+    batteryReplacementFractionPct: battReplaceFraction * 100,
+    generatorOverhaulAnnual,
+    generatorOverhaulCount25y,
+    generatorOverhaulHours,
+    generatorOverhaulCostTry,
     systemCapexTry: capex,
     totalCapexTry: totalCapex,
     alternativeEnergyCostPerKwh: Math.max(0, Number(financialInputs.alternativeEnergyCostPerKwh) || 0),
@@ -1272,6 +1407,7 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     provisional: true,
     synthetic: !loadProfile.hasRealHourlyLoad,
     feasibilityNotGuaranteed: true,
-    dispatchVersion: OFFGRID_DISPATCH_VERSION
+    dispatchVersion: OFFGRID_DISPATCH_VERSION,
+    autonomyThresholdPct: normalDispatch.autonomyThresholdPct ?? 1
   };
 }

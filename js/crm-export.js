@@ -36,7 +36,10 @@ export function buildCrmLeadExport(state = {}, results = {}) {
       confidenceLevel: results.confidenceLevel || gov.confidence?.level || null,
       confidenceScore: gov.confidence?.score ?? null,
       quoteReadiness: results.quoteReadiness?.status || null,
-      blockers: results.quoteReadiness?.blockers || []
+      blockers: results.quoteReadiness?.blockers || [],
+      offgridFieldDataState: results.offgridL2Results?.fieldDataState || null,
+      offgridGuaranteeCandidate: !!results.offgridL2Results?.fieldGuaranteeCandidate,
+      offgridGuaranteeReady: !!results.offgridL2Results?.fieldGuaranteeReady
     },
     commercial: proposal.commercial,
     approval: proposal.approval,

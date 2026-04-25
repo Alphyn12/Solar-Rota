@@ -411,7 +411,7 @@ export const TARIFF_META = {
     label: 'Tarımsal Sulama',
     sourceLabel: 'EPDK tarımsal sulama tarife doğrulaması, kullanıcı manuel TL/kWh girişi',
     sourceDate: '2026-04-12',
-    skttLimitKwh: null
+    skttLimitKwh: 150000000
   },
   custom: {
     label: 'Özel',

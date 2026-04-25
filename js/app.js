@@ -350,8 +350,13 @@ window.state = {
   offgridGeneratorSizePreset: 'auto',
   offgridGeneratorReservePct: 20,
   offgridGeneratorStartSocPct: 25,
+  offgridGeneratorStopSocPct: 40,
   offgridGeneratorMaxHoursPerDay: 8,
+  offgridGeneratorMinLoadRatePct: 30,
+  offgridGeneratorChargeBatteryEnabled: false,
   offgridGeneratorMaintenanceCostTry: 0,
+  offgridGeneratorOverhaulHours: 18000,
+  offgridGeneratorOverhaulCostTry: 0,
   offgridBadWeatherLevel: '',
   offgridPvHourly8760: null,
   offgridPvHourlySource: '',
@@ -359,6 +364,13 @@ window.state = {
   offgridFieldGuaranteeMode: false,
   offgridBatteryMaxChargeKw: null,
   offgridBatteryMaxDischargeKw: null,
+  offgridBatteryReservePct: null,
+  offgridBatteryChargeEfficiencyPct: null,
+  offgridBatteryDischargeEfficiencyPct: null,
+  offgridBatteryEolCapacityPct: null,
+  offgridBatteryEolEfficiencyLossPct: null,
+  offgridBatteryReplacementFractionPct: null,
+  offgridAutonomyThresholdPct: 1,
   offgridInverterAcKw: null,
   offgridInverterSurgeMultiplier: 1.25
 };
@@ -1196,7 +1208,24 @@ function updateShading(val) {
   const desc = ['Gölge yok', 'Az gölge', 'Orta gölge', 'Ciddi gölge'];
   const idx = val == 0 ? 0 : val <= 15 ? 1 : val <= 35 ? 2 : 3;
   document.getElementById('shading-desc').textContent = desc[idx];
+  syncOsmShadowDoubleCountWarning();
 }
+
+function syncOsmShadowDoubleCountWarning() {
+  const warningEl = document.getElementById('osm-double-count-warning');
+  if (!warningEl) return;
+  const osmEnabled = !!window.state?.osmShadowEnabled;
+  const userShade = Math.max(0, Number(window.state?.shadingFactor) || 0);
+  if (osmEnabled && userShade > 0) {
+    warningEl.style.display = '';
+    warningEl.textContent = window.i18n?.t?.('onGridResult.osmDoubleCountWarning')
+      || 'OSM gölge etkinken kullanıcı gölge faktörünü 0% yapın; aksi halde gölge kaybı iki kez sayılabilir.';
+    return;
+  }
+  warningEl.style.display = 'none';
+  warningEl.textContent = '';
+}
+window.syncOsmShadowDoubleCountWarning = syncOsmShadowDoubleCountWarning;
 
 function updateGroundAlbedo(val) {
   window.state.groundAlbedo = parseFloat(val) || 0.20;

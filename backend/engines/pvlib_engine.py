@@ -31,9 +31,48 @@ PANEL_GAMMA_PDC: dict[str, float] = {
     "poly": -0.0029,
 }
 
+PVLIB_CONFIDENCE_LEVEL = "medium"
+
+CITY_SUMMER_TEMPS: dict[str, float] = {
+    "Rize": 23, "Trabzon": 24, "Giresun": 24, "Artvin": 25, "Ordu": 25,
+    "Sinop": 24, "Samsun": 26, "Zonguldak": 25, "Bartın": 25,
+    "Erzurum": 21, "Kars": 20, "Ardahan": 19, "Ağrı": 22, "Iğdır": 28,
+    "Hakkari": 28, "Bitlis": 25, "Muş": 27, "Bingöl": 28, "Tunceli": 27,
+    "Van": 26, "Bayburt": 22, "Gümüşhane": 24, "Erzincan": 27,
+    "İstanbul": 28, "Istanbul": 28, "Edirne": 29, "Kırklareli": 28, "Tekirdağ": 27,
+    "Bursa": 29, "Balıkesir": 30, "Çanakkale": 28, "Bilecik": 28,
+    "Eskişehir": 28, "Kütahya": 27, "Afyonkarahisar": 28,
+    "İzmir": 32, "Izmir": 32, "Aydın": 33, "Muğla": 32, "Denizli": 31, "Uşak": 30,
+    "Antalya": 35, "Mersin": 34, "Adana": 36, "Hatay": 34, "Osmaniye": 35,
+    "Şanlıurfa": 38, "Sanliurfa": 38, "Gaziantep": 36, "Mardin": 37, "Diyarbakır": 38,
+    "Batman": 37, "Şırnak": 37, "Sirnak": 37, "Siirt": 36, "Adıyaman": 36, "Adiyaman": 36,
+    "Kahramanmaraş": 35, "Kahramanmaras": 35, "Elazığ": 33, "Elazig": 33, "Malatya": 33,
+    "Konya": 31, "Kayseri": 28, "Sivas": 27, "Yozgat": 26,
+    "Ankara": 29, "Kırıkkale": 28, "Kirikkale": 28, "Kırşehir": 28, "Kirsehir": 28,
+    "Nevşehir": 28, "Nevsehir": 28, "Aksaray": 29, "Niğde": 27, "Nigde": 27, "Karaman": 30,
+    "Isparta": 30, "Burdur": 30,
+    "default": 32,
+}
+
 
 def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
+
+
+def _city_summer_peak(city_name: str | None) -> float:
+    if city_name and city_name in CITY_SUMMER_TEMPS:
+        return CITY_SUMMER_TEMPS[city_name]
+    return CITY_SUMMER_TEMPS["default"]
+
+
+def _ambient_temperature_profile(day_of_year, city_name: str | None):
+    import numpy as np
+
+    summer_peak = _clamp(_city_summer_peak(city_name), 20, 42)
+    winter_trough = _clamp(summer_peak - 22, 4, 18)
+    seasonal_mean = (summer_peak + winter_trough) / 2
+    seasonal_amplitude = (summer_peak - winter_trough) / 2
+    return seasonal_mean + seasonal_amplitude * np.sin(2 * np.pi * (day_of_year - 172) / 365)
 
 
 def _system_power_kwp(request: EngineRequest) -> tuple[float, int]:
@@ -84,7 +123,7 @@ def engine_source(mode: str = "auto", fallback_reason: str | None = None) -> Eng
             notes=[
                 "pvlib solar position, clear-sky irradiance, POA transposition, cell temperature, and PVWatts DC model are active.",
                 "Panel wattage, panel area, inverter efficiency, bifacial gain, and cable loss are read from the shared frontend/backend request contract when present.",
-                "Weather uses synthetic seasonal temperature (17 ± 11 °C sinusoid) and constant 1.5 m/s wind — measured data not yet integrated.",
+                "Weather uses city-adjusted seasonal temperature and constant 1.5 m/s wind — measured data not yet integrated.",
                 "Inverter clipping, AOI losses, and dispatch remain simplified in this MVP pass.",
             ],
         )
@@ -161,7 +200,6 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
     if request.site.lat is None or request.site.lon is None:
         raise ValueError("pvlib engine requires latitude and longitude")
 
-    import numpy as np
     import pandas as pd
     import pvlib
 
@@ -185,7 +223,7 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
 
     target_annual_ghi = _annual_ghi_to_psh(request.site.ghi, request.site.cityName) * 365
     clear_annual_ghi = max(float(clearsky["ghi"].sum()) / 1000, 1)
-    ghi_scale = _clamp(target_annual_ghi / clear_annual_ghi, 0.45, 1.30)
+    ghi_scale = _clamp(target_annual_ghi / clear_annual_ghi, 0.45, 1.00)
 
     scaled_ghi = clearsky["ghi"] * ghi_scale
     scaled_dni = clearsky["dni"] * ghi_scale
@@ -206,7 +244,9 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
 
     inverter_eff = inverter_efficiency(request)
     day_of_year = pd.Series(times.dayofyear, index=times)
-    ambient_temp = pd.Series(17 + 11 * np.sin(2 * np.pi * (day_of_year - 172) / 365), index=times)
+    summer_peak = _city_summer_peak(request.site.cityName)
+    winter_trough = _clamp(summer_peak - 22, 4, 18)
+    ambient_temp = _ambient_temperature_profile(day_of_year, request.site.cityName)
     wind_speed = pd.Series(1.5, index=times)
     temp_params = pvlib.temperature.TEMPERATURE_MODEL_PARAMETERS["sapm"]["open_rack_glass_glass"]
     snapshot_sections = layout_sections_from_snapshot(request)
@@ -305,6 +345,10 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
         "gammaPdc": round(gamma_pdc, 4),
         "gammaPdcSource": "contract" if (_contract_coeff is not None and -0.01 <= float(_contract_coeff) <= 0) else "panel-type-map",
         "temperatureModel": "pvlib.sapm_cell.open_rack_glass_glass",
+        "temperatureProfileModel": "city-adjusted-seasonal-sine",
+        "temperatureProfileSummerPeakC": round(summer_peak, 1),
+        "temperatureProfileWinterTroughC": round(winter_trough, 1),
+        "temperatureProfileCity": request.site.cityName or "default",
         "dcModel": "pvlib.pvsystem.pvwatts_dc",
         "transpositionModel": "pvlib.irradiance.haydavies",
         "inverterApproximation": "constant efficiency with AC cap",
@@ -326,7 +370,7 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
             "hourly_kwh": hourly_kwh,
             "engine_used": "pvlib-backed",
             "engine_quality": "engineering-mvp",
-            "confidence_level": "high",
+            "confidence_level": PVLIB_CONFIDENCE_LEVEL,
             "assumption_flags": {
                 "usesClearSkyIrradianceScaledToInputGhi": True,
                 "usesMeasuredWeather": False,
@@ -349,8 +393,8 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
             "engine_used": "pvlib-backed",
             "engineQuality": "engineering-mvp",
             "engine_quality": "engineering-mvp",
-            "confidenceLevel": "high",
-            "confidence_level": "high",
+            "confidenceLevel": PVLIB_CONFIDENCE_LEVEL,
+            "confidence_level": PVLIB_CONFIDENCE_LEVEL,
             "sourceNotes": engine_source("pvlib").notes,
             "source_notes": engine_source("pvlib").notes,
             "parityNotes": [

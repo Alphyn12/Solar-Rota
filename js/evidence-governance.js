@@ -575,6 +575,7 @@ export function buildTariffSourceGovernance(tariffModel = {}, evidenceGovernance
 export function buildStructuredProposalExport(state = {}, results = {}) {
   const gov = results.proposalGovernance || {};
   const isOffGrid = state.scenarioKey === 'off-grid';
+  const offgridLineage = results.offgridL2Results?.dataLineage || null;
   const evidenceRegistry = results.evidenceGovernance?.registry || {};
   const evidenceSummary = Object.fromEntries(Object.entries(evidenceRegistry).map(([key, record]) => [
     key,
@@ -649,7 +650,13 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       shadowQuality: results.shadowQuality || state.shadingQuality || 'user-estimate',
       tariffInputMode: results.tariffInputMode || state.tariffInputMode || 'net-plus-fee',
       tariffSourceType: results.tariffSourceType || state.tariffSourceType || 'manual',
-      costSourceType: results.costSourceType || state.costSourceType || 'catalog'
+      costSourceType: results.costSourceType || state.costSourceType || 'catalog',
+      dataLineage: isOffGrid ? offgridLineage : {
+        version: 'GH-ONGRID-LINEAGE-2026.04-v1',
+        productionProfileSource: results.productionProfileSource || 'monthly-derived-synthetic-pv',
+        hourlyProfileSource: results.hourlyProfileSource || state.hourlyProfileSource || 'synthetic',
+        financialSavingsBasis: results.financialSavingsBasis || null
+      }
     },
     commercial: {
       totalCost: results.totalCost || null,
@@ -756,6 +763,8 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       badWeatherWindowCriticalCoverage: results.offgridL2Results.badWeatherScenario?.windowCriticalCoverage ?? null,
       badWeatherWorstWindowDayOfYear: results.offgridL2Results.badWeatherScenario?.worstWindowDayOfYear ?? null,
       methodologyNote: results.offgridL2Results.methodologyNote || null,
+      fieldDataState: results.offgridL2Results.fieldDataState || offgridLineage?.fieldDataState || null,
+      dataLineage: offgridLineage,
       provisional: results.offgridL2Results.provisional !== false,
       synthetic: !!results.offgridL2Results.synthetic,
       feasibilityNotGuaranteed: results.offgridL2Results.feasibilityNotGuaranteed !== false,
@@ -784,6 +793,12 @@ export function buildStructuredProposalExport(state = {}, results = {}) {
       fieldRevalidationGate: results.offgridL2Results.fieldRevalidationGate || null,
       fieldGuaranteeCandidate: !!results.offgridL2Results.fieldGuaranteeCandidate,
       fieldGuaranteeReady: !!results.offgridL2Results.fieldGuaranteeReady,
+      quoteGate: {
+        fieldGuaranteePhase1: !!results.offgridL2Results.fieldGuaranteeReadiness?.phase1Ready,
+        fieldEvidencePhase2: !!results.offgridL2Results.fieldEvidenceGate?.phase2Ready,
+        fieldModelPhase3: !!results.offgridL2Results.fieldModelMaturityGate?.phase3Ready,
+        fieldAcceptancePhase4: !!results.offgridL2Results.fieldAcceptanceGate?.phase4Ready
+      },
       dispatchVersion: results.offgridL2Results.dispatchVersion || null
     } : null,
     tariff: {

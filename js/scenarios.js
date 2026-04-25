@@ -3,7 +3,7 @@
 // Solar Rota v2.0
 // ═══════════════════════════════════════════════════════════
 
-import { buildTariffModel, calcIRR, computeFinancialTable } from './calc-core.js';
+import { buildTariffModel, evaluateProjectEconomics } from './calc-core.js';
 
 let scenarioChart = null;
 let fxChart = null;
@@ -112,7 +112,7 @@ export function renderScenarioAnalysis() {
 }
 
 function computeSensitivityNpv(r, state, overrides = {}) {
-  // FIX-1: Re-compute NPV via computeFinancialTable so each sensitivity case
+  // FIX-1: Re-compute NPV via the shared project-economics helper so each sensitivity case
   // uses a correctly scaled 25-year cash-flow model with proper degradation and
   // escalation — instead of the old heuristic (annualSavings × 0.10 × 8) which
   // was wrong and produced identical deltas for "Üretim -10%" and "Tarife -10%".
@@ -162,7 +162,7 @@ function computeSensitivityNpv(r, state, overrides = {}) {
   const annualOMCost = overrides.costMultiplier != null ? r.annualOMCost * costMultiplier : r.annualOMCost;
   const annualInsurance = overrides.costMultiplier != null ? r.annualInsurance * costMultiplier : r.annualInsurance;
   const inverterReplaceCost = overrides.costMultiplier != null ? r.inverterReplaceCost * costMultiplier : r.inverterReplaceCost;
-  const financial = computeFinancialTable({
+  const economicSummary = evaluateProjectEconomics({
     annualEnergy: r.annualEnergy * em,
     hourlySummary: scaledHourlySummary,
     batterySummary: scaledBatterySummary,
@@ -175,9 +175,10 @@ function computeSensitivityNpv(r, state, overrides = {}) {
     inverterReplaceCost,
     netMeteringEnabled: state.netMeteringEnabled,
     exportRateOverride: state.netMeteringEnabled && state.scenarioKey !== 'off-grid' ? tariffModel.exportRate : 0,
-    annualGeneratorCost: state.scenarioKey === 'off-grid' ? (r.offgridL2Results?.generatorFuelCostAnnual || 0) : 0
+    annualGeneratorCost: state.scenarioKey === 'off-grid' ? (r.offgridL2Results?.generatorFuelCostAnnual || 0) : 0,
+    scenarioKey: state.scenarioKey
   });
-  return Math.round(financial.projectNPV);
+  return Math.round(economicSummary.projectNPV);
 }
 
 function renderSensitivityTable(r) {
@@ -275,7 +276,7 @@ function computeScenario(r, inflationRate, state) {
   const financialTariffModel = state.scenarioKey === 'off-grid' && r.financialSavingsRate
     ? { ...tariffModel, importRate: r.financialSavingsRate, exportRate: 0, financialBasis: r.financialSavingsBasis || 'off-grid-alternative-energy-cost' }
     : tariffModel;
-  const financial = computeFinancialTable({
+  const economicSummary = evaluateProjectEconomics({
     annualEnergy: r.annualEnergy,
     hourlySummary: r.hourlySummary,
     batterySummary: r.batterySummary,
@@ -288,16 +289,17 @@ function computeScenario(r, inflationRate, state) {
     inverterReplaceCost: r.inverterReplaceCost,
     netMeteringEnabled: state.netMeteringEnabled,
     exportRateOverride: state.netMeteringEnabled && state.scenarioKey !== 'off-grid' ? tariffModel.exportRate : 0,
-    annualGeneratorCost: state.scenarioKey === 'off-grid' ? (r.offgridL2Results?.generatorFuelCostAnnual || 0) : 0
+    annualGeneratorCost: state.scenarioKey === 'off-grid' ? (r.offgridL2Results?.generatorFuelCostAnnual || 0) : 0,
+    scenarioKey: state.scenarioKey
   });
-  const cashFlows = [-totalCost, ...financial.rows.map(row => row.netCashFlow)];
+  const cashFlows = [-totalCost, ...economicSummary.yearlyTable.map(row => row.netCashFlow)];
 
   return {
     inflationRate,
-    paybackYear: financial.grossSimplePaybackYear ? Number(financial.grossSimplePaybackYear).toFixed(1) : financial.simplePaybackYear,
-    npv: Math.round(financial.projectNPV),
-    irr: calcIRR(cashFlows),
-    roi: financial.roi.toFixed(1),
+    paybackYear: economicSummary.grossSimplePaybackYear ? Number(economicSummary.grossSimplePaybackYear).toFixed(1) : economicSummary.simplePaybackYear,
+    npv: Math.round(economicSummary.projectNPV),
+    irr: economicSummary.irr,
+    roi: economicSummary.roi.toFixed(1),
     cashFlows
   };
 }

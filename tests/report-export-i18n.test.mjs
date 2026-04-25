@@ -256,7 +256,7 @@ renderEngReport();
 assert.match(reportBody.innerHTML, /Panel and System Design/);
 assert.match(reportBody.innerHTML, /Panel area = width/);
 assert.match(reportBody.innerHTML, /Inverter AC output efficiency/);
-assert.match(reportBody.innerHTML, /The 75% usable-area factor/);
+assert.match(reportBody.innerHTML, /The usable-area factor is a pre-feasibility assumption/);
 assert.match(reportBody.innerHTML, /Cost Breakdown/);
 assert.match(reportBody.innerHTML, /PVGIS live data is unavailable/);
 assert.match(reportBody.innerHTML, /Instant self-consumption/);
@@ -307,9 +307,21 @@ offGridState.results = {
     productionSource: 'PVGIS-based',
     productionSourceLabel: 'PVGIS Live',
     productionFallback: false,
+    productionDispatchProfile: 'real-hourly-pv-8760',
+    productionDispatchMetadata: { hasRealHourlyProduction: true, synthetic: false },
     loadSource: 'hourly-uploaded',
     loadMode: 'hourly-8760',
     dispatchType: 'hourly-8760-dispatch',
+    fieldDataState: 'field-input-ready',
+    dataLineage: {
+      version: 'GH-OFFGRID-LINEAGE-2026.04-v1',
+      fieldDataState: 'field-input-ready',
+      production: { realHourly: true, fallback: false, dispatchProfile: 'real-hourly-pv-8760' },
+      load: { realHourly: true, mode: 'hourly-8760' },
+      criticalLoad: { realHourly: false },
+      economics: { financialSavingsBasis: 'off-grid-user-alternative-energy-cost' },
+      gates: { phase1Ready: true, phase2Ready: false, phase3Ready: false, phase4Ready: false, phase5Ready: false, phase6Ready: false }
+    },
     generatorEnabled: true,
     generatorCapacityKw: 5,
     generatorEnergyKwh: 900,
@@ -321,6 +333,8 @@ offGridState.results = {
     pvBatteryCriticalCoverage: 0.91,
     totalLoadCoverage: 0.96,
     criticalLoadCoverage: 0.99,
+    criticalCoverageWithGenerator: 0.99,
+    criticalCoverageWithoutGenerator: 0.91,
     minimumSoc: 0.1,
     averageSoc: 0.48,
     batteryMaxChargeKw: 4,
@@ -338,16 +352,22 @@ offGridState.results = {
     provisional: true,
     synthetic: false,
     feasibilityNotGuaranteed: true,
+    fieldStressAnalysis: {
+      worstCriticalScenario: { key: 'combined-design-stress', label: 'Combined design stress', criticalLoadCoverage: 0.88, unmetCriticalKwh: 110 },
+      worstTotalScenario: { key: 'load-growth', label: 'Load growth', totalLoadCoverage: 0.84, unmetLoadKwh: 640 },
+      maxUnmetCriticalScenario: { key: 'combined-design-stress', label: 'Combined design stress', criticalLoadCoverage: 0.88, unmetCriticalKwh: 110 }
+    },
     dispatchVersion: 'OGD-2026.04-v1.1'
   }
 };
 window.state = offGridState;
 renderEngReport();
-assert.match(reportBody.innerHTML, /PV-served load share \(synthetic dispatch\)/);
+assert.match(reportBody.innerHTML, /real hourly PV 8760/i);
 assert.match(reportBody.innerHTML, /surplus PV is not monetized/);
 assert.match(reportBody.innerHTML, /synthetic 8760 dispatch pre-check/);
 assert.match(reportBody.innerHTML, /PV\+BESS total coverage/);
 assert.match(reportBody.innerHTML, /Generator CAPEX/);
+assert.match(reportBody.innerHTML, /Weakest critical-load scenario/i);
 assert.doesNotMatch(reportBody.innerHTML, /Grid Export \/ Settlement/);
 assert.doesNotMatch(reportBody.innerHTML, /Annual export/);
 
@@ -369,6 +389,9 @@ assert.equal(proposalEn.offGridL2.dispatchType, 'hourly-8760-dispatch');
 assert.equal(proposalEn.offGridL2.generatorCapex, 65000);
 assert.equal(proposalEn.offGridL2.pvBatteryLoadCoverage, 0.72);
 assert.equal(proposalEn.offGridL2.inverterAcLimitKw, 5);
+assert.equal(proposalEn.offGridL2.fieldDataState, 'field-input-ready');
+assert.equal(proposalEn.offGridL2.dataLineage.production.realHourly, true);
+assert.equal(proposalEn.system.dataLineage.fieldDataState, 'field-input-ready');
 
 const crmEn = buildCrmLeadExport(window.state, window.state.results);
 assert.equal(crmEn.display.language, 'en');
@@ -376,6 +399,7 @@ assert.equal(crmEn.display.productName, 'Solar Rota');
 assert.equal(crmEn.display.quoteReadiness, 'Not quote-ready');
 assert.match(crmEn.display.blockers.join(' '), /PVGIS live data is unavailable/);
 assert.deepEqual(crmEn.qualification.blockers, window.state.results.quoteReadiness.blockers);
+assert.equal(crmEn.qualification.offgridFieldDataState, 'field-input-ready');
 
 const pdfText = [];
 class FakePdf {

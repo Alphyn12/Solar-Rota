@@ -7,11 +7,14 @@ import {
   MONTH_WEIGHTS, INVERTER_TYPES, HEAT_PUMP_DATA, HOURLY_SOLAR_PROFILE
 } from './data.js';
 import {
-  METHODOLOGY_VERSION, PVGIS_LOSS_PARAM, buildTariffModel, calcIRR,
+  METHODOLOGY_VERSION, PVGIS_LOSS_PARAM, buildTariffModel,
+  buildHourlySimulationOptions,
   calculateEVLoad, calculateHeatPumpLoad, calculateSystemLayout,
-  combineHourlyLoads, computeFinancialTable, detectCalculationWarnings,
+  combineHourlyLoads, detectCalculationWarnings,
+  estimateSolarCapex, evaluateProjectEconomics,
   getMonthlyLoadKwh, buildBaseHourlyLoad8760, simulateBatteryOnHourlySummary,
-  simulateHourlyEnergy, resolveTaxTreatment, resolveProductionTemperatureAdjustment,
+  simulateHourlyEnergy, resolveAnnualOperatingCosts,
+  resolveTaxTreatment, resolveProductionTemperatureAdjustment,
   sumMonthlyArrays, normalizeMonthlyProductionToAnnual
 } from './calc-core.js';
 import { buildQuoteReadiness } from './turkey-regulation.js';
@@ -231,6 +234,17 @@ function modelBatteryCost(battery) {
   if (Number.isFinite(modelPrice) && modelPrice > 0) return Math.round(modelPrice);
   const capacity = Math.max(0, Number(battery?.capacity ?? model?.capacity) || 0);
   return Math.round(capacity * 8000);
+}
+
+function offgridBatteryChemistryDefaults(chemistry = '') {
+  const key = String(chemistry || '').trim().toUpperCase();
+  if (key === 'NMC') {
+    return { reservePct: 15, eolCapacityPct: 75, eolEfficiencyLossPct: 5, replacementFractionPct: 85 };
+  }
+  if (key === 'AGM' || key === 'GEL' || key === 'LEAD_ACID' || key === 'LEAD-ACID') {
+    return { reservePct: 20, eolCapacityPct: 70, eolEfficiencyLossPct: 8, replacementFractionPct: 95 };
+  }
+  return { reservePct: 10, eolCapacityPct: 80, eolEfficiencyLossPct: 3, replacementFractionPct: 80 };
 }
 
 function classifyOutputConfidence({ usedFallback, warnings = [], state }) {
@@ -504,7 +518,7 @@ export async function runCalculation() {
           lang: (typeof window !== 'undefined' && window._currentLang) || 'tr',
           backendProxyUrl,
           proxyFirst: true,
-          includeHourly: state.scenarioKey === 'on-grid'
+          includeHourly: state.scenarioKey === 'on-grid' || state.scenarioKey === 'off-grid'
         }
       );
       pvgisFetchStatus = fetchResult.fetchStatus;
@@ -676,11 +690,24 @@ export async function runCalculation() {
     if (banner) banner.style.display = 'none';
   }
   monthlyData = normalizeMonthlyProductionToAnnual(monthlyData, adjustedEnergy);
-  const offgridRealPvHourly = state.scenarioKey === 'off-grid'
+  const userOffgridPvHourly = state.scenarioKey === 'off-grid'
     ? (completeHourlyArray(state.offgridPvHourly8760) || completeHourlyArray(state.hourlyProduction8760))
     : null;
+  const derivedOffgridPvHourly = state.scenarioKey === 'off-grid' && pvgisHourlyProduction8760
+    ? normalizeHourlyProductionToAnnual(pvgisHourlyProduction8760, adjustedEnergy)
+    : null;
+  const offgridRealPvHourly = state.scenarioKey === 'off-grid'
+    ? (userOffgridPvHourly || derivedOffgridPvHourly)
+    : null;
   const offgridRealPvSource = offgridRealPvHourly
-    ? (state.offgridPvHourlySource || state.hourlyProductionSource || 'user-supplied-real-hourly-pv')
+    ? (userOffgridPvHourly
+        ? (state.offgridPvHourlySource || state.hourlyProductionSource || 'user-supplied-real-hourly-pv')
+        : 'pvgis-seriescalc-hourly')
+    : null;
+  const offgridRealPvSourceLabel = offgridRealPvHourly
+    ? (userOffgridPvHourly
+        ? (state.offgridPvHourlySourceLabel || state.hourlyProductionSourceLabel || 'Real hourly PV 8760')
+        : 'PVGIS seriescalc hourly 8760')
     : null;
   if (offgridRealPvHourly) {
     adjustedEnergy = offgridRealPvHourly.reduce((sum, value) => sum + value, 0);
@@ -776,31 +803,27 @@ export async function runCalculation() {
   // İnverter tipi maliyeti
   const invTypeKey = state.inverterType || 'string';
   const invType = INVERTER_TYPES[invTypeKey];
-  const invPrices = invType.pricePerKWp;
-  const invUnit = systemPower < 10 ? invPrices.lt10 : systemPower < 50 ? invPrices.lt50 : invPrices.gt50;
-
-  const panelPricePerWatt = panel.pricePerWatt;
+  const costBreakdownBase = estimateSolarCapex({
+    systemPowerKwp: systemPower,
+    panel,
+    inverterTypeKey: invTypeKey,
+    panelKdvRate: 0,
+    nonPanelKdvRate: 0.20
+  });
+  const invUnit = costBreakdownBase.invUnit;
   const invUnitEffective = invUnit;
-  const mountingPerKwp = 2200;
-  const dcCablePerKwp = 600;
-  const acElecPerKwp = 900;
-  const laborPerKwp = 1800;
-  const permitCost = systemPower < 5 ? 8000 : systemPower < 10 ? 6000 : systemPower < 20 ? 5000 : 4000;
-  // Law 7456/2023: solar panels 0% KDV, other components 20%
-  const nonPanelKdvRate = 0.20;
-  const panelKdvRate    = 0.00;
-
-  const panelCost   = systemPower * 1000 * panelPricePerWatt;
-  const inverterCost= systemPower * invUnitEffective;
-  const mountingCost= systemPower * mountingPerKwp;
-  const dcCableCost = systemPower * dcCablePerKwp;
-  const acElecCost  = systemPower * acElecPerKwp;
-  const laborCost   = systemPower * laborPerKwp;
-  const subtotal    = panelCost + inverterCost + mountingCost + dcCableCost + acElecCost + laborCost + permitCost;
-  const nonPanelSubtotal = subtotal - panelCost;
-  const kdv         = panelCost * panelKdvRate + nonPanelSubtotal * nonPanelKdvRate;
-  const kdvRate     = subtotal > 0 ? kdv / subtotal : 0; // blended rate, used downstream for display
-  let solarCost     = subtotal + kdv;
+  const panelCost = costBreakdownBase.panelCost;
+  const inverterCost = costBreakdownBase.inverterCost;
+  const mountingCost = costBreakdownBase.mountingCost;
+  const dcCableCost = costBreakdownBase.dcCableCost;
+  const acElecCost = costBreakdownBase.acElecCost;
+  const laborCost = costBreakdownBase.laborCost;
+  const permitCost = costBreakdownBase.permitCost;
+  const subtotal = costBreakdownBase.subtotal;
+  const nonPanelSubtotal = costBreakdownBase.nonPanelSubtotal;
+  const kdv = costBreakdownBase.solarKdv;
+  const kdvRate = costBreakdownBase.kdvRate;
+  let solarCost = costBreakdownBase.solarCost;
 
   let tariffModel = buildTariffModel(state);
   let tariff = tariffModel.importRate || 7.16;
@@ -870,29 +893,24 @@ export async function runCalculation() {
     heatPumpMetrics = calculateHeatPumpMetrics(state.heatPump, tariff, heatPumpLoad);
   }
 
-  const hourlySummaryRaw = simulateHourlyEnergy(monthlyData, monthlyLoad, {
-    tariffType: state.tariffType,
-    loadProfileKey: state.usageProfile || state.onGridUsageProfile,
+  const hourlySummaryRaw = simulateHourlyEnergy(monthlyData, monthlyLoad, buildHourlySimulationOptions({
+    state,
+    tariffModel,
     hourlyLoad8760,
-    hourlyProduction8760: state.scenarioKey === 'off-grid' ? offgridRealPvHourly : ongridHourlyProduction8760,
-    exportPolicy: tariffModel.exportCompensationPolicy,
-    previousYearConsumptionKwh: state.previousYearConsumptionKwh,
-    currentYearConsumptionKwh: state.currentYearConsumptionKwh,
-    sellableExportCapKwh: state.sellableExportCapKwh,
-    settlementDate: state.settlementDate
-  });
+    hourlyProduction8760: state.scenarioKey === 'off-grid' ? offgridRealPvHourly : ongridHourlyProduction8760
+  }));
 
   let bessMetrics = null;
   let batterySummary = null;
   let batteryCostVal = 0;
   let offgridL2Results = null;
 
-  if (state.scenarioKey === 'off-grid' && state.batteryEnabled) {
+  if (state.scenarioKey === 'off-grid') {
     // ── Off-Grid Level 2 Dispatch ─────────────────────────────────────────────
     const offgridPvProfile = buildOffgridPvDispatchProfile({
       realHourlyPv8760: offgridRealPvHourly,
       source: offgridRealPvSource,
-      sourceLabel: offgridRealPvHourly ? 'Real hourly PV 8760' : null,
+      sourceLabel: offgridRealPvHourly ? offgridRealPvSourceLabel : null,
       fallbackHourlyRows: hourlySummaryRaw.hourly8760,
       fallbackSource: 'monthly-production-derived-synthetic-8760',
       fallbackSourceLabel: authoritativeBackend ? authoritativeSourceMeta.source : getPvgisSourceLabel(aggregateFetchStatus, currentLang),
@@ -900,14 +918,34 @@ export async function runCalculation() {
     });
     const pvHourly = offgridPvProfile.pvHourly8760;
 
+    const offgridBatteryEnabled = !!state.batteryEnabled;
     const batt = state.battery || {};
-    const battCap = Math.max(0, Number(batt.capacity) || 0);
+    const chemistryDefaults = offgridBatteryChemistryDefaults(batt.chemistry);
+    const battCap = offgridBatteryEnabled ? Math.max(0, Number(batt.capacity) || 0) : 0;
     const battDod = Math.max(0, Math.min(1, Number(batt.dod) || 0.9));
     const battEff = Math.max(0.5, Math.min(1, Number(batt.efficiency) || 0.92));
     const usableCapKwh = battCap * battDod;
-    const defaultBatteryPowerKw = Math.max(0.5, usableCapKwh * 0.5);
-    const batteryMaxChargeKw = Math.max(0.1, Number(batt.maxChargePowerKw ?? batt.maxChargeKw ?? state.offgridBatteryMaxChargeKw ?? defaultBatteryPowerKw) || defaultBatteryPowerKw);
-    const batteryMaxDischargeKw = Math.max(0.1, Number(batt.maxDischargePowerKw ?? batt.maxDischargeKw ?? state.offgridBatteryMaxDischargeKw ?? defaultBatteryPowerKw) || defaultBatteryPowerKw);
+    const batteryReservePct = offgridBatteryEnabled
+      ? Math.max(0, Math.min(50, Number(state.offgridBatteryReservePct ?? batt.socReservePct ?? chemistryDefaults.reservePct) || chemistryDefaults.reservePct))
+      : 0;
+    const batteryChargeEfficiencyPct = Number(state.offgridBatteryChargeEfficiencyPct ?? batt.chargeEfficiencyPct ?? batt.chargeEfficiency);
+    const batteryDischargeEfficiencyPct = Number(state.offgridBatteryDischargeEfficiencyPct ?? batt.dischargeEfficiencyPct ?? batt.dischargeEfficiency);
+    const batteryChargeEfficiency = Number.isFinite(batteryChargeEfficiencyPct)
+      ? Math.max(0.5, Math.min(1, batteryChargeEfficiencyPct > 1 ? batteryChargeEfficiencyPct / 100 : batteryChargeEfficiencyPct))
+      : null;
+    const batteryDischargeEfficiency = Number.isFinite(batteryDischargeEfficiencyPct)
+      ? Math.max(0.5, Math.min(1, batteryDischargeEfficiencyPct > 1 ? batteryDischargeEfficiencyPct / 100 : batteryDischargeEfficiencyPct))
+      : null;
+    const batteryEolCapacityPct = Math.max(50, Math.min(100, Number(state.offgridBatteryEolCapacityPct ?? batt.eolCapacityPct ?? chemistryDefaults.eolCapacityPct) || chemistryDefaults.eolCapacityPct));
+    const batteryEolEfficiencyLossPct = Math.max(0, Math.min(30, Number(state.offgridBatteryEolEfficiencyLossPct ?? batt.eolEfficiencyLossPct ?? chemistryDefaults.eolEfficiencyLossPct) || chemistryDefaults.eolEfficiencyLossPct));
+    const batteryReplacementFractionPct = Math.max(0, Math.min(150, Number(state.offgridBatteryReplacementFractionPct ?? batt.replacementFractionPct ?? chemistryDefaults.replacementFractionPct) || chemistryDefaults.replacementFractionPct));
+    const defaultBatteryPowerKw = usableCapKwh > 0 ? Math.max(0.5, usableCapKwh * 0.5) : 0;
+    const batteryMaxChargeKw = usableCapKwh > 0
+      ? Math.max(0.1, Number(batt.maxChargePowerKw ?? batt.maxChargeKw ?? state.offgridBatteryMaxChargeKw ?? defaultBatteryPowerKw) || defaultBatteryPowerKw)
+      : 0;
+    const batteryMaxDischargeKw = usableCapKwh > 0
+      ? Math.max(0.1, Number(batt.maxDischargePowerKw ?? batt.maxDischargeKw ?? state.offgridBatteryMaxDischargeKw ?? defaultBatteryPowerKw) || defaultBatteryPowerKw)
+      : 0;
     const inverterAcLimitKw = Math.max(
       0.5,
       Number(state.offgridInverterAcKw ?? state.inverterAcKw)
@@ -918,16 +956,23 @@ export async function runCalculation() {
     const batteryConfig = {
       usableCapacityKwh: usableCapKwh,
       efficiency: battEff,
-      socReserveKwh: usableCapKwh * 0.10,
-      initialSocKwh: usableCapKwh * 0.10,
+      chargeEfficiency: batteryChargeEfficiency,
+      dischargeEfficiency: batteryDischargeEfficiency,
+      socReserveKwh: usableCapKwh * (batteryReservePct / 100),
+      initialSocKwh: usableCapKwh * (batteryReservePct / 100),
       maxChargePowerKw: batteryMaxChargeKw,
-      maxDischargePowerKw: batteryMaxDischargeKw
+      maxDischargePowerKw: batteryMaxDischargeKw,
+      chemistry: batt.chemistry || null,
+      eolCapacityPct: batteryEolCapacityPct,
+      eolEfficiencyLossPct: batteryEolEfficiencyLossPct
     };
 
     const generatorConfig = {
       enabled: !!(state.offgridGeneratorEnabled),
       capacityKw: Math.max(0, Number(state.offgridGeneratorKw) || 0),
-      fuelCostPerKwh: Math.max(0, Number(state.offgridGeneratorFuelCostPerKwh) || 0)
+      fuelCostPerKwh: Math.max(0, Number(state.offgridGeneratorFuelCostPerKwh) || 0),
+      minLoadRatePct: Math.max(0, Math.min(100, Number(state.offgridGeneratorMinLoadRatePct) || 30)),
+      chargeBatteryEnabled: !!state.offgridGeneratorChargeBatteryEnabled
     };
 
     // Yük profili oluştur. Basit mod profil/günlük kWh kullanır; ileri modda gerçek 8760 yük cihaz listesinin önüne geçer.
@@ -950,7 +995,16 @@ export async function runCalculation() {
       loadPeakKw8760: offgridLoadProfile.hourlyPeakKw8760,
       criticalPeakKw8760: offgridLoadProfile.criticalPeakKw8760,
       inverterAcLimitKw,
-      inverterSurgeMultiplier
+      inverterSurgeMultiplier,
+      autonomyThresholdPct: Math.max(0, Math.min(25, Number(state.offgridAutonomyThresholdPct) || 1)),
+      generatorStartSocPct: Math.max(0, Number(state.offgridGeneratorStartSocPct) || 0),
+      generatorStopSocPct: Math.max(0, Number(state.offgridGeneratorStopSocPct) || 0),
+      generatorMaxHoursPerDay: Number.isFinite(Number(state.offgridGeneratorMaxHoursPerDay))
+        ? Math.max(0, Number(state.offgridGeneratorMaxHoursPerDay) || 0)
+        : null,
+      generatorMinLoadRatePct: Math.max(0, Math.min(100, Number(state.offgridGeneratorMinLoadRatePct) || 30)),
+      generatorChargeBatteryEnabled: !!state.offgridGeneratorChargeBatteryEnabled,
+      generatorStrategy: state.offgridGeneratorStrategy || 'critical-backup'
     };
 
     // R1: 2-geçişli SOC başlangıcı — ısınma geçişi Ocak artefaktını giderir
@@ -1004,8 +1058,8 @@ export async function runCalculation() {
       : null;
 
     const batteryModel = BATTERY_MODELS[batt.model];
-    const battLifetimeYears = Number(batt.warranty || batteryModel?.warranty) || 10;
-    const battCapexForLifecycle = modelBatteryCost(batt);
+    const battLifetimeYears = offgridBatteryEnabled ? (Number(batt.warranty || batteryModel?.warranty) || 10) : 0;
+    const battCapexForLifecycle = offgridBatteryEnabled ? modelBatteryCost(batt) : 0;
 
     // L2 sonuç nesnesi oluştur
     offgridL2Results = buildOffgridResults(
@@ -1023,9 +1077,15 @@ export async function runCalculation() {
         generatorSizePreset: state.offgridGeneratorSizePreset || 'auto',
         generatorReservePct: Math.max(0, Number(state.offgridGeneratorReservePct) || 0),
         generatorStartSocPct: Math.max(0, Number(state.offgridGeneratorStartSocPct) || 0),
+        generatorStopSocPct: Math.max(0, Number(state.offgridGeneratorStopSocPct) || 0),
         generatorMaxHoursPerDay: Math.max(0, Number(state.offgridGeneratorMaxHoursPerDay) || 0),
+        generatorMinLoadRatePct: Math.max(0, Math.min(100, Number(state.offgridGeneratorMinLoadRatePct) || 30)),
+        generatorChargeBatteryEnabled: !!state.offgridGeneratorChargeBatteryEnabled,
+        generatorOverhaulHours: Math.max(0, Number(state.offgridGeneratorOverhaulHours) || 0),
+        generatorOverhaulCostTry: Math.max(0, Number(state.offgridGeneratorOverhaulCostTry) || 0),
         batteryCapexTry: battCapexForLifecycle,
         batteryLifetimeYears: battLifetimeYears,
+        batteryReplacementFractionPct: batteryReplacementFractionPct,
         weatherScenario: weatherLevel,
         productionProfile: offgridPvProfile,
         batteryConfig: batteryConfig,
@@ -1100,10 +1160,17 @@ export async function runCalculation() {
       hourly8760: normalDispatch.hourly8760
     };
 
-    bessMetrics = calculateBatteryMetrics(adjustedEnergy, hourlySummaryRaw.annualLoad / 365, state.battery);
+    bessMetrics = calculateBatteryMetrics(adjustedEnergy, hourlySummaryRaw.annualLoad / 365, {
+      ...batt,
+      capacity: battCap,
+      dod: battCap > 0 ? battDod : 0,
+      efficiency: battEff
+    });
     bessMetrics.gridIndependence = (normalDispatch.solarBatteryLoadCoverage * 100).toFixed(1);
     bessMetrics.totalLoadCoverageWithGenerator = (normalDispatch.totalLoadCoverage * 100).toFixed(1);
+    bessMetrics.pvBatteryCriticalCoverage = (normalDispatch.solarBatteryCriticalCoverage * 100).toFixed(1);
     bessMetrics.criticalLoadCoverage = (normalDispatch.solarBatteryCriticalCoverage * 100).toFixed(1);
+    bessMetrics.criticalCoverageWithGenerator = (normalDispatch.criticalLoadCoverage * 100).toFixed(1);
     bessMetrics.criticalLoadCoverageWithGenerator = (normalDispatch.criticalLoadCoverage * 100).toFixed(1);
     // H1: Gerçek gece kapsama hesabı — gece saatlerindeki yükün batarya ile karşılanma oranı
     (function () {
@@ -1129,7 +1196,7 @@ export async function runCalculation() {
     bessMetrics.batteryMaxChargeKw = batteryMaxChargeKw;
     bessMetrics.batteryMaxDischargeKw = batteryMaxDischargeKw;
     bessMetrics.inverterAcLimitKw = inverterAcLimitKw;
-    batteryCostVal = bessMetrics.batteryCost;
+    batteryCostVal = offgridBatteryEnabled ? bessMetrics.batteryCost : 0;
 
   } else if (state.batteryEnabled) {
     // ── On-grid / Hibrit Batarya — DEĞİŞMEDİ ─────────────────────────────────
@@ -1164,6 +1231,7 @@ export async function runCalculation() {
   });
   const totalCost = grossTotalCost;
   const financialCostBasis = taxTreatment.financialCostBasis;
+  const solarFinancialCostBasis = Math.max(0, solarCost - (taxTreatment.recoverableKdv || 0));
 
   let nmMetrics = calculateNMMetrics(
     adjustedEnergy, systemPower, hourlySummaryRaw.annualLoad / 365,
@@ -1180,17 +1248,28 @@ export async function runCalculation() {
     ? tariffModel.exportRate
     : 0;
 
-  const compensatedValueEnergy = state.netMeteringEnabled
-    ? (nmMetrics.compensatedConsumptionEnergy ?? nmMetrics.selfConsumedEnergy)
-    : nmMetrics.selfConsumedEnergy;
+  const offgridServedEnergyPreDegradation = state.scenarioKey === 'off-grid'
+    ? (batterySummary?.totalSelfConsumption ?? nmMetrics.selfConsumedEnergy)
+    : null;
+  const compensatedValueEnergy = state.scenarioKey === 'off-grid'
+    ? offgridServedEnergyPreDegradation
+    : state.netMeteringEnabled
+      ? (nmMetrics.compensatedConsumptionEnergy ?? nmMetrics.selfConsumedEnergy)
+      : nmMetrics.selfConsumedEnergy;
   const grossAnnualSavingsPreDegradation = compensatedValueEnergy * effectiveSavingsTariff
     + (state.netMeteringEnabled ? nmMetrics.paidGridExport * exportRate : 0);
   const annualSavings = grossAnnualSavingsPreDegradation;
   const co2Savings = adjustedEnergy * 0.442 / 1000;
   const trees = Math.round(co2Savings * 1000 / 21);
 
-  const annualOMCost = state.omEnabled ? Math.round(solarCost * (state.omRate / 100)) : 0;
-  const annualInsurance = state.omEnabled ? Math.round(solarCost * (state.insuranceRate / 100)) : 0;
+  const operatingCosts = resolveAnnualOperatingCosts({
+    costBasis: solarFinancialCostBasis,
+    omEnabled: state.omEnabled,
+    omRate: state.omRate,
+    insuranceRate: state.insuranceRate
+  });
+  const annualOMCost = operatingCosts.annualOMCost;
+  const annualInsurance = operatingCosts.annualInsurance;
   const inverterLifetime = invType.lifetime || 12;
   const inverterReplaceCost = state.omEnabled ? Math.round(inverterCost * 1.1) : 0;
   const batteryModel = BATTERY_MODELS[state.battery?.model];
@@ -1202,7 +1281,7 @@ export async function runCalculation() {
   const annualGeneratorKwh  = offgridL2Results ? (offgridL2Results.generatorKwh || 0) : 0;
   const generatorFuelCostPerKwh = state.offgridGeneratorEnabled
     ? Math.max(0, Number(state.offgridGeneratorFuelCostPerKwh) || 0) : 0;
-  const financial = computeFinancialTable({
+  const economicSummary = evaluateProjectEconomics({
     annualEnergy: adjustedEnergy,
     hourlySummary: hourlySummaryRaw,
     batterySummary,
@@ -1223,38 +1302,23 @@ export async function runCalculation() {
     // Yakıt gideri expenses içinde kalır; jeneratör kWh ayrıca tasarruf olarak kredilendirilmez.
     annualGeneratorKwh,
     generatorAlternativeCostPerKwh: 0,
-    generatorFuelCostPerKwh
+    generatorFuelCostPerKwh,
+    scenarioKey: state.scenarioKey
   });
-  const yearlyTable = financial.rows;
-  const displayAnnualSavings = financial.rows[0]?.savings || annualSavings;
-  const firstYearGrossSavings = financial.rows[0]?.savings ?? Math.round(annualSavings);
-  const firstYearNetCashFlow = financial.rows[0]?.netCashFlow ?? Math.round(annualSavings - annualOMCost - annualInsurance);
-  const paybackYear = financial.paybackYear;
-  const discountedPaybackYear = financial.discountedPaybackYear;
-  const grossSimplePaybackYear = financial.grossSimplePaybackYear || 0;
-  const netSimplePaybackYear = financial.netSimplePaybackYear || 0;
-  const totalExpenses25y = financial.totalExpenses25y;
-  const npvTotal = financial.projectNPV;
-  const roi = financial.roi;
-  const irr = calcIRR([-financialCostBasis, ...yearlyTable.map(y => y.netCashFlow)]);
-
-  let lcoeCostSum = financialCostBasis;
-  let lcoeEnergySum = 0;
-  let compensatedLcoeEnergySum = 0;
-  yearlyTable.forEach(y => {
-    const df = Math.pow(1 + discountRate, y.year);
-    lcoeCostSum += (y.expenses || 0) / df;
-    const deliveredEnergyForLcoe = state.scenarioKey === 'off-grid'
-      ? (y.selfConsumptionKwh || y.compensatedConsumptionKwh || 0)
-      : y.energy;
-    lcoeEnergySum += deliveredEnergyForLcoe / df;
-    const compensatedEnergyForLcoe = state.scenarioKey === 'off-grid'
-      ? deliveredEnergyForLcoe
-      : (Number(y.compensatedConsumptionKwh) || 0) + (Number(y.paidExportKwh) || 0);
-    compensatedLcoeEnergySum += compensatedEnergyForLcoe / df;
-  });
-  const lcoe = lcoeEnergySum > 0 ? Number((lcoeCostSum / lcoeEnergySum).toFixed(2)) : null;
-  const compensatedLcoe = compensatedLcoeEnergySum > 0 ? Number((lcoeCostSum / compensatedLcoeEnergySum).toFixed(2)) : null;
+  const yearlyTable = economicSummary.yearlyTable;
+  const displayAnnualSavings = yearlyTable[0]?.savings || annualSavings;
+  const firstYearGrossSavings = yearlyTable[0]?.savings ?? Math.round(annualSavings);
+  const firstYearNetCashFlow = yearlyTable[0]?.netCashFlow ?? Math.round(annualSavings - annualOMCost - annualInsurance);
+  const paybackYear = economicSummary.paybackYear;
+  const discountedPaybackYear = economicSummary.discountedPaybackYear;
+  const grossSimplePaybackYear = economicSummary.grossSimplePaybackYear || 0;
+  const netSimplePaybackYear = economicSummary.netSimplePaybackYear || 0;
+  const totalExpenses25y = economicSummary.totalExpenses25y;
+  const npvTotal = economicSummary.projectNPV;
+  const roi = economicSummary.roi;
+  const irr = economicSummary.irr;
+  const lcoe = economicSummary.lcoe;
+  const compensatedLcoe = economicSummary.compensatedLcoe;
 
   const ysp  = systemPower > 0 ? (adjustedEnergy / systemPower).toFixed(0) : 0;
   const cf   = systemPower > 0 ? ((adjustedEnergy / (systemPower * 8760)) * 100).toFixed(1) : 0;
@@ -1286,14 +1350,15 @@ export async function runCalculation() {
     panelCount, systemPower, annualEnergy: Math.round(adjustedEnergy),
     annualSavings: Math.round(displayAnnualSavings), totalCost: Math.round(totalCost),
     grossAnnualSavingsPreDegradation: Math.round(grossAnnualSavingsPreDegradation),
+    grossAnnualSavingsEnergyKwh: Math.round(compensatedValueEnergy || 0),
     firstYearGrossSavings: Math.round(firstYearGrossSavings),
     firstYearNetCashFlow: Math.round(firstYearNetCashFlow),
-    paybackYear, simplePaybackYear: financial.simplePaybackYear,
-    cumulativeNetPaybackYear: financial.cumulativeNetPaybackYear,
+    paybackYear, simplePaybackYear: economicSummary.simplePaybackYear,
+    cumulativeNetPaybackYear: economicSummary.cumulativeNetPaybackYear,
     grossSimplePaybackYear: grossSimplePaybackYear ? Number(grossSimplePaybackYear.toFixed(2)) : 0,
     netSimplePaybackYear: netSimplePaybackYear ? Number(netSimplePaybackYear.toFixed(2)) : 0,
     discountedPaybackYear,
-    npvTotal: Math.round(npvTotal), discountedCashFlow: Math.round(financial.discountedCashFlow), roi: roi.toFixed(1),
+    npvTotal: Math.round(npvTotal), discountedCashFlow: Math.round(economicSummary.discountedCashFlow), roi: roi.toFixed(1),
     co2Savings: co2Savings.toFixed(2), trees, monthlyData,
     tempLoss: (tempLoss * 100).toFixed(2), pr: (pr * 100).toFixed(1),
     temperatureAdjustment: authoritativeTempAdjustment,
@@ -1336,6 +1401,7 @@ export async function runCalculation() {
     },
     yearlyTable,
     annualOMCost, annualInsurance, inverterReplaceCost, inverterLifetime, batteryReplaceCost, batteryLifetime, totalExpenses25y,
+    omCostBasis: Math.round(operatingCosts.costBasis),
     lidFactor: (lidFactor * 100).toFixed(1),
     inverterType: invTypeKey,
     inverterEfficiency: (weightedInverterEfficiency * 100).toFixed(1),
@@ -1472,6 +1538,52 @@ export async function runCalculation() {
         || 'Faz 6 periyodik revalidasyon kanıtları eksik.';
       results.calculationWarnings.push(`Off-grid garanti revalidasyon kapısı kapalı: ${firstRevalidationBlocker}`);
     }
+    const hasRealPvHourly = !!results.offgridL2Results.productionDispatchMetadata?.hasRealHourlyProduction;
+    const hasRealLoadHourly = !!results.offgridL2Results.hasRealHourlyLoad || (Array.isArray(state.hourlyConsumption8760) && state.hourlyConsumption8760.length >= 8760);
+    const hasRealCriticalLoadHourly = (Array.isArray(state.offgridCriticalLoad8760) && state.offgridCriticalLoad8760.length >= 8760)
+      || (Array.isArray(state.criticalLoad8760) && state.criticalLoad8760.length >= 8760);
+    const phase1Ready = !!results.offgridL2Results.fieldGuaranteeReadiness?.phase1Ready;
+    const phase2Ready = !!results.offgridL2Results.fieldEvidenceGate?.phase2Ready;
+    const phase3Ready = !!results.offgridL2Results.fieldModelMaturityGate?.phase3Ready;
+    const phase4Ready = !!results.offgridL2Results.fieldAcceptanceGate?.phase4Ready;
+    const phase6Ready = !!results.offgridL2Results.fieldGuaranteeReady;
+    let fieldDataState = 'synthetic';
+    if (phase6Ready) fieldDataState = 'field-guarantee-ready';
+    else if (phase1Ready && phase2Ready && phase3Ready && phase4Ready) fieldDataState = 'accepted-hourly-evidence';
+    else if (phase1Ready) fieldDataState = 'field-input-ready';
+    else if (hasRealPvHourly || hasRealLoadHourly || hasRealCriticalLoadHourly) fieldDataState = 'hybrid-hourly';
+    results.offgridL2Results.fieldDataState = fieldDataState;
+    results.offgridL2Results.dataLineage = {
+      version: 'GH-OFFGRID-LINEAGE-2026.04-v1',
+      fieldDataState,
+      production: {
+        source: results.offgridL2Results.productionSource || null,
+        sourceLabel: results.offgridL2Results.productionSourceLabel || null,
+        dispatchProfile: results.offgridL2Results.productionDispatchProfile || null,
+        realHourly: hasRealPvHourly,
+        fallback: !!results.offgridL2Results.productionFallback
+      },
+      load: {
+        source: results.offgridL2Results.loadSource || null,
+        mode: results.offgridL2Results.loadMode || null,
+        realHourly: hasRealLoadHourly
+      },
+      criticalLoad: {
+        realHourly: hasRealCriticalLoadHourly
+      },
+      economics: {
+        financialSavingsBasis: results.financialSavingsBasis || null,
+        authoritativeFinancialBasis: results.authoritativeFinancialBasis || null
+      },
+      gates: {
+        phase1Ready,
+        phase2Ready,
+        phase3Ready,
+        phase4Ready,
+        phase5Ready: !!results.offgridL2Results.fieldOperationGate?.phase5Ready,
+        phase6Ready
+      }
+    };
   }
   results.tariffSourceGovernance = buildTariffSourceGovernance(tariffModel, results.evidenceGovernance);
   if (results.tariffSourceGovernance.warning) results.calculationWarnings.push(results.tariffSourceGovernance.warning);

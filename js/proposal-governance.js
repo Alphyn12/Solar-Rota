@@ -275,6 +275,15 @@ export function calculateProposalConfidence({ state = {}, results = {}, quoteRea
   if (state.bomCommercials?.supplierQuoteState !== 'received') add(7, 'Tedarikçi teklif durumu alınmadı.');
   if (state.gridApplicationChecklist && !isGridChecklistComplete(state.gridApplicationChecklist)) add(8, 'Şebeke başvuru kontrol listesi eksik.');
   if (quoteReadiness?.blockers?.length) add(Math.min(20, quoteReadiness.blockers.length * 3), 'Quote-readiness blocker mevcut.');
+  if (state.scenarioKey === 'off-grid') {
+    const offgrid = results.offgridL2Results || {};
+    if (offgrid.fieldDataState === 'synthetic') add(18, 'Off-grid dispatch sentetik veri ağırlıklı.');
+    else if (offgrid.fieldDataState === 'hybrid-hourly') add(10, 'Off-grid dispatch kısmen gerçek saatlik veri kullanıyor.');
+    if (offgrid.fieldGuaranteeReadiness?.phase1Ready !== true) add(12, 'Faz 1 saha dispatch girdileri eksik.');
+    if (offgrid.fieldEvidenceGate?.phase2Ready !== true) add(10, 'Faz 2 saha kanıtları eksik.');
+    if (offgrid.fieldModelMaturityGate?.phase3Ready !== true) add(10, 'Faz 3 stres/model olgunluğu eksik.');
+    if (offgrid.fieldAcceptanceGate?.phase4Ready !== true) add(8, 'Faz 4 saha kabul kanıtları eksik.');
+  }
 
   const normalized = Math.max(0, Math.min(100, Math.round(score)));
   const level = normalized >= 85 && state.proposalApproval?.state === 'approved'
@@ -477,9 +486,11 @@ export function buildProposalGovernance(state = {}, results = {}) {
   const confidence = calculateProposalConfidence({ state, results, quoteReadiness });
   const approval = buildApprovalWorkflow(state, confidence);
   const bomCommercials = calculateBomCommercials(results.costBreakdown?.bom?.subtotal || results.costBreakdown?.subtotal || 0, state);
-  const firstYearCashFlow = results.yearlyTable?.[0]?.netCashFlow || results.annualSavings || 0;
-  const financing = calculateFinancingModel(results.totalCost || 0, firstYearCashFlow, state);
-  const maintenance = buildMaintenancePlan(results.totalCost || 0, state);
+  const firstYearCashFlow = results.yearlyTable?.[0]?.netCashFlow ?? results.firstYearNetCashFlow ?? results.annualSavings ?? 0;
+  const financingBasis = results.financialCostBasis || results.totalCost || 0;
+  const maintenanceBasis = results.omCostBasis || results.financialCostBasis || results.totalCost || 0;
+  const financing = calculateFinancingModel(financingBasis, firstYearCashFlow, state);
+  const maintenance = buildMaintenancePlan(maintenanceBasis, state);
   const gridChecklist = defaultGridApplicationChecklist(state.gridApplicationChecklist || {});
   const ledger = createAssumptionLedger(state, results);
   const previousRevision = Array.isArray(state.proposalRevisions) ? state.proposalRevisions[0] : null;

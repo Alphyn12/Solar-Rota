@@ -53,7 +53,7 @@ export const SKTT_LIMITS_2026 = {
   industrial: 15000,
   public_service: 15000,
   lighting: 15000,
-  agriculture: null,
+  agriculture: 150000000,
   custom: null
 };
 
@@ -274,11 +274,43 @@ export function applyExportCompensation(monthly, policy = {}) {
 
 export function buildQuoteReadiness({ state = {}, results = {}, tariffModel = null, evidenceGovernance = null } = {}) {
   const blockers = [];
+  const isOffGrid = state.scenarioKey === 'off-grid';
   const policy = tariffModel?.exportCompensationPolicy || {};
   const tariffSourceType = tariffModel?.tariffSourceType || state.tariffSourceType || 'manual';
   const evidenceRegistry = evidenceGovernance?.registry || {};
   const validationWarnings = evidenceGovernance?.validation?.warnings || [];
   const hasHourlyConsumptionProfile = Array.isArray(state.hourlyConsumption8760) && state.hourlyConsumption8760.length >= 8760;
+  const offgrid = results.offgridL2Results || {};
+  if (isOffGrid) {
+    if (results.usedFallback) blockers.push('PVGIS canlı veri yok; fallback üretim off-grid teklif adayı için kabul edilmez.');
+    if (!state.roofGeometry) blockers.push('Çatı geometrisi harita/saha çizimiyle doğrulanmadı.');
+    if (!state.quoteInputsVerified) blockers.push('Teklif varsayımları yetkili kullanıcı tarafından doğrulanmadı.');
+    if (!hasMeaningfulConsumptionEvidence(state) && !hasHourlyConsumptionProfile) blockers.push('Off-grid toplam yük kaynağı doğrulanmadı.');
+    if (state.bomCommercials?.supplierQuoteState !== 'received') blockers.push('Tedarikçi BOM teklifi alınmadı.');
+    if ((state.costSourceType || 'catalog') !== 'bom-verified') blockers.push('Tedarikçi BOM teklifi ile maliyet doğrulanmadı — katalog/manuel fiyat kullanılıyor.');
+    if (offgrid.fieldGuaranteeReadiness?.phase1Ready !== true) {
+      blockers.push(offgrid.fieldGuaranteeReadiness?.blockers?.[0] || 'Faz 1 saatlik saha dispatch girdileri eksik.');
+    }
+    if (offgrid.fieldEvidenceGate?.phase2Ready !== true) {
+      blockers.push(offgrid.fieldEvidenceGate?.blockers?.[0] || 'Faz 2 doğrulanmış saha kanıtları eksik.');
+    }
+    if (offgrid.fieldModelMaturityGate?.phase3Ready !== true) {
+      blockers.push(offgrid.fieldModelMaturityGate?.blockers?.[0] || 'Faz 3 stres/model olgunluğu eksik.');
+    }
+    if (offgrid.fieldAcceptanceGate?.phase4Ready !== true) {
+      blockers.push(offgrid.fieldAcceptanceGate?.blockers?.[0] || 'Faz 4 saha kabul kanıtları eksik.');
+    }
+    if (!isEvidenceComplete(evidenceGovernance)) {
+      blockers.push(...(evidenceGovernance?.validation?.blockers || ['Kanıt yönetimi kaydı tamamlanmadı.']));
+    }
+    if (Array.isArray(results.calculationWarnings) && results.calculationWarnings.length) blockers.push(...results.calculationWarnings);
+    return {
+      status: blockers.length ? 'not-quote-ready' : 'quote-ready',
+      blockers: [...new Set(blockers)],
+      warnings: [...new Set(evidenceGovernance?.validation?.warnings || [])],
+      version: TURKEY_REGULATORY_VERSION
+    };
+  }
   if (state.exportSettlementMode === 'auto' && !state.settlementDate) {
     blockers.push('SETTLEMENT_DATE_MISSING: Mahsuplaşma modu Otomatik seçiliyken sistem devreye alma tarihi girilmesi zorunludur.');
   }

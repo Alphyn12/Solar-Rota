@@ -109,6 +109,11 @@ def test_pvlib_engine_contract_when_available():
     assert len(data["production"]["hourlyEnergyKwh"]) == 8760
     assert data["losses"]["transpositionModel"] == "pvlib.irradiance.haydavies"
     assert data["losses"]["temperatureModel"].startswith("pvlib.sapm_cell")
+    assert data["production"]["confidence_level"] == "medium"
+    assert data["raw"]["confidenceLevel"] == "medium"
+    assert data["losses"]["ghiScaleFactor"] <= 1.0
+    assert data["losses"]["temperatureProfileModel"] == "city-adjusted-seasonal-sine"
+    assert data["losses"]["temperatureProfileCity"] == "Ankara"
 
 
 def test_financial_proposal_contract():
@@ -513,3 +518,19 @@ def test_psh_fallback_coastal_vs_inner_provinces():
     assert antalya > ankara, "Antalya (Mediterranean) must have higher PSH than Ankara"
     assert rize < ankara, "Rize (Black Sea) must have lower PSH than Ankara"
     assert sanliurfa > antalya, "Şanlıurfa (SE Anatolia) must have the highest PSH"
+
+
+def test_simple_engine_tilt_factor_matches_frontend_curve():
+    """Fallback tilt factor must match the shared frontend breakpoint curve."""
+    from backend.engines.simple_engine import _tilt_factor
+
+    expected = {
+        0: 0.78,
+        15: 0.94,
+        30: 1.00,
+        45: 0.97,
+        60: 0.87,
+        90: 0.62,
+    }
+    for tilt_deg, coeff in expected.items():
+        assert abs(_tilt_factor(tilt_deg) - coeff) < 1e-9

@@ -572,38 +572,6 @@ body:not(.landing-active) #landing-root { display: none !important; }
   background: #10B981;
 }
 
-/* ─────────────── TRUST BAND ─────────────── */
-.lp-trust {
-  padding: 30px 0;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-}
-.lp-trust-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 28px;
-  flex-wrap: wrap;
-}
-.lp-trust-label {
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-.lp-trust-slot {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.88rem;
-  color: var(--text-muted);
-  letter-spacing: -0.01em;
-  opacity: 0.75;
-  transition: opacity .2s, color .2s;
-}
-.lp-trust-slot:hover { opacity: 1; color: var(--text); }
-
 /* ─────────────── ÖZELLİKLER (6 kart) ─────────────── */
 .lp-feat-grid {
   display: grid;
@@ -949,6 +917,62 @@ body:not(.landing-active) #landing-root { display: none !important; }
   flex-wrap: wrap;
   font-size: 0.74rem;
   color: var(--text-muted);
+}
+
+/* ─────────────── SSS / FAQ ─────────────── */
+.lp-faq-wrap {
+  max-width: 860px;
+  margin: 0 auto;
+}
+.lp-faq-item {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 22px 4px;
+  cursor: pointer;
+}
+.lp-faq-item:first-child {
+  border-top: 1px solid var(--border-subtle);
+}
+.lp-faq-q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+.lp-faq-plus {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  flex-shrink: 0;
+  border: 1px solid rgba(245,158,11,0.32);
+  background: rgba(245,158,11,0.05);
+  transition: transform .3s ease, background .2s, color .2s;
+}
+.lp-faq-item.open .lp-faq-plus {
+  transform: rotate(45deg);
+  background: linear-gradient(135deg, var(--primary), #FCD34D);
+  color: #0F172A;
+  border-color: transparent;
+}
+.lp-faq-a {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .35s ease, margin-top .3s ease;
+}
+.lp-faq-item.open .lp-faq-a {
+  max-height: 320px;
+  margin-top: 14px;
 }
 
 /* ─────────────── BACK-TO-LANDING (uygulama içindeyken) ─────────────── */

@@ -4,12 +4,18 @@
 // ═══════════════════════════════════════════════════════════
 import { PANEL_TYPES, INVERTER_TYPES, PANEL_TYPE_OPTIONS, normalizePanelTypeKey } from './data.js';
 import {
+  buildHourlySimulationOptions,
   buildTariffModel,
   calculateSystemLayout,
-  computeFinancialTable,
+  estimateSolarCapex,
+  evaluateProjectEconomics,
+  normalizeHourlyProfileToAnnual,
+  normalizeMonthlyProductionToAnnual,
+  resolveAnnualOperatingCosts,
   resolveTaxTreatment,
   simulateHourlyEnergy
 } from './calc-core.js';
+import { localeTag } from './output-i18n.js';
 
 const SCENARIO_LETTERS = ['A', 'B', 'C'];
 const DEFAULT_SCENARIOS = [
@@ -24,7 +30,7 @@ function money(value) {
   const currency = state.displayCurrency || 'TRY';
   const usdToTry = Math.max(0.0001, Number(state.usdToTry) || 38.5);
   const converted = currency === 'USD' ? (Number(value) || 0) / usdToTry : (Number(value) || 0);
-  return converted.toLocaleString(currency === 'USD' ? 'en-US' : 'tr-TR', { maximumFractionDigits: 0 }) + ' ' + currency;
+  return converted.toLocaleString(currency === 'USD' ? 'en-US' : localeTag(), { maximumFractionDigits: 0 }) + ' ' + currency;
 }
 
 function moneyRate(value, unit = 'kWh') {
@@ -32,7 +38,7 @@ function moneyRate(value, unit = 'kWh') {
   const currency = state.displayCurrency || 'TRY';
   const usdToTry = Math.max(0.0001, Number(state.usdToTry) || 38.5);
   const converted = currency === 'USD' ? (Number(value) || 0) / usdToTry : (Number(value) || 0);
-  return converted.toLocaleString(currency === 'USD' ? 'en-US' : 'tr-TR', { maximumFractionDigits: currency === 'USD' ? 3 : 2 }) + ` ${currency}/${unit}`;
+  return converted.toLocaleString(currency === 'USD' ? 'en-US' : localeTag(), { maximumFractionDigits: currency === 'USD' ? 3 : 2 }) + ` ${currency}/${unit}`;
 }
 
 export function openComparison() {
@@ -93,6 +99,9 @@ export function runComparison() {
   if (!state.results) return;
 
   const r = state.results;
+  const baseHourlyProduction8760 = Array.isArray(r.hourlySummary?.hourly8760) && r.hourlySummary.hourly8760.length >= 8760
+    ? r.hourlySummary.hourly8760.slice(0, 8760).map(row => Math.max(0, Number(row?.production) || 0))
+    : null;
   const results = DEFAULT_SCENARIOS.map((_, idx) => {
     const panelKey = normalizePanelTypeKey(document.getElementById(`comp-panel-${idx}`)?.value || 'mono_perc');
     const invKey = document.getElementById(`comp-inv-${idx}`)?.value || 'string';
@@ -111,41 +120,54 @@ export function runComparison() {
     const bifacialFactor = (1 + scenarioBifacialGain) / (1 + baseBifacialGain);
     const annualEnergy = Math.round(r.annualEnergy * (systemPower / basePower) * inv.efficiency / (INVERTER_TYPES[state.inverterType || 'string']?.efficiency || 0.97) * bifacialFactor);
 
-    // Maliyet — Law 7456/2023: Solar PV modülleri KDV %0, diğer bileşenler %20
-    const invUnit = systemPower < 10 ? inv.pricePerKWp.lt10 : systemPower < 50 ? inv.pricePerKWp.lt50 : inv.pricePerKWp.gt50;
-    const panelCostComp = systemPower * 1000 * panel.pricePerWatt;
-    const nonPanelCostComp = systemPower * invUnit + systemPower * (2200 + 600 + 900 + 1800) + 5000;
-    const kdvComp = nonPanelCostComp * 0.20;
-    const estimatedGrossCost = Math.round(panelCostComp + nonPanelCostComp + kdvComp);
+    const costBreakdown = estimateSolarCapex({
+      systemPowerKwp: systemPower,
+      panel,
+      inverterTypeKey: invKey,
+      panelKdvRate: 0,
+      nonPanelKdvRate: 0.20
+    });
+    const invUnit = costBreakdown.invUnit;
+    const estimatedGrossCost = Math.round(costBreakdown.solarCost);
     const totalCost = customPrice || estimatedGrossCost;
     const taxTreatment = customPrice
       ? null
       : resolveTaxTreatment({
           grossTotalCost: estimatedGrossCost,
-          solarKdv: kdvComp,
+          solarKdv: costBreakdown.solarKdv,
           taxEnabled: state.taxEnabled,
           tax: state.tax
         });
     const financialCostBasis = Math.round(taxTreatment?.financialCostBasis ?? totalCost);
+    const operatingCosts = resolveAnnualOperatingCosts({
+      costBasis: customPrice ? totalCost : financialCostBasis,
+      omEnabled: state.omEnabled,
+      omRate: state.omRate,
+      insuranceRate: state.insuranceRate
+    });
 
-    const monthlyData = (r.monthlyData || []).map(v => Math.round((Number(v) || 0) * (annualEnergy / Math.max(r.annualEnergy, 1))));
+    const monthlyData = normalizeMonthlyProductionToAnnual(r.monthlyData || [], annualEnergy);
     const monthlyLoad = Array.isArray(r.monthlyLoad)
       ? r.monthlyLoad
       : new Array(12).fill(Math.max(0, Number(state.dailyConsumption) || 0) * 365 / 12);
-    const hourlySummary = simulateHourlyEnergy(monthlyData, monthlyLoad, {
-      tariffType: state.tariffType,
-      hourlyLoad8760: state.hourlyConsumption8760
-    });
     const tariffModel = buildTariffModel({
       ...state,
       annualConsumptionKwh: monthlyLoad.reduce((a, b) => a + b, 0),
+      annualProductionKwh: annualEnergy,
       annualPriceIncrease: r.annualPriceIncrease,
       discountRate: r.discountRate,
       tariff: r.tariff,
       exportTariff: r.tariffModel?.exportRate ?? state.exportTariff ?? r.tariff
     });
-    const annualOMCost = state.omEnabled ? Math.round(totalCost * ((Number(state.omRate) || 0) / 100)) : 0;
-    const annualInsurance = state.omEnabled ? Math.round(totalCost * ((Number(state.insuranceRate) || 0) / 100)) : 0;
+    const hourlyProduction8760 = normalizeHourlyProfileToAnnual(baseHourlyProduction8760, annualEnergy);
+    const hourlySummary = simulateHourlyEnergy(monthlyData, monthlyLoad, buildHourlySimulationOptions({
+      state,
+      tariffModel,
+      hourlyLoad8760: state.hourlyConsumption8760,
+      hourlyProduction8760
+    }));
+    const annualOMCost = operatingCosts.annualOMCost;
+    const annualInsurance = operatingCosts.annualInsurance;
     const inverterReplaceCost = state.omEnabled ? Math.round((systemPower * invUnit) * 1.1) : 0;
     const isOffGridScenario = state.scenarioKey === 'off-grid';
     const financialTariffModel = isOffGridScenario && r.financialSavingsRate
@@ -154,7 +176,7 @@ export function runComparison() {
     const exportRate = state.netMeteringEnabled && !isOffGridScenario
       ? tariffModel.exportRate
       : 0;
-    const financial = computeFinancialTable({
+    const economicSummary = evaluateProjectEconomics({
       annualEnergy,
       hourlySummary,
       batterySummary: null,
@@ -167,33 +189,22 @@ export function runComparison() {
       inverterReplaceCost,
       netMeteringEnabled: state.netMeteringEnabled && !isOffGridScenario,
       exportRateOverride: exportRate,
-      annualGeneratorCost: isOffGridScenario ? (r.offgridL2Results?.generatorFuelCostAnnual || 0) : 0
+      annualGeneratorCost: isOffGridScenario ? (r.offgridL2Results?.generatorFuelCostAnnual || 0) : 0,
+      scenarioKey: state.scenarioKey
     });
-
-    let lcoeCostSum = financialCostBasis;
-    let lcoeEnergySum = 0;
-    let compensatedLcoeEnergySum = 0;
-    financial.rows.forEach(y => {
-      const df = Math.pow(1 + tariffModel.discountRate, y.year);
-      lcoeCostSum += (y.expenses || 0) / df;
-      lcoeEnergySum += y.energy / df;
-      compensatedLcoeEnergySum += ((y.compensatedConsumptionKwh || 0) + (y.paidExportKwh || 0)) / df;
-    });
-    const lcoe = lcoeEnergySum > 0 ? (lcoeCostSum / lcoeEnergySum).toFixed(2) : '—';
-    const compensatedLcoe = compensatedLcoeEnergySum > 0 ? (lcoeCostSum / compensatedLcoeEnergySum).toFixed(2) : null;
 
     return {
       name: ct('comparison.scenarioLabel').replace('{letter}', SCENARIO_LETTERS[idx]),
       panelName: panel.name,
       invName: inv.name,
       panelCount, systemPower: systemPower.toFixed(2),
-      annualEnergy: annualEnergy.toLocaleString('tr-TR'),
+      annualEnergy: annualEnergy.toLocaleString(localeTag()),
       totalCost,
       financialCostBasis,
-      paybackYear: financial.grossSimplePaybackYear ? Number(financial.grossSimplePaybackYear).toFixed(1) : '>25',
-      npv: Math.round(financial.projectNPV),
-      lcoe,
-      compensatedLcoe,
+      paybackYear: economicSummary.grossSimplePaybackYear ? Number(economicSummary.grossSimplePaybackYear).toFixed(1) : '>25',
+      npv: Math.round(economicSummary.projectNPV),
+      lcoe: economicSummary.lcoe,
+      compensatedLcoe: economicSummary.compensatedLcoe,
       isCustom: !!customPrice
     };
   });
