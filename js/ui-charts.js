@@ -9,6 +9,10 @@ export function showToast(msg, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.textContent = msg;
+  const assertive = type === 'error' || type === 'warning';
+  toast.setAttribute('role', assertive ? 'alert' : 'status');
+  toast.setAttribute('aria-live', assertive ? 'assertive' : 'polite');
+  toast.setAttribute('aria-atomic', 'true');
   container.appendChild(toast);
   setTimeout(() => {
     toast.style.animation = 'toastOut 0.3s ease forwards';

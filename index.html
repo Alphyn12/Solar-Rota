@@ -139,6 +139,9 @@ body>main{z-index:auto}
 .step-dots-wrap{flex:1}
 .step-dots{display:flex;align-items:center;justify-content:center}
 .step-dot{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;user-select:none;border:0;background:transparent;color:inherit;font:inherit;padding:0}
+.step-dot.locked{cursor:not-allowed;opacity:.58}
+.step-dot.locked .step-dot-num{border-style:dashed}
+.step-dot.locked .step-dot-label{color:var(--text-muted)}
 .step-dot-num{width:32px;height:32px;border-radius:50%;background:var(--surface-light);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:0.8rem;font-weight:700;color:var(--text-muted);transition:all var(--transition);}
 .step-dot.active .step-dot-num{background:var(--primary);border-color:var(--primary);color:#000;box-shadow:0 0 16px rgba(245,158,11,0.55);}
 .step-dot.done .step-dot-num{background:var(--success);border-color:var(--success);color:#fff}
@@ -168,6 +171,16 @@ body>main{z-index:auto}
 .skip-link{position:fixed;top:10px;left:12px;z-index:10000;transform:translateY(-160%);background:var(--primary);color:#000;border-radius:8px;padding:9px 12px;font-weight:800;font-size:.82rem;text-decoration:none;box-shadow:var(--shadow-md);transition:transform .2s ease}
 .skip-link:focus{transform:translateY(0);outline:3px solid rgba(6,182,212,.85);outline-offset:2px}
 .ui-scroll-hint{display:none;color:var(--text-muted);font-size:.72rem;line-height:1.45;margin:6px 0 8px}
+.panel-card:focus-visible{outline:3px solid rgba(245,158,11,0.72);outline-offset:3px;box-shadow:0 0 0 6px rgba(245,158,11,0.16),var(--shadow-glow-primary)}
+.ui-callout{border-radius:12px;padding:14px 16px;font-size:.8rem;line-height:1.58;border:1px solid var(--border-subtle);background:rgba(255,255,255,.03);color:var(--text)}
+.ui-callout strong{display:block;margin-bottom:6px}
+.ui-callout span{display:block;color:var(--text-muted)}
+.ui-callout--warn{border-color:rgba(245,158,11,.28);background:rgba(245,158,11,.08)}
+.ui-callout--warn strong{color:var(--primary)}
+.ui-callout--danger{border-color:rgba(239,68,68,.28);background:rgba(239,68,68,.08)}
+.ui-callout--danger strong{color:#FCA5A5}
+.ui-callout--soft{background:rgba(255,255,255,.025)}
+.ui-callout--compact{padding:12px 14px;font-size:.78rem}
 .result-actions-note{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:flex-start;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.22);border-radius:10px;padding:12px 14px;margin-top:18px;font-size:.8rem;line-height:1.5;color:var(--text)}
 .result-actions-note svg{color:var(--primary);margin-top:2px;flex-shrink:0}
 .result-actions-note strong{display:block;color:var(--primary);margin-bottom:2px}
@@ -182,6 +195,17 @@ body>main{z-index:auto}
 .result-trust-note,.audit-purpose-note{background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.22);border-radius:10px;padding:12px 14px;color:var(--text);font-size:.8rem;line-height:1.55;margin-bottom:16px}
 .result-trust-note strong,.audit-purpose-note strong{color:var(--primary)}
 .result-trust-note span,.audit-purpose-note span{display:block;color:var(--text-muted);margin-top:4px}
+.result-alert-stack{display:grid;gap:12px;margin:18px 0 20px}
+.result-alert-banner{border-radius:12px;padding:14px 16px;font-size:.8rem;line-height:1.55;border:1px solid var(--border-subtle);background:rgba(255,255,255,.03);color:var(--text)}
+.result-alert-banner strong{display:block;margin-bottom:6px}
+.result-alert-banner--warn{border-color:rgba(245,158,11,.28);background:rgba(245,158,11,.08)}
+.result-alert-banner--warn strong{color:var(--primary)}
+.result-alert-banner--danger{border-color:rgba(239,68,68,.28);background:rgba(239,68,68,.08)}
+.result-alert-banner--danger strong{color:#FCA5A5}
+.result-alert-list{margin:0;padding-left:18px;color:var(--text-muted)}
+.result-alert-list li+li{margin-top:6px}
+.step-inline-alert{margin-top:14px;border-radius:12px;padding:12px 14px;border:1px solid rgba(239,68,68,.26);background:rgba(239,68,68,.08);color:var(--text);font-size:.8rem;line-height:1.55}
+.step-inline-alert strong{display:block;color:#FCA5A5;margin-bottom:4px}
 .advanced-details{border:1px solid var(--border-subtle);border-radius:12px;background:rgba(255,255,255,.02);padding:0}
 .advanced-details-summary{cursor:pointer;list-style:none;padding:14px 16px;font-family:var(--font-display);font-size:.88rem;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between}
 .advanced-details-summary::-webkit-details-marker{display:none}
@@ -587,7 +611,18 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .tooltip-wrap{position:relative;display:inline-block}
 .tooltip-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.3);font-size:0.7rem;color:var(--text-muted);cursor:help;margin-left:4px}
 .tooltip-box{visibility:hidden;opacity:0;position:absolute;z-index:200;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1E293B;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:0.76rem;line-height:1.5;color:var(--text-muted);width:260px;white-space:normal;box-shadow:var(--shadow-md);transition:opacity 0.2s}
-.tooltip-wrap:hover .tooltip-box{visibility:visible;opacity:1}
+.tooltip-wrap:hover .tooltip-box,.tooltip-wrap:focus-within .tooltip-box{visibility:visible;opacity:1}
+.tooltip-icon:focus-visible{outline:2px solid var(--primary);outline-offset:2px;box-shadow:0 0 0 3px rgba(245,158,11,0.18)}
+
+/* toast */
+#toast-container{position:fixed;right:16px;bottom:16px;z-index:1200;display:flex;flex-direction:column;gap:10px;max-width:min(380px,calc(100vw - 24px));pointer-events:none}
+.toast{pointer-events:auto;padding:12px 14px;border-radius:12px;border:1px solid var(--border-subtle);background:rgba(15,23,42,0.94);color:var(--text);box-shadow:var(--shadow-lg);font-size:0.84rem;line-height:1.45;backdrop-filter:blur(10px);animation:toastIn .24s ease both}
+.toast.info{border-color:rgba(59,130,246,0.28)}
+.toast.success{border-color:rgba(16,185,129,0.28)}
+.toast.warning{border-color:rgba(245,158,11,0.34)}
+.toast.error{border-color:rgba(239,68,68,0.34)}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(8px)}}
 
 /* ghi-legend */
 .ghi-legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
@@ -598,7 +633,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 #location-warning{display:none;color:var(--danger);font-size:0.8rem;margin-top:6px;padding:8px 12px;background:rgba(239,68,68,0.08);border-radius:6px;border:1px solid rgba(239,68,68,0.2)}
 </style>
 </head>
-<body class="landing-active">
+<body>
 <a class="skip-link" href="#main-content" data-i18n="common.skipToMain">Ana içeriğe geç</a>
 
 <!-- ═══════════════════════════════════════════════════════════
@@ -1720,37 +1755,37 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div class="header-inner">
       <div class="step-dots-wrap" style="flex:1">
         <div class="step-dots" role="navigation" aria-label="Form adımları" data-i18n-aria-label="nav.progressAria">
-          <button type="button" class="step-dot active" data-step="1" data-testid="step-dot-1" aria-controls="step-1" aria-label="1. adım: Senaryo" aria-current="step" onclick="goToStep(1)">
+          <button type="button" class="step-dot active" data-step="1" data-testid="step-dot-1" aria-controls="step-1" aria-label="1. adım: Senaryo" aria-current="step" onclick="requestStepChange(1)">
             <span class="step-dot-num">1</span>
             <span class="step-dot-label">Senaryo</span>
           </button>
           <div class="step-connector" id="conn-1-2"></div>
-          <button type="button" class="step-dot" data-step="2" data-testid="step-dot-2" aria-controls="step-2" aria-label="2. adım: Konum" onclick="goToStep(2)">
+          <button type="button" class="step-dot" data-step="2" data-testid="step-dot-2" aria-controls="step-2" aria-label="2. adım: Konum" onclick="requestStepChange(2)">
             <span class="step-dot-num">2</span>
             <span class="step-dot-label">Konum</span>
           </button>
           <div class="step-connector" id="conn-2-3"></div>
-          <button type="button" class="step-dot" data-step="3" data-testid="step-dot-3" aria-controls="step-3" aria-label="3. adım: Çatı" onclick="goToStep(3)">
+          <button type="button" class="step-dot" data-step="3" data-testid="step-dot-3" aria-controls="step-3" aria-label="3. adım: Çatı" onclick="requestStepChange(3)">
             <span class="step-dot-num">3</span>
             <span class="step-dot-label">Çatı</span>
           </button>
           <div class="step-connector" id="conn-3-4"></div>
-          <button type="button" class="step-dot" data-step="4" data-testid="step-dot-4" aria-controls="step-4" aria-label="4. adım: Ekipman" onclick="goToStep(4)">
+          <button type="button" class="step-dot" data-step="4" data-testid="step-dot-4" aria-controls="step-4" aria-label="4. adım: Ekipman" onclick="requestStepChange(4)">
             <span class="step-dot-num">4</span>
             <span class="step-dot-label">Ekipman</span>
           </button>
           <div class="step-connector" id="conn-4-5"></div>
-          <button type="button" class="step-dot" data-step="5" data-testid="step-dot-5" aria-controls="step-5" aria-label="5. adım: Ayarlar" onclick="goToStep(5)">
+          <button type="button" class="step-dot" data-step="5" data-testid="step-dot-5" aria-controls="step-5" aria-label="5. adım: Ayarlar" onclick="requestStepChange(5)">
             <span class="step-dot-num">5</span>
             <span class="step-dot-label">Ayarlar</span>
           </button>
           <div class="step-connector" id="conn-5-6"></div>
-          <button type="button" class="step-dot" data-step="6" data-testid="step-dot-6" aria-controls="step-6" aria-label="6. adım: Hesapla" onclick="goToStep(6)">
+          <button type="button" class="step-dot" data-step="6" data-testid="step-dot-6" aria-controls="step-6" aria-label="6. adım: Hesapla" onclick="requestStepChange(6)">
             <span class="step-dot-num">6</span>
             <span class="step-dot-label">Hesapla</span>
           </button>
           <div class="step-connector" id="conn-6-7"></div>
-          <button type="button" class="step-dot" data-step="7" data-testid="step-dot-7" aria-controls="step-7" aria-label="7. adım: Sonuçlar" onclick="goToStep(7)">
+          <button type="button" class="step-dot" data-step="7" data-testid="step-dot-7" aria-controls="step-7" aria-label="7. adım: Sonuçlar" onclick="requestStepChange(7)">
             <span class="step-dot-num">7</span>
             <span class="step-dot-label">Sonuçlar</span>
           </button>
@@ -2068,8 +2103,8 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           <label>Kullanılabilir Alan (m²)
             <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Güneş paneli kurulacak kullanılabilir çatı alanı. 1 kWp sistem için yaklaşık 6-7 m² alan gerekir.</span></span>
           </label>
-          <input type="number" id="roof-area" placeholder="Örn: 80" min="10" max="2000" oninput="updatePanelPreview()"/>
-          <div class="error-msg" id="roof-area-err" style="display:none">Lütfen 10-2000 m² arası değer girin.</div>
+          <input type="number" id="roof-area" placeholder="Örn: 80" min="10" max="2000" aria-describedby="roof-area-err" aria-invalid="false" oninput="updatePanelPreview()"/>
+          <div class="error-msg" id="roof-area-err" role="alert" aria-live="polite" style="display:none">Lütfen 10-2000 m² arası değer girin.</div>
           <div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px" id="panel-count-preview"></div>
         </div>
         <div id="roof-area-badge">
@@ -2834,6 +2869,15 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);width:100%;font-size:0.9rem"
             oninput="updateTariffAssumptions()"/>
         </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px" data-i18n="onGridFlow.tariffSourceType">Tarife kaynak türü</div>
+          <select id="tariff-source-type" onchange="updateTariffAssumptions()"
+            style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;width:100%">
+            <option value="manual" selected data-i18n="onGridFlow.tariffSourceManual">Manuel giriş</option>
+            <option value="estimate" data-i18n="onGridFlow.tariffSourceEstimate">Tahmini / varsayılan</option>
+            <option value="official" data-i18n="onGridFlow.tariffSourceOfficial">Resmi / güncel kaynak (EPDK, RG)</option>
+          </select>
+        </div>
       </div>
 
       <div class="step5-tariff-tips">
@@ -2843,7 +2887,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
         </div>
         <div class="step5-tariff-tip">
           <strong>Ne zaman uzman alan açılmalı?</strong>
-          <span>SKTT, ikili anlaşma, satış sınırı, kur ve kanıt dosyaları yalnızca elinizde doğrulanmış veri varsa değiştirilmelidir.</span>
+          <span>SKTT, ikili anlaşma, satış sınırı, kur ve kanıt dosyaları yalnızca elinizde doğrulanmış veri varsa değiştirilmelidir. Tarife kaynak türü burada görünür bırakıldı; çünkü sonuç güvenini en hızlı etkileyen ticari alanlardan biridir.</span>
         </div>
       </div>
 
@@ -2953,15 +2997,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
                 <option value="pending">Bekliyor</option>
                 <option value="missing">Eksik</option>
                 <option value="rejected">Reddedildi</option>
-              </select>
-            </div>
-            <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px" data-i18n="onGridFlow.tariffSourceType">Tarife kaynak türü</div>
-              <select id="tariff-source-type" onchange="updateTariffAssumptions()"
-                style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;width:100%">
-                <option value="manual" selected data-i18n="onGridFlow.tariffSourceManual">Manuel giriş</option>
-                <option value="estimate" data-i18n="onGridFlow.tariffSourceEstimate">Tahmini / varsayılan</option>
-                <option value="official" data-i18n="onGridFlow.tariffSourceOfficial">Resmi / güncel kaynak (EPDK, RG)</option>
               </select>
             </div>
             <div>
@@ -3462,7 +3497,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div class="advanced-feature-block" id="proposal-governance-block" style="margin-bottom:18px">
       <div class="feature-toggle-header">
         <div>
-          <div style="font-weight:700;color:var(--text);font-size:0.9rem" data-i18n="governance.title">Proposal Governance</div>
+          <div style="font-weight:700;color:var(--text);font-size:0.9rem" data-i18n="governance.title">Teklif yönetişimi</div>
           <div style="font-size:0.74rem;color:var(--text-muted)" data-i18n="governance.subtitle">Onay, marj, finansman ve bakım varsayımları</div>
         </div>
       </div>
@@ -3500,7 +3535,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             </select>
           </div>
           <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-muted);cursor:pointer">
-            <input type="checkbox" id="grid-checklist-complete" onchange="updateProposalGovernanceInput()"> Şebeke başvuru kontrol listesi tamamlandı
+            <input type="checkbox" id="grid-checklist-complete" onchange="updateProposalGovernanceInput()"> <span data-i18n="governance.gridChecklistComplete">Şebeke başvuru kontrol listesi tamamlandı</span>
           </label>
           <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-muted);cursor:pointer">
             <input type="checkbox" id="quote-inputs-verified" onchange="updateTariffAssumptions()"> <span data-i18n="governance.inputsVerified">Teklif varsayımları doğrulandı</span>
@@ -3528,21 +3563,21 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Rol</div>
                 <select id="user-role-input" onchange="updateUserIdentityInput()"
                   style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;width:100%">
-                  <option value="sales" selected>Sales</option>
-                  <option value="engineer">Engineer</option>
-                  <option value="approver">Approver</option>
-                  <option value="admin">Admin</option>
+                  <option value="sales" selected data-i18n="governance.roleSales">Satış</option>
+                  <option value="engineer" data-i18n="governance.roleEngineer">Mühendis</option>
+                  <option value="approver" data-i18n="governance.roleApprover">Onay Yetkilisi</option>
+                  <option value="admin" data-i18n="governance.roleAdmin">Yönetici</option>
                 </select>
               </div>
               <div>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Onay Durumu</div>
                 <select id="proposal-approval-state" onchange="updateProposalGovernanceInput()"
                   style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.9rem;width:100%">
-                  <option value="draft" selected>Taslak</option>
-                  <option value="engineering-review">Mühendislik İncelemesi</option>
-                  <option value="finance-review">Finans İncelemesi</option>
-                  <option value="approved">Onaylandı</option>
-                  <option value="rejected">Reddedildi</option>
+                  <option value="draft" selected data-i18n="governance.approvalDraft">Taslak</option>
+                  <option value="engineering-review" data-i18n="governance.approvalEngineeringReview">Mühendislik İncelemesi</option>
+                  <option value="finance-review" data-i18n="governance.approvalFinanceReview">Finans İncelemesi</option>
+                  <option value="approved" data-i18n="governance.approvalApproved">Onaylandı</option>
+                  <option value="rejected" data-i18n="governance.approvalRejected">Reddedildi</option>
                 </select>
               </div>
               <div>
@@ -3601,9 +3636,9 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
                 </select>
               </div>
             </div>
-            <div style="font-size:0.74rem;color:var(--text-muted);margin-top:12px">Onay yalnızca approver/admin rolüyle verilir. Onay kaydı oluşturulduktan sonra sessizce değiştirilemez.</div>
+            <div style="font-size:0.74rem;color:var(--text-muted);margin-top:12px" data-i18n="governance.approvalNote">Onay yalnızca yetkili kullanıcı rolüyle verilir. Onay kaydı oluşturulduktan sonra sessizce değiştirilemez.</div>
             <div id="local-auth-warning" style="font-size:0.72rem;color:#F59E0B;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:6px;padding:6px 10px;max-width:520px;margin-top:8px">
-              ⚠ <strong>Yerel Kimlik Doğrulama:</strong> Kullanıcı rolü yalnızca bu tarayıcıda localStorage'da saklanır. Sunucu tarafı kimlik doğrulaması yoktur. Onay kaydı kriptografik olarak imzalanmamıştır ve yerel tarayıcıda değiştirilebilir. Bu aracı gerçek müşteri teklifi için kullanmadan önce kurumsal bir kimlik doğrulama katmanı eklenmelidir.
+              ⚠ <strong data-i18n="governance.localAuthWarningTitle">Yerel deneme oturumu:</strong> <span data-i18n="governance.localAuthWarningBody">Kullanıcı rolü yalnızca bu tarayıcıda tutulur. Sunucu tarafı kimlik doğrulaması ve değiştirilemez onay kaydı yoktur; gerçek müşteri teklifi öncesinde kurumsal yetkilendirme katmanı gerekir.</span>
             </div>
           </div>
         </details>
@@ -3667,7 +3702,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <strong>Şebeke İhracatı / Saatlik Mahsuplaşma</strong>
             <span>Fazla üretimin hangi kuralla değerlendirileceğini görmek ve ihracat varsayımını daha gerçekçi kurmak için açın.</span>
           </div>
-          <span class="feature-badge">YENİ</span>
+          <span class="feature-badge" data-i18n="common.badgeOptional">Opsiyonel</span>
         </div>
         <label class="toggle-switch" onclick="event.stopPropagation()">
           <input type="checkbox" id="nm-toggle" onchange="onNMToggle(this.checked)">
@@ -3699,7 +3734,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <strong>Fatura Analizi</strong>
             <span>12 aylık tüketim dağılımını girerek tasarruf hesabını kaba tahminden daha savunulabilir hale getirir.</span>
           </div>
-          <span class="feature-badge">FAZ B</span>
+          <span class="feature-badge" data-i18n="common.badgeDetailed">Detay</span>
         </div>
         <label class="toggle-switch" onclick="event.stopPropagation()">
           <input type="checkbox" id="bill-toggle" onchange="onBillToggle(this.checked)">
@@ -3721,7 +3756,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <strong>Bakım & İşletme Giderleri</strong>
             <span>Uzun vadeli finansal tabloda bakım, sigorta ve inverter yenileme giderlerini hesaba katar.</span>
           </div>
-          <span class="feature-badge">YENİ</span>
+          <span class="feature-badge" data-i18n="common.badgeOptional">Opsiyonel</span>
         </div>
         <label class="toggle-switch" onclick="event.stopPropagation()">
           <input type="checkbox" id="om-toggle" checked onchange="onOMToggle(this.checked)">
@@ -3780,7 +3815,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <strong>EV Şarj Entegrasyonu</strong>
             <span>İleride elektrikli araç şarjı eklenecekse yeni yükü sisteme dahil ederek boyutlandırmayı günceller.</span>
           </div>
-          <span class="feature-badge">YÜK ARTIŞI</span>
+          <span class="feature-badge" data-i18n="common.badgeLoadGrowth">Yük artışı</span>
         </div>
         <label class="toggle-switch" onclick="event.stopPropagation()">
           <input type="checkbox" id="ev-toggle" onchange="onEVToggle(this.checked)">
@@ -3848,7 +3883,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <strong>Isı Pompası Entegrasyonu</strong>
             <span>Elektrik tüketimi ileride ısı pompası nedeniyle artacaksa yeni yıllık yükü hesaba katar.</span>
           </div>
-          <span class="feature-badge">YÜK ARTIŞI</span>
+          <span class="feature-badge" data-i18n="common.badgeLoadGrowth">Yük artışı</span>
         </div>
         <label class="toggle-switch" onclick="event.stopPropagation()">
           <input type="checkbox" id="hp-toggle" onchange="onHeatPumpToggle(this.checked)">
@@ -3904,7 +3939,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
             <strong>Vergi Avantajı</strong>
             <span>Kurumlar vergisi, amortisman ve yatırım teşviklerinin ticari geri dönüşe etkisini görmek için kullanılır.</span>
           </div>
-          <span class="feature-badge">TİCARİ</span>
+          <span class="feature-badge" data-i18n="common.badgeCommercial">Ticari</span>
         </div>
         <label class="toggle-switch" onclick="event.stopPropagation()">
           <input type="checkbox" id="tax-toggle" onchange="onTaxToggle(this.checked)">
@@ -4055,6 +4090,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div><strong id="result-scenario-label">On-Grid</strong> <span id="result-scenario-frame">Grid-connected savings and proposal readiness</span></div>
     <div id="result-engine-source">Hesap özeti hazırlanıyor</div>
   </div>
+  <div id="result-alert-stack" class="result-alert-stack"></div>
   <div class="results-hero" aria-hidden="true"><div class="results-glow"></div></div>
   <div id="kpi-grid" class="kpi-grid">
     <div class="kpi-card" style="--kpi-color:var(--primary)">
@@ -4416,46 +4452,64 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     <div class="eng-report-body" id="eng-report-body"></div>
   </div>
 
-  <div class="result-actions-note">
+  <div class="result-actions-note ui-callout ui-callout--warn">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
     <div>
       <strong data-i18n="report.actionsNoteTitle">Çıktılar ne için?</strong>
       <span data-i18n="report.actionsNote">İlk PDF müşteriye sunulabilecek sade özet içindir. Teknik PDF ve veri çıktıları ise proje ekibi veya ileri seviye kontrol amaçlıdır.</span>
     </div>
   </div>
-  <div class="action-btns">
-    <button class="btn btn-primary" data-testid="download-proposal-pdf" onclick="downloadPDF()">
+  <div class="result-action-groups">
+    <section class="action-group-card" data-testid="result-actions-customer">
+      <div class="action-group-head">
+        <div class="action-group-kicker" data-i18n="report.customerOutputsKicker">Müşteri Çıktıları</div>
+        <div class="action-group-title" data-i18n="report.customerOutputsTitle">Paylaşılabilir ve sunulabilir özetler</div>
+        <div class="action-group-copy" data-i18n="report.customerOutputsCopy">İlk görüşme, karar özeti ve teknik eki müşteriye veya karar vericiye göndermek için kullanın.</div>
+      </div>
+      <div class="action-btns">
+        <button class="btn btn-primary" data-testid="download-proposal-pdf" onclick="downloadPDF()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/></svg>
       <span data-i18n="report.downloadProposalPdf">Ön Fizibilite PDF İndir</span>
-    </button>
-    <button class="btn btn-outline" data-testid="download-technical-pdf" onclick="downloadTechnicalPDF()">
+        </button>
+        <button class="btn btn-outline" data-testid="download-technical-pdf" onclick="downloadTechnicalPDF()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6"/><path d="M9 16h6"/><path d="M9 8h6"/><path d="M5 3h14v18H5z"/></svg>
       <span data-i18n="report.downloadTechnicalPdf">Teknik Ek PDF İndir</span>
-    </button>
-    <button class="btn btn-secondary" data-testid="share-results" onclick="shareResults()">
+        </button>
+        <button class="btn btn-secondary" data-testid="share-results" onclick="shareResults()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
       <span data-i18n="report.shareResults">Sonuç Özetini Paylaş</span>
-    </button>
-    <button class="btn btn-secondary" data-testid="export-proposal-json" onclick="exportProposalHandoff()">
+        </button>
+      </div>
+    </section>
+    <section class="action-group-card" data-testid="result-actions-ops">
+      <div class="action-group-head">
+        <div class="action-group-kicker" data-i18n="report.opsOutputsKicker">İç Ekip ve Veri</div>
+        <div class="action-group-title" data-i18n="report.opsOutputsTitle">Kayıt, entegrasyon ve tekrar çalışma</div>
+        <div class="action-group-copy" data-i18n="report.opsOutputsCopy">CRM aktarımı, veri handoff, teklif karşılaştırması ve yeni varyasyon denemeleri için kullanın.</div>
+      </div>
+      <div class="action-btns">
+        <button class="btn btn-secondary" data-testid="export-proposal-json" onclick="exportProposalHandoff()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       <span data-i18n="report.exportProposalJson">Proposal JSON</span>
-    </button>
-    <button class="btn btn-secondary" data-testid="export-crm-json" onclick="exportCrmLead()">
+        </button>
+        <button class="btn btn-secondary" data-testid="export-crm-json" onclick="exportCrmLead()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5M8 17h8"/></svg>
       <span data-i18n="report.exportCrmJson">CRM JSON</span>
-    </button>
-    <button class="btn btn-success" data-testid="save-calculation" onclick="saveCurrentCalculation()">
+        </button>
+        <button class="btn btn-success" data-testid="save-calculation" onclick="saveCurrentCalculation()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       <span data-i18n="report.saveCalculation">Hesabı Kaydet</span>
-    </button>
-    <button class="btn btn-outline" data-testid="open-comparison" onclick="openComparison()">
+        </button>
+        <button class="btn btn-outline" data-testid="open-comparison" onclick="openComparison()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       <span data-i18n="report.compareQuotes">Teklif Karşılaştır</span>
-    </button>
-    <button class="btn btn-outline" data-testid="recalculate" onclick="goToStep(1)">
+        </button>
+        <button class="btn btn-outline" data-testid="recalculate" onclick="goToStep(1)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
       <span data-i18n="report.recalculate">Yeniden Hesapla</span>
-    </button>
+        </button>
+      </div>
+    </section>
   </div>
 
   <!-- Hourly profile card -->
@@ -4601,7 +4655,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 </main>
 
 <!-- TOAST CONTAINER -->
-<div id="toast-container"></div>
+<div id="toast-container" aria-live="polite" aria-atomic="true" aria-relevant="additions text"></div>
 
 <!-- TEKLİF KARŞILAŞTIRMA MODAL -->
 <div id="comparison-modal" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px">
@@ -4649,7 +4703,8 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 <script>
 (function(){
   'use strict';
-  var LP_ROUTE = '#/app';
+  var APP_ROUTE = '#/app';
+  var LANDING_ROUTE = '#/landing';
   var pendingScenario = null;
 
   function showApp(){
@@ -4657,8 +4712,8 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
     // Scroll app'in başına
     window.scrollTo({top:0, behavior:'auto'});
     // Hash'i senkronla
-    if (location.hash !== LP_ROUTE) {
-      history.replaceState(null, '', LP_ROUTE);
+    if (location.hash !== APP_ROUTE) {
+      history.replaceState(null, '', APP_ROUTE);
     }
     // Pending senaryo varsa uygula
     if (pendingScenario) {
@@ -4669,8 +4724,8 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
   function showLanding(){
     document.body.classList.add('landing-active');
     window.scrollTo({top:0, behavior:'auto'});
-    if (location.hash === LP_ROUTE) {
-      history.replaceState(null, '', location.pathname + location.search);
+    if (location.hash !== LANDING_ROUTE) {
+      history.replaceState(null, '', LANDING_ROUTE);
     }
   }
 
@@ -4763,19 +4818,19 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 
   // İlk açılışta hash'e göre mod
   function initialRoute(){
-    if (location.hash === LP_ROUTE) {
-      document.body.classList.remove('landing-active');
-    } else {
+    if (location.hash === LANDING_ROUTE) {
       document.body.classList.add('landing-active');
+    } else {
+      document.body.classList.remove('landing-active');
     }
   }
 
   // Hash değişirse mod değiştir
   window.addEventListener('hashchange', function(){
-    if (location.hash === LP_ROUTE) {
-      document.body.classList.remove('landing-active');
-    } else if (location.hash === '' || location.hash === '#') {
+    if (location.hash === LANDING_ROUTE) {
       document.body.classList.add('landing-active');
+    } else {
+      document.body.classList.remove('landing-active');
     }
   });
 

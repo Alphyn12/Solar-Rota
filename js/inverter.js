@@ -26,7 +26,7 @@ export function buildInverterCards() {
       ? `$${price10.toLocaleString('en-US', { maximumFractionDigits: 0 })}/kWp`
       : `${Math.round(price10).toLocaleString('tr-TR')} ₺/kWp`;
     return `
-    <div class="inverter-card${selected === key ? ' selected' : ''}" id="inv-card-${key}" onclick="selectInverter('${key}')">
+    <div class="inverter-card${selected === key ? ' selected' : ''}" id="inv-card-${key}" data-testid="inverter-card-${key}" data-inverter-key="${key}" role="button" tabindex="0" aria-pressed="${selected === key ? 'true' : 'false'}" onclick="selectInverter('${key}')">
       <div class="inverter-check">✓</div>
       <div class="equipment-card-topline">
         <span class="equipment-card-badge">${inv.badge || 'İnverter tipi'}</span>
@@ -77,9 +77,11 @@ export function selectInverter(key) {
   const state = window.state;
   state.inverterType = key;
 
-  document.querySelectorAll('.inverter-card').forEach(c => c.classList.remove('selected'));
-  const card = document.getElementById(`inv-card-${key}`);
-  if (card) card.classList.add('selected');
+  document.querySelectorAll('.inverter-card').forEach(card => {
+    const isSelected = card.dataset.inverterKey === key;
+    card.classList.toggle('selected', isSelected);
+    card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+  });
 
   const inv = INVERTER_TYPES[key];
   const infoEl = document.getElementById('inverter-info');
@@ -104,6 +106,18 @@ export function selectInverter(key) {
   }
   window.updatePanelPreview?.();
   window.updateEquipmentSelectionSummary?.();
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', event => {
+    const card = event.target?.closest?.('.inverter-card[role="button"]');
+    if (!card) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      const key = card.dataset.inverterKey;
+      if (key) selectInverter(key);
+    }
+  });
 }
 
 // window'a expose et

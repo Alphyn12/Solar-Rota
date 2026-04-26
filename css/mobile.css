@@ -749,13 +749,32 @@ textarea {
   }
 
   #offgrid-device-table {
-    min-width: 720px;
+    min-width: 640px;
   }
 
   #offgrid-device-table input,
   #offgrid-device-table select,
   #offgrid-device-table button {
-    min-height: 36px;
+    min-height: 44px !important;
+  }
+
+  #offgrid-device-table td,
+  #offgrid-device-table th {
+    padding: 5px 4px !important;
+  }
+
+  #offgrid-device-table input,
+  #offgrid-device-table select {
+    font-size: 0.82rem !important;
+  }
+
+  #offgrid-device-table button {
+    min-width: 44px;
+  }
+
+  #evidence-file-status {
+    overflow-wrap: anywhere;
+    line-height: 1.55;
   }
 
   .on-grid-data-source-table {

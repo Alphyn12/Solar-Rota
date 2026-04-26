@@ -40,9 +40,11 @@ function engineSummaryText(results = {}, state = window.state || {}) {
   const source = results.authoritativeEngineSource || results.engineSource || results.backendEngineSource;
   const fallback = results.authoritativeEngineFallbackReason || (state.backendEngineAvailable === false ? state.backendEngineLastError : '');
   if (fallback) return 'Canlı veri geçici olarak alınamadı; yerel tahmin modeli kullanıldı.';
-  return source?.pvlibBacked || source?.source
-    ? 'Canlı güneş verisiyle desteklenen hesaplama kullanıldı.'
-    : 'Yerel tahmin modeliyle hesaplama yapıldı.';
+  if (source?.pvlibBacked || source?.source) {
+    const sourceLabel = source?.source ? ` (${source.source})` : '';
+    return `Canlı güneş verisiyle desteklenen hesaplama kullanıldı${sourceLabel}.`;
+  }
+  return 'Yerel tahmin modeliyle hesaplama yapıldı.';
 }
 
 function backendEngineText(results = {}, state = window.state || {}) {
@@ -161,38 +163,45 @@ export function renderResults() {
     `;
   }
   if (engineSource) engineSource.textContent = engineSummaryText(r, state);
-  let trustNote = document.getElementById('result-trust-note');
-  if (!trustNote && scenarioFrame) {
-    trustNote = document.createElement('div');
-    trustNote.id = 'result-trust-note';
-    trustNote.className = 'result-trust-note';
-    scenarioFrame.closest('.result-context-strip')?.insertAdjacentElement('afterend', trustNote);
-  }
-  if (trustNote) {
+  const resultAlertStack = document.getElementById('result-alert-stack');
+  if (resultAlertStack) {
     const status = statusLabel(r.quoteReadiness?.status || r.confidenceLevel || '—');
-    trustNote.innerHTML = `
-      <strong>${escapeHtml(i18n.t('report.trustNoteTitle'))}: ${escapeHtml(status)}</strong>
-      <span>${escapeHtml(state.scenarioContext?.nextAction || i18n.t('onGridResult.commercialNextAction'))}</span>
-    `;
-  }
-  let settlementBanner = document.getElementById('result-settlement-banner');
-  if (!settlementBanner && trustNote) {
-    settlementBanner = document.createElement('div');
-    settlementBanner.id = 'result-settlement-banner';
-    settlementBanner.className = 'result-trust-note';
-    trustNote.insertAdjacentElement('afterend', settlementBanner);
-  }
-  if (settlementBanner) {
-    if (r.settlementProvisional) {
-      settlementBanner.style.display = '';
-      settlementBanner.innerHTML = `
-        <strong>${escapeHtml(i18n.t('onGridResult.settlementProvisionalBannerTitle'))}</strong>
-        <span>${escapeHtml(i18n.t('onGridResult.settlementProvisionalBannerBody'))}</span>
-      `;
-    } else {
-      settlementBanner.style.display = 'none';
-      settlementBanner.innerHTML = '';
+    const quoteBlockers = localizeMessageList(r.quoteReadiness?.blockers || []);
+    const calcWarnings = localizeMessageList(Array.isArray(r.calculationWarnings) ? r.calculationWarnings : []);
+    const prominentWarnings = [...new Set([...quoteBlockers, ...calcWarnings])].slice(0, 3);
+    const alertCards = [
+      `
+        <div id="result-trust-note" class="result-trust-note ui-callout ui-callout--warn" data-testid="result-trust-note" role="status">
+          <strong>${escapeHtml(i18n.t('report.trustNoteTitle'))}: ${escapeHtml(status)}</strong>
+          <span>${escapeHtml(state.scenarioContext?.nextAction || i18n.t('onGridResult.commercialNextAction'))}</span>
+        </div>
+      `
+    ];
+    if (state.scenarioKey === 'off-grid') {
+      alertCards.push(`
+        <div class="result-alert-banner result-alert-banner--danger ui-callout ui-callout--danger" data-testid="result-offgrid-warning" role="alert">
+          <strong>${escapeHtml(i18n.t('offGrid.preFeasibilityOnly'))}</strong>
+          <span>${escapeHtml(i18n.t('offGrid.notFeasibilityAnalysis'))}</span>
+        </div>
+      `);
     }
+    if (r.settlementProvisional) {
+      alertCards.push(`
+        <div id="result-settlement-banner" class="result-alert-banner result-alert-banner--warn ui-callout ui-callout--warn" data-testid="result-settlement-warning" role="alert">
+          <strong>${escapeHtml(i18n.t('onGridResult.settlementProvisionalBannerTitle'))}</strong>
+          <span>${escapeHtml(i18n.t('onGridResult.settlementProvisionalBannerBody'))}</span>
+        </div>
+      `);
+    }
+    if (prominentWarnings.length) {
+      alertCards.push(`
+        <div class="result-alert-banner result-alert-banner--warn ui-callout ui-callout--warn" data-testid="result-prominent-warnings" role="alert">
+          <strong>${escapeHtml(i18n.t('audit.warningsTitle'))}</strong>
+          <ul class="result-alert-list">${prominentWarnings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+        </div>
+      `);
+    }
+    resultAlertStack.innerHTML = alertCards.join('');
   }
 
   const savingsUnit = document.querySelector('#step-7 .kpi-card:nth-child(2) .kpi-unit');
@@ -1136,7 +1145,7 @@ function renderWarningsAndAudit(state, r) {
       .replace(/Faz 4 saha kabul kapısı tamamlanmadan Faz 5 garanti operasyon kapısı açılamaz\./i, 'Garanti ve işletme aşamasına geçmeden önce saha kabulü tamamlanmalıdır.')
       .replace(/Faz 5 aktif izleme\/operasyon kapısı tamamlanmadan Faz 6 revalidasyon kapısı açılamaz\./i, 'Yıllık yeniden doğrulama için önce aktif izleme dönemi gerekir.')
       .replace(/Kurulu güç sözleşme gücünü aşıyor; bağlantı görüşü ve mahsuplaşma sınırları proje bazında kontrol edilmeli\./i, 'Kurulu güç mevcut sınırları aşıyor olabilir. Bağlantı ve mahsuplaşma tarafı ayrıca kontrol edilmelidir.')
-      .replace(/Quote-ready değil \| /i, 'Bu sonuç henüz teklif sunumuna hazır değil: ');
+      .replace(/(?:Quote-ready değil|Henüz teklife hazır değil) \| /i, 'Bu sonuç henüz teklif sunumuna hazır değil: ');
   };
 
   const quoteBlockers = localizeMessageList(r.quoteReadiness?.blockers || []).slice(0, 3);

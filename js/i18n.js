@@ -187,6 +187,9 @@ export const i18n = {
     window.updateDashboard?.();
     window.renderScenarioCards?.();
     window.updateScenarioUI?.();
+    window.renderEvidenceFileStatus?.();
+    window.enhanceTooltipAccessibility?.();
+    window.syncRoofAreaValidationUi?.();
     window.syncHeaderHeightVar?.();
     window.syncMapLayerButton?.();
     window.syncRoofDrawToolbarLabels?.();

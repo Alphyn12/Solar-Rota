@@ -16,7 +16,8 @@
     "step6": "Calculate",
     "step7": "Results",
     "stepPrefix": "step",
-    "progressAria": "Form steps"
+    "progressAria": "Form steps",
+    "completeCurrentStepFirst": "Complete the current step first."
   },
   "language": {
     "switcherAria": "Language selection",
@@ -245,7 +246,20 @@
     "approvalState": "Approval State",
     "billVerified": "Bill/consumption evidence verified",
     "inputsVerified": "Proposal assumptions verified",
-    "quoteReadyApproved": "Quote-ready approval granted"
+    "quoteReadyApproved": "Quote-ready approval granted",
+    "gridChecklistComplete": "Grid application checklist completed",
+    "roleSales": "Sales",
+    "roleEngineer": "Engineer",
+    "roleApprover": "Approver",
+    "roleAdmin": "Admin",
+    "approvalDraft": "Draft",
+    "approvalEngineeringReview": "Engineering review",
+    "approvalFinanceReview": "Finance review",
+    "approvalApproved": "Approved",
+    "approvalRejected": "Rejected",
+    "approvalNote": "Approval can only be granted by an authorized role. Once created, the approval record should not be silently changed.",
+    "localAuthWarningTitle": "Local trial session:",
+    "localAuthWarningBody": "The user role is stored only in this browser. There is no server-side authentication or immutable approval record; add enterprise authorization before using this for real customer offers."
   },
   "onGridFlow": {
     "eyebrow": "ON-GRID PRE-FEASIBILITY",
@@ -345,7 +359,7 @@
     "monthlyOffset": "Settlement import offset",
     "paidSurplus": "Paid surplus energy",
     "unpaidSurplus": "Unpaid surplus energy",
-    "settlementBasisLabel": "Settlement basis",
+    "settlementBasisLabel": "Settlement / export treatment",
     "settlementProvisional": "Date missing; monthly preliminary assumption",
     "settlementProvisionalBannerTitle": "Settlement assumption is provisional",
     "settlementProvisionalBannerBody": "The commissioning date is missing, so results are shown with a monthly-netting assumption. For systems commissioned after May 1, 2026, this can be optimistic.",
@@ -404,6 +418,12 @@
     "shareResults": "Share Result Summary",
     "actionsNoteTitle": "What are these outputs for?",
     "actionsNote": "The PDF is for customer pre-feasibility, the Technical Appendix is for engineering review, and JSON files are for integration and CRM handoff.",
+    "customerOutputsKicker": "Customer Outputs",
+    "customerOutputsTitle": "Shareable decision-ready summaries",
+    "customerOutputsCopy": "Use these for first meetings, management review, and customer-facing pre-feasibility communication.",
+    "opsOutputsKicker": "Internal Team and Data",
+    "opsOutputsTitle": "Save, integrate, and iterate",
+    "opsOutputsCopy": "Use these for CRM handoff, data exchange, quote comparison, and rerunning alternative scenarios.",
     "exportProposalJson": "Proposal JSON",
     "exportCrmJson": "CRM JSON",
     "saveCalculation": "Save Calculation",
@@ -846,10 +866,17 @@
     "cancel": "Cancel",
     "close": "Close",
     "remove": "Remove",
+    "datasheet": "Datasheet",
+    "badgeOptional": "Optional",
+    "badgeDetailed": "Detailed",
+    "badgeLoadGrowth": "Load growth",
+    "badgeCommercial": "Commercial",
     "loading": "Loading...",
     "error": "Error",
     "success": "Success",
-    "pending": "-"
+    "pending": "-",
+    "noFile": "No file",
+    "moreInfo": "More information"
   },
   "offgridL2": {
     "sectionTitle": "Off-Grid System Sizing",

@@ -532,6 +532,12 @@
   transition: border-color .2s ease, transform .2s ease, background .2s ease, box-shadow .2s ease;
 }
 
+.on-grid-choice-card:focus-visible {
+  outline: 3px solid rgba(6,182,212,0.78);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(6,182,212,0.16);
+}
+
 .on-grid-choice-card:hover {
   transform: translateY(-1px);
   border-color: rgba(245,158,11,.28);
@@ -1209,6 +1215,13 @@
   transition: all var(--transition-bounce);
   position: relative;
   overflow: hidden;
+}
+
+.inverter-card:focus-visible,
+.bat-model-btn:focus-visible {
+  outline: 3px solid rgba(6,182,212,0.78);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(6,182,212,0.16);
 }
 
 .inverter-card::before {

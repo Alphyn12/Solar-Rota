@@ -183,6 +183,7 @@ window.setTheme = setTheme;
 // ═══════════════════════════════════════════════════════════
 window.state = {
   step: 1,
+  maxUnlockedStep: 1,
   scenarioKey: DEFAULT_SCENARIO_KEY,
   scenarioContext: getScenarioDefinition(DEFAULT_SCENARIO_KEY),
   lat: null, lon: null, cityName: null, ghi: null,
@@ -621,6 +622,28 @@ function setAutocompleteOpen(open) {
   if (input) input.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
+function setStepInlineAlert(step, message = '') {
+  const pane = document.getElementById(`step-${step}`);
+  const heading = pane?.querySelector('.step-heading');
+  if (!heading) return;
+  let alert = document.getElementById(`step-${step}-inline-alert`);
+  if (!message) {
+    if (alert) alert.remove();
+    return;
+  }
+  if (!alert) {
+    alert = document.createElement('div');
+    alert.id = `step-${step}-inline-alert`;
+    alert.className = 'step-inline-alert';
+    heading.appendChild(alert);
+  }
+  alert.innerHTML = `<strong>Bu adımdan devam edilemiyor</strong><span>${escapeHtml(message)}</span>`;
+}
+
+function clearStepInlineAlert(step) {
+  setStepInlineAlert(step, '');
+}
+
 function createAutocompleteItem({ title, subtitle = '', meta = '', onSelect }) {
   const item = document.createElement('div');
   item.className = 'autocomplete-item';
@@ -687,6 +710,7 @@ document.addEventListener('DOMContentLoaded', () => {
   syncMultiRoofUi();
   syncEnterpriseInputsFromState();
   initScenarioExperience();
+  updateProgressBar();
   updateDashboard();
 
   // Wire up tariff visual tabs
@@ -759,6 +783,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  const roofAreaInput = document.getElementById('roof-area');
+  if (roofAreaInput) {
+    roofAreaInput.addEventListener('input', () => {
+      const value = parseFloat(roofAreaInput.value);
+      if (!roofAreaInput.value || (Number.isFinite(value) && value >= 10 && value <= 2000)) {
+        syncRoofAreaValidationUi(false);
+        clearStepInlineAlert(3);
+      } else if (roofAreaInput.classList.contains('error')) {
+        syncRoofAreaValidationUi(true);
+      }
+    });
+  }
+
+  enhanceTooltipAccessibility();
+
   // i18n başlat
   i18n.init().catch(() => {});
   initExchangeRateService().catch(() => {}).then(() => {
@@ -781,6 +820,7 @@ function highlightAC(items) {
 function selectCity(city) {
   window.state.lat = city.lat; window.state.lon = city.lon;
   window.state.cityName = city.name; window.state.ghi = city.ghi;
+  clearStepInlineAlert(2);
   document.getElementById('city-search').value = city.name;
   setAutocompleteOpen(false);
   document.getElementById('location-warning').style.display = 'none';
@@ -834,6 +874,7 @@ function _selectNominatimResult(result) {
   );
   window.state.lat = lat; window.state.lon = lon;
   window.state.cityName = name; window.state.ghi = nearest.ghi;
+  clearStepInlineAlert(2);
   document.getElementById('city-search').value = name;
   setAutocompleteOpen(false);
   document.getElementById('location-warning').style.display = 'none';
@@ -1095,12 +1136,15 @@ function syncScenarioControls() {
 function selectScenario(key) {
   const next = applyScenarioDefaults(window.state, key);
   Object.assign(window.state, next);
+  window.state.maxUnlockedStep = 1;
+  clearStepInlineAlert(1);
   appendAuditEntry(window.state, 'scenario.selected', {
     scenarioKey: window.state.scenarioKey,
     label: window.state.scenarioContext?.label
   }, currentUser());
   updateScenarioUI();
   syncScenarioControls();
+  updateProgressBar();
   persistState();
   showToast(`${window.state.scenarioContext?.label || i18n.t('scenario.fallbackLabel')} ${i18n.t('scenario.selectedToast')}`, 'success');
 }
@@ -1732,6 +1776,11 @@ function setOnGridInputMode(mode = 'basic') {
   if (advanced) advanced.style.display = window.state.onGridInputMode === 'advanced' ? '' : 'none';
   const advancedCard = document.getElementById('step5-advanced-card');
   if (advancedCard) advancedCard.open = window.state.onGridInputMode === 'advanced';
+  if (window.state.onGridInputMode === 'advanced') {
+    document.querySelectorAll('#step5-advanced-card > .step5-advanced-body > details.step5-subdetails').forEach((detail, index) => {
+      if (index < 2) detail.open = true;
+    });
+  }
   syncOnGridDesignTargetCards();
   updateOnGridFlowSummary();
   persistState();
@@ -2184,14 +2233,18 @@ function renderEvidenceFileStatus() {
       'offgridCustomerSignoff'
     );
   }
+  const missingLabel = i18n.t('common.noFile');
   const rows = types.map(type => {
     const files = window.state.evidence?.[type]?.files || [];
     const latest = files[files.length - 1];
-    return `${type}: ${latest ? `${latest.name} · ${Math.round((latest.size || 0) / 1024)} KB · ${String(latest.sha256 || '').slice(0, 12)}` : 'dosya yok'}`;
+    const localizedLabel = i18n.t(`evidenceItems.${type}`);
+    const label = localizedLabel !== `evidenceItems.${type}` ? localizedLabel : type;
+    return `${label}: ${latest ? `${latest.name} · ${Math.round((latest.size || 0) / 1024)} KB · ${String(latest.sha256 || '').slice(0, 12)}` : missingLabel}`;
   });
   const el = document.getElementById('evidence-file-status');
   if (el) el.textContent = rows.join(' | ');
 }
+window.renderEvidenceFileStatus = renderEvidenceFileStatus;
 
 async function attachEvidenceFromInput(type, input) {
   const file = input?.files?.[0];
@@ -2395,6 +2448,12 @@ function buildPanelCatalogFilters() {
 
 function syncPanelSelectionUI() {
   const selectedType = normalizePanelTypeKey(window.state.panelType);
+  const selectedCatalogId = window.state.panelCatalogId;
+  document.querySelectorAll('.panel-card[data-panel-id]').forEach(card => {
+    const isSelected = card.dataset.panelId === selectedCatalogId;
+    card.classList.toggle('selected', isSelected);
+    card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+  });
   const albedoWrap = document.getElementById('albedo-wrap');
   if (albedoWrap) albedoWrap.style.display = selectedType === 'bifacial_topcon' ? '' : 'none';
 }
@@ -2473,7 +2532,13 @@ function buildPanelCards() {
     const card = document.createElement('div');
     card.className = 'panel-card panel-catalog-card' + (entry.id === window.state.panelCatalogId ? ' selected' : '');
     card.id = `panel-card-${entry.id}`;
+    card.dataset.panelId = entry.id;
     card.dataset.panelTech = techKey;
+    card.dataset.testid = `panel-card-${entry.id}`;
+    card.setAttribute('data-testid', `panel-card-${entry.id}`);
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-pressed', entry.id === window.state.panelCatalogId ? 'true' : 'false');
     card.innerHTML = `
       <div class="panel-check">✓</div>
       <div class="panel-catalog-topline">
@@ -2508,16 +2573,21 @@ function buildPanelCards() {
       <div class="equipment-card-note equipment-card-note-muted"><strong>Dikkat:</strong> ${entry.watchFor}</div>
       <div class="panel-catalog-footer">
         <div class="panel-catalog-source">${entry.sourceLabel}</div>
-        <a class="panel-catalog-link" href="${entry.datasheetUrl}" target="_blank" rel="noopener noreferrer">Datasheet</a>
+        <a class="panel-catalog-link" href="${entry.datasheetUrl}" target="_blank" rel="noopener noreferrer">${i18n.t('common.datasheet')}</a>
       </div>`;
-    card.addEventListener('click', () => {
+    const activateCard = () => {
       window.state.panelCatalogId = entry.id;
       window.state.panelType = techKey;
-      document.querySelectorAll('.panel-card').forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
       syncPanelSelectionUI();
       updatePanelPreview();
       updateEquipmentSelectionSummary();
+    };
+    card.addEventListener('click', activateCard);
+    card.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        activateCard();
+      }
     });
     wrap.appendChild(card);
   });
@@ -2711,10 +2781,28 @@ function repositionMap(n) {
   }
 }
 
+function getMaxUnlockedStep() {
+  return Math.max(1, Number(window.state?.maxUnlockedStep) || 1);
+}
+
+function unlockStep(n) {
+  if (!window.state) return;
+  window.state.maxUnlockedStep = Math.max(getMaxUnlockedStep(), Number(n) || 1);
+}
+
+function requestStepChange(n) {
+  if (n > getMaxUnlockedStep()) {
+    showToast(i18n.t('nav.completeCurrentStepFirst'), 'warning');
+    return;
+  }
+  goToStep(n);
+}
+
 function goToStep(n) {
   const state = window.state;
   if (n < 1 || n > 7) return;
   if (n === state.step) return;
+  unlockStep(n);
   const fromEl = document.getElementById(`step-${state.step}`);
   const toEl = document.getElementById(`step-${n}`);
   if (!fromEl || !toEl) return;
@@ -2750,14 +2838,18 @@ function goToStep(n) {
 
 function updateProgressBar() {
   const state = window.state;
+  const maxUnlockedStep = getMaxUnlockedStep();
   document.querySelectorAll('.step-dot').forEach(el => {
     const s = parseInt(el.dataset.step);
     const isActive = s === state.step;
+    const isLocked = s > maxUnlockedStep;
     el.classList.remove('active','done');
+    el.classList.toggle('locked', isLocked);
     if (isActive) el.classList.add('active');
     else if (s < state.step) el.classList.add('done');
     if (isActive) el.setAttribute('aria-current', 'step');
     else el.removeAttribute('aria-current');
+    el.setAttribute('aria-disabled', isLocked ? 'true' : 'false');
   });
   for (let i = 1; i <= 6; i++) {
     const conn = document.getElementById(`conn-${i}-${i+1}`);
@@ -2768,8 +2860,12 @@ function updateProgressBar() {
 // ADIM 1: Senaryo seçimi doğrula → Adım 2
 function validateStep1() {
   if (!window.state.scenarioKey) {
-    showToast('Lütfen bir sistem senaryosu seçin.', 'error'); return;
+    const message = 'Lütfen devam etmeden önce on-grid veya off-grid senaryosunu seçin.';
+    setStepInlineAlert(1, message);
+    showToast(message, 'error'); return;
   }
+  clearStepInlineAlert(1);
+  unlockStep(2);
   goToStep(2);
 }
 
@@ -2777,13 +2873,19 @@ function validateStep1() {
 function validateStep2() {
   const state = window.state;
   if (!state.lat || !state.lon) {
-    showToast('Lütfen bir konum seçin.', 'error'); return;
+    const message = 'Lütfen haritadan veya arama kutusundan bir konum seçin.';
+    setStepInlineAlert(2, message);
+    showToast(message, 'error'); return;
   }
   if (!isInTurkey(state.lat, state.lon)) {
-    showToast('Lütfen Türkiye sınırları içinde bir konum seçin.', 'error'); return;
+    const message = 'Lütfen Türkiye sınırları içinde bir konum seçin.';
+    setStepInlineAlert(2, message);
+    showToast(message, 'error'); return;
   }
+  clearStepInlineAlert(2);
   // Lokasyon bottom card'ı gizle (adım 2'den ayrılıyoruz)
   document.getElementById('location-bottom-card')?.classList.remove('visible');
+  unlockStep(3);
   goToStep(3);
 }
 
@@ -2792,12 +2894,12 @@ function validateStep3() {
   const state = window.state;
   const area = parseFloat(document.getElementById('roof-area').value);
   if (!area || area < 10 || area > 2000) {
-    document.getElementById('roof-area').classList.add('error');
-    document.getElementById('roof-area-err').style.display = 'block';
+    syncRoofAreaValidationUi(true);
+    setStepInlineAlert(3, 'Çatı alanı 10 ile 2000 m² arasında olmalıdır.');
     return;
   }
-  document.getElementById('roof-area').classList.remove('error');
-  document.getElementById('roof-area-err').style.display = 'none';
+  syncRoofAreaValidationUi(false);
+  clearStepInlineAlert(3);
   state.roofArea = area;
 
   if (state.multiRoof) {
@@ -2807,6 +2909,7 @@ function validateStep3() {
       if (areaEl) {
         const secArea = parseFloat(areaEl.value);
         if (!secArea || secArea < 5 || secArea > 500) {
+          setStepInlineAlert(3, `${i + 2}. yüzey alanı 5 ile 500 m² arasında olmalıdır.`);
           showToast(`${i + 2}. yüzey alanı geçersiz (5–500 m² olmalı).`, 'error'); return;
         }
         sec.area = secArea;
@@ -2814,13 +2917,47 @@ function validateStep3() {
     }
   }
 
+  clearStepInlineAlert(3);
+  unlockStep(4);
   goToStep(4);
   updatePanelPreview();
   buildInverterCards();
 }
 
+function syncRoofAreaValidationUi(forceInvalid = null) {
+  const roofAreaInput = document.getElementById('roof-area');
+  const roofAreaError = document.getElementById('roof-area-err');
+  if (!roofAreaInput || !roofAreaError) return;
+  const rawValue = String(roofAreaInput.value || '').trim();
+  const value = parseFloat(rawValue);
+  const invalid = forceInvalid === null
+    ? !!rawValue && (!Number.isFinite(value) || value < 10 || value > 2000)
+    : !!forceInvalid;
+  roofAreaInput.classList.toggle('error', invalid);
+  roofAreaInput.setAttribute('aria-invalid', invalid ? 'true' : 'false');
+  roofAreaError.style.display = invalid ? 'block' : 'none';
+}
+window.syncRoofAreaValidationUi = syncRoofAreaValidationUi;
+
+function enhanceTooltipAccessibility() {
+  const moreInfoLabel = i18n.t('common.moreInfo');
+  document.querySelectorAll('.tooltip-wrap').forEach((wrap, index) => {
+    const icon = wrap.querySelector('.tooltip-icon');
+    const box = wrap.querySelector('.tooltip-box');
+    if (!icon || !box) return;
+    const tooltipId = box.id || `tooltip-box-${index + 1}`;
+    box.id = tooltipId;
+    box.setAttribute('role', 'tooltip');
+    icon.setAttribute('tabindex', '0');
+    icon.setAttribute('aria-describedby', tooltipId);
+    icon.setAttribute('aria-label', moreInfoLabel);
+  });
+}
+window.enhanceTooltipAccessibility = enhanceTooltipAccessibility;
+
 // ADIM 4: Ekipman — passthrough → Adım 5
 function validateStep4() {
+  unlockStep(5);
   goToStep(5);
 }
 
@@ -2829,6 +2966,7 @@ function validateStep5() {
   const tariffInput = document.getElementById('tariff-input');
   if (tariffInput) window.state.tariff = parseFloat(tariffInput.value) || 7.16;
   updateTariffAssumptions();
+  unlockStep(6);
   goToStep(6);
   refreshCalculationStageMeta(0);
   const calcBtn = document.getElementById('calc-btn') || document.querySelector('[onclick*="validateStep5"]');
@@ -3266,6 +3404,7 @@ window.addEventListener('load', () => {
 // WINDOW EXPOSE — HTML onclick için
 // ═══════════════════════════════════════════════════════════
 window.goToStep = goToStep;
+window.requestStepChange = requestStepChange;
 window.validateStep1 = validateStep1;
 window.validateStep2 = validateStep2;
 window.validateStep3 = validateStep3;
@@ -3521,6 +3660,9 @@ function syncOffgridL2ModeUI() {
   if (simpleWrap) simpleWrap.style.display = mode === 'basic' ? '' : 'none';
   if (fieldSection) fieldSection.style.display = mode === 'advanced' ? '' : 'none';
   if (deviceSection) deviceSection.style.display = mode === 'advanced' ? '' : 'none';
+  if (mode === 'advanced' && fieldSection && deviceSection && deviceSection.nextElementSibling !== fieldSection) {
+    deviceSection.insertAdjacentElement('afterend', fieldSection);
+  }
   if (liveSummary && mode !== 'advanced') liveSummary.style.display = 'none';
   document.querySelectorAll('[data-offgrid-mode-btn]').forEach(btn => {
     btn.classList.toggle('active', btn.getAttribute('data-offgrid-mode-btn') === mode);
