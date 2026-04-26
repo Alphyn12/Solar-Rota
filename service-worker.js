@@ -1,5 +1,5 @@
-// v25: Etap 1 mobile responsive — settings panel class + breakpoint contract.
-const CACHE_NAME = 'solarRota-v25';
+// v26: Etap 2 mobile responsive — sticky bottom CTA bar + 44px touch targets.
+const CACHE_NAME = 'solarRota-v26';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',

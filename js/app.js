@@ -178,6 +178,42 @@ window.openSettings = openSettings;
 window.closeSettings = closeSettings;
 window.setTheme = setTheme;
 
+// ── Etap 2: Mobil klavye davranışı ───────────────────────────
+// Telefon klavyesi açıldığında odaklanan input'un altta kalmamasını sağlar.
+// Yalnız dokunmatik cihazlarda çalışır; fareli laptop bozulmaz.
+function initMobileKeyboardScroll() {
+  if (typeof window.matchMedia !== 'function') return;
+  if (!window.matchMedia('(pointer: coarse)').matches) return;
+  let scrollTimer = null;
+  document.addEventListener('focusin', (e) => {
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
+    const tag = target.tagName;
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return;
+    // Klavyenin tamamen açılmasını bekle (~280 ms iOS, ~200 ms Android)
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      try { target.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch {}
+    }, 320);
+  });
+}
+
+// İlk yüklemede body[data-step] ve has-bottom-bar set et
+function initMobileBottomBarBaseline() {
+  document.body.dataset.step = String(window.state?.step || 1);
+  document.body.classList.add('has-bottom-bar');
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    initMobileKeyboardScroll();
+    initMobileBottomBarBaseline();
+  });
+} else {
+  initMobileKeyboardScroll();
+  initMobileBottomBarBaseline();
+}
+
 // ═══════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════
@@ -2826,6 +2862,9 @@ function goToStep(n) {
   if (main) main.classList.toggle('wide-flow', n === 4);
   document.body.classList.toggle('immersive-screen', n === 2 || n === 3);
   document.documentElement.classList.toggle('immersive-screen', n === 2 || n === 3);
+  // Etap 2: mobil sticky bottom bar — body[data-step] ile içerik switch
+  document.body.dataset.step = String(n);
+  document.body.classList.toggle('has-bottom-bar', n !== 6);
   syncHeaderHeightVar();
   updateProgressBar();
   window.scrollTo({ top: 0, behavior: (n === 2 || n === 3) ? 'auto' : 'smooth' });
