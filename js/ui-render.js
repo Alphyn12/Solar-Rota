@@ -169,6 +169,62 @@ function offgridStressScenarioLabel(row = {}) {
   return row.label || row.key || '—';
 }
 
+function isOffgridCoverageApproximate(L = {}) {
+  const hasRealHourlyPv = L.productionDispatchProfile === 'real-hourly-pv-8760'
+    || !!L.productionDispatchMetadata?.hasRealHourlyProduction;
+  const hasRealHourlyLoad = !!L.hasRealHourlyLoad || L.loadMode === 'hourly-8760';
+  return !(hasRealHourlyPv && hasRealHourlyLoad);
+}
+
+function formatOffgridCoverageValue(value, L = {}, { decimals = 1 } = {}) {
+  const pct = Math.max(0, Math.min(100, (Number(value) || 0) * 100));
+  if (!isOffgridCoverageApproximate(L)) return `${pct.toFixed(decimals)}%`;
+  if (pct >= 99.5) return '>%98';
+  if (pct >= 97) return '95-99%';
+  if (pct >= 92) return '90-97%';
+  if (pct >= 85) return '85-95%';
+  if (pct >= 75) return '75-90%';
+  return `~${pct.toFixed(0)}%`;
+}
+
+function offgridCoverageInterpretationMeta(L = {}) {
+  if (!isOffgridCoverageApproximate(L)) {
+    return {
+      total: i18n.t('offgridL2.coverageNoteMeasured'),
+      critical: i18n.t('offgridL2.criticalCoverageNoteMeasured')
+    };
+  }
+  return {
+    total: i18n.t('offgridL2.coverageNoteApprox'),
+    critical: i18n.t('offgridL2.criticalCoverageNoteApprox')
+  };
+}
+
+function offgridSyntheticPeakMeta(L = {}) {
+  const peak = L.syntheticPeakModel || null;
+  if (!peak || !peak.peakEnvelopeApplied) return null;
+  return {
+    label: i18n.t('offgridL2.syntheticPeakModelConservative'),
+    severity: i18n.t(`offgridL2.syntheticPeakSeverity_${peak.severity || 'medium'}`),
+    note: i18n.t('offgridL2.syntheticPeakNote')
+      .replace('{factor}', Number(peak.peakEnvelopeMaxFactor || 1).toFixed(2))
+      .replace('{delta}', Number(peak.peakDeltaKw || 0).toFixed(1))
+      .replace('{hours}', Math.round(Number(peak.peakEnvelopeHours) || 0).toLocaleString(localeTag()))
+  };
+}
+
+function offgridSyntheticPvMeta(L = {}) {
+  const weatherMeta = L.productionDispatchMetadata?.syntheticWeatherMetadata || null;
+  if (!L.productionDispatchMetadata?.synthetic || !weatherMeta) return null;
+  return {
+    label: i18n.t('offgridL2.syntheticPvWeatherModelClustered'),
+    note: i18n.t('offgridL2.syntheticPvWeatherNote')
+      .replace('{days}', Math.round(Number(weatherMeta.longestLowPvClusterDays) || 0).toLocaleString(localeTag()))
+      .replace('{min}', Number(((weatherMeta.minimumDailyFractionOfAverage || 0) * 100)).toFixed(0))
+      .replace('{max}', Number(((weatherMeta.maximumDailyFractionOfAverage || 0) * 100)).toFixed(0))
+  };
+}
+
 export function renderResults() {
   const state = window.state;
   const r = state.results;
@@ -476,6 +532,12 @@ function renderOffgridL2Results(offgridL2Results, state) {
   const uncertaintyText = uncertainty
     ? `±${Number(uncertainty.lowPct || 0).toFixed(0)}-${Number(uncertainty.highPct || 0).toFixed(0)}%`
     : '—';
+  const totalCoverageText = formatOffgridCoverageValue(L.totalLoadCoverage, L);
+  const criticalCoverageWithGeneratorText = formatOffgridCoverageValue(criticalCoverageWithGenerator, L);
+  const criticalCoverageWithoutGeneratorText = formatOffgridCoverageValue(criticalCoverageWithoutGenerator, L);
+  const coverageNotes = offgridCoverageInterpretationMeta(L);
+  const syntheticPeakMeta = offgridSyntheticPeakMeta(L);
+  const syntheticPvMeta = offgridSyntheticPvMeta(L);
   const accuracyColor = (L.accuracyScore || 0) >= 80 ? '#22C55E'
     : (L.accuracyScore || 0) >= 60 ? '#F59E0B'
     : '#EF4444';
@@ -498,8 +560,12 @@ function renderOffgridL2Results(offgridL2Results, state) {
   // Kapsama metrikleri
   const totalCovEl = document.getElementById('offgrid-total-coverage');
   const critCovEl = document.getElementById('offgrid-critical-coverage');
-  if (totalCovEl) totalCovEl.textContent = `${(L.totalLoadCoverage * 100).toFixed(1)}%`;
-  if (critCovEl) critCovEl.textContent = `${(criticalCoverageWithGenerator * 100).toFixed(1)}%`;
+  if (totalCovEl) totalCovEl.textContent = totalCoverageText;
+  if (critCovEl) critCovEl.textContent = criticalCoverageWithGeneratorText;
+  const totalCovNoteEl = document.getElementById('offgrid-total-coverage-note');
+  const critCovNoteEl = document.getElementById('offgrid-critical-coverage-note');
+  if (totalCovNoteEl) totalCovNoteEl.textContent = coverageNotes.total;
+  if (critCovNoteEl) critCovNoteEl.textContent = coverageNotes.critical;
 
   // Jeneratör analizi (enhanced with narrative)
   const genResultWrap = document.getElementById('offgrid-generator-result-wrap');
@@ -612,20 +678,20 @@ function renderOffgridL2Results(offgridL2Results, state) {
         <div class="offgrid-stat-grid">
           ${worstCritical ? offgridStatCard({
             label: i18n.t('offgridL2.stressWorstCriticalLabel'),
-            value: `${offgridStressScenarioLabel(worstCritical)} · ${(Number(worstCritical.criticalLoadCoverage || 0) * 100).toFixed(1)}%`,
+            value: `${offgridStressScenarioLabel(worstCritical)} · ${formatOffgridCoverageValue(worstCritical.criticalLoadCoverage, L)}`,
             note: `${i18n.t('offgridL2.unmetLabel')}: ${Math.round(worstCritical.unmetCriticalKwh || 0).toLocaleString(locale)} kWh`,
             color: 'var(--danger)'
           }) : ''}
           ${worstTotal ? offgridStatCard({
             label: i18n.t('offgridL2.stressWorstTotalLabel'),
-            value: `${offgridStressScenarioLabel(worstTotal)} · ${(Number(worstTotal.totalLoadCoverage || 0) * 100).toFixed(1)}%`,
+            value: `${offgridStressScenarioLabel(worstTotal)} · ${formatOffgridCoverageValue(worstTotal.totalLoadCoverage, L)}`,
             note: `${i18n.t('offgridL2.unmetLabel')}: ${Math.round(worstTotal.unmetLoadKwh || 0).toLocaleString(locale)} kWh`,
             color: 'var(--primary)'
           }) : ''}
           ${maxUnmetCritical ? offgridStatCard({
             label: i18n.t('offgridL2.stressMaxUnmetCriticalLabel'),
             value: `${offgridStressScenarioLabel(maxUnmetCritical)} · ${Math.round(maxUnmetCritical.unmetCriticalKwh || 0).toLocaleString(locale)} kWh`,
-            note: `${i18n.t('offgridL2.criticalCoverageWithGeneratorLabel')}: ${(Number(maxUnmetCritical.criticalLoadCoverage || 0) * 100).toFixed(1)}%`,
+            note: `${i18n.t('offgridL2.criticalCoverageWithGeneratorLabel')}: ${formatOffgridCoverageValue(maxUnmetCritical.criticalLoadCoverage, L)}`,
             color: '#F97316'
           }) : ''}
         </div>
@@ -670,8 +736,8 @@ function renderOffgridL2Results(offgridL2Results, state) {
       L.annualCriticalLoadKwh > 0 ? { label: i18n.t('offgridL2.resultCriticalLoad'), value: `${Math.round(L.annualCriticalLoadKwh).toLocaleString(locale)} kWh/yıl`, note: 'Kesintide öncelikli tutulacak kritik kısım' } : '',
       { label: i18n.t('offgridL2.directPvLabel'), value: `${Math.round(L.directPvKwh || 0).toLocaleString(locale)} kWh/yıl`, note: 'Güneşten gelip anında kullanılan enerji' },
       { label: i18n.t('offgridL2.batteryLabel'), value: `${Math.round(L.batteryKwh || 0).toLocaleString(locale)} kWh/yıl`, note: 'Bataryanın devreye girip taşıdığı enerji' },
-      { label: i18n.t('offgridL2.pvBessCriticalCoverageLabel'), value: `${(criticalCoverageWithoutGenerator * 100).toFixed(1)}%`, note: 'Sadece PV ve batarya ile kritik yük koruması' },
-      L.generatorEnabled ? { label: i18n.t('offgridL2.criticalCoverageWithGeneratorLabel'), value: `${(criticalCoverageWithGenerator * 100).toFixed(1)}%`, note: 'Jeneratör dahil kritik yük koruması' } : '',
+      { label: i18n.t('offgridL2.pvBessCriticalCoverageLabel'), value: criticalCoverageWithoutGeneratorText, note: 'Sadece PV ve batarya ile kritik yük koruması' },
+      L.generatorEnabled ? { label: i18n.t('offgridL2.criticalCoverageWithGeneratorLabel'), value: criticalCoverageWithGeneratorText, note: 'Jeneratör dahil kritik yük koruması' } : '',
       L.batteryReservePct != null ? { label: i18n.t('offgridL2.batteryReserveLabel'), value: `%${Number(L.batteryReservePct).toFixed(0)}`, note: 'Korunan minimum batarya rezervi' } : '',
       L.batteryChargeEfficiencyPct != null ? { label: i18n.t('offgridL2.batteryChargeEfficiencyLabel'), value: `%${Number(L.batteryChargeEfficiencyPct).toFixed(1)}`, note: 'Şarj tarafı verimi' } : '',
       L.batteryDischargeEfficiencyPct != null ? { label: i18n.t('offgridL2.batteryDischargeEfficiencyLabel'), value: `%${Number(L.batteryDischargeEfficiencyPct).toFixed(1)}`, note: 'Deşarj tarafı verimi' } : '',
@@ -700,6 +766,9 @@ function renderOffgridL2Results(offgridL2Results, state) {
             ${offgridChipCard({ label: i18n.t('offgridL2.totalDailyWh'), value: `${totalWh} Wh/gün`, note: 'Günlük toplam enerji ihtiyacı' })}
             ${offgridChipCard({ label: i18n.t('offgridL2.criticalDailyWh'), value: `${critWh} Wh/gün`, note: 'Kesintide mutlaka korunması gereken günlük tüketim' })}
             ${offgridChipCard({ label: i18n.t('offgridL2.criticalDeviceCount'), value: L.criticalDeviceCount || 0, note: 'Kritik olarak işaretlenen cihaz adedi' })}
+            ${syntheticPeakMeta ? offgridChipCard({ label: i18n.t('offgridL2.syntheticPeakModelLabel'), value: syntheticPeakMeta.label, note: syntheticPeakMeta.note }) : ''}
+            ${syntheticPeakMeta ? offgridChipCard({ label: i18n.t('offgridL2.syntheticPeakMaxLabel'), value: `${Number(L.syntheticPeakModel?.maxSyntheticPeakKw || 0).toFixed(1)} kW`, note: `${i18n.t('offgridL2.syntheticPeakFactorLabel')}: ×${Number(L.syntheticPeakModel?.peakEnvelopeMaxFactor || 1).toFixed(2)}` }) : ''}
+            ${syntheticPeakMeta ? offgridChipCard({ label: i18n.t('offgridL2.syntheticPeakCriticalMaxLabel'), value: `${Number(L.syntheticPeakModel?.maxCriticalPeakKw || 0).toFixed(1)} kW`, note: `${i18n.t('offgridL2.syntheticPeakSeverityLabel')}: ${syntheticPeakMeta.severity}` }) : ''}
           </div>`;
       }
     } else {
@@ -791,8 +860,12 @@ function renderOffgridL2Results(offgridL2Results, state) {
           ${offgridChipCard({ label: i18n.t('offgridL2.dispatchLabel'), value: dispatchLabel, note: 'Hesabın yıl içine nasıl yayıldığı' })}
           ${offgridChipCard({ label: i18n.t('offgridL2.financialBasisLabel'), value: financialBasisMeta.label, note: 'Tasarruf ve ekonomik karşılaştırma için kullanılan baz fiyat' })}
           ${offgridChipCard({ label: 'Ek doğrulama durumu', value: parityText, note: L.productionFallback ? i18n.t('offgridL2.fallbackUsed') : i18n.t('offgridL2.liveData') })}
+          ${syntheticPvMeta ? offgridChipCard({ label: i18n.t('offgridL2.syntheticPvWeatherModelLabel'), value: syntheticPvMeta.label, note: syntheticPvMeta.note }) : ''}
+          ${syntheticPeakMeta ? offgridChipCard({ label: i18n.t('offgridL2.syntheticPeakModelLabel'), value: syntheticPeakMeta.label, note: syntheticPeakMeta.note }) : ''}
         </div>
         <div class="offgrid-note-strip"><div class="offgrid-note ${fieldDataMeta.tone === 'danger' ? 'offgrid-note--warn' : ''}">${escapeHtml(fieldDataMeta.note)}</div></div>
+        ${syntheticPvMeta ? `<div class="offgrid-note-strip"><div class="offgrid-note offgrid-note--warn">${escapeHtml(i18n.t('offgridL2.syntheticPvWeatherPenaltyApplied').replace('{days}', Math.round(Number(L.productionDispatchMetadata?.syntheticWeatherMetadata?.longestLowPvClusterDays) || 0).toLocaleString(localeTag())).replace('{min}', Number(((L.productionDispatchMetadata?.syntheticWeatherMetadata?.minimumDailyFractionOfAverage || 0) * 100)).toFixed(0)))}</div></div>` : ''}
+        ${syntheticPeakMeta ? `<div class="offgrid-note-strip"><div class="offgrid-note offgrid-note--warn">${escapeHtml(i18n.t('offgridL2.syntheticPeakPenaltyApplied').replace('{severity}', syntheticPeakMeta.severity).replace('{factor}', Number(L.syntheticPeakModel?.peakEnvelopeMaxFactor || 1).toFixed(2)))}</div></div>` : ''}
         ${financialBasisMeta.warning ? `<div class="offgrid-note-strip"><div class="offgrid-note offgrid-note--warn">${escapeHtml(financialBasisMeta.warning)}</div></div>` : ''}
         <div class="offgrid-list-title">${pendingSteps.length ? 'Kesin projeye geçmeden önce tamamlanması gerekenler' : 'Bu aşama için durum'}</div>
         ${pendingSteps.length
@@ -1216,7 +1289,7 @@ function renderWarningsAndAudit(state, r) {
     ? `<ul class="audit-warning-list">${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`
     : `<div class="audit-summary-note">${escapeHtml(i18n.t('audit.noCriticalAnomalies'))}</div>`;
   const energyBalanceValue = L2
-    ? `${i18n.t('offgridL2.pvBessCoverageLabel')}: ${((L2.pvBatteryLoadCoverage ?? L2.totalLoadCoverage) * 100).toFixed(1)}% / ${i18n.t('offgridL2.accuracyScoreLabel')}: ${L2.accuracyScore ?? '—'}/100 / ${i18n.t('offgridL2.generatorLabel')}: ${Math.round(L2.generatorEnergyKwh || L2.generatorKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.unservedLoad')}: ${Math.round(L2.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.curtailedPv')}: ${Math.round(L2.curtailedPvKwh || 0).toLocaleString(localeTag())} kWh`
+    ? `${i18n.t('offgridL2.pvBessCoverageLabel')}: ${formatOffgridCoverageValue(L2.pvBatteryLoadCoverage ?? L2.totalLoadCoverage, L2)} / ${i18n.t('offgridL2.accuracyScoreLabel')}: ${L2.accuracyScore ?? '—'}/100 / ${i18n.t('offgridL2.generatorLabel')}: ${Math.round(L2.generatorEnergyKwh || L2.generatorKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.unservedLoad')}: ${Math.round(L2.unmetLoadKwh || 0).toLocaleString(localeTag())} kWh / ${i18n.t('audit.curtailedPv')}: ${Math.round(L2.curtailedPvKwh || 0).toLocaleString(localeTag())} kWh`
     : state.netMeteringEnabled
     ? `${Math.round(r.nmMetrics?.directSelfConsumedEnergy || r.nmMetrics?.selfConsumedEnergy || 0).toLocaleString(localeTag())} kWh direct / offset ${Math.round(r.nmMetrics?.importOffsetEnergy || 0).toLocaleString(localeTag())} kWh / paid ${Math.round(r.nmMetrics?.paidGridExport || 0).toLocaleString(localeTag())} kWh / total ${Math.round(r.nmMetrics?.annualGridExport || 0).toLocaleString(localeTag())} kWh`
     : isOffGrid
@@ -1659,8 +1732,8 @@ export function downloadPDF() {
   if (state.scenarioKey === 'off-grid' && r.offgridL2Results) {
     const L = r.offgridL2Results;
     kpis.push(
-      [pdfSafeText(i18n.t('offgridL2.pvBessCoverageLabel')), `${((L.pvBatteryLoadCoverage ?? L.totalLoadCoverage) * 100).toFixed(1)}%`],
-      [pdfSafeText(i18n.t('offgridL2.totalCoverageWithGeneratorLabel')), `${(L.totalLoadCoverage * 100).toFixed(1)}%`],
+      [pdfSafeText(i18n.t('offgridL2.pvBessCoverageLabel')), formatOffgridCoverageValue(L.pvBatteryLoadCoverage ?? L.totalLoadCoverage, L)],
+      [pdfSafeText(i18n.t('offgridL2.totalCoverageWithGeneratorLabel')), formatOffgridCoverageValue(L.totalLoadCoverage, L)],
       [pdfSafeText(i18n.t('offgridL2.accuracyScoreLabel')), `${L.accuracyScore ?? '—'} / 100${L.expectedUncertaintyPct ? ` (${Number(L.expectedUncertaintyPct.lowPct || 0).toFixed(0)}-${Number(L.expectedUncertaintyPct.highPct || 0).toFixed(0)}%)` : ''}`],
       [pdfSafeText(i18n.t('offgridL2.resultAutonomousDays')), `${L.autonomousDays ?? '—'} ${yearUnit}`],
       ...(L.generatorEnabled ? [[pdfSafeText(i18n.t('offgridL2.resultAutonomousDaysWithGenerator')), `${L.autonomousDaysWithGenerator ?? '—'} ${yearUnit}`]] : []),

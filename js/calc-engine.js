@@ -962,6 +962,8 @@ export async function runCalculation() {
       source: offgridRealPvSource,
       sourceLabel: offgridRealPvHourly ? offgridRealPvSourceLabel : null,
       fallbackHourlyRows: hourlySummaryRaw.hourly8760,
+      cityName: state.cityName,
+      panelTempCoeffPerC: panel.tempCoeff,
       fallbackSource: 'monthly-production-derived-synthetic-8760',
       fallbackSourceLabel: authoritativeBackend ? authoritativeSourceMeta.source : getPvgisSourceLabel(aggregateFetchStatus, currentLang),
       fallbackUsed: usedFallback || !!authoritativeSourceMeta.fallbackUsed
@@ -1158,7 +1160,9 @@ export async function runCalculation() {
       dispatchBus: offgridPvProfile.dispatchBus,
       resolution: offgridPvProfile.resolution,
       missingHours: offgridPvProfile.missingHours,
-      synthetic: offgridPvProfile.synthetic
+      synthetic: offgridPvProfile.synthetic,
+      syntheticWeatherModel: offgridPvProfile.syntheticWeatherModel || null,
+      syntheticWeatherMetadata: offgridPvProfile.syntheticWeatherMetadata || null
     };
     offgridL2Results.loadSource = offgridLoadProfile.loadSource || offgridLoadProfile.mode;
     offgridL2Results.loadMode = offgridLoadProfile.mode;

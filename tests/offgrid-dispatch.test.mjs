@@ -48,6 +48,26 @@ function makeDaytimePvHourly(dailyKwh) {
   return hourlys;
 }
 
+const MONTH_DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
+
+function monthlyTotals(hourly8760) {
+  const monthly = [];
+  let cursor = 0;
+  for (const days of MONTH_DAYS) {
+    const hours = days * 24;
+    monthly.push(hourly8760.slice(cursor, cursor + hours).reduce((sum, value) => sum + value, 0));
+    cursor += hours;
+  }
+  return monthly;
+}
+
+function dailyTotals(hourly8760) {
+  return Array.from({ length: 365 }, (_, day) => {
+    const start = day * 24;
+    return hourly8760.slice(start, start + 24).reduce((sum, value) => sum + value, 0);
+  });
+}
+
 const DEFAULT_BATTERY = {
   usableCapacityKwh: 10,
   efficiency: 0.92,
@@ -184,6 +204,43 @@ describe('buildOffgridPvDispatchProfile — üretim source-of-truth', () => {
     assert.equal(result.productionDispatchProfile, 'monthly-production-derived-synthetic-8760');
     nearly(result.annualKwh, 12 * 365, 0.01, 'fallback pv annual');
   });
+
+  it('sentetik fallback PV aylık toplamı koruyup günler arası kümeli oynaklık üretir', () => {
+    const fallbackHourly = makeLoadHourly(12);
+    const result = buildOffgridPvDispatchProfile({
+      fallbackHourlyRows: fallbackHourly.map(production => ({ production }))
+    });
+
+    const sourceMonthly = monthlyTotals(fallbackHourly);
+    const clusteredMonthly = monthlyTotals(result.pvHourly8760);
+    sourceMonthly.forEach((value, idx) => nearly(clusteredMonthly[idx], value, 0.5, `month ${idx + 1} total preserved`));
+
+    const daily = dailyTotals(result.pvHourly8760);
+    assert.ok(Math.min(...daily) < (Math.max(...daily) * 0.2), 'daily PV variability yeterince sert değil');
+    assert.equal(result.syntheticWeatherModel, 'clustered-seasonal-regime-v1');
+    assert.ok((result.syntheticWeatherMetadata?.longestLowPvClusterDays || 0) >= 2, 'low PV cluster bekleniyor');
+  });
+
+  it('sentetik PV sıcaklık şekillendirmesi sıcak şehirde yaz öğle pikini bastırır ama yıllık enerjiyi korur', () => {
+    const fallbackHourly = makeLoadHourly(12);
+    const hot = buildOffgridPvDispatchProfile({
+      fallbackHourlyRows: fallbackHourly.map(production => ({ production })),
+      cityName: 'Antalya',
+      panelTempCoeffPerC: -0.0034
+    });
+    const cool = buildOffgridPvDispatchProfile({
+      fallbackHourlyRows: fallbackHourly.map(production => ({ production })),
+      cityName: 'Erzurum',
+      panelTempCoeffPerC: -0.0034
+    });
+
+    nearly(hot.annualKwh, cool.annualKwh, 0.01, 'temperature shaping annual energy preservation');
+    assert.equal(hot.syntheticWeatherMetadata?.syntheticTemperatureModel, 'city-seasonal-cell-derate-v1');
+    assert.ok((hot.syntheticWeatherMetadata?.peakSummerNoonTempFactor || 1) < (cool.syntheticWeatherMetadata?.peakSummerNoonTempFactor || 1),
+      'sıcak şehirde öğle temperature factor daha düşük olmalı');
+    assert.ok((hot.syntheticWeatherMetadata?.peakSummerCellTempC || 0) > (cool.syntheticWeatherMetadata?.peakSummerCellTempC || 0),
+      'sıcak şehirde hücre sıcaklığı daha yüksek olmalı');
+  });
 });
 
 describe('evaluateOffgridFieldGuaranteeReadiness — Faz 1 gate', () => {
@@ -282,7 +339,7 @@ describe('runOffgridDispatch — battery and inverter power limits', () => {
     const critical = makeLoadHourly(1);
     const slow = runOffgridDispatch(pv, load, critical, batterySlow, NO_GENERATOR, {});
     const fast = runOffgridDispatch(pv, load, critical, batteryFast, NO_GENERATOR, {});
-    assert.ok(slow.curtailedPvKwh > fast.curtailedPvKwh, 'şarj kW limiti curtailed PV artırmalı');
+    assert.ok(slow.batteryChargeLimitedKwh > fast.batteryChargeLimitedKwh, 'şarj kW limiti charge-limited enerjiyi artırmalı');
     assert.ok(slow.batteryChargeLimitedKwh > 0, 'şarj kW limit metriği dolmalı');
   });
 
@@ -295,6 +352,31 @@ describe('runOffgridDispatch — battery and inverter power limits', () => {
     const unlimited = runOffgridDispatch(pv, load, critical, battery, NO_GENERATOR, {});
     assert.ok(limited.totalLoadCoverage < unlimited.totalLoadCoverage, 'inverter limiti kapsamayı düşürmeli');
     assert.ok(limited.inverterPowerLimitedLoadKwh > 0, 'inverter limit metriği dolmalı');
+  });
+
+  it('sentetik cihaz peak envelope inverter limitini daha erken tetikleyebilir', () => {
+    const devices = [
+      { name: 'Kettle', category: 'kitchen', powerW: 2000, hoursPerDay: 0.2, isCritical: false, usageType: 'manual' },
+      { name: 'Çamaşır', category: 'laundry', powerW: 1800, hoursPerDay: 1.5, isCritical: false, usageType: 'cyclic' }
+    ];
+    const profile = buildOffgridLoadProfile(devices, {});
+    const annualLoad = profile.annualTotalKwh;
+    const pvHourly = new Array(8760).fill(annualLoad / 8760);
+    const battery = { usableCapacityKwh: 500, efficiency: 1, socReserveKwh: 0, initialSocKwh: 500, maxDischargePowerKw: 10, maxChargePowerKw: 10 };
+    const result = runOffgridDispatch(
+      pvHourly,
+      profile.totalHourly8760,
+      profile.criticalHourly8760,
+      battery,
+      NO_GENERATOR,
+      {
+        loadPeakKw8760: profile.hourlyPeakKw8760,
+        criticalPeakKw8760: profile.criticalPeakKw8760,
+        inverterAcLimitKw: 3.5,
+        inverterSurgeMultiplier: 1
+      }
+    );
+    assert.ok(result.inverterPowerLimitedLoadKwh > 0, 'sentetik peak envelope inverter limitini tetiklemeli');
   });
 
   it('jeneratör dahil kapsama PV+BESS kapsamasından ayrı raporlanır', () => {
@@ -596,16 +678,19 @@ describe('buildOffgridResults', () => {
     const load = makeLoadHourly(8);
     const critical = makeLoadHourly(3);
     const normal = runOffgridDispatch(pv, load, critical, DEFAULT_BATTERY, NO_GENERATOR, {});
-    const loadProfile = buildOffgridLoadProfile([], { fallbackDailyKwh: 8, criticalFraction: 0.375 });
+    const loadProfile = buildOffgridLoadProfile([
+      { name: 'Kettle', category: 'kitchen', powerW: 2000, hoursPerDay: 0.2, isCritical: false, usageType: 'manual' }
+    ], {});
     const result = buildOffgridResults(normal, null, loadProfile, { enabled: false }, { systemCapexTry: 50000, alternativeEnergyCostPerKwh: 15 });
     assert.equal(result.methodologyNote, 'synthetic-dispatch-pre-feasibility');
     assert.ok(result.dispatchVersion.startsWith('OGD-'), 'dispatchVersion başlangıcı');
     assert.equal(typeof result.pvBatteryLoadCoverage, 'number');
     assert.equal(typeof result.minimumSoc, 'number');
     assert.equal(typeof result.accuracyScore, 'number');
-    assert.equal(result.accuracyAssessment.tier, 'basic-synthetic');
+    assert.equal(result.accuracyAssessment.tier, 'device-library');
     assert.equal(result.criticalCoverageWithGenerator, result.criticalLoadCoverage);
     assert.equal(result.criticalCoverageWithoutGenerator, result.criticalLoadCoverage);
+    assert.equal(result.syntheticPeakModel?.peakEnvelopeApplied, true);
   });
 
   it('badWeatherScenario null olabilir', () => {
@@ -669,6 +754,30 @@ describe('runOffgridDispatch — Faz 3 parametreleri', () => {
     const result = runOffgridDispatch(pv, load, critical, battery, NO_GENERATOR, {});
     nearly(result.chargeEfficiency, 0.95, 0.0001, 'charge eff');
     nearly(result.dischargeEfficiency, 0.85, 0.0001, 'discharge eff');
+  });
+
+  it('dinamik battery efficiency yüksek C-rate ve düşük SOC altında efektif verimi düşürür', () => {
+    const battery = {
+      usableCapacityKwh: 6,
+      efficiency: 0.95,
+      chemistry: 'NMC',
+      socReserveKwh: 0.6,
+      initialSocKwh: 1.5,
+      maxChargePowerKw: 6,
+      maxDischargePowerKw: 6,
+      dynamicEfficiencyModelEnabled: true
+    };
+    const pv = makeLoadHourly(0);
+    const load = makeLoadHourly(36); // 1.5 kWh/h
+    const critical = makeLoadHourly(18);
+    const dynamicOn = runOffgridDispatch(pv, load, critical, battery, NO_GENERATOR, {});
+    const dynamicOff = runOffgridDispatch(pv, load, critical, { ...battery, dynamicEfficiencyModelEnabled: false }, NO_GENERATOR, {});
+
+    assert.equal(dynamicOn.dynamicBatteryEfficiencyModel, 'c-rate-soc-v1');
+    assert.ok(dynamicOn.effectiveDischargeEfficiencyAvg < dynamicOff.effectiveDischargeEfficiencyAvg,
+      'dinamik model efektif deşarj verimini düşürmeli');
+    assert.ok(dynamicOn.unmetLoadKwh >= dynamicOff.unmetLoadKwh,
+      'daha düşük efektif verim unmet load azaltmamalı');
   });
 });
 

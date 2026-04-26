@@ -36,6 +36,52 @@ def sample_request():
     }
 
 
+def offgrid_sample_request():
+    request = sample_request()
+    request["scenario"] = {"key": "off-grid", "label": "Off-Grid", "proposalTone": "autonomy"}
+    request["system"]["batteryEnabled"] = True
+    request["system"]["battery"] = {
+        "capacity": 14.4,
+        "dod": 0.9,
+        "efficiency": 0.94,
+        "socReservePct": 15,
+    }
+    request["system"]["batteryMaxChargeKw"] = 5
+    request["system"]["batteryMaxDischargeKw"] = 5
+    request["system"]["offgridInverterAcKw"] = 6
+    request["system"]["offgridInverterSurgeMultiplier"] = 1.5
+    request["system"]["netMeteringEnabled"] = False
+    request["load"]["dailyConsumptionKwh"] = 18
+    request["load"]["hourlyConsumption8760"] = [0.75] * 8760
+    request["load"]["offgridCriticalLoad8760"] = [0.30] * 8760
+    request["load"]["hourlyProduction8760"] = [0.0] * 8760
+    for day in range(365):
+        base = day * 24
+        for hour in range(8, 17):
+            request["load"]["hourlyProduction8760"][base + hour] = 1.6
+    request["offgrid"] = {
+        "calculationMode": "advanced",
+        "generatorEnabled": True,
+        "generatorKw": 4.5,
+        "generatorFuelCostPerKwh": 6.5,
+        "generatorStrategy": "critical-backup",
+        "generatorFuelType": "diesel",
+        "generatorSizePreset": "manual",
+        "generatorReservePct": 20,
+        "generatorStartSocPct": 25,
+        "generatorStopSocPct": 70,
+        "generatorMaxHoursPerDay": 8,
+        "generatorMinLoadRatePct": 30,
+        "generatorChargeBatteryEnabled": False,
+        "generatorMaintenanceCostTry": 8000,
+        "generatorCapexTry": 120000,
+        "badWeatherLevel": "moderate",
+        "fieldGuaranteeMode": False,
+    }
+    request["tariff"]["offGridCostPerKwhTry"] = 19.5
+    return request
+
+
 def test_health_contract():
     response = client.get("/health")
     assert response.status_code == 200
@@ -128,18 +174,16 @@ def test_financial_proposal_contract():
     assert data["financial"]["warning"] == "estimate_only_not_for_commercial_quotes"
     assert data["proposal"]["warning"] == "estimate_only_not_for_commercial_quotes"
     # FIX-6 (backend KDV parity): panels at 0% KDV, non-panel components at 20%.
-    # 12.9 kWp mono: panel_cost=258_000 (0% KDV) + non_panel=159_800 (20% KDV → +31_960)
-    # = 449_760. Old value was 501_360 (20% on full subtotal).
-    assert data["financial"]["roughCapexTry"] == 449760
+    # Frontend default mono price basis is 18.5 TL/W:
+    # 12.9 kWp mono: panel_cost=238_650 (0% KDV) + non_panel=159_800 (20% KDV → +31_960)
+    # = 430_410.
+    assert data["financial"]["roughCapexTry"] == 430410
 
 
 def test_backend_offgrid_financial_uses_alternative_cost_and_blocks_export_revenue():
-    request = sample_request()
-    request["scenario"] = {"key": "off-grid", "label": "Off-Grid", "proposalTone": "autonomy"}
-    request["system"]["netMeteringEnabled"] = True
+    request = offgrid_sample_request()
     request["tariff"]["importRateTryKwh"] = 7.16
     request["tariff"]["exportRateTryKwh"] = 3.0
-    request["tariff"]["offGridCostPerKwhTry"] = 19.5
 
     response = client.post("/api/financial/proposal", json=request)
     assert response.status_code == 200
@@ -150,12 +194,31 @@ def test_backend_offgrid_financial_uses_alternative_cost_and_blocks_export_reven
     assert data["financial"]["paidGridExportKwh"] == 0
     assert data["financial"]["curtailedSurplusEstimateKwh"] >= 0
     assert abs(data["financial"]["annualSavingsTry"] - round(data["financial"]["selfConsumedEnergyKwh"] * 19.5)) <= 20
-    assert data["financial"]["dispatchAvailable"] is False
-    assert data["financial"]["authoritativeForOffgrid"] is False
-    assert data["financial"]["offgridDispatchAuthority"] == "frontend-offgrid-l2-dispatch"
-    assert data["financial"]["selfConsumptionModel"] == "heuristic-target-not-dispatch"
-    assert data["proposal"]["quoteReadiness"] == "not-quote-ready"
-    assert "off-grid dispatch" in data["proposal"]["warningDetail"].lower()
+    assert data["financial"]["dispatchAvailable"] is True
+    assert data["financial"]["authoritativeForOffgrid"] is True
+    assert data["financial"]["offgridDispatchAuthority"] == "backend-offgrid-l2-dispatch"
+    assert data["financial"]["selfConsumptionModel"] == "dispatch-hourly-offgrid-l2"
+    assert "backend l2 dispatch" in data["proposal"]["warningDetail"].lower()
+    assert data["offgridL2Results"]["generatorEnabled"] is True
+    assert data["offgridL2Results"]["criticalLoadCoverage"] >= data["offgridL2Results"]["totalLoadCoverage"]
+
+
+def test_backend_offgrid_calculate_returns_dispatch_results():
+    response = client.post("/api/pv/calculate", json=offgrid_sample_request())
+    assert response.status_code == 200
+    data = response.json()
+    assert data["offgridL2Results"] is not None
+    assert data["raw"]["offgridDispatchAvailable"] is True
+    assert data["offgridL2Results"]["dispatchVersion"] == "OGD-PY-2026.04-v1"
+    assert data["offgridL2Results"]["loadMode"] == "hourly-8760"
+    assert data["offgridL2Results"]["productionDispatchMetadata"]["hasRealHourlyProduction"] is True
+    assert data["offgridL2Results"]["calculationMode"] == "advanced"
+    assert data["offgridL2Results"]["accuracyScore"] >= 0
+    assert data["offgridL2Results"]["accuracyAssessment"]["calculationMode"] == "advanced"
+    assert data["offgridL2Results"]["dataLineage"]["economics"]["authoritativeFinancialBasis"] == "backend-offgrid-l2-dispatch"
+    assert len(data["offgridL2Results"]["hourly8760"]) == 8760
+    assert data["offgridL2Results"]["criticalLoadCoverage"] >= 0
+    assert data["offgridL2Results"]["fieldGuaranteeReadiness"]["status"] in {"blocked", "phase-1-input-ready"}
 
 
 @pytest.mark.parametrize(
@@ -303,7 +366,7 @@ def test_fix6_kdv_split_panel_zero_nonpanel_twenty():
     req = EngineRequest(**request_data)
     capex = _frontend_default_capex(req, 12.9)
 
-    panel_cost = 12.9 * 1000 * 20.0  # mono
+    panel_cost = 12.9 * 1000 * 18.5  # mono
     non_panel = 12.9 * 6500 + 12.9 * 2200 + 12.9 * 600 + 12.9 * 900 + 12.9 * 1800 + 5000
     expected = panel_cost * 1.00 + non_panel * 1.20
     assert abs(capex - expected) < 1, (

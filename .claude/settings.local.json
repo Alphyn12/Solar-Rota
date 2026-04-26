@@ -51,7 +51,10 @@
       "Bash(python -m http.server 8768)",
       "Bash(curl -s -o /dev/null -w \"index:%{http_code} %{size_download}b\\\\n\" http://localhost:8768/index.html)",
       "Bash(curl -s -o /dev/null -w \"css  :%{http_code} %{size_download}b\\\\n\" http://localhost:8768/css/landing.css)",
-      "Bash(pkill -f \"http.server 8768\")"
+      "Bash(pkill -f \"http.server 8768\")",
+      "Bash(python -m pytest backend/tests/test_backend_api.py -x --tb=short)",
+      "Bash(python -m pytest backend/tests/test_backend_api.py --tb=short --deselect backend/tests/test_backend_api.py::test_financial_proposal_contract)",
+      "Bash(python *)"
     ]
   }
 }

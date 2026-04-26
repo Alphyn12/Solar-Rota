@@ -2,7 +2,7 @@
 <html lang="tr" data-theme="dark">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"/>
 <title>Solar Rota | Profesyonel GES Mühendislik Aracı</title>
 <meta name="description" content="Solar Rota ile Türkiye için senaryo bazlı güneş paneli enerji ve yatırım hesaplaması yapın."/>
 <link rel="manifest" href="/manifest.json"/>
@@ -4228,12 +4228,12 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
         <div class="offgrid-stat-card" style="--metric-color:var(--primary)">
           <div class="offgrid-stat-value" id="offgrid-total-coverage">--%</div>
           <div class="offgrid-stat-label" data-i18n="offgridL2.totalCoverageLabel">Toplam ihtiyacın karşılanan kısmı</div>
-          <div class="offgrid-stat-note">Evin veya tesisin toplam elektrik ihtiyacının sistem tarafından karşılanan bölümü.</div>
+          <div class="offgrid-stat-note" id="offgrid-total-coverage-note">Evin veya tesisin toplam elektrik ihtiyacının sistem tarafından karşılanan bölümü.</div>
         </div>
         <div class="offgrid-stat-card" style="--metric-color:var(--danger)">
           <div class="offgrid-stat-value" id="offgrid-critical-coverage">--%</div>
           <div class="offgrid-stat-label" data-i18n="offgridL2.criticalCoverageLabel">Kritik ihtiyaçların karşılanan kısmı</div>
-          <div class="offgrid-stat-note">Buzdolabı, modem, aydınlatma gibi kesintide öncelikli yüklerin ne kadarının korunabildiği.</div>
+          <div class="offgrid-stat-note" id="offgrid-critical-coverage-note">Buzdolabı, modem, aydınlatma gibi kesintide öncelikli yüklerin ne kadarının korunabildiği.</div>
         </div>
       </div>
     </div>
@@ -4650,6 +4650,66 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 </div>
 
 </main>
+
+<!-- MOBILE STICKY BOTTOM CTA BAR (Etap 2) -->
+<nav class="mobile-bottom-bar" aria-label="Adım navigasyonu" data-testid="mobile-bottom-bar">
+  <div class="mobile-bottom-bar__group" data-step="1">
+    <button class="btn btn-primary" data-testid="m-step1-continue" onclick="validateStep1()">
+      <span data-i18n="step1.continue">Devam</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
+  </div>
+  <div class="mobile-bottom-bar__group" data-step="2">
+    <button class="btn btn-secondary" onclick="goToStep(1)" aria-label="Geri">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Geri</span>
+    </button>
+    <button class="btn btn-primary" data-testid="m-step2-continue" onclick="validateStep2()">
+      <span>Konumu Onayla</span>
+    </button>
+  </div>
+  <div class="mobile-bottom-bar__group" data-step="3">
+    <button class="btn btn-secondary" onclick="goToStep(2)" aria-label="Geri">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Geri</span>
+    </button>
+    <button class="btn btn-primary" data-testid="m-step3-continue" onclick="validateStep3()">
+      <span>Devam</span>
+    </button>
+  </div>
+  <div class="mobile-bottom-bar__group" data-step="4">
+    <button class="btn btn-secondary" onclick="goToStep(3)" aria-label="Geri">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Geri</span>
+    </button>
+    <button class="btn btn-primary" data-testid="m-step4-continue" onclick="validateStep4()">
+      <span>Devam</span>
+    </button>
+  </div>
+  <div class="mobile-bottom-bar__group" data-step="5">
+    <button class="btn btn-secondary" onclick="goToStep(4)" aria-label="Geri">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Geri</span>
+    </button>
+    <button class="btn btn-primary" data-testid="m-step5-calculate" onclick="validateStep5()">
+      <span data-i18n="report.calculate">Hesapla</span>
+    </button>
+  </div>
+  <div class="mobile-bottom-bar__group" data-step="7">
+    <button class="btn btn-primary" data-testid="m-pdf" onclick="downloadPDF()" aria-label="PDF indir">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span>PDF</span>
+    </button>
+    <button class="btn btn-outline" data-testid="m-compare" onclick="openComparison()" aria-label="Karşılaştır">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Karşılaştır</span>
+    </button>
+    <button class="btn btn-outline" data-testid="m-recalculate" onclick="goToStep(1)" aria-label="Yeniden hesapla">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+      <span>Yenile</span>
+    </button>
+  </div>
+</nav>
 
 <!-- TOAST CONTAINER -->
 <div id="toast-container" aria-live="polite" aria-atomic="true" aria-relevant="additions text"></div>

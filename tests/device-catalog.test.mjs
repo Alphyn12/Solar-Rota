@@ -255,6 +255,19 @@ describe('Cihaz listesi → dispatch entegrasyonu', () => {
     assert.ok(profile.annualTotalKwh > 0);
     assert.ok(profile.annualCriticalKwh > 0); // buzdolabı kritik
   });
+
+  it('sentetik cihaz profili peak envelope ile nominal surge toplamından daha konservatif davranır', () => {
+    const devices = [
+      { name: 'Kettle', category: 'kitchen', powerW: 2000, hoursPerDay: 0.2, isCritical: false, usageType: 'manual' },
+      { name: 'Çamaşır', category: 'laundry', powerW: 1800, hoursPerDay: 1.5, isCritical: false, usageType: 'cyclic' }
+    ];
+    const profile = buildOffgridLoadProfile(devices, {});
+    const naiveNominalPeakKw = (2.0 * 1.2) + (1.8 * 1.4);
+    const maxPeakKw = Math.max(...profile.hourlyPeakKw8760);
+    assert.equal(profile.syntheticPeakModel?.peakEnvelopeApplied, true);
+    assert.ok(profile.syntheticPeakModel?.peakEnvelopeHours > 0, 'peak envelope hour count > 0 olmalı');
+    assert.ok(maxPeakKw > naiveNominalPeakKw, `peak envelope beklenenden sert değil: ${maxPeakKw} <= ${naiveNominalPeakKw}`);
+  });
 });
 
 // ── 9. Manuel cihaz + katalog cihaz birlikte ─────────────────────────────────

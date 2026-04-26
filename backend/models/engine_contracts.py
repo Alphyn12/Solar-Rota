@@ -79,12 +79,55 @@ class SystemInput(FlexibleModel):
     ev: Optional[Dict[str, Any]] = None
     heatPumpEnabled: bool = False
     heatPump: Optional[Dict[str, Any]] = None
+    batteryMaxChargeKw: Optional[float] = None
+    batteryMaxDischargeKw: Optional[float] = None
+    offgridInverterAcKw: Optional[float] = None
+    offgridInverterSurgeMultiplier: Optional[float] = None
+    layoutSnapshot: Optional[Dict[str, Any]] = None
+    authoritativePanelCount: Optional[int] = None
+    chosenSystemPowerKwp: Optional[float] = None
 
 
 class LoadInput(FlexibleModel):
     dailyConsumptionKwh: float = 0
     monthlyConsumptionKwh: Optional[List[float]] = None
     hourlyConsumption8760: Optional[List[float]] = None
+    hourlyProduction8760: Optional[List[float]] = None
+    offgridCriticalLoad8760: Optional[List[float]] = None
+    offgridDevices: Optional[List[Dict[str, Any]]] = None
+    offgridCriticalFraction: Optional[float] = None
+
+
+class OffgridInput(FlexibleModel):
+    calculationMode: str = "basic"
+    generatorEnabled: bool = False
+    generatorKw: float = 0
+    generatorFuelCostPerKwh: float = 0
+    generatorCapexTry: float = 0
+    generatorStrategy: str = "critical-backup"
+    generatorFuelType: str = "diesel"
+    generatorSizePreset: str = "auto"
+    generatorReservePct: float = 0
+    generatorStartSocPct: float = 0
+    generatorStopSocPct: Optional[float] = None
+    generatorMaxHoursPerDay: Optional[float] = None
+    generatorMinLoadRatePct: Optional[float] = None
+    generatorChargeBatteryEnabled: Optional[bool] = None
+    generatorMaintenanceCostTry: float = 0
+    generatorOverhaulHours: float = 0
+    generatorOverhaulCostTry: float = 0
+    badWeatherLevel: str = ""
+    fieldGuaranteeMode: bool = False
+    productionSourcePriority: List[str] = Field(default_factory=list)
+    loadSourcePriority: List[str] = Field(default_factory=list)
+    fieldEvidenceRequired: List[str] = Field(default_factory=list)
+    fieldModelStressRequired: List[str] = Field(default_factory=list)
+    fieldAcceptanceRequired: List[str] = Field(default_factory=list)
+    fieldOperationRequired: List[str] = Field(default_factory=list)
+    fieldRevalidationRequired: List[str] = Field(default_factory=list)
+    fieldRevalidationSkipped: List[str] = Field(default_factory=list)
+    dispatchLevel: str = "L2"
+    fieldGuaranteeGate: Optional[str] = None
 
 
 class TariffInput(FlexibleModel):
@@ -124,6 +167,7 @@ class EngineRequest(FlexibleModel):
     roof: RoofInput = Field(default_factory=RoofInput)
     system: SystemInput = Field(default_factory=SystemInput)
     load: LoadInput = Field(default_factory=LoadInput)
+    offgrid: Optional[OffgridInput] = None
     tariff: TariffInput = Field(default_factory=TariffInput)
     governance: GovernanceInput = Field(default_factory=GovernanceInput)
     parity: ParityInput = Field(default_factory=ParityInput)
@@ -149,6 +193,7 @@ class EngineResponse(FlexibleModel):
     losses: Dict[str, Any] = Field(default_factory=dict)
     financial: Dict[str, Any] = Field(default_factory=dict)
     proposal: Dict[str, Any] = Field(default_factory=dict)
+    offgridL2Results: Optional[Dict[str, Any]] = None
     raw: Dict[str, Any] = Field(default_factory=dict)
 
 

@@ -251,6 +251,7 @@ export function normalizePvEngineResponse(response = {}) {
     losses: response.losses || null,
     financial: response.financial || null,
     proposal: response.proposal || null,
+    offgridL2Results: response.offgridL2Results || null,
     raw: response.raw || null,
     engineUsed: response.raw?.engineUsed || response.production?.engine_used || response.engineSource?.source || null,
     engineQuality: response.raw?.engineQuality || response.production?.engine_quality || response.engineSource?.engineQuality || null,

@@ -40,6 +40,107 @@ textarea {
   touch-action: manipulation;
 }
 
+/* ── GLOBAL TOUCH TARGETS (Etap 2) ─────────────────────────
+   Dokunmatik cihazlarda tüm aksiyon hedefleri 44 px asgari.
+   `pointer: coarse` koşulu fareli laptop ve trackpad'i bozmaz.       */
+@media (pointer: coarse) {
+  button,
+  .btn,
+  [role="button"],
+  a.cta,
+  .step-dot,
+  .lang-btn,
+  .currency-btn,
+  .settings-choice-btn,
+  .header-icon-btn,
+  .header-lang-btn,
+  .leaflet-bar a,
+  .leaflet-touch .leaflet-bar a,
+  .roof-tool-btn,
+  .modal-close,
+  .settings-panel-close {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Form alanları zoom önlemi için 16 px font, dar alanlarda taşmasın */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+    min-width: 0;
+  }
+}
+
+/* ── MOBILE BOTTOM CTA BAR (Etap 2) ────────────────────────
+   <=768 ekranda sticky alt aksiyon barı; adıma duyarlı içerik
+   body[data-step="N"] ile değişir. Masaüstünde tamamen gizli.        */
+.mobile-bottom-bar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  body.has-bottom-bar #main-content {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-bottom-bar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    padding: 10px 12px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(8px);
+  }
+
+  .mobile-bottom-bar__group {
+    display: none;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobile-bottom-bar__group .btn {
+    flex: 1;
+    min-height: 48px;
+    padding: 12px 14px;
+    font-size: 0.92rem;
+    justify-content: center;
+  }
+
+  .mobile-bottom-bar__group .btn-primary {
+    flex: 2;
+  }
+
+  body[data-step="1"] .mobile-bottom-bar__group[data-step="1"],
+  body[data-step="2"] .mobile-bottom-bar__group[data-step="2"],
+  body[data-step="3"] .mobile-bottom-bar__group[data-step="3"],
+  body[data-step="4"] .mobile-bottom-bar__group[data-step="4"],
+  body[data-step="5"] .mobile-bottom-bar__group[data-step="5"],
+  body[data-step="7"] .mobile-bottom-bar__group[data-step="7"] {
+    display: flex;
+  }
+
+  /* Step 6 (yükleniyor) ve modallar açıkken bar gizli */
+  body[data-step="6"] .mobile-bottom-bar,
+  body.modal-open .mobile-bottom-bar {
+    display: none;
+  }
+
+  /* Mevcut adım içi nav-btns / hero-cta-wrap mobilde gizli — sticky bar
+     onları çoğaltıyor. Masaüstünde ve >768 tabletlerde korunur. */
+  .step-pane.active .nav-btns,
+  .step-pane.active .hero-cta-wrap {
+    display: none !important;
+  }
+}
+
 /* ── SETTINGS PANEL & OVERLAY ─────────────────────────────
    Inline style'dan class'a taşındı (Etap 1).
    JS hala display ve transform'u inline manipüle eder; bu kurallar

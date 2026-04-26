@@ -5,6 +5,7 @@
 // Solar Rota v2.0 — OGD-2026.04-v1.1
 // ═══════════════════════════════════════════════════════════
 import { getLoadProfile } from './calc-core.js';
+import { CITY_SUMMER_TEMPS, HOURLY_SOLAR_PROFILE } from './data.js';
 
 function getLoadSeasonForMonth(monthIdx) {
   if (monthIdx === 11 || monthIdx <= 1) return 'winter';
@@ -21,6 +22,57 @@ const HOURS_PER_YEAR = 8760;
 const MONTH_DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
 const DAY_HOURS = new Set([6,7,8,9,10,11,12,13,14,15,16,17]);
 const NIGHT_HOURS = new Set([0,1,2,3,4,5,18,19,20,21,22,23]);
+const PV_DAYLIGHT_HOURS = new Set([5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]);
+const BATTERY_DYNAMIC_EFFICIENCY_PRESETS = {
+  LFP: { chargeRatePenalty: 0.040, dischargeRatePenalty: 0.055, topSocPenalty: 0.022, lowSocPenalty: 0.042 },
+  NMC: { chargeRatePenalty: 0.050, dischargeRatePenalty: 0.068, topSocPenalty: 0.030, lowSocPenalty: 0.055 },
+  AGM: { chargeRatePenalty: 0.070, dischargeRatePenalty: 0.090, topSocPenalty: 0.040, lowSocPenalty: 0.080 },
+  GEL: { chargeRatePenalty: 0.070, dischargeRatePenalty: 0.090, topSocPenalty: 0.040, lowSocPenalty: 0.080 },
+  LEAD_ACID: { chargeRatePenalty: 0.075, dischargeRatePenalty: 0.095, topSocPenalty: 0.045, lowSocPenalty: 0.085 },
+  DEFAULT: { chargeRatePenalty: 0.045, dischargeRatePenalty: 0.060, topSocPenalty: 0.026, lowSocPenalty: 0.048 }
+};
+
+const SYNTHETIC_PV_REGIME_LIBRARY = {
+  winter: [
+    { key: 'storm', multiplier: 0.03, shapeExponent: 0.72 },
+    { key: 'overcast', multiplier: 0.10, shapeExponent: 0.82 },
+    { key: 'broken-cloud', multiplier: 0.24, shapeExponent: 0.92 },
+    { key: 'mixed', multiplier: 0.46, shapeExponent: 1.00 },
+    { key: 'clear', multiplier: 0.78, shapeExponent: 1.10 },
+    { key: 'clear-cold', multiplier: 1.06, shapeExponent: 1.18 }
+  ],
+  spring: [
+    { key: 'storm', multiplier: 0.05, shapeExponent: 0.76 },
+    { key: 'overcast', multiplier: 0.16, shapeExponent: 0.88 },
+    { key: 'broken-cloud', multiplier: 0.34, shapeExponent: 0.97 },
+    { key: 'mixed', multiplier: 0.58, shapeExponent: 1.02 },
+    { key: 'clear', multiplier: 0.86, shapeExponent: 1.10 },
+    { key: 'clear-bright', multiplier: 1.10, shapeExponent: 1.18 }
+  ],
+  summer: [
+    { key: 'storm', multiplier: 0.08, shapeExponent: 0.82 },
+    { key: 'overcast', multiplier: 0.22, shapeExponent: 0.92 },
+    { key: 'broken-cloud', multiplier: 0.44, shapeExponent: 1.00 },
+    { key: 'mixed', multiplier: 0.66, shapeExponent: 1.06 },
+    { key: 'clear', multiplier: 0.90, shapeExponent: 1.14 },
+    { key: 'clear-high', multiplier: 1.06, shapeExponent: 1.22 }
+  ],
+  autumn: [
+    { key: 'storm', multiplier: 0.04, shapeExponent: 0.74 },
+    { key: 'overcast', multiplier: 0.13, shapeExponent: 0.84 },
+    { key: 'broken-cloud', multiplier: 0.28, shapeExponent: 0.94 },
+    { key: 'mixed', multiplier: 0.50, shapeExponent: 1.00 },
+    { key: 'clear', multiplier: 0.80, shapeExponent: 1.10 },
+    { key: 'clear-crisp', multiplier: 1.04, shapeExponent: 1.16 }
+  ]
+};
+
+const SYNTHETIC_PV_REGIME_PATTERNS = {
+  winter: [5, 4, 2, 1, 0, 1, 2, 4, 5, 3, 2, 1, 0, 2],
+  spring: [4, 5, 3, 2, 1, 2, 3, 5, 4, 3, 2, 4],
+  summer: [5, 5, 4, 3, 2, 3, 4, 5, 5, 4, 3, 5],
+  autumn: [4, 3, 1, 0, 1, 2, 3, 4, 2, 1, 3, 5]
+};
 
 // Kötü hava senaryosu: ardışık gün sayısı + o penceredeki PV ölçek faktörü
 // Yıl içinde en düşük PV'ye sahip ardışık pencere seçilir ve orada PV düşürülür.
@@ -130,6 +182,27 @@ const CATEGORY_SURGE_MULTIPLIERS = {
   generic: 1.0
 };
 
+const USAGE_TYPE_PEAK_FACTORS = {
+  continuous: 1.02,
+  cyclic: 1.18,
+  scheduled: 1.14,
+  manual: 1.22
+};
+
+const CATEGORY_PEAK_RISK_FACTORS = {
+  lighting: 1.06,
+  refrigerator: 1.08,
+  hvac: 1.15,
+  security: 1.03,
+  pump: 1.20,
+  entertainment: 1.08,
+  kitchen: 1.16,
+  laundry: 1.18,
+  workshop: 1.20,
+  gaming: 1.10,
+  generic: 1.08
+};
+
 // İç yardımcı: profili normalize et ve 1.0'a topla
 function norm24(arr) {
   const safe = Array.isArray(arr) && arr.length === 24 ? arr.map(v => Math.max(0, Number(v) || 0)) : new Array(24).fill(1);
@@ -182,6 +255,177 @@ function sum(arr) {
   return arr.reduce((a, b) => a + Math.max(0, Number(b) || 0), 0);
 }
 
+function monthTotalsFromHourly8760(hourly8760 = []) {
+  const monthly = [];
+  let cursor = 0;
+  for (const days of MONTH_DAYS) {
+    const hours = days * 24;
+    monthly.push(hourly8760.slice(cursor, cursor + hours).reduce((acc, value) => acc + Math.max(0, Number(value) || 0), 0));
+    cursor += hours;
+  }
+  return monthly;
+}
+
+function normalize24Profile(arr, hourSet = null) {
+  const safe = Array.isArray(arr) && arr.length === 24
+    ? arr.map((value, hour) => {
+        const allowed = !hourSet || hourSet.has(hour);
+        return allowed ? Math.max(0, Number(value) || 0) : 0;
+      })
+    : new Array(24).fill(0).map((_, hour) => hourSet && hourSet.has(hour) ? 1 : 0);
+  const total = safe.reduce((acc, value) => acc + value, 0);
+  if (total <= 0) {
+    const activeHours = hourSet ? [...hourSet] : [...Array(24).keys()];
+    return safe.map((_, hour) => activeHours.includes(hour) ? 1 / activeHours.length : 0);
+  }
+  return safe.map(value => value / total);
+}
+
+function reshapeSolarDayProfile(baseProfile, exponent = 1) {
+  const adjusted = baseProfile.map(value => value > 0 ? Math.pow(value, exponent) : 0);
+  return normalize24Profile(adjusted, PV_DAYLIGHT_HOURS);
+}
+
+function syntheticCitySummerPeak(cityName = '') {
+  return clamp(Number(CITY_SUMMER_TEMPS?.[cityName] ?? CITY_SUMMER_TEMPS?.default ?? 32) || 32, 20, 42);
+}
+
+function syntheticAmbientTemperatureC(dayOfYear, hour, cityName = '') {
+  const summerPeak = syntheticCitySummerPeak(cityName);
+  const winterTrough = clamp(summerPeak - 22, 4, 18);
+  const seasonalMean = (summerPeak + winterTrough) / 2;
+  const seasonalAmplitude = (summerPeak - winterTrough) / 2;
+  const seasonal = seasonalMean + seasonalAmplitude * Math.sin((2 * Math.PI * (dayOfYear - 172)) / 365);
+  const diurnal = 4.5 * Math.sin((2 * Math.PI * (hour - 9)) / 24);
+  return seasonal + diurnal;
+}
+
+function applySyntheticTemperatureShaping(profile24, {
+  dayOfYear = 1,
+  cityName = '',
+  panelTempCoeffPerC = -0.0034
+} = {}) {
+  const gamma = Number.isFinite(Number(panelTempCoeffPerC)) ? Number(panelTempCoeffPerC) : -0.0034;
+  const maxWeight = profile24.reduce((max, value) => Math.max(max, Number(value) || 0), 0) || 1;
+  const factors = profile24.map((weight, hour) => {
+    if (!(weight > 0)) return null;
+    const irradianceFraction = clamp((Number(weight) || 0) / maxWeight, 0, 1.25);
+    const ambientTempC = syntheticAmbientTemperatureC(dayOfYear, hour, cityName);
+    const cellTempC = ambientTempC + (irradianceFraction * 18) + 2;
+    return {
+      factor: clamp(1 + (gamma * (cellTempC - 25)), 0.82, 1.08),
+      ambientTempC,
+      cellTempC
+    };
+  });
+  const thermallyShaped = profile24.map((weight, hour) => weight * (factors[hour]?.factor || 0));
+  return {
+    profile: normalize24Profile(thermallyShaped, PV_DAYLIGHT_HOURS),
+    factors
+  };
+}
+
+function buildSyntheticClusteredPv8760(fallbackHourly8760 = [], options = {}) {
+  const monthlyTotals = monthTotalsFromHourly8760(fallbackHourly8760);
+  const hourly8760 = [];
+  const dailyTotals = [];
+  const regimeKeys = [];
+  let longestLowClusterDays = 0;
+  let currentLowClusterDays = 0;
+  let minimumHourlyTempFactor = Infinity;
+  let maximumHourlyTempFactor = 0;
+  let peakSummerCellTempC = -Infinity;
+  let peakSummerNoonTempFactor = 1;
+
+  for (let monthIdx = 0; monthIdx < 12; monthIdx++) {
+    const daysInMonth = MONTH_DAYS[monthIdx];
+    const season = getLoadSeasonForMonth(monthIdx);
+    const monthlyTotal = Math.max(0, Number(monthlyTotals[monthIdx]) || 0);
+    const regimeLibrary = SYNTHETIC_PV_REGIME_LIBRARY[season] || SYNTHETIC_PV_REGIME_LIBRARY.spring;
+    const regimePattern = SYNTHETIC_PV_REGIME_PATTERNS[season] || SYNTHETIC_PV_REGIME_PATTERNS.spring;
+    const baseSolarProfile = normalize24Profile(HOURLY_SOLAR_PROFILE[season] || HOURLY_SOLAR_PROFILE.spring, PV_DAYLIGHT_HOURS);
+
+    const monthDayStart = MONTH_DAYS.slice(0, monthIdx).reduce((acc, days) => acc + days, 0);
+    const dailyDescriptors = Array.from({ length: daysInMonth }, (_, dayIdx) => {
+      const patternIdx = (dayIdx + (monthIdx * 3)) % regimePattern.length;
+      const regimeIdx = regimePattern[patternIdx];
+      const regime = regimeLibrary[regimeIdx] || regimeLibrary[regimeLibrary.length - 1];
+      const baseProfile = reshapeSolarDayProfile(baseSolarProfile, regime.shapeExponent);
+      const dayOfYear = monthDayStart + dayIdx + 1;
+      const temperatureShaping = applySyntheticTemperatureShaping(baseProfile, {
+        dayOfYear,
+        cityName: options.cityName,
+        panelTempCoeffPerC: options.panelTempCoeffPerC
+      });
+      temperatureShaping.factors.forEach(entry => {
+        if (!entry) return;
+        minimumHourlyTempFactor = Math.min(minimumHourlyTempFactor, entry.factor);
+        maximumHourlyTempFactor = Math.max(maximumHourlyTempFactor, entry.factor);
+      });
+      const noonEntry = temperatureShaping.factors[13];
+      if (monthIdx >= 5 && monthIdx <= 7 && noonEntry) {
+        peakSummerCellTempC = Math.max(peakSummerCellTempC, noonEntry.cellTempC);
+        peakSummerNoonTempFactor = Math.min(peakSummerNoonTempFactor, noonEntry.factor);
+      }
+      return {
+        regimeKey: regime.key,
+        multiplier: regime.multiplier,
+        profile: temperatureShaping.profile
+      };
+    });
+
+    const monthlyWeight = dailyDescriptors.reduce((acc, day) => acc + Math.max(0.001, day.multiplier), 0);
+    const monthScale = monthlyWeight > 0 ? monthlyTotal / monthlyWeight : 0;
+
+    dailyDescriptors.forEach(day => {
+      const dayEnergy = Math.max(0, monthScale * day.multiplier);
+      dailyTotals.push(dayEnergy);
+      regimeKeys.push(day.regimeKey);
+
+      if (day.multiplier <= 0.16) {
+        currentLowClusterDays += 1;
+        longestLowClusterDays = Math.max(longestLowClusterDays, currentLowClusterDays);
+      } else {
+        currentLowClusterDays = 0;
+      }
+
+      day.profile.forEach(weight => {
+        hourly8760.push(dayEnergy * weight);
+      });
+    });
+  }
+
+  const annualTarget = sum(monthlyTotals);
+  const scaledHourly8760 = annualTarget > 0 ? (() => {
+    const rawAnnual = sum(hourly8760);
+    if (rawAnnual <= 0) return new Array(HOURS_PER_YEAR).fill(0);
+    const scale = annualTarget / rawAnnual;
+    return hourly8760.map(value => value * scale);
+  })() : new Array(HOURS_PER_YEAR).fill(0);
+  const averageDaily = dailyTotals.length ? annualTarget / dailyTotals.length : 0;
+  const minDaily = dailyTotals.length ? Math.min(...dailyTotals) : 0;
+  const maxDaily = dailyTotals.length ? Math.max(...dailyTotals) : 0;
+
+  return {
+    hourly8760: scaledHourly8760,
+    metadata: {
+      syntheticWeatherModel: 'clustered-seasonal-regime-v1',
+      syntheticTemperatureModel: 'city-seasonal-cell-derate-v1',
+      longestLowPvClusterDays: longestLowClusterDays,
+      minimumDailyPvKwh: minDaily,
+      maximumDailyPvKwh: maxDaily,
+      minimumDailyFractionOfAverage: averageDaily > 0 ? minDaily / averageDaily : 0,
+      maximumDailyFractionOfAverage: averageDaily > 0 ? maxDaily / averageDaily : 0,
+      uniqueRegimeCount: new Set(regimeKeys).size,
+      minimumHourlyTempFactor: Number.isFinite(minimumHourlyTempFactor) ? minimumHourlyTempFactor : 1,
+      maximumHourlyTempFactor: maximumHourlyTempFactor > 0 ? maximumHourlyTempFactor : 1,
+      peakSummerCellTempC: Number.isFinite(peakSummerCellTempC) ? peakSummerCellTempC : null,
+      peakSummerNoonTempFactor,
+      annualEnergyPreserved: true
+    }
+  };
+}
+
 function scale8760(arr, factor = 1) {
   const f = Math.max(0, Number(factor) || 0);
   return Array.from({ length: HOURS_PER_YEAR }, (_, i) => Math.max(0, Number(arr?.[i]) || 0) * f);
@@ -221,6 +465,45 @@ function eolBatteryConfig(battery = {}) {
     maxChargePowerKw: scaledPower(battery.maxChargePowerKw ?? battery.maxChargeKw),
     maxDischargePowerKw: scaledPower(battery.maxDischargePowerKw ?? battery.maxDischargeKw)
   };
+}
+
+function batteryDynamicEfficiencyPreset(chemistry = '') {
+  const key = String(chemistry || '').trim().toUpperCase().replace(/-/g, '_');
+  return BATTERY_DYNAMIC_EFFICIENCY_PRESETS[key] || BATTERY_DYNAMIC_EFFICIENCY_PRESETS.DEFAULT;
+}
+
+function resolveDynamicBatteryEfficiency({
+  mode = 'discharge',
+  baseEfficiency = 0.95,
+  socKwh = 0,
+  usableCapacityKwh = 0,
+  socReserveKwh = 0,
+  powerKw = 0,
+  maxPowerKw = null,
+  chemistry = '',
+  enabled = true
+} = {}) {
+  const base = clamp(Number(baseEfficiency) || 0.95, 0.5, 1);
+  if (!enabled || usableCapacityKwh <= 0 || powerKw <= 1e-9) return base;
+  const preset = batteryDynamicEfficiencyPreset(chemistry);
+  const derivedMaxPower = Number.isFinite(Number(maxPowerKw)) && Number(maxPowerKw) > 0
+    ? Number(maxPowerKw)
+    : Math.max(0.1, usableCapacityKwh * 0.5);
+  const normalizedPower = clamp(powerKw / derivedMaxPower, 0, 1.5);
+  const ratePenalty = Math.pow(normalizedPower, 1.35) * (mode === 'charge' ? preset.chargeRatePenalty : preset.dischargeRatePenalty);
+
+  let socStress = 0;
+  if (mode === 'charge') {
+    const socRatio = usableCapacityKwh > 0 ? clamp(socKwh / usableCapacityKwh, 0, 1) : 0;
+    socStress = clamp((socRatio - 0.82) / 0.18, 0, 1);
+  } else {
+    const availableBand = Math.max(1e-6, usableCapacityKwh - socReserveKwh);
+    const dischargeableSoc = clamp((socKwh - socReserveKwh) / availableBand, 0, 1);
+    socStress = clamp((0.18 - dischargeableSoc) / 0.18, 0, 1);
+  }
+
+  const socPenalty = socStress * (mode === 'charge' ? preset.topSocPenalty : preset.lowSocPenalty);
+  return clamp(base * (1 - ratePenalty - socPenalty), 0.5, 1);
 }
 
 function dispatchSummaryForStress(key, scenario, dispatch, peakCriticalKw) {
@@ -272,7 +555,13 @@ export function buildOffgridPvDispatchProfile(options = {}) {
     ? options.fallbackHourlyRows.map(row => typeof row === 'number' ? row : row?.production)
     : [];
   const fallbackComplete = isComplete8760(fallbackHourly);
-  const pvHourly8760 = fallbackComplete ? clone8760(fallbackHourly) : new Array(HOURS_PER_YEAR).fill(0);
+  const clusteredSynthetic = fallbackComplete
+    ? buildSyntheticClusteredPv8760(clone8760(fallbackHourly), {
+        cityName: options.cityName,
+        panelTempCoeffPerC: options.panelTempCoeffPerC
+      })
+    : { hourly8760: new Array(HOURS_PER_YEAR).fill(0), metadata: null };
+  const pvHourly8760 = clusteredSynthetic.hourly8760;
   return {
     pvHourly8760,
     annualKwh: sum(pvHourly8760),
@@ -287,7 +576,9 @@ export function buildOffgridPvDispatchProfile(options = {}) {
     resolution: 'hourly',
     missingHours: fallbackComplete ? 0 : HOURS_PER_YEAR,
     dispatchBus: 'ac-load-bus-kwh',
-    synthetic: true
+    synthetic: true,
+    syntheticWeatherModel: clusteredSynthetic.metadata?.syntheticWeatherModel || null,
+    syntheticWeatherMetadata: clusteredSynthetic.metadata || null
   };
 }
 
@@ -417,6 +708,50 @@ function fallbackPeakFromEnergy(totalHourly8760, criticalHourly8760) {
     hourlyPeakKw8760: totalHourly8760.map(v => Math.max(0, Number(v) || 0)),
     criticalPeakKw8760: criticalHourly8760.map(v => Math.max(0, Number(v) || 0))
   };
+}
+
+function summarizeSyntheticPeakModel({
+  mode,
+  baselinePeakKw8760 = [],
+  hourlyPeakKw8760 = [],
+  criticalPeakKw8760 = []
+} = {}) {
+  const maxBaselinePeakKw = baselinePeakKw8760.reduce((max, value) => Math.max(max, Math.max(0, Number(value) || 0)), 0);
+  const maxSyntheticPeakKw = hourlyPeakKw8760.reduce((max, value) => Math.max(max, Math.max(0, Number(value) || 0)), 0);
+  const maxCriticalPeakKw = criticalPeakKw8760.reduce((max, value) => Math.max(max, Math.max(0, Number(value) || 0)), 0);
+  const peakEnvelopeHours = hourlyPeakKw8760.reduce((count, value, idx) => {
+    const conservative = Math.max(0, Number(value) || 0);
+    const baseline = Math.max(0, Number(baselinePeakKw8760[idx]) || 0);
+    return count + (conservative > baseline + 1e-9 ? 1 : 0);
+  }, 0);
+  const peakEnvelopeMaxFactor = maxBaselinePeakKw > 0 ? maxSyntheticPeakKw / maxBaselinePeakKw : 1;
+  const peakDeltaKw = Math.max(0, maxSyntheticPeakKw - maxBaselinePeakKw);
+  const severity = peakEnvelopeMaxFactor >= 1.35 ? 'high'
+    : peakEnvelopeMaxFactor >= 1.18 ? 'medium'
+    : 'low';
+  return {
+    peakModel: mode === 'device-list' ? 'synthetic-conservative-envelope' : 'energy-shaped-fallback-peak',
+    peakEnvelopeApplied: mode === 'device-list',
+    severity,
+    peakEnvelopeHours,
+    peakEnvelopeMaxFactor,
+    maxBaselinePeakKw,
+    maxSyntheticPeakKw,
+    maxCriticalPeakKw,
+    peakDeltaKw
+  };
+}
+
+function syntheticPeakEnvelopeFactor(device, category, templateValue, hoursPerDay) {
+  const usageType = typeof device?.usageType === 'string' ? device.usageType : 'manual';
+  const usageFactor = USAGE_TYPE_PEAK_FACTORS[usageType] || USAGE_TYPE_PEAK_FACTORS.manual;
+  const categoryFactor = CATEGORY_PEAK_RISK_FACTORS[category] || CATEGORY_PEAK_RISK_FACTORS.generic;
+  const normalizedHours = clamp((Number(hoursPerDay) || 0) / 24, 0, 1);
+  const sparseUseBoost = 1 + ((1 - normalizedHours) * 0.22);
+  const concentrationBoost = 1 + Math.max(0, ((Number(templateValue) || 0) - (1 / 24)) * 1.6);
+  const quantity = Math.max(1, Number(device?.quantity) || 1);
+  const quantityBoost = quantity > 1 ? 1 + Math.min(0.18, Math.log2(quantity) * 0.05) : 1;
+  return clamp(usageFactor * categoryFactor * sparseUseBoost * concentrationBoost * quantityBoost, 1, 1.9);
 }
 
 function clampScore(value) {
@@ -642,6 +977,7 @@ export function buildOffgridLoadProfile(devices, options = {}) {
   const criticalHourly8760 = new Array(HOURS_PER_YEAR).fill(0);
   const hourlyPeakKw8760 = new Array(HOURS_PER_YEAR).fill(0);
   const criticalPeakKw8760 = new Array(HOURS_PER_YEAR).fill(0);
+  const baselinePeakKw8760 = new Array(HOURS_PER_YEAR).fill(0);
   const deviceSummary = [];
   let criticalDeviceCount = 0;
 
@@ -657,6 +993,7 @@ export function buildOffgridLoadProfile(devices, options = {}) {
     const rawTemplate = [...DEVICE_LOAD_TEMPLATES[category]];
     const template = blendDayNightTemplate(rawTemplate, dayHours, nightHours);
     const surgeMultiplier = deviceSurgeMultiplier(device, category);
+    const peakEnvelope = template.map(weight => syntheticPeakEnvelopeFactor(device, category, weight, hoursPerDay));
 
     const normFactor = SEASONAL_NORM_FACTORS[category] || 1;
     const seasonFactors = SEASONAL_LOAD_FACTORS[category] || {};
@@ -669,10 +1006,13 @@ export function buildOffgridLoadProfile(devices, options = {}) {
         for (let h = 0; h < 24; h++) {
           const val = seasonalDailyKwh * template[h];
           totalHourly8760[cursor] += val;
-          if (val > 1e-9) hourlyPeakKw8760[cursor] += powerKw * surgeMultiplier;
+          if (val > 1e-9) {
+            baselinePeakKw8760[cursor] += powerKw * surgeMultiplier;
+            hourlyPeakKw8760[cursor] += powerKw * surgeMultiplier * peakEnvelope[h];
+          }
           if (isCritical) {
             criticalHourly8760[cursor] += val;
-            if (val > 1e-9) criticalPeakKw8760[cursor] += powerKw * surgeMultiplier;
+            if (val > 1e-9) criticalPeakKw8760[cursor] += powerKw * surgeMultiplier * peakEnvelope[h];
           }
           cursor++;
         }
@@ -693,6 +1033,12 @@ export function buildOffgridLoadProfile(devices, options = {}) {
 
   const annualTotalKwh = sum(totalHourly8760);
   const annualCriticalKwh = sum(criticalHourly8760);
+  const syntheticPeakModel = summarizeSyntheticPeakModel({
+    mode: 'device-list',
+    baselinePeakKw8760,
+    hourlyPeakKw8760,
+    criticalPeakKw8760
+  });
 
   return {
     totalHourly8760,
@@ -706,6 +1052,7 @@ export function buildOffgridLoadProfile(devices, options = {}) {
     loadSource: 'device-library-and-manual-inventory',
     criticalLoadBasis: 'device-critical-flags',
     hasRealHourlyLoad: false,
+    syntheticPeakModel,
     deviceCount: validDevices.length,
     criticalDeviceCount
   };
@@ -763,6 +1110,9 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
   const generatorMaxHoursPerDay = hasGeneratorHourCap
     ? Math.max(0, Math.min(24, Number(options.generatorMaxHoursPerDay) || 0))
     : Infinity;
+  const dynamicBatteryEfficiencyEnabled = options.dynamicBatteryEfficiency !== false
+    && battery.dynamicEfficiencyModelEnabled !== false;
+  const batteryChemistry = battery.chemistry || options.batteryChemistry || '';
 
   let soc = Math.max(socReserveKwh, Math.min(usableCap, Number(battery.initialSocKwh) || socReserveKwh));
 
@@ -789,6 +1139,10 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
   let inverterPowerLimitHours = 0;
   let minSocKwh = usableCap > 0 ? soc : 0;
   let socSumKwh = 0;
+  let effectiveChargeEfficiencyWeighted = 0;
+  let effectiveChargeInputKwh = 0;
+  let effectiveDischargeEfficiencyWeighted = 0;
+  let effectiveDischargeOutputKwh = 0;
 
   let autonomousDays = 0;
   let autonomousDaysWithGenerator = 0;
@@ -849,12 +1203,25 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
     const chargeRoom = usableCap > 0 ? Math.max(0, (usableCap - soc) / chargeEff) : 0;
     const potentialChargeFromPv = Math.min(pvSurplus, chargeRoom);
     const chargeFromPv = Math.min(potentialChargeFromPv, maxChargePowerKw);
+    const effectiveChargeEff = resolveDynamicBatteryEfficiency({
+      mode: 'charge',
+      baseEfficiency: chargeEff,
+      socKwh: soc,
+      usableCapacityKwh: usableCap,
+      socReserveKwh,
+      powerKw: chargeFromPv,
+      maxPowerKw: maxChargePowerKw === Infinity ? null : maxChargePowerKw,
+      chemistry: batteryChemistry,
+      enabled: dynamicBatteryEfficiencyEnabled
+    });
     if (potentialChargeFromPv > chargeFromPv + 1e-9) {
       batteryChargeLimitedKwh += potentialChargeFromPv - chargeFromPv;
     }
-    soc += chargeFromPv * chargeEff;
+    soc += chargeFromPv * effectiveChargeEff;
     chargedFromPvKwh += chargeFromPv;
-    totalChargedKwh += chargeFromPv * chargeEff;
+    totalChargedKwh += chargeFromPv * effectiveChargeEff;
+    effectiveChargeEfficiencyWeighted += chargeFromPv * effectiveChargeEff;
+    effectiveChargeInputKwh += chargeFromPv;
     pvSurplus -= chargeFromPv;
     curtailedPvKwh += Math.max(0, pvSurplus);
 
@@ -866,21 +1233,34 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
     let batteryToCritical = 0;
     let batteryToNonCritical = 0;
     if (totalDeficitForBattery > 0 && soc > socReserveKwh + 1e-9) {
-      const energyAvailableDischargeKwh = Math.max(0, (soc - socReserveKwh) * dischargeEff);
+      const effectiveDischargeEff = resolveDynamicBatteryEfficiency({
+        mode: 'discharge',
+        baseEfficiency: dischargeEff,
+        socKwh: soc,
+        usableCapacityKwh: usableCap,
+        socReserveKwh,
+        powerKw: Math.min(totalDeficitForBattery, maxDischargePowerKw),
+        maxPowerKw: maxDischargePowerKw === Infinity ? null : maxDischargePowerKw,
+        chemistry: batteryChemistry,
+        enabled: dynamicBatteryEfficiencyEnabled
+      });
+      const energyAvailableDischargeKwh = Math.max(0, (soc - socReserveKwh) * effectiveDischargeEff);
       const dischargeBudget = Math.min(energyAvailableDischargeKwh, maxDischargePowerKw);
       const powerLimitedDischarge = Math.max(0, Math.min(totalDeficitForBattery, energyAvailableDischargeKwh) - dischargeBudget);
       if (powerLimitedDischarge > 1e-9) batteryDischargeLimitedKwh += powerLimitedDischarge;
 
       const dischargeToCritical = Math.min(criticalDeficitForBattery, dischargeBudget);
-      soc -= dischargeToCritical / dischargeEff;
+      soc -= dischargeToCritical / effectiveDischargeEff;
       batteryToCritical = dischargeToCritical;
       batteryDischargeThisHour += dischargeToCritical;
 
       const budgetAfterCritical = Math.max(0, dischargeBudget - dischargeToCritical);
       const dischargeToNonCritical = Math.min(nonCriticalDeficitForBattery, budgetAfterCritical);
-      soc -= dischargeToNonCritical / dischargeEff;
+      soc -= dischargeToNonCritical / effectiveDischargeEff;
       batteryToNonCritical = dischargeToNonCritical;
       batteryDischargeThisHour += dischargeToNonCritical;
+      effectiveDischargeEfficiencyWeighted += batteryDischargeThisHour * effectiveDischargeEff;
+      effectiveDischargeOutputKwh += batteryDischargeThisHour;
     }
 
     batteryToLoadKwh += batteryDischargeThisHour;
@@ -932,8 +1312,21 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
       let genRemaining = Math.max(0, genOutputThisHour - genServedLoadThisHour);
       if (generatorChargeBatteryEnabled && genRemaining > 1e-9 && generatorChargeRoomKwh > 1e-9) {
         genToBattery = Math.min(genRemaining, generatorChargeRoomKwh, maxChargePowerKw);
-        soc += genToBattery * chargeEff;
-        totalChargedKwh += genToBattery * chargeEff;
+        const effectiveGeneratorChargeEff = resolveDynamicBatteryEfficiency({
+          mode: 'charge',
+          baseEfficiency: chargeEff,
+          socKwh: soc,
+          usableCapacityKwh: usableCap,
+          socReserveKwh,
+          powerKw: genToBattery,
+          maxPowerKw: maxChargePowerKw === Infinity ? null : maxChargePowerKw,
+          chemistry: batteryChemistry,
+          enabled: dynamicBatteryEfficiencyEnabled
+        });
+        soc += genToBattery * effectiveGeneratorChargeEff;
+        totalChargedKwh += genToBattery * effectiveGeneratorChargeEff;
+        effectiveChargeEfficiencyWeighted += genToBattery * effectiveGeneratorChargeEff;
+        effectiveChargeInputKwh += genToBattery;
         genRemaining -= genToBattery;
       }
       generatorToLoadKwh += genServedLoadThisHour;
@@ -1004,6 +1397,8 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
   const autonomousDaysWithGeneratorPct = (autonomousDaysWithGenerator / 365) * 100;
   const cyclesPerYear = usableCap > 0 ? totalChargedKwh / usableCap : 0;
   const averageSocKwh = N > 0 ? socSumKwh / N : 0;
+  const effectiveChargeEfficiencyAvg = effectiveChargeInputKwh > 0 ? effectiveChargeEfficiencyWeighted / effectiveChargeInputKwh : chargeEff;
+  const effectiveDischargeEfficiencyAvg = effectiveDischargeOutputKwh > 0 ? effectiveDischargeEfficiencyWeighted / effectiveDischargeOutputKwh : dischargeEff;
 
   return {
     directPvToLoadKwh,
@@ -1032,7 +1427,10 @@ export function runOffgridDispatch(pvHourly8760, loadHourly8760, criticalLoadHou
     maxDischargePowerKw: maxDischargePowerKw === Infinity ? null : maxDischargePowerKw,
     chargeEfficiency: chargeEff,
     dischargeEfficiency: dischargeEff,
+    effectiveChargeEfficiencyAvg,
+    effectiveDischargeEfficiencyAvg,
     roundTripEfficiency,
+    dynamicBatteryEfficiencyModel: dynamicBatteryEfficiencyEnabled ? 'c-rate-soc-v1' : 'flat-efficiency',
     socReservePct,
     inverterAcLimitKw: inverterAcLimitKw === Infinity ? null : inverterAcLimitKw,
     inverterSurgeMultiplier,
@@ -1334,6 +1732,9 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     batteryChargeEfficiencyPct: (normalDispatch.chargeEfficiency || 0) * 100,
     batteryDischargeEfficiencyPct: (normalDispatch.dischargeEfficiency || 0) * 100,
     batteryRoundTripEfficiencyPct: (normalDispatch.roundTripEfficiency || 0) * 100,
+    batteryEffectiveChargeEfficiencyPct: (normalDispatch.effectiveChargeEfficiencyAvg || normalDispatch.chargeEfficiency || 0) * 100,
+    batteryEffectiveDischargeEfficiencyPct: (normalDispatch.effectiveDischargeEfficiencyAvg || normalDispatch.dischargeEfficiency || 0) * 100,
+    dynamicBatteryEfficiencyModel: normalDispatch.dynamicBatteryEfficiencyModel || 'flat-efficiency',
 
     // Güç limitleri
     batteryMaxChargeKw: normalDispatch.maxChargePowerKw,
@@ -1398,6 +1799,7 @@ export function buildOffgridResults(normalDispatch, badWeatherDispatch, loadProf
     annualTotalLoadKwh: loadProfile.annualTotalKwh,
     annualCriticalLoadKwh: loadProfile.annualCriticalKwh,
     deviceSummary: loadProfile.deviceSummary || [],
+    syntheticPeakModel: loadProfile.syntheticPeakModel || null,
     deviceCount: loadProfile.deviceCount || 0,
     criticalDeviceCount: loadProfile.criticalDeviceCount || 0,
 

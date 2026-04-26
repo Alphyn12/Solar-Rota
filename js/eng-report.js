@@ -7,6 +7,24 @@ import { localeTag, localizeKnownMessage, statusLabel, tx } from './output-i18n.
 import { escapeHtml } from './security.js';
 import { calculateSystemLayout, resolvePanelSpec } from './calc-core.js';
 
+function isOffgridCoverageApproximate(L = {}) {
+  const hasRealHourlyPv = L.productionDispatchProfile === 'real-hourly-pv-8760'
+    || !!L.productionDispatchMetadata?.hasRealHourlyProduction;
+  const hasRealHourlyLoad = !!L.hasRealHourlyLoad || L.loadMode === 'hourly-8760';
+  return !(hasRealHourlyPv && hasRealHourlyLoad);
+}
+
+function formatOffgridCoverageValue(value, L = {}, { decimals = 1 } = {}) {
+  const pct = Math.max(0, Math.min(100, (Number(value) || 0) * 100));
+  if (!isOffgridCoverageApproximate(L)) return `${pct.toFixed(decimals)}%`;
+  if (pct >= 99.5) return '>%98';
+  if (pct >= 97) return '95-99%';
+  if (pct >= 92) return '90-97%';
+  if (pct >= 85) return '85-95%';
+  if (pct >= 75) return '75-90%';
+  return `~${pct.toFixed(0)}%`;
+}
+
 export function toggleEngReport() {
   const body    = document.getElementById('eng-report-body');
   const header  = document.getElementById('eng-report-toggle');
@@ -381,6 +399,12 @@ ${escapeHtml(report('batteryInstalledCost'))}: ${money(bm.batteryCost)}${offGrid
       : i18n.t('offgridL2.productionDispatchSynthetic');
     const criticalCoverageWithGenerator = L.criticalCoverageWithGenerator ?? L.criticalLoadCoverage;
     const criticalCoverageWithoutGenerator = L.criticalCoverageWithoutGenerator ?? L.criticalLoadCoverageWithoutGenerator ?? L.pvBatteryCriticalCoverage;
+    const pvBessCoverageText = formatOffgridCoverageValue(L.pvBatteryLoadCoverage ?? L.totalLoadCoverage, L);
+    const totalCoverageText = formatOffgridCoverageValue(L.totalLoadCoverage, L);
+    const pvBessCriticalCoverageText = formatOffgridCoverageValue(criticalCoverageWithoutGenerator ?? L.criticalLoadCoverage, L);
+    const criticalCoverageWithGeneratorText = formatOffgridCoverageValue(criticalCoverageWithGenerator, L);
+    const syntheticPeakModel = L.syntheticPeakModel || null;
+    const syntheticWeatherMeta = L.productionDispatchMetadata?.syntheticWeatherMetadata || null;
     const stress = L.fieldStressAnalysis || null;
     html += `
   <div class="eng-section-header">
@@ -393,11 +417,14 @@ ${escapeHtml(report('batteryInstalledCost'))}: ${money(bm.batteryCost)}${offGrid
 ${escapeHtml(dispatchProfileText)} (${escapeHtml(L.productionDispatchProfile || 'monthly-production-derived-synthetic-8760')})
 ${escapeHtml(i18n.t('offgridL2.loadSourceLabel'))}: ${escapeHtml(L.loadSource || L.loadMode || '—')}
 ${escapeHtml(i18n.t('offgridL2.dispatchLabel'))}: ${escapeHtml(L.dispatchType || 'synthetic-8760-dispatch')}
-${escapeHtml(i18n.t('offgridL2.pvBessCoverageLabel'))}: ${((L.pvBatteryLoadCoverage ?? L.totalLoadCoverage) * 100).toFixed(1)}%
-${escapeHtml(i18n.t('offgridL2.totalCoverageWithGeneratorLabel'))}: ${(L.totalLoadCoverage * 100).toFixed(1)}%
-${escapeHtml(i18n.t('offgridL2.pvBessCriticalCoverageLabel'))}: ${((criticalCoverageWithoutGenerator ?? L.criticalLoadCoverage) * 100).toFixed(1)}%
-${escapeHtml(i18n.t('offgridL2.criticalCoverageWithGeneratorLabel'))}: ${(criticalCoverageWithGenerator * 100).toFixed(1)}%
-${escapeHtml(i18n.t('offgridL2.resultAutonomousDays'))}: ${L.autonomousDays ?? '—'} ${escapeHtml(dayUnit)}; ${escapeHtml(i18n.t('offgridL2.resultAutonomousDaysWithGenerator'))}: ${L.autonomousDaysWithGenerator ?? '—'} ${escapeHtml(dayUnit)}
+${escapeHtml(i18n.t('offgridL2.pvBessCoverageLabel'))}: ${pvBessCoverageText}
+${escapeHtml(i18n.t('offgridL2.totalCoverageWithGeneratorLabel'))}: ${totalCoverageText}
+${escapeHtml(i18n.t('offgridL2.pvBessCriticalCoverageLabel'))}: ${pvBessCriticalCoverageText}
+${escapeHtml(i18n.t('offgridL2.criticalCoverageWithGeneratorLabel'))}: ${criticalCoverageWithGeneratorText}
+${syntheticWeatherMeta ? `${escapeHtml(i18n.t('offgridL2.syntheticPvWeatherModelLabel'))}: ${escapeHtml(i18n.t('offgridL2.syntheticPvWeatherModelClustered'))}
+${escapeHtml(i18n.t('offgridL2.syntheticPvLongestClusterLabel'))}: ${Math.round(Number(syntheticWeatherMeta.longestLowPvClusterDays) || 0)} ${escapeHtml(dayUnit)}
+${escapeHtml(i18n.t('offgridL2.syntheticPvDailyRangeLabel'))}: %${Number(((syntheticWeatherMeta.minimumDailyFractionOfAverage || 0) * 100)).toFixed(0)} - %${Number(((syntheticWeatherMeta.maximumDailyFractionOfAverage || 0) * 100)).toFixed(0)}
+` : ''}${escapeHtml(i18n.t('offgridL2.resultAutonomousDays'))}: ${L.autonomousDays ?? '—'} ${escapeHtml(dayUnit)}; ${escapeHtml(i18n.t('offgridL2.resultAutonomousDaysWithGenerator'))}: ${L.autonomousDaysWithGenerator ?? '—'} ${escapeHtml(dayUnit)}
 ${escapeHtml(i18n.t('offgridL2.autonomyThresholdLabel'))}: %${Number(L.autonomyThresholdPct || 1).toFixed(1)}
 ${escapeHtml(i18n.t('offgridL2.unmetLabel'))}: ${fmt(L.unmetLoadKwh || 0)} kWh/${escapeHtml(yearUnit)}
 ${escapeHtml(i18n.t('offgridL2.curtailedLabel'))}: ${fmt(L.curtailedPvKwh || 0)} kWh/${escapeHtml(yearUnit)}
@@ -409,7 +436,10 @@ ${escapeHtml(i18n.t('offgridL2.minSocLabel'))}: ${L.minimumSoc != null ? (L.mini
 ${escapeHtml(i18n.t('offgridL2.batteryReserveLabel'))}: %${Number(L.batteryReservePct || 0).toFixed(0)}; ${escapeHtml(i18n.t('offgridL2.batteryChargeEfficiencyLabel'))}: %${Number(L.batteryChargeEfficiencyPct || 0).toFixed(1)}; ${escapeHtml(i18n.t('offgridL2.batteryDischargeEfficiencyLabel'))}: %${Number(L.batteryDischargeEfficiencyPct || 0).toFixed(1)}
 ${escapeHtml(i18n.t('offgridL2.inverterLimitLabel'))}: ${L.inverterAcLimitKw || '—'} kW; ${escapeHtml(i18n.t('offgridL2.batteryPowerLimitLabel'))}: ${L.batteryMaxChargeKw || '—'} / ${L.batteryMaxDischargeKw || '—'} kW
 ${escapeHtml(i18n.t('offgridL2.powerLimitedLabel'))}: ${fmt(L.inverterPowerLimitedKwh || 0)} kWh (${L.inverterPowerLimitHours || 0} h)
-${escapeHtml(i18n.t('offgridL2.lifecycleAnnual'))}: ${money(L.lifecycleCostAnnual || 0)}; ${escapeHtml(i18n.t('offgridL2.lifecycleGeneratorOverhaulLabel'))}: ${money(L.generatorOverhaulAnnual || 0)}
+${syntheticPeakModel?.peakEnvelopeApplied ? `${escapeHtml(i18n.t('offgridL2.syntheticPeakModelLabel'))}: ${escapeHtml(i18n.t('offgridL2.syntheticPeakModelConservative'))}
+${escapeHtml(i18n.t('offgridL2.syntheticPeakMaxLabel'))}: ${Number(syntheticPeakModel.maxSyntheticPeakKw || 0).toFixed(1)} kW; ${escapeHtml(i18n.t('offgridL2.syntheticPeakCriticalMaxLabel'))}: ${Number(syntheticPeakModel.maxCriticalPeakKw || 0).toFixed(1)} kW
+${escapeHtml(i18n.t('offgridL2.syntheticPeakFactorLabel'))}: ×${Number(syntheticPeakModel.peakEnvelopeMaxFactor || 1).toFixed(2)}; ${escapeHtml(i18n.t('offgridL2.syntheticPeakSeverityLabel'))}: ${escapeHtml(i18n.t(`offgridL2.syntheticPeakSeverity_${syntheticPeakModel.severity || 'medium'}`))}
+` : ''}${escapeHtml(i18n.t('offgridL2.lifecycleAnnual'))}: ${money(L.lifecycleCostAnnual || 0)}; ${escapeHtml(i18n.t('offgridL2.lifecycleGeneratorOverhaulLabel'))}: ${money(L.generatorOverhaulAnnual || 0)}
 ${escapeHtml(i18n.t('offgridL2.fieldGuaranteeStatus'))}: ${escapeHtml(i18n.t(L.fieldGuaranteeReadiness?.phase1Ready ? 'offgridL2.fieldGuaranteePhase1Ready' : 'offgridL2.fieldGuaranteeBlocked'))}
 ${(L.fieldGuaranteeReadiness?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
 ${escapeHtml(i18n.t('offgridL2.fieldEvidenceStatus'))}: ${escapeHtml(i18n.t(L.fieldEvidenceGate?.phase2Ready ? 'offgridL2.fieldEvidenceReady' : 'offgridL2.fieldEvidenceBlocked'))}
@@ -422,8 +452,8 @@ ${escapeHtml(i18n.t('offgridL2.fieldOperationStatus'))}: ${escapeHtml(i18n.t(L.f
 ${(L.fieldOperationGate?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
 ${escapeHtml(i18n.t('offgridL2.fieldRevalidationStatus'))}: ${escapeHtml(i18n.t(L.fieldRevalidationGate?.phase6Ready ? 'offgridL2.fieldRevalidationReady' : 'offgridL2.fieldRevalidationBlocked'))}
 ${(L.fieldRevalidationGate?.blockers || []).slice(0, 3).map(item => `- ${escapeHtml(item)}`).join('\n')}
-${stress?.worstCriticalScenario ? `\n${escapeHtml(i18n.t('offgridL2.stressWorstCriticalLabel'))}: ${escapeHtml(stress.worstCriticalScenario.label || stress.worstCriticalScenario.key || '—')} — ${((stress.worstCriticalScenario.criticalLoadCoverage || 0) * 100).toFixed(1)}%` : ''}
-${stress?.worstTotalScenario ? `\n${escapeHtml(i18n.t('offgridL2.stressWorstTotalLabel'))}: ${escapeHtml(stress.worstTotalScenario.label || stress.worstTotalScenario.key || '—')} — ${((stress.worstTotalScenario.totalLoadCoverage || 0) * 100).toFixed(1)}%` : ''}
+${stress?.worstCriticalScenario ? `\n${escapeHtml(i18n.t('offgridL2.stressWorstCriticalLabel'))}: ${escapeHtml(stress.worstCriticalScenario.label || stress.worstCriticalScenario.key || '—')} — ${formatOffgridCoverageValue(stress.worstCriticalScenario.criticalLoadCoverage, L)}` : ''}
+${stress?.worstTotalScenario ? `\n${escapeHtml(i18n.t('offgridL2.stressWorstTotalLabel'))}: ${escapeHtml(stress.worstTotalScenario.label || stress.worstTotalScenario.key || '—')} — ${formatOffgridCoverageValue(stress.worstTotalScenario.totalLoadCoverage, L)}` : ''}
 ${stress?.maxUnmetCriticalScenario ? `\n${escapeHtml(i18n.t('offgridL2.stressMaxUnmetCriticalLabel'))}: ${escapeHtml(stress.maxUnmetCriticalScenario.label || stress.maxUnmetCriticalScenario.key || '—')} — ${fmt(stress.maxUnmetCriticalScenario.unmetCriticalKwh || 0)} kWh` : ''}
 
 ${escapeHtml(i18n.t('offGrid.notFeasibilityAnalysis'))}</div>
