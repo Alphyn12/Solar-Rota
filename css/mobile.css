@@ -1257,3 +1257,161 @@ textarea {
     border-radius: 10px !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────
+   ETAP 3 — Step 2 + Step 4 + Off-grid tablo + Türkiye SVG
+   ───────────────────────────────────────────────────────── */
+
+/* Türkiye SVG: 620 px dayatması kaldırılır, viewBox-based responsive */
+@media (max-width: 768px) {
+  #turkey-map-wrap {
+    overflow-x: visible;
+  }
+
+  #turkey-svg-map {
+    min-width: 0 !important;
+    width: 100%;
+    height: auto;
+    max-width: 620px;
+    margin: 0 auto;
+    display: block;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Bölge etiketleri küçük ekranda daha kompakt */
+  #turkey-svg-map text {
+    font-size: 0.6rem;
+  }
+}
+
+/* Off-grid cihaz tablosu — <= 480 kart layout
+   thead gizlenir, her tr bir karta dönüşür, td'ler data-label ile etiketlenir */
+@media (max-width: 480px) {
+  #offgrid-device-table-wrap {
+    overflow-x: visible !important;
+  }
+
+  #offgrid-device-table {
+    min-width: 0 !important;
+    display: block;
+    width: 100%;
+  }
+
+  #offgrid-device-table thead {
+    display: none;
+  }
+
+  #offgrid-device-table tbody,
+  #offgrid-device-table tfoot {
+    display: block;
+    width: 100%;
+  }
+
+  #offgrid-device-table tr.offgrid-device-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    border-bottom: 1px solid var(--border) !important;
+    border-radius: 10px;
+    background: var(--surface-light, rgba(255,255,255,0.02));
+  }
+
+  #offgrid-device-table .ogd-cell {
+    display: flex !important;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 !important;
+    text-align: left !important;
+    min-width: 0;
+  }
+
+  #offgrid-device-table .ogd-cell::before {
+    content: attr(data-label);
+    font-size: 0.66rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  #offgrid-device-table .ogd-cell--name {
+    grid-column: 1 / -1;
+  }
+
+  #offgrid-device-table .ogd-cell--name input {
+    width: 100% !important;
+  }
+
+  #offgrid-device-table .ogd-cell--remove {
+    grid-column: 1 / -1;
+    align-items: stretch;
+  }
+
+  #offgrid-device-table .ogd-cell--remove::before {
+    display: none;
+  }
+
+  #offgrid-device-table .ogd-cell--remove button {
+    width: 100%;
+    min-height: 44px;
+    font-size: 0.85rem !important;
+    padding: 10px !important;
+  }
+
+  #offgrid-device-table .ogd-cell input,
+  #offgrid-device-table .ogd-cell select {
+    width: 100% !important;
+    min-height: 44px;
+    font-size: 16px !important;
+    padding: 10px 12px !important;
+    box-sizing: border-box;
+  }
+
+  #offgrid-device-table .ogd-cell--total {
+    align-self: end;
+    font-size: 0.95rem !important;
+  }
+
+  #offgrid-device-table tfoot tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 12px;
+    padding: 10px 12px;
+  }
+
+  #offgrid-device-table tfoot td {
+    padding: 0 !important;
+    text-align: left !important;
+  }
+
+  /* Yatay scroll ipucu off-grid tablosu için artık gerekli değil */
+  #offgrid-device-table-wrap + .ui-scroll-hint,
+  .ui-scroll-hint:has(+ #offgrid-device-table-wrap) {
+    display: none;
+  }
+}
+
+/* Step 2 helper + legend kart yığma — <= 480 ekranda absolute yerine relative */
+@media (max-width: 480px) {
+  .step2-map-helper,
+  .step2-legend-card {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    margin: 8px 12px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  /* Legend bottom konumlanıyordu; şimdi aşağıya akış */
+  .step2-legend-card {
+    margin-top: 4px !important;
+  }
+}

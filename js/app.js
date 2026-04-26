@@ -3990,30 +3990,30 @@ function renderOffgridDeviceTable() {
     estimatedNightWh += nightWh;
     if (d.isCritical) { critDailyWh += dailyWh; critCount++; }
 
-    return `<tr style="border-bottom:1px solid rgba(148,163,184,0.1)">
-      <td style="padding:3px 6px"><input type="text" value="${_escHtml(d.name || '')}" placeholder="${_escHtml(nameLabel)}" aria-label="${_escHtml(nameLabel)}"
+    return `<tr class="offgrid-device-row" style="border-bottom:1px solid rgba(148,163,184,0.1)">
+      <td class="ogd-cell ogd-cell--name" data-label="${_escHtml(nameLabel)}" style="padding:3px 6px"><input type="text" value="${_escHtml(d.name || '')}" placeholder="${_escHtml(nameLabel)}" aria-label="${_escHtml(nameLabel)}"
         style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);width:100px;font-size:0.75rem"
         oninput="updateOffgridDevice(${i},'name',this.value)"/></td>
-      <td style="padding:3px 6px;text-align:right"><input type="number" value="${powerW||100}" min="1" max="100000" aria-label="${_escHtml(powerLabel)}"
+      <td class="ogd-cell ogd-cell--power" data-label="${_escHtml(powerLabel)}" style="padding:3px 6px;text-align:right"><input type="number" value="${powerW||100}" min="1" max="100000" aria-label="${_escHtml(powerLabel)}"
         style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);width:68px;font-size:0.75rem;text-align:right"
         oninput="updateOffgridDevice(${i},'powerW',this.value)"/></td>
-      <td style="padding:3px 6px;text-align:right"><input type="number" value="${hours||4}" min="0.1" max="24" step="0.25" aria-label="${_escHtml(hoursLabel)}"
+      <td class="ogd-cell ogd-cell--hours" data-label="${_escHtml(hoursLabel)}" style="padding:3px 6px;text-align:right"><input type="number" value="${hours||4}" min="0.1" max="24" step="0.25" aria-label="${_escHtml(hoursLabel)}"
         style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);width:55px;font-size:0.75rem;text-align:right"
         oninput="updateOffgridDevice(${i},'hoursPerDay',this.value)"/></td>
-      <td style="padding:3px 6px;text-align:right"><input type="number" value="${nightH||0}" min="0" max="24" step="0.25" aria-label="${_escHtml(nightLabel)}"
+      <td class="ogd-cell ogd-cell--night" data-label="${_escHtml(nightLabel)}" style="padding:3px 6px;text-align:right"><input type="number" value="${nightH||0}" min="0" max="24" step="0.25" aria-label="${_escHtml(nightLabel)}"
         style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text);width:50px;font-size:0.75rem;text-align:right"
         oninput="updateOffgridDevice(${i},'nightHoursPerDay',this.value)"/></td>
-      <td style="padding:3px 6px;text-align:right;font-weight:600;color:var(--text);font-size:0.75rem">${_whLabel(dailyWh)}${_escHtml(perDayLabel)}</td>
-      <td style="padding:3px 6px;text-align:center"><input type="checkbox" ${d.isCritical ? 'checked' : ''}
+      <td class="ogd-cell ogd-cell--total" data-label="Wh/Gün" style="padding:3px 6px;text-align:right;font-weight:600;color:var(--text);font-size:0.75rem">${_whLabel(dailyWh)}${_escHtml(perDayLabel)}</td>
+      <td class="ogd-cell ogd-cell--critical" data-label="${_escHtml(criticalLabel)}" style="padding:3px 6px;text-align:center"><input type="checkbox" ${d.isCritical ? 'checked' : ''}
         aria-label="${_escHtml(criticalLabel)}"
         onchange="updateOffgridDevice(${i},'isCritical',this.checked)"
         style="accent-color:#EF4444;cursor:pointer"/></td>
-      <td style="padding:3px 6px"><select aria-label="${_escHtml(categoryLabel)}"
+      <td class="ogd-cell ogd-cell--category" data-label="${_escHtml(categoryLabel)}" style="padding:3px 6px"><select aria-label="${_escHtml(categoryLabel)}"
         style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 4px;color:var(--text);font-size:0.72rem"
         onchange="updateOffgridDevice(${i},'category',this.value)">
         ${DEVICE_CATEGORIES.map(c => `<option value="${c}" ${(d.category||'generic')===c?'selected':''}>${_escHtml(catLabels[c]||c)}</option>`).join('')}
       </select></td>
-      <td style="padding:3px 6px"><button onclick="removeOffgridDevice(${i})" aria-label="${_escHtml(removeLabel)}"
+      <td class="ogd-cell ogd-cell--remove" style="padding:3px 6px"><button onclick="removeOffgridDevice(${i})" aria-label="${_escHtml(removeLabel)}"
         style="background:rgba(239,68,68,0.1);color:#EF4444;border:none;border-radius:4px;padding:2px 8px;font-size:0.72rem;cursor:pointer">✕</button></td>
     </tr>`;
   }).join('');
