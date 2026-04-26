@@ -552,15 +552,18 @@ export async function runCalculation() {
     if (!rawEnergy) {
       usedFallback = true;
       const psh = PSH_FALLBACK[state.cityName] || PSH_FALLBACK['default'];
-      // 0.80 = conservative "pre-loss" Performance Ratio applied BEFORE the explicit loss
-      // stack below (shading, soiling, inverter, cable). It captures losses the stack
-      // doesn't model: module mismatch (~1%), wiring/connector tolerance (~1%),
-      // module nameplate tolerance (~2%), dust on optics (~1%), and a general
-      // engineering safety margin (~3%) ≈ PR 0.80 at this stage.
-      // The explicit loss stack then further reduces this output by shading, soiling
-      // (~3%), inverter (~3%) and cable (~2%), yielding a final effective PR ~0.70-0.74.
-      // This is within IEA PVPS typical range (0.70-0.80) for Turkish climate conditions.
-      rawEnergy = secPower * psh * 365 * 0.80;
+      // Faz-2 D4: pre-loss PR cleaned up to remove double-counting against the
+      // explicit loss stack below. The previous 0.80 value bundled module
+      // mismatch, wiring tolerance, dust, and a generic engineering margin —
+      // but the explicit stack ALSO subtracts cable loss, soiling, and inverter
+      // efficiency, producing ~3-5% double-counting and an unrealistically low
+      // final PR (~0.70-0.74). 0.92 keeps only the residuals the explicit stack
+      // does not model: module mismatch (~1%), nameplate tolerance (~2%), and a
+      // small uncertainty margin (~5%) for the data-poor fallback path. After
+      // the explicit shading/soiling/inverter/cable losses, final effective PR
+      // ≈ 0.82-0.85 — IEA PVPS typical range for Turkish climates. PVGIS-live
+      // path is unaffected.
+      rawEnergy = secPower * psh * 365 * 0.92;
       rawPoa = psh * 365;
     }
 

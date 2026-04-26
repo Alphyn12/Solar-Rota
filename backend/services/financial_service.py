@@ -9,6 +9,40 @@ def _npv(cashflows: list[float], discount_rate: float) -> float:
     return sum(cf / ((1 + discount_rate) ** idx) for idx, cf in enumerate(cashflows))
 
 
+def _irr(cashflows: list[float], guess_lo: float = -0.95, guess_hi: float = 5.0,
+         tol: float = 1e-7, max_iter: int = 200) -> float | None:
+    """Internal Rate of Return via bisection on NPV(rate)=0.
+
+    Faz-2 D5: replaces the previous "ROI = total return %" misnomer. The browser
+    financial model and the backend now both surface IRR explicitly so quotes
+    can present an apples-to-apples annualised return instead of a 25-year
+    cumulative profit ratio. Returns None when no sign change exists in the
+    bracketed interval (e.g. project never recovers capex).
+    """
+    if not cashflows or cashflows[0] >= 0:
+        return None
+    f_lo = _npv(cashflows, guess_lo)
+    f_hi = _npv(cashflows, guess_hi)
+    if f_lo == 0:
+        return guess_lo
+    if f_hi == 0:
+        return guess_hi
+    if f_lo * f_hi > 0:
+        return None
+    for _ in range(max_iter):
+        mid = (guess_lo + guess_hi) / 2
+        f_mid = _npv(cashflows, mid)
+        if abs(f_mid) < tol or (guess_hi - guess_lo) < tol:
+            return mid
+        if f_lo * f_mid < 0:
+            guess_hi = mid
+            f_hi = f_mid
+        else:
+            guess_lo = mid
+            f_lo = f_mid
+    return (guess_lo + guess_hi) / 2
+
+
 def build_financial_payload(request: EngineRequest, production: dict) -> dict:
     annual_energy = float(production.get("annualEnergyKwh") or 0)
     annual_load = annual_load_kwh(request)
@@ -77,7 +111,15 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
         om_this_year = base_annual_om_cost * ((1 + expense_escalation) ** (year - 1))
         cashflows.append(gross - round(om_this_year))
     project_npv = _npv(cashflows, discount_rate)
-    roi = ((sum(cashflows[1:]) - rough_capex) / rough_capex) * 100
+    # Faz-2 D5: `roi` historically held (sum of yr1..25 net cashflows − capex) / capex,
+    # i.e. a 25-year cumulative profitability index minus 1 — NOT an annualised
+    # return. We surface both: `totalReturnPct` for the legacy figure under a
+    # name that matches what it computes, and `irrPct` for the true IRR. The
+    # `roiPct` key is kept for backwards compatibility with existing API
+    # consumers but mirrors `totalReturnPct`; UIs should migrate to `irrPct`.
+    total_return_pct = ((sum(cashflows[1:]) - rough_capex) / rough_capex) * 100
+    irr_value = _irr(cashflows)
+    irr_pct = round(irr_value * 100, 2) if irr_value is not None else None
 
     blockers = []
     if not request.governance.quoteInputsVerified:
@@ -102,7 +144,13 @@ def build_financial_payload(request: EngineRequest, production: dict) -> dict:
         "capexModel": "frontend-default-cost-basis",
         "simplePaybackYears": round(simple_payback, 2) if simple_payback else None,
         "npv25Try": round(project_npv),
-        "roiPct": round(roi, 1),
+        "totalReturnPct": round(total_return_pct, 1),
+        "irrPct": irr_pct,
+        # Faz-2 D5: kept for backwards compatibility — same value as totalReturnPct.
+        # New consumers should read `irrPct` for annualised return and
+        # `totalReturnPct` for the 25-year cumulative figure.
+        "roiPct": round(total_return_pct, 1),
+        "roiMetricBasis": "25y-cumulative-net-return-pct (alias of totalReturnPct; not IRR)",
         "estimateOnly": True,
         "dispatchAvailable": False if is_off_grid else None,
         "authoritativeForOffgrid": False if is_off_grid else None,
