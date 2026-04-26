@@ -198,7 +198,9 @@
     "heatmap": "Türkei Produktionskarte",
     "scenarios": "Szenarioanalyse",
     "comparison": "Angebote vergleichen",
-    "prGauge": "Performance Ratio (PR)"
+    "prGauge": "Performance Ratio (PR)",
+    "estimateDisclaimer": "Diese Ergebnisse sind eine Vor-Machbarkeitsschätzung aus einer stündlichen Simulation. Endgültige Werte werden nach Vor-Ort-Messung und Lieferantenangebot bestimmt.",
+    "estimatePill": "≈ Schätzwert"
   },
   "charts": {
     "monthlyProduction": "Monatliche Produktion",

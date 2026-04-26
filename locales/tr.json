@@ -198,7 +198,9 @@
     "heatmap": "Türkiye Üretim Haritası",
     "scenarios": "Senaryo Analizi",
     "comparison": "Teklif Karşılaştır",
-    "prGauge": "Sistem Verim Skoru"
+    "prGauge": "Sistem Verim Skoru",
+    "estimateDisclaimer": "Bu sonuçlar saatlik simülasyona dayalı ön tahmindir. Kesin değerler saha ölçümü ve tedarikçi teklifi sonrasında belirlenir.",
+    "estimatePill": "≈ Tahmini"
   },
   "charts": {
     "monthlyProduction": "Aylık elektrik üretimi",

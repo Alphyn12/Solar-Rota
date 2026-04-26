@@ -1,5 +1,5 @@
-// v31: UI Polish Faz A — text-muted contrast (AA), input[aria-invalid] icon, focus-visible.
-const CACHE_NAME = 'solarRota-v31';
+// v32: UI Polish Faz B — KPI estimate pill + result page disclaimer banner.
+const CACHE_NAME = 'solarRota-v32';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',

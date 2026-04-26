@@ -198,7 +198,9 @@
     "heatmap": "Turkey Production Heatmap",
     "scenarios": "Scenario Analysis",
     "comparison": "Compare Offers",
-    "prGauge": "Performance Ratio (PR)"
+    "prGauge": "Performance Ratio (PR)",
+    "estimateDisclaimer": "These results are pre-feasibility estimates from an hourly simulation. Final figures are determined after on-site measurement and supplier quotation.",
+    "estimatePill": "≈ Estimate"
   },
   "charts": {
     "monthlyProduction": "Monthly production",
