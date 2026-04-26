@@ -1,5 +1,5 @@
-// v33: UI Polish Faz C — map hint mobile, empty-state pattern, offgrid stat <=480.
-const CACHE_NAME = 'solarRota-v33';
+// v34: UI Polish Faz D — locationSelected i18n, panel-preview 2x2, a11y smoke.
+const CACHE_NAME = 'solarRota-v34';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',

@@ -1779,3 +1779,27 @@ body.modal-open {
     overflow-wrap: anywhere;
   }
 }
+
+/* Faz D: panel-preview <=480 4'lü stat 2x2 grid */
+@media (max-width: 480px) {
+  .panel-preview {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px !important;
+    padding: 12px !important;
+  }
+
+  .panel-preview-stat {
+    min-width: 0;
+  }
+
+  .panel-preview-val {
+    font-size: 1.25rem !important;
+    overflow-wrap: anywhere;
+  }
+
+  .panel-preview-label {
+    font-size: 0.68rem !important;
+    overflow-wrap: anywhere;
+  }
+}
