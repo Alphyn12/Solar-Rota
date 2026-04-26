@@ -238,10 +238,13 @@ export function initRoofDrawing(map) {
     return;
   }
 
-  // ── Özel vertex ikonu ────────────────────────────────────
+  // ── Özel vertex ikonu (Etap 4: dokunmatik cihazlarda 28 px hit alanı) ──
+  const _isCoarse = typeof window.matchMedia === 'function'
+    && window.matchMedia('(pointer: coarse)').matches;
+  const _vSize = _isCoarse ? 28 : 10;
   const vertexIcon = new L.DivIcon({
-    iconSize: new L.Point(10, 10),
-    className: 'roof-vertex-icon'
+    iconSize: new L.Point(_vSize, _vSize),
+    className: 'roof-vertex-icon' + (_isCoarse ? ' roof-vertex-icon--touch' : '')
   });
 
   const drawControl = new L.Control.Draw({

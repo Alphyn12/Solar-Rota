@@ -1,5 +1,5 @@
-// v27: Etap 3 mobile responsive — off-grid card layout + Türkiye SVG fluid + Step 2 stack.
-const CACHE_NAME = 'solarRota-v27';
+// v28: Etap 4 mobile responsive — Step 3 fullscreen + Leaflet touch + 28px vertex.
+const CACHE_NAME = 'solarRota-v28';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',

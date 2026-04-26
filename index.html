@@ -2081,6 +2081,12 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
           Çizimleri Temizle
         </button>
       </div>
+      <!-- Etap 4: Mobile fullscreen draw mode toggle -->
+      <button class="step3-fullscreen-toggle" id="step3-fullscreen-toggle" type="button"
+              onclick="toggleStep3Fullscreen()" aria-label="Tam ekran çizim modu" title="Tam ekran çizim">
+        <svg class="step3-fs-icon-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/></svg>
+        <svg class="step3-fs-icon-close" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6"/></svg>
+      </button>
     </div>
 
     <!-- RIGHT: config col -->

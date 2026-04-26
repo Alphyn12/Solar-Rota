@@ -178,6 +178,31 @@ window.openSettings = openSettings;
 window.closeSettings = closeSettings;
 window.setTheme = setTheme;
 
+// ── Etap 4: Step 3 fullscreen draw mode (mobil) ─────────────
+function toggleStep3Fullscreen() {
+  const next = !document.body.classList.contains('step3-fullscreen');
+  document.body.classList.toggle('step3-fullscreen', next);
+  // Leaflet harita boyutu yeniden hesaplansın (animasyon bittikten sonra)
+  setTimeout(() => { try { window.map?.invalidateSize(); } catch {} }, 360);
+  // Android donanım geri tuşu ile çıkış için history state
+  try {
+    if (next) {
+      history.pushState({ step3Fullscreen: true }, '');
+    } else if (history.state?.step3Fullscreen) {
+      history.back();
+    }
+  } catch {}
+}
+window.toggleStep3Fullscreen = toggleStep3Fullscreen;
+
+// popstate listener — Android geri tuşu fullscreen'i kapatır
+window.addEventListener('popstate', () => {
+  if (document.body.classList.contains('step3-fullscreen')) {
+    document.body.classList.remove('step3-fullscreen');
+    setTimeout(() => { try { window.map?.invalidateSize(); } catch {} }, 200);
+  }
+});
+
 // ── Etap 2: Mobil klavye davranışı ───────────────────────────
 // Telefon klavyesi açıldığında odaklanan input'un altta kalmamasını sağlar.
 // Yalnız dokunmatik cihazlarda çalışır; fareli laptop bozulmaz.
@@ -452,7 +477,15 @@ function syncHeaderHeightVar() {
 window.syncHeaderHeightVar = syncHeaderHeightVar;
 
 function initMap() {
-  map = L.map('map', { zoomControl: true }).setView([39.0, 35.0], 6);
+  // Etap 4: Mobil dokunmatik optimizasyon
+  map = L.map('map', {
+    zoomControl: true,
+    tap: true,
+    tapTolerance: 20,
+    zoomSnap: 0.5,
+    zoomDelta: 0.5,
+    bounceAtZoomLimits: false
+  }).setView([39.0, 35.0], 6);
   window.map = map;
 
   // ── Tile katmanları ──────────────────────────────────────
@@ -2865,6 +2898,10 @@ function goToStep(n) {
   // Etap 2: mobil sticky bottom bar — body[data-step] ile içerik switch
   document.body.dataset.step = String(n);
   document.body.classList.toggle('has-bottom-bar', n !== 6);
+  // Etap 4: Step 3 dışına çıkıldığında fullscreen mode kapatılır
+  if (n !== 3 && document.body.classList.contains('step3-fullscreen')) {
+    document.body.classList.remove('step3-fullscreen');
+  }
   syncHeaderHeightVar();
   updateProgressBar();
   window.scrollTo({ top: 0, behavior: (n === 2 || n === 3) ? 'auto' : 'smooth' });

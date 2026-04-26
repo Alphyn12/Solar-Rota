@@ -1415,3 +1415,132 @@ textarea {
     margin-top: 4px !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────
+   ETAP 4 — Step 3 Fullscreen Draw + Leaflet Touch
+   ───────────────────────────────────────────────────────── */
+
+/* Vertex ikonu — dokunmatik cihazlarda 28 px hit alanı, görsel 10 px ortalı */
+.roof-vertex-icon--touch {
+  background: transparent;
+  border: 0;
+  position: relative;
+}
+
+.roof-vertex-icon--touch::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  background: #F59E0B;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+/* Leaflet edit handles — dokunmatik için büyütülmüş hit alanı */
+@media (pointer: coarse) {
+  .leaflet-editing-icon,
+  .leaflet-edit-marker-selected,
+  .leaflet-marker-icon.leaflet-div-icon {
+    width: 28px !important;
+    height: 28px !important;
+    margin-left: -14px !important;
+    margin-top: -14px !important;
+    background-clip: content-box;
+    padding: 8px;
+    box-sizing: border-box;
+  }
+}
+
+/* Fullscreen toggle butonu — sadece <=768 ekranda görünür */
+.step3-fullscreen-toggle {
+  display: none;
+}
+
+.step3-fullscreen-toggle .step3-fs-icon-close {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .step3-fullscreen-toggle {
+    display: flex;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 35;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .step3-fullscreen-toggle:hover,
+  .step3-fullscreen-toggle:focus-visible {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  body.step3-fullscreen .step3-fullscreen-toggle .step3-fs-icon-open {
+    display: none;
+  }
+
+  body.step3-fullscreen .step3-fullscreen-toggle .step3-fs-icon-close {
+    display: block;
+  }
+
+  /* Fullscreen mode aktifken */
+  body.step3-fullscreen #app-header {
+    transform: translateY(-100%);
+    pointer-events: none;
+  }
+
+  body.step3-fullscreen .step3-config-col,
+  body.step3-fullscreen .roof-tool-legend,
+  body.step3-fullscreen .roof-tool-legend-toggle {
+    display: none !important;
+  }
+
+  body.step3-fullscreen #step-3,
+  body.step3-fullscreen .step3-split,
+  body.step3-fullscreen .step3-map-col {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-width: none !important;
+    z-index: 30;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  body.step3-fullscreen #step3-map-slot {
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+  }
+
+  body.step3-fullscreen .step3-fullscreen-toggle {
+    z-index: 50;
+    background: rgba(28, 28, 30, 0.92);
+    backdrop-filter: blur(8px);
+  }
+
+  /* Fullscreen aktifken bottom bar gizli — harita üstünde tek aksiyon hâkim */
+  body.step3-fullscreen .mobile-bottom-bar {
+    display: none;
+  }
+}
