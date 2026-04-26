@@ -1674,3 +1674,108 @@ body.modal-open {
     justify-content: center;
   }
 }
+
+/* ─────────────────────────────────────────────────────────
+   FAZ C — UX Polish (map hint, empty states, edge cases)
+   ───────────────────────────────────────────────────────── */
+
+/* Map draw hint mobilde 2 satıra geçebilsin, harita merkezini kapatmasın */
+@media (max-width: 480px) {
+  #map-draw-hint {
+    white-space: normal !important;
+    max-width: calc(100vw - 24px);
+    width: max-content;
+    top: 12px !important;
+    bottom: auto !important;
+    left: 12px !important;
+    right: 12px !important;
+    transform: none !important;
+    margin: 0 auto;
+    text-align: center;
+    font-size: 0.78rem;
+    padding: 8px 12px;
+    line-height: 1.4;
+  }
+}
+
+/* Empty state — Off-grid cihaz listesi boşken yönlendirici kart */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 22px 18px;
+  margin: 12px 0;
+  background: var(--surface-glass);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.empty-state__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(139, 92, 246, 0.10);
+  color: #8B5CF6;
+}
+
+.empty-state__title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text);
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.empty-state__hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: normal;
+  line-height: 1.5;
+  max-width: 360px;
+}
+
+.empty-state__cta {
+  margin-top: 4px;
+  min-height: 40px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--primary);
+  background: rgba(245, 158, 11, 0.08);
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.empty-state__cta:hover,
+.empty-state__cta:focus-visible {
+  background: var(--primary);
+  color: #000;
+  transform: translateY(-1px);
+}
+
+/* offgrid-stat-card <=480 fail-safe — 114 px sabit yükseklik DE/EN dilde
+   uzun etiketleri kırpıyordu; küçük ekranda yükseklik içeriğe uyar.   */
+@media (max-width: 480px) {
+  .offgrid-stat-card {
+    min-height: auto !important;
+    padding: 14px;
+  }
+
+  .offgrid-stat-value {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .offgrid-stat-label,
+  .offgrid-stat-note {
+    overflow-wrap: anywhere;
+  }
+}

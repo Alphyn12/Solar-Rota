@@ -1,5 +1,5 @@
-// v32: UI Polish Faz B — KPI estimate pill + result page disclaimer banner.
-const CACHE_NAME = 'solarRota-v32';
+// v33: UI Polish Faz C — map hint mobile, empty-state pattern, offgrid stat <=480.
+const CACHE_NAME = 'solarRota-v33';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',

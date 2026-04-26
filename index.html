@@ -3353,8 +3353,13 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
                 </tfoot>
               </table>
             </div>
-            <div id="offgrid-device-empty" style="font-size:0.72rem;color:var(--text-muted);font-style:italic" data-i18n="offgridL2.deviceListEmpty">
-              Cihaz eklenmedi — basit mod (günlük kWh + kritik oran) kullanılıyor.
+            <div id="offgrid-device-empty" class="empty-state">
+              <div class="empty-state__icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </div>
+              <div class="empty-state__title" data-i18n="offgridL2.deviceListEmpty">Cihaz eklenmedi — basit mod kullanılıyor.</div>
+              <div class="empty-state__hint" data-i18n="offgridL2.deviceListEmptyHint">Detaylı sonuç için cihaz kütüphanesinden ekleyin veya manuel ekleyebilirsiniz.</div>
+              <button class="empty-state__cta" type="button" onclick="addOffgridDevice()" data-i18n="offgridL2.deviceListEmptyCta">İlk Cihazı Ekle</button>
             </div>
           </div>
 
