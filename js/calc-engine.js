@@ -329,11 +329,29 @@ export function calculateBatteryMetrics(annualEnergy, dailyConsumption, battery)
   };
 }
 
-export function calculateNMMetrics(annualEnergy, systemPower, dailyConsumption, tariffModelOrRate, annualPriceIncrease, usdToTry, hourlySummary = null, batterySummary = null) {
+// Faz-1 D2: scenario-keyed self-consumption ratios used ONLY when neither a
+// battery-dispatch result nor an hourly simulation summary is available. The
+// previous behaviour silently assumed 100 % self-consumption (Math.min(load,
+// production)), which is physically impossible for a battery-less on-grid system
+// and inflated savings by tariff arbitrage when import/export rates differ.
+// Targets mirror backend/services/financial_service.py self_consumption_target
+// so frontend and backend heuristic fallbacks tell the same story.
+const HEURISTIC_SELF_CONSUMPTION_RATIO = {
+  'off-grid': 0.90,
+  'flexible-mobile': 0.88,
+  'agricultural-irrigation': 0.72,
+  'ev-charging': 0.68,
+  'heat-pump': 0.62,
+  'on-grid': 0.40
+};
+
+export function calculateNMMetrics(annualEnergy, systemPower, dailyConsumption, tariffModelOrRate, annualPriceIncrease, usdToTry, hourlySummary = null, batterySummary = null, scenarioKey = 'on-grid') {
   const tariffModel = typeof tariffModelOrRate === 'object' ? tariffModelOrRate : null;
   const tariff = tariffModel ? tariffModel.exportRate : tariffModelOrRate;
   const annualConsumption = hourlySummary?.annualLoad ?? dailyConsumption * 365;
-  const directSelfConsumedEnergy = batterySummary?.totalSelfConsumption ?? hourlySummary?.selfConsumption ?? Math.min(annualConsumption, annualEnergy);
+  const heuristicSelfConsumptionRatio = HEURISTIC_SELF_CONSUMPTION_RATIO[scenarioKey] ?? 0.40;
+  const heuristicSelfConsumed = Math.min(annualConsumption, annualEnergy * heuristicSelfConsumptionRatio);
+  const directSelfConsumedEnergy = batterySummary?.totalSelfConsumption ?? hourlySummary?.selfConsumption ?? heuristicSelfConsumed;
   const importOffsetEnergy = batterySummary?.importOffsetEnergy ?? hourlySummary?.importOffsetEnergy ?? 0;
   const selfConsumedEnergy = directSelfConsumedEnergy;
   const compensatedConsumptionEnergy = directSelfConsumedEnergy + importOffsetEnergy;
@@ -656,9 +674,30 @@ export async function runCalculation() {
     source: usedFallback ? 'local-fallback' : 'browser-pvgis'
   };
   const authoritativeOverride = state.authoritativeEngineOverride;
-  const authoritativeBackend = authoritativeOverride?.engineSource?.pvlibBacked && !authoritativeOverride?.fallbackUsed && !authoritativeOverride?.engineSource?.fallbackUsed
-    ? authoritativeOverride
-    : null;
+  // Faz-1 D1: Backend pvlib must NOT override real PVGIS production while it still
+  // synthesises irradiance from a clear-sky model. Only authorise the backend when
+  // it reports a real meteorology source (TMY, hourly PVGIS, ERA5, measured TMY).
+  // The `weatherSource` label is set by `engine_source()` / pvlib_engine.py.
+  const REAL_BACKEND_WEATHER_SOURCES = new Set([
+    'pvgis-tmy', 'pvgis-hourly', 'pvgis-live',
+    'era5-hourly', 'measured-tmy', 'real-meteorology'
+  ]);
+  const backendWeatherSource =
+    authoritativeOverride?.engineSource?.weatherSource
+    || authoritativeOverride?.production?.weatherSource
+    || authoritativeOverride?.production?.assumption_flags?.weatherSource
+    || authoritativeOverride?.losses?.weatherSource
+    || null;
+  const backendUsesRealWeather = backendWeatherSource && REAL_BACKEND_WEATHER_SOURCES.has(backendWeatherSource);
+  const authoritativeBackend = (
+    authoritativeOverride?.engineSource?.pvlibBacked
+    && !authoritativeOverride?.fallbackUsed
+    && !authoritativeOverride?.engineSource?.fallbackUsed
+    && backendUsesRealWeather
+  ) ? authoritativeOverride : null;
+  if (authoritativeOverride?.engineSource?.pvlibBacked && !authoritativeBackend && backendWeatherSource && !backendUsesRealWeather) {
+    console.warn('[calc-engine] Backend pvlib result not authoritative: weatherSource=' + backendWeatherSource + ' is synthetic. Browser PVGIS retained as authority.');
+  }
   let ongridHourlyProduction8760 = null;
   let ongridProductionProfileSource = 'monthly-derived-synthetic-pv';
   if (authoritativeBackend) {
@@ -677,7 +716,15 @@ export async function runCalculation() {
     soilingLoss = Math.round(pvgisRawEnergy * ((Number(bl.soilingPct ?? state.soilingFactor) || 0) / 100));
     tempLossEnergy = Math.max(0, Math.round((Number(bl.dcAnnualKwh || adjustedEnergy) || adjustedEnergy) - adjustedEnergy));
     azimuthLossEnergy = 0;
-    bifacialGainEnergy = (state.panelType === 'bifacial' || state.panelType === 'bifacial_topcon') ? Math.max(0, Math.round(adjustedEnergy * 0.05)) : 0;
+    // Faz-1 D3: prefer backend-computed bifacial gain over a hard-coded 5% fallback.
+    // pvlib_engine.py emits losses.bifacialGainKwh from `bifacial_factor` resolved
+    // through the shared request contract.
+    const backendBifacialKwh = Number(bl.bifacialGainKwh);
+    bifacialGainEnergy = Number.isFinite(backendBifacialKwh) && backendBifacialKwh >= 0
+      ? Math.round(backendBifacialKwh)
+      : ((state.panelType === 'bifacial' || state.panelType === 'bifacial_topcon')
+          ? Math.max(0, Math.round(adjustedEnergy * 0.05))
+          : 0);
     const backendCableLossPct = Math.max(0, Number(bl.wiringLossPct ?? bl.wiringMismatchPct ?? cableLossPct) || 0);
     totalCableLoss = Math.max(0, Math.round(pvgisRawEnergy * backendCableLossPct / 100));
     effectiveShadingFactor = Number(bl.shadingPct ?? state.shadingFactor ?? effectiveShadingFactor);
@@ -1235,7 +1282,8 @@ export async function runCalculation() {
 
   let nmMetrics = calculateNMMetrics(
     adjustedEnergy, systemPower, hourlySummaryRaw.annualLoad / 365,
-    tariffModel, annualPriceIncrease, state.usdToTry, hourlySummaryRaw, batterySummary
+    tariffModel, annualPriceIncrease, state.usdToTry, hourlySummaryRaw, batterySummary,
+    state.scenarioKey
   );
   if (state.scenarioKey === 'off-grid') {
     nmMetrics = suppressGridExportRevenue(nmMetrics);

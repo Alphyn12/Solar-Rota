@@ -120,6 +120,10 @@ def engine_source(mode: str = "auto", fallback_reason: str | None = None) -> Eng
             pvlibReady=True,
             pvlibBacked=True,
             fallbackUsed=False,
+            # Faz-1 D1: Frontend authoritative gating reads weatherSource to refuse
+            # overriding real PVGIS production with a synthetic clear-sky model.
+            # This stays "clearsky-scaled-synthetic" until pvlib is wired to TMY/ERA5.
+            weatherSource="clearsky-scaled-synthetic",
             notes=[
                 "pvlib solar position, clear-sky irradiance, POA transposition, cell temperature, and PVWatts DC model are active.",
                 "Panel wattage, panel area, inverter efficiency, bifacial gain, and cable loss are read from the shared frontend/backend request contract when present.",
@@ -138,6 +142,7 @@ def engine_source(mode: str = "auto", fallback_reason: str | None = None) -> Eng
             pvlibReady=True,
             pvlibBacked=False,
             fallbackUsed=True,
+            weatherSource="none",
             notes=[
                 fallback_reason,
                 "Deterministic backend model preserved the normalized response contract.",
@@ -154,6 +159,7 @@ def engine_source(mode: str = "auto", fallback_reason: str | None = None) -> Eng
         pvlibReady=True,
         pvlibBacked=False,
         fallbackUsed=False,
+        weatherSource="none",
         notes=[
             "pvlib is not installed in this environment; deterministic backend engine is active.",
             "TODO(pvlib): add measured/PVGIS hourly weather, AOI losses, clipping, inverter curves, and dispatch.",
@@ -331,11 +337,16 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
     clipping_kwh = float(clipped_w.sum()) / 1000
     capacity_factor = (annual_kwh / max(system_power_kwp * 8760, 1)) * 100
 
+    # Faz-1 D3: surface bifacial gain in kWh so the frontend authoritative path can
+    # reuse the engine-computed value instead of hard-coding 5%.
+    bifacial_gain_kwh = annual_kwh * (bifacial_factor - 1) / max(bifacial_factor, 1e-9)
     loss_flags = {
         "shadingPct": round(weighted_shading_pct, 3),
         "soilingPct": float(request.roof.soilingPct or 0),
         "wiringMismatchPct": round((1 - wiring_mismatch_factor) * 100, 2),
         "wiringLossPct": round((1 - wiring_mismatch_factor) * 100, 2),
+        "bifacialFactor": round(bifacial_factor, 4),
+        "bifacialGainKwh": round(max(0.0, bifacial_gain_kwh), 2),
         "contractPanelWattPeak": round(panel_watt_peak(request), 3),
         "contractPanelAreaM2": round(panel_area_m2(request), 4),
         "contractInverterEfficiency": round(inverter_eff, 4),
@@ -353,6 +364,9 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
         "transpositionModel": "pvlib.irradiance.haydavies",
         "inverterApproximation": "constant efficiency with AC cap",
         "clippingKwh": round(clipping_kwh, 2),
+        # Faz-1 D1: explicit weather provenance label so the frontend authoritative
+        # gate refuses synthetic clear-sky over real PVGIS until TMY/ERA5 is wired.
+        "weatherSource": "clearsky-scaled-synthetic",
     }
 
     return {
@@ -371,12 +385,14 @@ def calculate_pvlib_production(request: EngineRequest) -> dict[str, Any]:
             "engine_used": "pvlib-backed",
             "engine_quality": "engineering-mvp",
             "confidence_level": PVLIB_CONFIDENCE_LEVEL,
+            "weatherSource": "clearsky-scaled-synthetic",
             "assumption_flags": {
                 "usesClearSkyIrradianceScaledToInputGhi": True,
                 "usesMeasuredWeather": False,
                 "usesHourlySolarPosition": True,
                 "usesPvlibTemperatureModel": True,
                 "usesSimplifiedInverterModel": True,
+                "weatherSource": "clearsky-scaled-synthetic",
             },
         },
         "losses": {

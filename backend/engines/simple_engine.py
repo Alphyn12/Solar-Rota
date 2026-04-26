@@ -255,6 +255,9 @@ def calculate_production(request: EngineRequest) -> Dict[str, object]:
     if use_section_geometry:
         bifacial_factor = 1 + _bifacial_base_gain * (1 - _clamp(shading_pct, 0, 80) / 200)
 
+    # Faz-1 D3: emit bifacial gain in kWh so frontend authoritative path can prefer
+    # the engine value over a hard-coded 5 % fallback.
+    bifacial_gain_kwh = annual_energy * (bifacial_factor - 1) / max(bifacial_factor, 1e-9)
     losses = {
         "baseEnergyKwh": round(base_energy),
         "orientationFactor": round(orientation_factor, 4),
@@ -262,11 +265,15 @@ def calculate_production(request: EngineRequest) -> Dict[str, object]:
         "soilingPct": request.roof.soilingPct,
         "inverterEfficiency": inverter_factor,
         "bifacialFactor": bifacial_factor,
+        "bifacialGainKwh": round(max(0.0, bifacial_gain_kwh), 2),
         "wiringLossPct": round((1 - wiring_factor) * 100, 3),
         "modelCompleteness": "deterministic backend fallback aligned to frontend panel/inverter contract; pvlib hourly model chain preferred when available",
         "layoutSnapshotUsed": bool(snapshot_power),
         "layoutSectionGeometryUsed": use_section_geometry,
         "layoutSnapshot": layout_snapshot(request),
+        # Faz-1 D1: simple deterministic fallback uses a synthetic GHI/PSH model — not
+        # real meteorology — so it must not be promoted to authoritative on the frontend.
+        "weatherSource": "psh-deterministic-synthetic",
         "parityNotes": [
             "Panel wattage, panel area, inverter efficiency, bifacial gain, and cable loss are read from the shared request contract when present.",
             "This fallback still uses a deterministic GHI/PSH orientation model, so it is not expected to numerically match pvlib-backed or browser PVGIS output exactly.",
