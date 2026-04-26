@@ -36,28 +36,66 @@ function moneyRate(value, unit = 'kWh') {
   return converted.toLocaleString(ctx.locale, { maximumFractionDigits: ctx.currency === 'USD' ? 3 : 2 }) + ` ${ctx.suffix}/${unit}`;
 }
 
+// Faz-3 D7: explicit weather-provenance labels so a "8760-hour simulation" badge
+// can never imply "real meteorology" when the actual data is a clear-sky scaling
+// or deterministic PSH model. Mirrors the synthetic set guarded by the
+// frontend authoritative-backend gate and turkey-regulation.js quote-readiness.
+const WEATHER_SOURCE_DISCLOSURE = {
+  'pvgis-live':                     { label: 'PVGIS canlı (gerçek)',         synthetic: false },
+  'pvgis-tmy':                      { label: 'PVGIS TMY (gerçek)',           synthetic: false },
+  'pvgis-hourly':                   { label: 'PVGIS saatlik (gerçek)',       synthetic: false },
+  'era5-hourly':                    { label: 'ERA5 saatlik (gerçek)',        synthetic: false },
+  'measured-tmy':                   { label: 'Ölçülmüş TMY (gerçek)',        synthetic: false },
+  'real-meteorology':               { label: 'Gerçek meteoroloji',           synthetic: false },
+  'clearsky-scaled-synthetic':      { label: 'Bulutsuz gökyüzü (sentetik)',  synthetic: true  },
+  'psh-deterministic-synthetic':    { label: 'PSH deterministik (sentetik)', synthetic: true  },
+  'monthly-derived-synthetic-pv':   { label: 'Aylıktan türetilmiş (sentetik)', synthetic: true },
+  'monthly-production-derived-synthetic-8760': { label: 'Aylıktan türetilmiş 8760 (sentetik)', synthetic: true }
+};
+
+function resolveWeatherSourceMeta(results = {}) {
+  const key =
+    results.authoritativeEngineSource?.weatherSource
+    || results.engineSource?.weatherSource
+    || results.authoritativeEngineResponse?.engineSource?.weatherSource
+    || results.authoritativeEngineResponse?.production?.weatherSource
+    || results.authoritativeEngineResponse?.production?.assumption_flags?.weatherSource
+    || results.authoritativeEngineResponse?.losses?.weatherSource
+    || (results.usedFallback ? 'psh-deterministic-synthetic'
+        : results.authoritativeEngineMode === 'browser-pvgis' ? 'pvgis-live'
+        : null);
+  if (!key) return null;
+  return { key, ...(WEATHER_SOURCE_DISCLOSURE[key] || { label: key, synthetic: false }) };
+}
+
 function engineSummaryText(results = {}, state = window.state || {}) {
   const source = results.authoritativeEngineSource || results.engineSource || results.backendEngineSource;
   const fallback = results.authoritativeEngineFallbackReason || (state.backendEngineAvailable === false ? state.backendEngineLastError : '');
-  if (fallback) return 'Canlı veri geçici olarak alınamadı; yerel tahmin modeli kullanıldı.';
+  const weather = resolveWeatherSourceMeta(results);
+  const weatherSuffix = weather
+    ? ` · Hava modeli: ${weather.label}${weather.synthetic ? ' ⚠' : ''}`
+    : '';
+  if (fallback) return `Canlı veri geçici olarak alınamadı; yerel tahmin modeli kullanıldı.${weatherSuffix}`;
   if (source?.pvlibBacked || source?.source) {
     const sourceLabel = source?.source ? ` (${source.source})` : '';
-    return `Canlı güneş verisiyle desteklenen hesaplama kullanıldı${sourceLabel}.`;
+    return `Canlı güneş verisiyle desteklenen hesaplama kullanıldı${sourceLabel}.${weatherSuffix}`;
   }
-  return 'Yerel tahmin modeliyle hesaplama yapıldı.';
+  return `Yerel tahmin modeliyle hesaplama yapıldı.${weatherSuffix}`;
 }
 
 function backendEngineText(results = {}, state = window.state || {}) {
   const source = results.authoritativeEngineSource || results.engineSource || results.backendEngineSource || results.backendEngineResponse?.engineSource;
+  const weather = resolveWeatherSourceMeta(results);
+  const weatherTag = weather ? ` / hava: ${weather.label}${weather.synthetic ? ' (sentetik)' : ''}` : '';
   if (source) {
     const backed = source.pvlibBacked ? 'pvlib-backed' : source.fallbackUsed || results.authoritativeEngineFallbackReason ? i18n.t('engine.fallback') : i18n.t('engine.primary');
     const annual = results.authoritativeEngineResponse?.production?.annualEnergyKwh || results.backendEngineResponse?.production?.annualEnergyKwh || results.annualEnergy;
     const energy = annual ? ` / ${Number(annual).toLocaleString(localeTag())} kWh/${i18n.t('units.year')}` : '';
-    return `${source.provider || 'engine'} / ${source.source || results.calculationMode || '—'} / ${backed}${energy}`;
+    return `${source.provider || 'engine'} / ${source.source || results.calculationMode || '—'} / ${backed}${energy}${weatherTag}`;
   }
   return state.backendEngineAvailable === false
-    ? `${i18n.t('engine.fallbackActive')} / ${state.backendEngineLastError || i18n.t('engine.backendUnavailable')}`
-    : i18n.t('engine.browserActive');
+    ? `${i18n.t('engine.fallbackActive')} / ${state.backendEngineLastError || i18n.t('engine.backendUnavailable')}${weatherTag}`
+    : `${i18n.t('engine.browserActive')}${weatherTag}`;
 }
 
 function offgridStatCard({ value, label, note = '', color = 'var(--primary)' }) {

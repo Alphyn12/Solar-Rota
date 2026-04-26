@@ -272,6 +272,30 @@ export function applyExportCompensation(monthly, policy = {}) {
   };
 }
 
+// Faz-3 D6: production weather provenance allow-list. Anything else is synthetic
+// (clear-sky scaled to GHI, deterministic PSH, monthly-derived synthetic profile)
+// and may not be promoted to a binding commercial quote. Mirrors the frontend
+// authoritative-backend gate in calc-engine.js so quote-readiness and engine
+// authority share one definition of "real meteorology".
+const SYNTHETIC_PRODUCTION_WEATHER_SOURCES = new Set([
+  'clearsky-scaled-synthetic',
+  'psh-deterministic-synthetic',
+  'monthly-derived-synthetic-pv',
+  'monthly-production-derived-synthetic-8760'
+]);
+
+function resolveProductionWeatherSource(results = {}) {
+  return (
+    results.authoritativeEngineSource?.weatherSource
+    || results.engineSource?.weatherSource
+    || results.authoritativeEngineResponse?.engineSource?.weatherSource
+    || results.authoritativeEngineResponse?.production?.weatherSource
+    || results.authoritativeEngineResponse?.production?.assumption_flags?.weatherSource
+    || results.authoritativeEngineResponse?.losses?.weatherSource
+    || null
+  );
+}
+
 export function buildQuoteReadiness({ state = {}, results = {}, tariffModel = null, evidenceGovernance = null } = {}) {
   const blockers = [];
   const isOffGrid = state.scenarioKey === 'off-grid';
@@ -281,8 +305,16 @@ export function buildQuoteReadiness({ state = {}, results = {}, tariffModel = nu
   const validationWarnings = evidenceGovernance?.validation?.warnings || [];
   const hasHourlyConsumptionProfile = Array.isArray(state.hourlyConsumption8760) && state.hourlyConsumption8760.length >= 8760;
   const offgrid = results.offgridL2Results || {};
+  // Faz-3 D6: a synthetic production weather source (clear-sky scaled, deterministic
+  // PSH, etc.) cannot back a binding quote even when other governance flags pass.
+  const productionWeatherSource = resolveProductionWeatherSource(results);
+  const productionWeatherIsSynthetic = !!productionWeatherSource
+    && SYNTHETIC_PRODUCTION_WEATHER_SOURCES.has(productionWeatherSource);
   if (isOffGrid) {
     if (results.usedFallback) blockers.push('PVGIS canlı veri yok; fallback üretim off-grid teklif adayı için kabul edilmez.');
+    if (productionWeatherIsSynthetic) {
+      blockers.push(`Üretim verisi sentetik meteoroloji modelinden geliyor (${productionWeatherSource}); off-grid teklif için PVGIS canlı/TMY veya ölçülmüş hava verisi zorunlu.`);
+    }
     if (!state.roofGeometry) blockers.push('Çatı geometrisi harita/saha çizimiyle doğrulanmadı.');
     if (!state.quoteInputsVerified) blockers.push('Teklif varsayımları yetkili kullanıcı tarafından doğrulanmadı.');
     if (!hasMeaningfulConsumptionEvidence(state) && !hasHourlyConsumptionProfile) blockers.push('Off-grid toplam yük kaynağı doğrulanmadı.');
@@ -315,6 +347,13 @@ export function buildQuoteReadiness({ state = {}, results = {}, tariffModel = nu
     blockers.push('SETTLEMENT_DATE_MISSING: Mahsuplaşma modu Otomatik seçiliyken sistem devreye alma tarihi girilmesi zorunludur.');
   }
   if (results.usedFallback) blockers.push('PVGIS canlı veri yok; fallback üretim quote-ready kabul edilmez.');
+  // Faz-3 D6: on-grid commercial quotes also require real meteorology, not a
+  // synthetic clear-sky / PSH model. The frontend authoritative gate prevents
+  // these sources from overriding PVGIS at calc time, but we still block here
+  // in case a downstream caller injected a synthetic-only result set.
+  if (productionWeatherIsSynthetic) {
+    blockers.push(`Üretim verisi sentetik meteoroloji modelinden geliyor (${productionWeatherSource}); ticari teklif için PVGIS canlı/TMY veya ölçülmüş hava verisi zorunlu.`);
+  }
   if (!state.roofGeometry) blockers.push('Çatı geometrisi harita/saha çizimiyle doğrulanmadı.');
   if (!state.quoteInputsVerified) blockers.push('Teklif varsayımları yetkili kullanıcı tarafından doğrulanmadı.');
   if (!hasMeaningfulConsumptionEvidence(state)) blockers.push('Müşteri fatura/tüketim verisi doğrulanmadı.');
