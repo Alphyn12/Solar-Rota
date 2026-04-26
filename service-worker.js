@@ -1,5 +1,5 @@
-// v29: Etap 5 mobile responsive — hero orbs hide + modallar full-screen + landing.
-const CACHE_NAME = 'solarRota-v29';
+// v30: Etap 6 mobile responsive — 100dvh, lazy-load, orientationchange, mobile playwright.
+const CACHE_NAME = 'solarRota-v30';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',

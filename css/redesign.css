@@ -100,6 +100,7 @@ h2, .h2, .step-heading-title {
 
 .step-hero {
   min-height: calc(100vh - var(--header-h));
+  min-height: calc(100dvh - var(--header-h));
   background: var(--hero-gradient);
   margin: -24px -16px 0;
   padding: 0;
@@ -755,12 +756,14 @@ h2, .h2, .step-heading-title {
   display: grid;
   grid-template-columns: 60% 40%;
   height: calc(100vh - var(--header-h));
+  height: calc(100dvh - var(--header-h));
   overflow: hidden;
 }
 .step3-map-col {
   position: sticky;
   top: var(--header-h);
   height: calc(100vh - var(--header-h));
+  height: calc(100dvh - var(--header-h));
   overflow: hidden;
 }
 #step3-map-slot {
@@ -777,6 +780,7 @@ h2, .h2, .step-heading-title {
 .step3-config-col {
   overflow-y: auto;
   height: calc(100vh - var(--header-h));
+  height: calc(100dvh - var(--header-h));
   padding: 16px 20px 32px;
   border-left: 1px solid var(--border-subtle);
   background: var(--secondary);
@@ -1352,6 +1356,7 @@ h2, .h2, .step-heading-title {
 
 .step-loading-wrap {
   min-height: calc(100vh - var(--header-h) - 24px);
+  min-height: calc(100dvh - var(--header-h) - 24px);
   display: flex;
   flex-direction: column;
   align-items: center;

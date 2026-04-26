@@ -21,6 +21,7 @@ body.landing-active #back-to-landing-btn { display: none !important; }
   color: var(--text);
   font-family: var(--font-body);
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .lp-container {

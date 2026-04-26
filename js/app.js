@@ -229,14 +229,40 @@ function initMobileBottomBarBaseline() {
   document.body.classList.add('has-bottom-bar');
 }
 
+// Etap 6: Rotasyon / viewport resize — Leaflet harita boyutunu yeniden hesapla
+function initOrientationChangeHandler() {
+  let resizeTimer = null;
+  const onResize = () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      try { window.map?.invalidateSize(); } catch {}
+      try { window.heatmapMap?.invalidateSize(); } catch {}
+    }, 150);
+  };
+  window.addEventListener('orientationchange', onResize);
+  window.addEventListener('resize', onResize);
+}
+
+// Etap 6: <img> elemanlarına lazy-load + decoding=async (zaten yoksa)
+function initImageLazyLoad() {
+  document.querySelectorAll('img').forEach((img) => {
+    if (!img.hasAttribute('loading')) img.setAttribute('loading', 'lazy');
+    if (!img.hasAttribute('decoding')) img.setAttribute('decoding', 'async');
+  });
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     initMobileKeyboardScroll();
     initMobileBottomBarBaseline();
+    initOrientationChangeHandler();
+    initImageLazyLoad();
   });
 } else {
   initMobileKeyboardScroll();
   initMobileBottomBarBaseline();
+  initOrientationChangeHandler();
+  initImageLazyLoad();
 }
 
 // ═══════════════════════════════════════════════════════════

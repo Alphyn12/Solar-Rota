@@ -133,12 +133,9 @@ textarea {
     display: none;
   }
 
-  /* Mevcut adım içi nav-btns / hero-cta-wrap mobilde gizli — sticky bar
-     onları çoğaltıyor. Masaüstünde ve >768 tabletlerde korunur. */
-  .step-pane.active .nav-btns,
-  .step-pane.active .hero-cta-wrap {
-    display: none !important;
-  }
+  /* Etap 6 regresyon: mevcut adım içi .nav-btns / .hero-cta-wrap mobilde
+     görünür kalır — bottom bar ek aksiyondur, mevcut Playwright testleri
+     ve scroll-up etkileşimi bozulmasın. */
 }
 
 /* ── SETTINGS PANEL & OVERLAY ─────────────────────────────
