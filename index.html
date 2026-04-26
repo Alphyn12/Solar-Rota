@@ -1796,52 +1796,49 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 </header>
 
 <!-- SETTINGS OVERLAY + PANEL -->
-<div id="settings-overlay" onclick="closeSettings()" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px)"></div>
-<div id="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-panel-title" style="display:none;position:fixed;top:0;right:0;width:300px;height:100vh;z-index:9999;background:var(--surface);border-left:1px solid var(--border);padding:28px 24px;overflow-y:auto;transform:translateX(100%);transition:transform 0.3s ease;box-shadow:var(--shadow-md)">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px">
-    <span id="settings-panel-title" style="font-family:var(--font-display);font-weight:700;font-size:1.05rem;color:var(--text)" data-i18n="settings.title">Ayarlar</span>
-    <button id="settings-close-btn" onclick="closeSettings()" aria-label="Kapat" title="Kapat" data-i18n-title="common.close" data-i18n-aria-label="common.close" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.3rem;line-height:1;padding:4px 6px;border-radius:8px;transition:0.2s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
+<div id="settings-overlay" class="settings-overlay" onclick="closeSettings()" style="display:none"></div>
+<div id="settings-panel" class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-panel-title" style="display:none">
+  <div class="settings-panel-header">
+    <span id="settings-panel-title" class="settings-panel-title" data-i18n="settings.title">Ayarlar</span>
+    <button id="settings-close-btn" class="settings-panel-close" onclick="closeSettings()" aria-label="Kapat" title="Kapat" data-i18n-title="common.close" data-i18n-aria-label="common.close">✕</button>
   </div>
-  <div style="margin-bottom:28px">
-    <button class="header-icon-btn" id="dashboard-btn" onclick="closeSettings(); openDashboard()" style="display:none;width:100%;justify-content:center;height:44px">
+  <div class="settings-panel-section">
+    <button class="header-icon-btn settings-panel-dashboard-btn" id="dashboard-btn" onclick="closeSettings(); openDashboard()" style="display:none">
       Kayıtlı Hesaplar
     </button>
   </div>
-  <div style="margin-bottom:28px">
-    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600" data-i18n="settings.theme">Tema</div>
-    <div style="display:flex;gap:8px">
+  <div class="settings-panel-section">
+    <div class="settings-panel-label" data-i18n="settings.theme">Tema</div>
+    <div class="settings-panel-row">
       <button class="settings-choice-btn" id="theme-dark-btn" onclick="setTheme('dark')" data-i18n="settings.dark">🌙 Koyu</button>
       <button class="settings-choice-btn" id="theme-light-btn" onclick="setTheme('light')" data-i18n="settings.light">☀️ Açık</button>
     </div>
   </div>
-  <div style="margin-bottom:28px">
-    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600" data-i18n="settings.language">Dil / Language</div>
-    <div style="display:flex;gap:8px">
+  <div class="settings-panel-section">
+    <div class="settings-panel-label" data-i18n="settings.language">Dil / Language</div>
+    <div class="settings-panel-row">
       <button class="settings-choice-btn lang-btn" data-lang="tr" data-testid="lang-tr" onclick="switchLanguage('tr')">TR</button>
       <button class="settings-choice-btn lang-btn" data-lang="en" data-testid="lang-en" onclick="switchLanguage('en')">EN</button>
       <button class="settings-choice-btn lang-btn" data-lang="de" data-testid="lang-de" onclick="switchLanguage('de')">DE</button>
     </div>
   </div>
-  <div style="margin-bottom:28px">
-    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600" data-i18n="settings.currency">Para Birimi</div>
-    <div style="display:flex;gap:8px;margin-bottom:14px">
+  <div class="settings-panel-section">
+    <div class="settings-panel-label" data-i18n="settings.currency">Para Birimi</div>
+    <div class="settings-panel-row" style="margin-bottom:14px">
       <button class="settings-choice-btn currency-btn" data-currency="TRY" onclick="switchCurrency('TRY')">₺ TL</button>
       <button class="settings-choice-btn currency-btn" data-currency="USD" onclick="switchCurrency('USD')">$ USD</button>
     </div>
-    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:8px;font-weight:500" data-i18n="settings.usdTryRate">USD / TRY Kuru</div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <input type="number" id="usd-try-settings" min="1" step="0.5" value="38.5"
+    <div class="settings-panel-label" style="text-transform:none;letter-spacing:0;font-size:0.7rem;margin-bottom:8px;font-weight:500" data-i18n="settings.usdTryRate">USD / TRY Kuru</div>
+    <div class="settings-panel-row settings-panel-row--rate">
+      <input type="number" id="usd-try-settings" class="settings-panel-rate-input" min="1" step="0.5" value="38.5"
              oninput="setManualUsdTryRate(this.value); const el=document.getElementById('usd-try-input'); if(el){el.value=this.value}"
-             aria-label="USD / TRY Kuru" data-i18n-aria-label="settings.usdTryRate"
-             style="flex:1;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface-light);color:var(--text);font-size:0.9rem;font-family:var(--font-body);outline:none"/>
-      <button onclick="refreshExchangeRate()" title="Kuru güncelle" aria-label="Kuru güncelle"
-              data-i18n-title="settings.refreshRate" data-i18n-aria-label="settings.refreshRate"
-              style="width:36px;height:36px;border-radius:9px;border:1px solid var(--border);background:var(--surface-light);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:0.2s;flex-shrink:0"
-              onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">
+             aria-label="USD / TRY Kuru" data-i18n-aria-label="settings.usdTryRate"/>
+      <button class="settings-panel-rate-refresh" onclick="refreshExchangeRate()" title="Kuru güncelle" aria-label="Kuru güncelle"
+              data-i18n-title="settings.refreshRate" data-i18n-aria-label="settings.refreshRate">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
       </button>
     </div>
-    <div id="exchange-rate-status-settings" style="font-size:0.68rem;color:var(--text-muted);margin-top:6px;line-height:1.4"></div>
+    <div id="exchange-rate-status-settings" class="settings-panel-rate-status"></div>
   </div>
 </div>
 

@@ -1,5 +1,5 @@
-// v24: Precache active brand logo asset.
-const CACHE_NAME = 'solarRota-v24';
+// v25: Etap 1 mobile responsive — settings panel class + breakpoint contract.
+const CACHE_NAME = 'solarRota-v25';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',

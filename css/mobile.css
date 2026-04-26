@@ -1,5 +1,18 @@
 /* Solar Rota mobile and touch ergonomics */
 
+/* ─────────────────────────────────────────────────────────
+   BREAKPOINT CONTRACT (Etap 1 — 2026-04-26)
+   xs:  <= 360px   küçük telefon (iPhone SE, alt segment Android)
+   sm:  <= 480px   telefon dikey (full-screen drawer/modal, sticky CTA)
+   md:  <= 768px   telefon yatay / tablet dikey (2 sütun → 1, kart layout)
+   lg:  <= 1024px  tablet yatay / küçük dizüstü (yan panel daralır)
+       >= 1025px   masaüstü (mevcut tasarım korunur)
+
+   Eski 720 / 900 blokları geçici olarak korunur, yeni kurallar bu
+   sözleşmeye göre eklenir. (legacy 720 / legacy 900 etiketleri ile
+   işaretli eski bloklar Etap 6'da konsolide edilir.)
+   ───────────────────────────────────────────────────────── */
+
 html {
   max-width: 100%;
   overflow-x: hidden;
@@ -25,6 +38,179 @@ input,
 select,
 textarea {
   touch-action: manipulation;
+}
+
+/* ── SETTINGS PANEL & OVERLAY ─────────────────────────────
+   Inline style'dan class'a taşındı (Etap 1).
+   JS hala display ve transform'u inline manipüle eder; bu kurallar
+   yalnız statik görünümü ve responsive davranışı tanımlar.            */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 9999;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  padding: 28px 24px;
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  box-shadow: var(--shadow-md);
+  padding-bottom: max(28px, env(safe-area-inset-bottom));
+}
+
+.settings-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.settings-panel-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.settings-panel-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: color 0.2s;
+}
+
+.settings-panel-close:hover,
+.settings-panel-close:focus-visible {
+  color: var(--text);
+}
+
+.settings-panel-section {
+  margin-bottom: 28px;
+}
+
+.settings-panel-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.settings-panel-row {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-panel-row--rate {
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-panel-rate-input {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-light);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: var(--font-body);
+  outline: none;
+  min-width: 0;
+}
+
+.settings-panel-rate-refresh {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-light);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.2s;
+  flex-shrink: 0;
+}
+
+.settings-panel-rate-refresh:hover,
+.settings-panel-rate-refresh:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.settings-panel-rate-status {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+.settings-panel-dashboard-btn {
+  width: 100%;
+  justify-content: center;
+  height: 44px;
+}
+
+/* Settings drawer responsive — md (telefon yatay / tablet dikey) */
+@media (max-width: 768px) {
+  .settings-panel {
+    width: 360px;
+    max-width: 80vw;
+    padding: 24px 20px;
+  }
+
+  /* Drawer içindeki seçim butonları dokunma için 44 px */
+  .settings-panel .lang-btn,
+  .settings-panel .currency-btn,
+  .settings-panel .settings-choice-btn {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 0.78rem;
+  }
+
+  .settings-panel-rate-refresh {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Settings drawer responsive — sm (telefon dikey) full-screen */
+@media (max-width: 480px) {
+  .settings-panel {
+    width: 100%;
+    max-width: 100vw;
+    border-left: 0;
+    padding: 20px 16px;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+
+  .settings-panel-section {
+    margin-bottom: 22px;
+  }
+
+  .settings-panel-header {
+    margin-bottom: 24px;
+  }
 }
 
 @media (max-width: 900px) {
@@ -278,8 +464,14 @@ textarea {
   }
 
   .header-lang-btn {
-    width: 30px;
-    padding: 0;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 6px;
+  }
+
+  .header-icon-btn {
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .header-steps-center {
