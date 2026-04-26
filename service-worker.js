@@ -1,5 +1,5 @@
-// v30: Etap 6 mobile responsive — 100dvh, lazy-load, orientationchange, mobile playwright.
-const CACHE_NAME = 'solarRota-v30';
+// v31: UI Polish Faz A — text-muted contrast (AA), input[aria-invalid] icon, focus-visible.
+const CACHE_NAME = 'solarRota-v31';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',

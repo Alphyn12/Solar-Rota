@@ -668,6 +668,20 @@ h2, .h2, .step-heading-title {
   cursor: pointer;
   box-shadow: 0 8px 22px rgba(0,0,0,.24);
 }
+.roof-tool-legend-toggle:focus-visible,
+.roof-tool-legend-close:focus-visible {
+  outline: 3px solid rgba(6,182,212,0.85);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px rgba(6,182,212,0.16), 0 8px 22px rgba(0,0,0,.24);
+}
+/* Leaflet draw / zoom kontrol butonları için klavye odak halkası */
+.leaflet-draw-toolbar a:focus-visible,
+.leaflet-draw-actions a:focus-visible,
+.leaflet-bar a:focus-visible {
+  outline: 3px solid rgba(6,182,212,0.85);
+  outline-offset: 2px;
+  z-index: 1001;
+}
 .roof-map-compass {
   position: absolute;
   bottom: 16px;

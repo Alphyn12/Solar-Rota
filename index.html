@@ -30,7 +30,7 @@
   --accent:#06B6D4;--accent-dark:#0891B2;--accent-glow:rgba(6,182,212,0.2);
   --secondary:#1C1C1E;--surface:#242426;--surface-light:#2C2C2E;
   --surface-glass:rgba(255,255,255,0.04);
-  --text:#F5F5F7;--text-muted:#98989E;
+  --text:#F5F5F7;--text-muted:#B1B1B6;
   --success:#10B981;--danger:#EF4444;
   --border:#3A3A3C;--border-subtle:rgba(255,255,255,0.07);
   --radius:14px;--radius-lg:20px;--radius-xl:28px;--radius-2xl:40px;
@@ -357,8 +357,20 @@ label{display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;f
 .input-wrap{position:relative}
 input[type=text],input[type=number],select{width:100%;background:var(--surface-light);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:1rem;padding:10px 12px;font-family:inherit;outline:none;transition:border-color var(--transition);touch-action:manipulation;}
 input[type=text]:focus,input[type=number]:focus,select:focus{border-color:var(--primary)}
-input.error{border-color:var(--danger)!important}
-.error-msg{font-size:0.75rem;color:var(--danger);margin-top:4px}
+/* Form validation — Faz A: renk + ⚠️ ikon (sadece renk yetersizdi, WCAG 1.4.1) */
+input.error,
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"]{
+  border-color:var(--danger)!important;
+  padding-right:36px!important;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23EF4444' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='12' y1='8' x2='12' y2='13'/%3E%3Ccircle cx='12' cy='16.5' r='1' fill='%23EF4444'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 10px center;
+  background-size:18px 18px;
+}
+.error-msg{font-size:0.78rem;color:var(--danger);margin-top:4px;display:flex;align-items:center;gap:6px}
+.error-msg::before{content:"⚠";font-size:0.95rem;line-height:1;flex-shrink:0}
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:var(--surface-light);cursor:pointer;outline:none;}
 input[type=range].range-filled{background:linear-gradient(90deg,var(--primary) var(--range-pct,0%),var(--surface-light) var(--range-pct,0%));}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:var(--primary);border:2px solid rgba(255,255,255,0.2);cursor:pointer;box-shadow:0 0 10px rgba(245,158,11,0.45);transition:transform var(--transition),box-shadow var(--transition);}
