@@ -45,12 +45,16 @@ export function openComparison() {
   const modal = document.getElementById('comparison-modal');
   if (!modal) return;
   modal.style.display = 'flex';
+  document.body.classList.add('modal-open');
   buildComparisonUI();
 }
 
 export function closeComparison() {
   const modal = document.getElementById('comparison-modal');
   if (modal) modal.style.display = 'none';
+  if (!document.querySelector('.modal-active, [data-modal-open="true"]')) {
+    document.body.classList.remove('modal-open');
+  }
 }
 
 function buildComparisonUI() {

@@ -131,12 +131,14 @@ export function openDashboard() {
   const modal = document.getElementById('dashboard-modal');
   if (!modal) return;
   modal.style.display = 'flex';
+  document.body.classList.add('modal-open');
   renderDashboard();
 }
 
 export function closeDashboard() {
   const modal = document.getElementById('dashboard-modal');
   if (modal) modal.style.display = 'none';
+  document.body.classList.remove('modal-open');
 }
 
 export function updateDashboard() {

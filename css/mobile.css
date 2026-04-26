@@ -1544,3 +1544,136 @@ textarea {
     display: none;
   }
 }
+
+/* ─────────────────────────────────────────────────────────
+   ETAP 5 — Hero / Modallar / Landing
+   ───────────────────────────────────────────────────────── */
+
+/* Hero orblar ve floating panellar — küçük ekranda azalt/gizle */
+@media (max-width: 768px) {
+  .hero-orb {
+    transform: scale(0.5);
+    opacity: 0.4;
+  }
+
+  .hero-fp {
+    opacity: 0.5;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-orb,
+  .hero-panels-bg {
+    display: none;
+  }
+
+  /* Hero başlık asla container'ı taşırmasın */
+  .hero-eyebrow,
+  .hero-content h1,
+  .hero-content .scenario-select-subline {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Modal scroll lock — body.modal-open eklendiğinde arka plan kaymaz */
+body.modal-open {
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* Comparison ve Dashboard modal — <= 480 full-screen */
+@media (max-width: 480px) {
+  #comparison-modal,
+  #dashboard-modal {
+    padding: 0 !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+  }
+
+  #comparison-modal > div,
+  #dashboard-modal > div {
+    width: 100vw !important;
+    max-width: none !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    margin: 0 !important;
+    padding-bottom: env(safe-area-inset-bottom) !important;
+  }
+
+  /* Modal başlık sticky — kaydırırken kapatma butonu hep ulaşılabilir */
+  #comparison-modal > div > div:first-child,
+  #dashboard-modal > div > div:first-child {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--surface);
+  }
+
+  /* Comparison senaryo kartları yatay swipe (scroll-snap) */
+  #comparison-scenarios {
+    grid-template-columns: 100% !important;
+    grid-auto-flow: column;
+    grid-auto-columns: 100%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 12px !important;
+    padding-bottom: 8px;
+  }
+
+  #comparison-scenarios::-webkit-scrollbar {
+    display: none;
+  }
+
+  #comparison-scenarios > * {
+    scroll-snap-align: start;
+    min-width: 0;
+  }
+}
+
+/* Landing page — küçük ekranda tour carousel ve FAQ ergonomi */
+@media (max-width: 768px) {
+  .lp-tour-tabs,
+  .lp-tour-panes {
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .lp-tour-tabs::-webkit-scrollbar,
+  .lp-tour-panes::-webkit-scrollbar {
+    display: none;
+  }
+
+  .lp-tour-pane,
+  .lp-tour-tab {
+    scroll-snap-align: start;
+  }
+
+  /* FAQ accordion — başlık 48 px asgari */
+  .lp-faq-q,
+  details.lp-faq-row > summary,
+  summary.lp-faq-q {
+    min-height: 48px;
+    padding: 12px 14px;
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Landing CTA butonları full-width */
+  .lp-cta-btn,
+  .lp-tour-cta,
+  .lp-tour-summary-go {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+  }
+}

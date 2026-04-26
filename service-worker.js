@@ -1,5 +1,5 @@
-// v28: Etap 4 mobile responsive — Step 3 fullscreen + Leaflet touch + 28px vertex.
-const CACHE_NAME = 'solarRota-v28';
+// v29: Etap 5 mobile responsive — hero orbs hide + modallar full-screen + landing.
+const CACHE_NAME = 'solarRota-v29';
 // Sadece local dosyaları pre-cache et — CDN dosyaları runtime'da cache'lenir
 const STATIC_ASSETS = [
   '/',
