@@ -3,8 +3,15 @@ from typing import Any, Dict
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.engines.engine_router import calculate_pv
+from backend.engines.panel_thermal_engine import calculate_panel_thermal_sizing
 from backend.engines.pvlib_engine import PVLIB_AVAILABLE
-from backend.models.engine_contracts import EngineRequest, EngineResponse, HealthResponse
+from backend.models.engine_contracts import (
+    EngineRequest,
+    EngineResponse,
+    HealthResponse,
+    PanelThermalRequest,
+    PanelThermalResponse,
+)
 from backend.services.financial_service import calculate_financial_proposal
 from backend.services.pvgis_proxy import fetch_pvgis_via_proxy, validate_pvgis_params
 
@@ -30,6 +37,25 @@ def pvlib_calculate(request: EngineRequest) -> EngineResponse:
 @router.post("/api/financial/proposal", response_model=EngineResponse)
 def financial_proposal(request: EngineRequest) -> EngineResponse:
     return calculate_financial_proposal(request)
+
+
+@router.post("/api/panel/thermal-check", response_model=PanelThermalResponse)
+def panel_thermal_check(request: PanelThermalRequest) -> PanelThermalResponse:
+    try:
+        result = calculate_panel_thermal_sizing(
+            voc_stc=request.vocStcV,
+            voc_coeff_pct_per_c=request.vocCoeffPctPerC,
+            vmp_stc=request.vmpStcV,
+            vmp_coeff_pct_per_c=request.vmpCoeffPctPerC,
+            pmax_stc_w=request.pmaxStcW,
+            pmax_coeff_pct_per_c=request.pmaxCoeffPctPerC,
+            inverter_max_input_v=request.inverterMaxInputV,
+            inverter_mppt_optimal_v=request.inverterMpptOptimalV,
+            temperatures_c=request.temperaturesC,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return PanelThermalResponse(**result)
 
 
 @router.get("/api/pvgis-proxy")

@@ -597,3 +597,96 @@ def test_simple_engine_tilt_factor_matches_frontend_curve():
     }
     for tilt_deg, coeff in expected.items():
         assert abs(_tilt_factor(tilt_deg) - coeff) < 1e-9
+
+
+def panel_thermal_sample_request():
+    # Reference Longi Hi-MO 6 -ish numbers, simplified.
+    return {
+        "vocStcV": 49.5,
+        "vocCoeffPctPerC": -0.27,
+        "vmpStcV": 41.8,
+        "vmpCoeffPctPerC": -0.30,
+        "pmaxStcW": 550,
+        "pmaxCoeffPctPerC": -0.34,
+        "inverterMaxInputV": 1000,
+        "inverterMpptOptimalV": 600,
+    }
+
+
+def test_panel_thermal_check_returns_three_default_scenarios():
+    response = client.post("/api/panel/thermal-check", json=panel_thermal_sample_request())
+    assert response.status_code == 200
+    data = response.json()
+    temps = sorted(s["ambientTempC"] for s in data["scenarios"])
+    assert temps == [-10.0, 25.0, 60.0]
+    coldest = data["coldestScenario"]
+    hottest = data["hottestScenario"]
+    assert coldest["ambientTempC"] == -10.0
+    assert hottest["ambientTempC"] == 60.0
+
+
+def test_panel_thermal_check_voc_at_minus_ten_matches_formula():
+    """Voc(-10) = 49.5 * (1 + (-0.27/100) * (-10 - 25)) = 49.5 * 1.0945 ≈ 54.18 V"""
+    response = client.post("/api/panel/thermal-check", json=panel_thermal_sample_request())
+    data = response.json()
+    coldest = data["coldestScenario"]
+    expected = 49.5 * (1 + (-0.27 / 100.0) * (-10.0 - 25.0))
+    assert abs(coldest["vocV"] - round(expected, 3)) < 1e-3
+
+
+def test_panel_thermal_check_uses_floor_for_safe_string_count():
+    """1000 V / 54.18 V ≈ 18.45 → must floor to 18 (never round up)."""
+    response = client.post("/api/panel/thermal-check", json=panel_thermal_sample_request())
+    data = response.json()
+    sizing = data["stringSizing"]
+    assert sizing["safeMaxSeriesPanels"] == 18
+    assert sizing["rawMaxSeriesPanels"] > sizing["safeMaxSeriesPanels"]
+    assert sizing["limitingScenario"]["ambientTempC"] == -10.0
+
+
+def test_panel_thermal_check_realistic_power_uses_hottest_pmax():
+    """Realistic peak power = floor(strings) * Pmax(+60°C). Must NOT use the raw float."""
+    response = client.post("/api/panel/thermal-check", json=panel_thermal_sample_request())
+    data = response.json()
+    safe_count = data["stringSizing"]["safeMaxSeriesPanels"]
+    hottest_pmax = data["hottestScenario"]["pmaxW"]
+    expected_total_w = safe_count * hottest_pmax
+    assert abs(data["realisticPeakPower"]["totalWatt"] - round(expected_total_w, 2)) < 1e-2
+    assert data["realisticPeakPower"]["panelCount"] == safe_count
+    # Hot Pmax must be lower than STC (negative coefficient applied to ΔT=+35).
+    assert hottest_pmax < 550
+
+
+def test_panel_thermal_check_falls_back_to_voc_coeff_when_vmp_omitted():
+    payload = panel_thermal_sample_request()
+    payload.pop("vmpCoeffPctPerC")
+    response = client.post("/api/panel/thermal-check", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["inputs"]["vmpCoeffSource"] == "fallback-voc-coeff"
+    assert data["inputs"]["vmpCoeffPctPerC"] == payload["vocCoeffPctPerC"]
+
+
+def test_panel_thermal_check_rejects_non_positive_voltage():
+    payload = panel_thermal_sample_request()
+    payload["vocStcV"] = 0
+    response = client.post("/api/panel/thermal-check", json=payload)
+    assert response.status_code == 422
+
+
+def test_panel_thermal_check_rejects_mppt_above_inverter_max():
+    payload = panel_thermal_sample_request()
+    payload["inverterMpptOptimalV"] = 1200  # > inverterMaxInputV=1000
+    response = client.post("/api/panel/thermal-check", json=payload)
+    assert response.status_code == 422
+
+
+def test_panel_thermal_check_custom_temperatures_still_force_safety_pair():
+    payload = panel_thermal_sample_request()
+    payload["temperaturesC"] = [0, 40]  # caller forgot -10/+60
+    response = client.post("/api/panel/thermal-check", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    temps = sorted(s["ambientTempC"] for s in data["scenarios"])
+    # Module must still inject -10 and +60 so safety/realism stay anchored.
+    assert -10.0 in temps and 60.0 in temps and 0.0 in temps and 40.0 in temps

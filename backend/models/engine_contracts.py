@@ -205,3 +205,30 @@ class HealthResponse(BaseModel):
     pvlibBackedEngineAvailable: bool = False
     activeEngineWhenAvailable: str = "pvlib-backed"
     fallbackEngine: str = "python-deterministic-fallback"
+
+
+class PanelThermalRequest(FlexibleModel):
+    vocStcV: float = Field(..., gt=0, description="Open-circuit voltage at STC (V)")
+    vocCoeffPctPerC: float = Field(..., description="Voc temperature coefficient in %/°C (e.g. -0.29)")
+    vmpStcV: float = Field(..., gt=0, description="Maximum-power-point voltage at STC (V)")
+    vmpCoeffPctPerC: Optional[float] = Field(
+        default=None,
+        description="Vmp temperature coefficient in %/°C. If omitted, vocCoeffPctPerC is reused.",
+    )
+    pmaxStcW: float = Field(..., gt=0, description="Maximum power at STC (W)")
+    pmaxCoeffPctPerC: float = Field(..., description="Pmax temperature coefficient in %/°C (e.g. -0.34)")
+    inverterMaxInputV: float = Field(..., gt=0, description="Inverter maximum DC input voltage (V)")
+    inverterMpptOptimalV: float = Field(..., gt=0, description="Inverter most-efficient MPPT operating voltage (V)")
+    temperaturesC: Optional[List[float]] = Field(
+        default=None,
+        description="Ambient temperatures to evaluate (°C). Defaults to [-10, 25, 60].",
+    )
+
+
+class PanelThermalResponse(FlexibleModel):
+    inputs: Dict[str, Any] = Field(default_factory=dict)
+    scenarios: List[Dict[str, Any]] = Field(default_factory=list)
+    coldestScenario: Dict[str, Any] = Field(default_factory=dict)
+    hottestScenario: Dict[str, Any] = Field(default_factory=dict)
+    stringSizing: Dict[str, Any] = Field(default_factory=dict)
+    realisticPeakPower: Dict[str, Any] = Field(default_factory=dict)
